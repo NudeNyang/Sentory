@@ -1,0 +1,859 @@
+<Window x:Class="Sentory.App.GalleryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Sentory"
+        Width="1180"
+        Height="780"
+        MinWidth="820"
+        MinHeight="560"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        FontFamily="Segoe UI Variable Text"
+        TextOptions.TextFormattingMode="Display"
+        UseLayoutRounding="True">
+    <Window.Resources>
+        <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#E9E4DC" />
+        <SolidColorBrush x:Key="HeaderBackgroundBrush" Color="#F2EEE7" />
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#F7F3EC" />
+        <SolidColorBrush x:Key="SurfaceSecondaryBrush" Color="#DED8CF" />
+        <SolidColorBrush x:Key="InputBackgroundBrush" Color="#E4DED5" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#756655" />
+        <SolidColorBrush x:Key="FavoriteBrush" Color="#B1842F" />
+        <SolidColorBrush x:Key="AccentTextBrush" Color="#F7F4EE" />
+        <SolidColorBrush x:Key="TextBrush" Color="#292722" />
+        <SolidColorBrush x:Key="MutedTextBrush" Color="#6D6861" />
+        <SolidColorBrush x:Key="SoftTextBrush" Color="#89827A" />
+        <SolidColorBrush x:Key="LineBrush" Color="#CEC7BC" />
+        <SolidColorBrush x:Key="CopyButtonBackgroundBrush" Color="#EDF3EEE7" />
+        <SolidColorBrush x:Key="CopyButtonHoverBrush" Color="#FAF7F1" />
+        <SolidColorBrush x:Key="CopyButtonBorderBrush" Color="#C8C0B5" />
+        <SolidColorBrush x:Key="CardHoverBorderBrush" Color="#9A8976" />
+        <SolidColorBrush x:Key="StatusBackgroundBrush" Color="#E2DDD5" />
+        <SolidColorBrush x:Key="StatusTextBrush" Color="#5E5952" />
+        <SolidColorBrush x:Key="SkeletonBrush" Color="#D9D3CA" />
+        <SolidColorBrush x:Key="EmptyIconBackgroundBrush" Color="#DCE3F1" />
+        <SolidColorBrush x:Key="ToastBackgroundBrush" Color="#292722" />
+        <SolidColorBrush x:Key="ToastTextBrush" Color="#F2EEE7" />
+        <SolidColorBrush x:Key="DangerBrush" Color="#B85A52" />
+
+        <Style x:Key="FilterButtonStyle" TargetType="ToggleButton">
+            <Setter Property="Foreground"
+                    Value="{DynamicResource MutedTextBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0,0,0,2" />
+            <Setter Property="Padding" Value="10,7,10,6" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="FontWeight"
+                                        Value="SemiBold" />
+                                <Setter TargetName="Root"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource AccentBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource TextBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root"
+                                        Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="0.97"
+                                                        ScaleY="0.97" />
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter TargetName="Root"
+                                        Property="RenderTransformOrigin"
+                                        Value="0.5,0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CopyButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="36" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Background"
+                    Value="{DynamicResource CopyButtonBackgroundBrush}" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource TextBrush}" />
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource CopyButtonBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root"
+                                        Property="Background"
+                                        Value="{DynamicResource CopyButtonHoverBrush}" />
+                                <Setter TargetName="Root"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource CardHoverBorderBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root"
+                                        Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="0.94"
+                                                        ScaleY="0.94" />
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter TargetName="Root"
+                                        Property="RenderTransformOrigin"
+                                        Value="0.5,0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="InlineFavoriteButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root"
+                                        Property="Background"
+                                        Value="{DynamicResource StatusBackgroundBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root"
+                                        Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="0.92"
+                                                        ScaleY="0.92" />
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter TargetName="Root"
+                                        Property="RenderTransformOrigin"
+                                        Value="0.5,0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ToolbarButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Padding" Value="9,0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource MutedTextBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="7">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root"
+                                        Property="Background"
+                                        Value="{DynamicResource StatusBackgroundBrush}" />
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource TextBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root"
+                                        Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="0.97"
+                                                        ScaleY="0.97" />
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter TargetName="Root"
+                                        Property="RenderTransformOrigin"
+                                        Value="0.5,0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="MenuOptionButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Padding" Value="11,0" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground"
+                    Value="{DynamicResource MutedTextBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root"
+                                        Property="Background"
+                                        Value="{DynamicResource StatusBackgroundBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root"
+                                        Property="Opacity"
+                                        Value="0.75" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Background="{DynamicResource HeaderBackgroundBrush}"
+                BorderBrush="{DynamicResource LineBrush}"
+                BorderThickness="0,0,0,1">
+            <Grid Margin="30,22,30,18">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="360" />
+                    <ColumnDefinition Width="48" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Row="0" Grid.Column="0">
+                    <TextBlock Text="Sentory"
+                               FontSize="25"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextBrush}" />
+                    <TextBlock Margin="0,4,0,0"
+                               Text="복사 붙여넣기한 사진과 링크를 한 곳으로"
+                               FontSize="13"
+                               Foreground="{DynamicResource MutedTextBrush}" />
+                </StackPanel>
+
+                <Border Grid.Row="0"
+                        Grid.Column="1"
+                        Height="42"
+                        Background="{DynamicResource InputBackgroundBrush}"
+                        BorderBrush="{DynamicResource LineBrush}"
+                        BorderThickness="1"
+                        CornerRadius="11">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="42" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0"
+                                   Text="&#xE721;"
+                                   FontFamily="Segoe Fluent Icons"
+                                   FontSize="15"
+                                   Foreground="{DynamicResource MutedTextBrush}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                        <Grid Grid.Column="1">
+                            <TextBox x:Name="SearchBox"
+                                     Margin="0,0,12,0"
+                                     Padding="0"
+                                     AutomationProperties.Name="보관함 검색"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     VerticalContentAlignment="Center"
+                                     FontSize="13"
+                                     Foreground="{DynamicResource TextBrush}"
+                                     TextChanged="SearchBox_TextChanged" />
+                            <TextBlock IsHitTestVisible="False"
+                                       Text="URL, 도메인 검색"
+                                       VerticalAlignment="Center"
+                                       FontSize="13"
+                                       Foreground="{DynamicResource SoftTextBrush}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility"
+                                                Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Text.Length, ElementName=SearchBox}"
+                                                         Value="0">
+                                                <Setter Property="Visibility"
+                                                        Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Button x:Name="ThemeButton"
+                        Grid.Row="0"
+                        Grid.Column="2"
+                        Margin="10,3,0,3"
+                        Style="{StaticResource CopyButtonStyle}"
+                        AutomationProperties.Name="다크 테마로 전환"
+                        ToolTip="다크 테마로 전환"
+                        Click="ThemeButton_Click">
+                    <TextBlock x:Name="ThemeIcon"
+                               Text="&#xE708;"
+                               FontFamily="Segoe Fluent Icons"
+                               FontSize="15" />
+                </Button>
+
+                <Grid Grid.Row="1"
+                      Grid.ColumnSpan="3"
+                      Margin="0,20,0,0">
+                    <StackPanel HorizontalAlignment="Left"
+                                Orientation="Horizontal">
+                        <ToggleButton x:Name="AllFilterButton"
+                                      AutomationProperties.AutomationId="FilterAll"
+                                      Content="전체"
+                                      IsChecked="True"
+                                      Style="{StaticResource FilterButtonStyle}"
+                                      Checked="FilterButton_Checked"
+                                      Unchecked="FilterButton_Unchecked" />
+                        <ToggleButton x:Name="UrlFilterButton"
+                                      AutomationProperties.AutomationId="FilterUrl"
+                                      Margin="4,0,0,0"
+                                      Content="링크"
+                                      Style="{StaticResource FilterButtonStyle}"
+                                      Checked="FilterButton_Checked"
+                                      Unchecked="FilterButton_Unchecked" />
+                        <ToggleButton x:Name="ImageFilterButton"
+                                      AutomationProperties.AutomationId="FilterImage"
+                                      Margin="4,0,0,0"
+                                      Content="사진"
+                                      Style="{StaticResource FilterButtonStyle}"
+                                      Checked="FilterButton_Checked"
+                                      Unchecked="FilterButton_Unchecked" />
+                        <ToggleButton x:Name="FavoriteFilterButton"
+                                      AutomationProperties.AutomationId="FilterFavorite"
+                                      Margin="4,0,0,0"
+                                      Style="{StaticResource FilterButtonStyle}"
+                                      Checked="FilterButton_Checked"
+                                      Unchecked="FilterButton_Unchecked">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE735;"
+                                           FontFamily="Segoe Fluent Icons"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource FavoriteBrush}"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Margin="6,0,0,0"
+                                           Text="즐겨찾기"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </ToggleButton>
+                    </StackPanel>
+                    <StackPanel HorizontalAlignment="Right"
+                                Orientation="Horizontal">
+                        <Button x:Name="DateFilterButton"
+                                AutomationProperties.AutomationId="DateFilterButton"
+                                Style="{StaticResource ToolbarButtonStyle}"
+                                Click="DateFilterButton_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE71C;"
+                                           FontFamily="Segoe Fluent Icons"
+                                           FontSize="13"
+                                           VerticalAlignment="Center" />
+                                <TextBlock x:Name="DateFilterText"
+                                           Margin="7,0,0,0"
+                                           Text="기간 전체"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Margin="7,0,0,0"
+                                           Text="&#xE70D;"
+                                           FontFamily="Segoe Fluent Icons"
+                                           FontSize="10"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="SortButton"
+                                AutomationProperties.AutomationId="SortButton"
+                                Margin="4,0,0,0"
+                                Style="{StaticResource ToolbarButtonStyle}"
+                                Click="SortButton_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE8CB;"
+                                           FontFamily="Segoe Fluent Icons"
+                                           FontSize="13"
+                                           VerticalAlignment="Center" />
+                                <TextBlock x:Name="SortButtonText"
+                                           Margin="7,0,8,0"
+                                           Text="정렬 최신순"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Text="&#xE70D;"
+                                           FontFamily="Segoe Fluent Icons"
+                                           FontSize="10"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <Popup x:Name="DateFilterPopup"
+                           PlacementTarget="{Binding ElementName=DateFilterButton}"
+                           Placement="Bottom"
+                           VerticalOffset="6"
+                           AllowsTransparency="True"
+                           PopupAnimation="Fade"
+                           StaysOpen="False">
+                        <Border Width="156"
+                                Padding="6"
+                                Background="{DynamicResource SurfaceBrush}"
+                                BorderBrush="{DynamicResource LineBrush}"
+                                BorderThickness="1"
+                                CornerRadius="12">
+                            <StackPanel>
+                                <Button x:Name="DateAllButton"
+                                        Content="전체 기간"
+                                        Tag="All"
+                                        Style="{StaticResource MenuOptionButtonStyle}"
+                                        Click="DateOptionButton_Click" />
+                                <Button x:Name="DateTodayButton"
+                                        Content="오늘"
+                                        Tag="Today"
+                                        Style="{StaticResource MenuOptionButtonStyle}"
+                                        Click="DateOptionButton_Click" />
+                                <Button x:Name="Date7DaysButton"
+                                        Content="최근 7일"
+                                        Tag="Last7Days"
+                                        Style="{StaticResource MenuOptionButtonStyle}"
+                                        Click="DateOptionButton_Click" />
+                                <Button x:Name="Date30DaysButton"
+                                        Content="최근 30일"
+                                        Tag="Last30Days"
+                                        Style="{StaticResource MenuOptionButtonStyle}"
+                                        Click="DateOptionButton_Click" />
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+
+                    <Popup x:Name="SortPopup"
+                           PlacementTarget="{Binding ElementName=SortButton}"
+                           Placement="Bottom"
+                           VerticalOffset="6"
+                           AllowsTransparency="True"
+                           PopupAnimation="Fade"
+                           StaysOpen="False">
+                        <Border Width="184"
+                                Padding="6"
+                                Background="{DynamicResource SurfaceBrush}"
+                                BorderBrush="{DynamicResource LineBrush}"
+                                BorderThickness="1"
+                                CornerRadius="12">
+                            <StackPanel>
+                                <Button x:Name="SortNewestButton"
+                                        Content="최신순"
+                                        Tag="Newest"
+                                        Style="{StaticResource MenuOptionButtonStyle}"
+                                        Click="SortOptionButton_Click" />
+                                <Button x:Name="SortOldestButton"
+                                        Content="오래된순"
+                                        Tag="Oldest"
+                                        Style="{StaticResource MenuOptionButtonStyle}"
+                                        Click="SortOptionButton_Click" />
+                                <Button x:Name="SortMostCapturedButton"
+                                        Content="많이 저장한 순"
+                                        Tag="MostCaptured"
+                                        Style="{StaticResource MenuOptionButtonStyle}"
+                                        Click="SortOptionButton_Click" />
+                                <Button x:Name="SortMostCopiedButton"
+                                        Content="많이 복사한 순"
+                                        Tag="MostCopied"
+                                        Style="{StaticResource MenuOptionButtonStyle}"
+                                        Click="SortOptionButton_Click" />
+                                <Button x:Name="SortRecentlyCopiedButton"
+                                        Content="최근 복사한 순"
+                                        Tag="RecentlyCopied"
+                                        Style="{StaticResource MenuOptionButtonStyle}"
+                                        Click="SortOptionButton_Click" />
+                                <Button x:Name="SortNameButton"
+                                        Content="이름순"
+                                        Tag="Name"
+                                        Style="{StaticResource MenuOptionButtonStyle}"
+                                        Click="SortOptionButton_Click" />
+                            </StackPanel>
+                        </Border>
+                    </Popup>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <ScrollViewer x:Name="GalleryScrollViewer"
+                          Padding="22,20,14,28"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+                <ItemsControl x:Name="GalleryItems">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border x:Name="Card"
+                                    Width="252"
+                                    Height="320"
+                                    Margin="8"
+                                    AutomationProperties.Name="{Binding AutomationName}"
+                                    Background="{DynamicResource SurfaceBrush}"
+                                    BorderBrush="{DynamicResource LineBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="16"
+                                    Cursor="Hand"
+                                    MouseLeftButtonUp="Card_MouseLeftButtonUp">
+                                <Border.ContextMenu>
+                                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                        <MenuItem Header="{Binding FavoriteMenuLabel}"
+                                                  Click="FavoriteMenuItem_Click" />
+                                        <Separator />
+                                        <MenuItem Header="복사"
+                                                  Click="CopyMenuItem_Click" />
+                                        <MenuItem Header="원본 열기"
+                                                  Click="OpenMenuItem_Click" />
+                                        <Separator />
+                                        <MenuItem Header="삭제"
+                                                  Foreground="{DynamicResource DangerBrush}"
+                                                  Click="DeleteMenuItem_Click" />
+                                    </ContextMenu>
+                                </Border.ContextMenu>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="170" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+
+                                    <Border Grid.Row="0"
+                                            Margin="10,10,10,0"
+                                            Background="{DynamicResource SurfaceSecondaryBrush}"
+                                            CornerRadius="12">
+                                        <Grid>
+                                            <Grid x:Name="UrlArtwork">
+                                                <StackPanel HorizontalAlignment="Center"
+                                                            VerticalAlignment="Center">
+                                                    <Border Width="54"
+                                                            Height="54"
+                                                            Background="{DynamicResource SurfaceBrush}"
+                                                            BorderBrush="{DynamicResource LineBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="14">
+                                                        <TextBlock Text="{Binding Initial}"
+                                                                   FontSize="23"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource AccentBrush}"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center" />
+                                                    </Border>
+                                                    <TextBlock Margin="0,11,0,0"
+                                                               Text="{Binding Domain}"
+                                                               FontSize="12"
+                                                               Foreground="{DynamicResource MutedTextBrush}"
+                                                               MaxWidth="180"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <Image x:Name="ThumbnailImage"
+                                                   Margin="8"
+                                                   Source="{Binding Thumbnail}"
+                                                   Stretch="Uniform"
+                                                   Visibility="Collapsed" />
+                                        </Grid>
+                                    </Border>
+
+                                    <Button Grid.Row="0"
+                                            Margin="0,20,20,0"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Top"
+                                            Style="{StaticResource CopyButtonStyle}"
+                                            ToolTip="클립보드에 복사"
+                                            AutomationProperties.Name="복사"
+                                            Tag="{Binding}"
+                                            Click="CopyButton_Click">
+                                        <TextBlock Text="&#xE8C8;"
+                                                   FontFamily="Segoe Fluent Icons"
+                                                   FontSize="15" />
+                                    </Button>
+
+                                    <Grid Grid.Row="1" Margin="16,13,16,15">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Grid Grid.Row="0">
+                                            <TextBlock Text="{Binding TypeLabel}"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource AccentBrush}" />
+                                            <TextBlock HorizontalAlignment="Right"
+                                                       Text="{Binding DateLabel}"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource SoftTextBrush}" />
+                                        </Grid>
+                                        <TextBlock Grid.Row="1"
+                                                   Margin="0,9,0,0"
+                                                   Text="{Binding Title}"
+                                                   FontSize="15"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextBrush}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Row="2"
+                                                   Margin="0,5,0,0"
+                                                   Text="{Binding Subtitle}"
+                                                   FontSize="12"
+                                                   LineHeight="17"
+                                                   Foreground="{DynamicResource MutedTextBrush}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   TextWrapping="Wrap" />
+                                        <Grid Grid.Row="3">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="0"
+                                                    Height="28"
+                                                    HorizontalAlignment="Left"
+                                                    VerticalAlignment="Center"
+                                                    Padding="8,0"
+                                                    Background="{DynamicResource StatusBackgroundBrush}"
+                                                    CornerRadius="8">
+                                                <TextBlock Text="{Binding StatusLabel}"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="10"
+                                                           Foreground="{DynamicResource StatusTextBrush}" />
+                                            </Border>
+                                            <TextBlock Grid.Column="1"
+                                                       Margin="0,0,7,0"
+                                                       HorizontalAlignment="Right"
+                                                       VerticalAlignment="Center"
+                                                       Text="{Binding CopyUsageLabel}"
+                                                       FontSize="10"
+                                                       Foreground="{DynamicResource SoftTextBrush}">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Visibility"
+                                                                Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasBeenCopied}"
+                                                                         Value="True">
+                                                                <Setter Property="Visibility"
+                                                                        Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <Button Grid.Column="2"
+                                                    HorizontalAlignment="Right"
+                                                    VerticalAlignment="Center"
+                                                    Style="{StaticResource InlineFavoriteButtonStyle}"
+                                                    ToolTip="{Binding FavoriteToolTip}"
+                                                    AutomationProperties.Name="{Binding FavoriteToolTip}"
+                                                    Tag="{Binding}"
+                                                    Click="FavoriteButton_Click">
+                                                <Button.RenderTransform>
+                                                    <TranslateTransform X="6" />
+                                                </Button.RenderTransform>
+                                                <TextBlock Text="{Binding FavoriteIcon}"
+                                                           FontFamily="Segoe Fluent Icons"
+                                                           FontSize="13"
+                                                           Foreground="{DynamicResource FavoriteBrush}">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Opacity"
+                                                                    Value="0.72" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Item.IsFavorite}"
+                                                                             Value="True">
+                                                                    <Setter Property="Opacity"
+                                                                            Value="1" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Button>
+                                        </Grid>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding IsImage}"
+                                             Value="True">
+                                    <Setter TargetName="UrlArtwork"
+                                            Property="Visibility"
+                                            Value="Collapsed" />
+                                    <Setter TargetName="ThumbnailImage"
+                                            Property="Visibility"
+                                            Value="Visible" />
+                                </DataTrigger>
+                                <Trigger SourceName="Card"
+                                         Property="IsMouseOver"
+                                         Value="True">
+                                    <Setter TargetName="Card"
+                                            Property="BorderBrush"
+                                            Value="{DynamicResource CardHoverBorderBrush}" />
+                                    <Setter TargetName="Card"
+                                            Property="RenderTransform">
+                                        <Setter.Value>
+                                            <TranslateTransform Y="-2" />
+                                        </Setter.Value>
+                                    </Setter>
+                                </Trigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <StackPanel x:Name="LoadingPanel"
+                        Width="720"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Top"
+                        Margin="0,56,0,0">
+                <TextBlock Text="보관함을 불러오는 중"
+                           FontSize="13"
+                           Foreground="{DynamicResource MutedTextBrush}"
+                           HorizontalAlignment="Center" />
+                <UniformGrid Margin="0,22,0,0" Columns="3">
+                    <Border Height="260"
+                            Margin="8"
+                            Background="{DynamicResource SkeletonBrush}"
+                            CornerRadius="16" />
+                    <Border Height="260"
+                            Margin="8"
+                            Background="{DynamicResource SkeletonBrush}"
+                            CornerRadius="16" />
+                    <Border Height="260"
+                            Margin="8"
+                            Background="{DynamicResource SkeletonBrush}"
+                            CornerRadius="16" />
+                </UniformGrid>
+            </StackPanel>
+
+            <StackPanel x:Name="EmptyPanel"
+                        Visibility="Collapsed"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+                <Border Width="64"
+                        Height="64"
+                        Background="{DynamicResource EmptyIconBackgroundBrush}"
+                        CornerRadius="18">
+                    <TextBlock Text="&#xE8B7;"
+                               FontFamily="Segoe Fluent Icons"
+                               FontSize="25"
+                               Foreground="{DynamicResource AccentBrush}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+                </Border>
+                <TextBlock x:Name="EmptyTitleText"
+                           Margin="0,18,0,0"
+                           Text="아직 보관된 항목이 없습니다"
+                           FontSize="17"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextBrush}"
+                           HorizontalAlignment="Center" />
+                <TextBlock x:Name="EmptyDescriptionText"
+                           Margin="0,7,0,0"
+                           Text="카카오톡 개별 채팅창에 URL이나 사진을 붙여넣어 보세요."
+                           FontSize="12"
+                           Foreground="{DynamicResource MutedTextBrush}"
+                           HorizontalAlignment="Center" />
+            </StackPanel>
+
+            <StackPanel x:Name="ErrorPanel"
+                        Visibility="Collapsed"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+                <TextBlock Text="보관함을 불러오지 못했습니다"
+                           FontSize="17"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextBrush}" />
+                <TextBlock x:Name="ErrorText"
+                           Margin="0,7,0,0"
+                           MaxWidth="460"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"
+                           FontSize="12"
+                           Foreground="{DynamicResource MutedTextBrush}" />
+                <Button Margin="0,18,0,0"
+                        Padding="16,8"
+                        Content="다시 시도"
+                        Click="RetryButton_Click" />
+            </StackPanel>
+
+            <Border x:Name="FeedbackToast"
+                    Visibility="Collapsed"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Bottom"
+                    Margin="0,0,28,26"
+                    Padding="14,10"
+                    Background="{DynamicResource ToastBackgroundBrush}"
+                    CornerRadius="10">
+                <TextBlock x:Name="FeedbackText"
+                           FontSize="12"
+                           Foreground="{DynamicResource ToastTextBrush}" />
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

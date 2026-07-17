@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Sentory.Diagnostics</AssemblyName>
+    <RootNamespace>Sentory.Diagnostics</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="Uia\Probe.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Uia\MsaaProbe.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Uia\MsaaTreeProbe.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Uia\KakaoInputProbe.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Uia\WinEventProbe.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Uia\DiscordInputProbe.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Uia\DiscordLatestMessageProbe.ps1" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
