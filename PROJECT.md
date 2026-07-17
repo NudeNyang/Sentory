@@ -142,6 +142,13 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
 [`docs/03-cross-platform-and-distribution-readiness.md`](./docs/03-cross-platform-and-distribution-readiness.md)에
 기록한다.
 
+## 개발 및 Git 작업 규칙
+
+- 기능 추가와 수정은 의미 있는 작업 단위로 나눠 커밋한다.
+- 커밋 메시지는 영어가 아닌 한국어로 작성한다.
+- 원격 저장소 푸시는 사용자가 직접 수행한다.
+- 커밋 전에는 변경 범위에 맞는 빌드와 테스트를 실행한다.
+
 ## 안전 원칙
 
 - 키 입력 전체를 기록하지 않는다.
