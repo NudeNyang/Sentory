@@ -286,7 +286,7 @@
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextBrush}" />
                     <TextBlock Margin="0,4,0,0"
-                               Text="복사 붙여넣기한 사진과 링크를 한 곳으로"
+                               Text="붙여넣기한 사진과 링크를 한 곳에서!"
                                FontSize="13"
                                Foreground="{DynamicResource MutedTextBrush}" />
                 </StackPanel>
