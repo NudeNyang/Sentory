@@ -27,6 +27,8 @@ public partial class App : System.Windows.Application
     private SentorySettingsStore? _settingsStore;
     private ICaptureRuntime? _runtime;
     private GalleryWindow? _galleryWindow;
+    private readonly CancellationTokenSource _maintenanceCancellation = new();
+    private Task? _maintenanceTask;
     private readonly WindowsStartupManager _startupManager = new();
     private bool _shuttingDown;
 
@@ -78,6 +80,9 @@ public partial class App : System.Windows.Application
                     "일부 사진 파일을 확인하지 못했습니다. 데이터 폴더를 확인해 주세요.",
                     Forms.ToolTipIcon.Warning);
             }
+            await ApplyAutomaticCleanupAsync();
+            _maintenanceTask = RunMaintenanceLoopAsync(
+                _maintenanceCancellation.Token);
             _runtime.Start();
             UpdatePauseUi();
             if (e.Args.Contains("--gallery", StringComparer.OrdinalIgnoreCase))
@@ -317,6 +322,79 @@ public partial class App : System.Windows.Application
         _galleryWindow.Activate();
     }
 
+    private async Task RunMaintenanceLoopAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (true)
+            {
+                await Task.Delay(TimeSpan.FromHours(6), cancellationToken);
+                await ApplyAutomaticCleanupAsync(cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task ApplyAutomaticCleanupAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (_repository is null || _settingsStore is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var settings = _settingsStore.Load();
+            if (settings.AutoCleanupDays == 0)
+            {
+                return;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            if (settings.LastAutoCleanupAt is { } lastCleanup &&
+                now - lastCleanup < TimeSpan.FromHours(24))
+            {
+                return;
+            }
+
+            var result = await _repository.CleanupAsync(
+                now.AddDays(-settings.AutoCleanupDays),
+                cancellationToken);
+            settings.LastAutoCleanupAt = now;
+            _settingsStore.Save(settings);
+            if (result.Deleted.TotalItems > 0)
+            {
+                _trayIcon?.ShowBalloonTip(
+                    2600,
+                    "Sentory 자동 정리",
+                    $"즐겨찾기를 제외한 {result.Deleted.TotalItems:N0}개 항목을 정리했습니다.",
+                    Forms.ToolTipIcon.Info);
+                if (_galleryWindow is { IsLoaded: true })
+                {
+                    await _galleryWindow.RefreshAsync();
+                }
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            _trayIcon?.ShowBalloonTip(
+                2600,
+                "Sentory 자동 정리",
+                "자동 정리를 완료하지 못했습니다. 다음 실행 때 다시 시도합니다.",
+                Forms.ToolTipIcon.Warning);
+        }
+    }
+
     private async Task ShutdownRuntimeAsync()
     {
         if (_shuttingDown)
@@ -325,6 +403,12 @@ public partial class App : System.Windows.Application
         }
 
         _shuttingDown = true;
+        _maintenanceCancellation.Cancel();
+        if (_maintenanceTask is not null)
+        {
+            await _maintenanceTask;
+            _maintenanceTask = null;
+        }
         _galleryWindow?.Close();
         _galleryWindow = null;
         if (_runtime is not null)
@@ -356,6 +440,7 @@ public partial class App : System.Windows.Application
         }
 
         _singleInstanceMutex?.Dispose();
+        _maintenanceCancellation.Dispose();
         base.OnExit(e);
     }
 }

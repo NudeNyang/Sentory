@@ -242,6 +242,95 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task StatisticsIncludeFavoritesKindsAndImageBytes()
+    {
+        var repository = CreateRepository();
+        await repository.InitializeAsync();
+        var url = await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/stats",
+            DeliveryStatus.NotObserved));
+        byte[] bytes = [2, 4, 6, 8];
+        await repository.UpsertImageAsync(CreateImageRequest(
+            Guid.NewGuid(),
+            bytes,
+            Convert.ToHexString(SHA256.HashData(bytes))));
+        await repository.SetFavoriteAsync(url.ItemId, true);
+
+        var statistics = await repository.GetDataStatisticsAsync();
+
+        Assert.Equal(2, statistics.TotalItems);
+        Assert.Equal(1, statistics.FavoriteItems);
+        Assert.Equal(1, statistics.UrlItems);
+        Assert.Equal(1, statistics.ImageItems);
+        Assert.Equal(bytes.Length, statistics.ImageBytes);
+    }
+
+    [Fact]
+    public async Task AgeCleanupAlwaysPreservesFavoritesAndRecentItems()
+    {
+        var repository = CreateRepository();
+        await repository.InitializeAsync();
+        var now = DateTimeOffset.UtcNow;
+        var oldRegular = await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/old",
+            DeliveryStatus.NotObserved,
+            now.AddDays(-100)));
+        var oldFavorite = await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/favorite-old",
+            DeliveryStatus.NotObserved,
+            now.AddDays(-100)));
+        await repository.SetFavoriteAsync(oldFavorite.ItemId, true);
+        await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/recent",
+            DeliveryStatus.NotObserved,
+            now.AddDays(-10)));
+
+        var preview = await repository.PreviewCleanupAsync(now.AddDays(-90));
+        var result = await repository.CleanupAsync(now.AddDays(-90));
+        var remaining = await repository.GetRecentAsync(10);
+
+        Assert.Equal(1, preview.TotalItems);
+        Assert.Equal(1, result.Deleted.TotalItems);
+        Assert.DoesNotContain(remaining, item => item.ItemId == oldRegular.ItemId);
+        Assert.Contains(remaining, item => item.ItemId == oldFavorite.ItemId);
+        Assert.Equal(2, remaining.Count);
+    }
+
+    [Fact]
+    public async Task CleanupWithoutCutoffDeletesAllNonFavoritesAndImageFile()
+    {
+        var repository = CreateRepository();
+        await repository.InitializeAsync();
+        var favorite = await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/keep",
+            DeliveryStatus.NotObserved));
+        await repository.SetFavoriteAsync(favorite.ItemId, true);
+        byte[] bytes = [1, 3, 5, 7];
+        await repository.UpsertImageAsync(CreateImageRequest(
+            Guid.NewGuid(),
+            bytes,
+            Convert.ToHexString(SHA256.HashData(bytes))));
+        var image = (await repository.GetRecentAsync(10))
+            .Single(item => item.Kind == ContentKind.Image);
+        var imagePath = Path.Combine(_root, image.ContentPath!);
+
+        var preview = await repository.PreviewCleanupAsync(null);
+        var result = await repository.CleanupAsync(null);
+
+        Assert.Equal(1, preview.TotalItems);
+        Assert.Equal(1, preview.ImageItems);
+        Assert.Equal(bytes.Length, preview.ImageBytes);
+        Assert.Equal(1, result.DeletedImageFiles);
+        Assert.False(File.Exists(imagePath));
+        Assert.True(Assert.Single(await repository.GetRecentAsync(10)).IsFavorite);
+    }
+
+    [Fact]
     public void SettingsStoreReadsLegacyJsonAndPersistsWindowState()
     {
         var paths = SentoryDataPaths.ForRoot(_root);
@@ -316,7 +405,8 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
     private static UrlCaptureRequest CreateRequest(
         Guid eventId,
         string url,
-        DeliveryStatus deliveryStatus)
+        DeliveryStatus deliveryStatus,
+        DateTimeOffset? capturedAt = null)
     {
         Assert.True(UrlNormalizer.TryNormalize(url, out var normalized));
         return new UrlCaptureRequest(
@@ -327,7 +417,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
             CaptureMethod.KakaoCtrlVUrl,
             deliveryStatus,
             "test-context",
-            DateTimeOffset.UtcNow,
+            capturedAt ?? DateTimeOffset.UtcNow,
             ["test"]);
     }
 

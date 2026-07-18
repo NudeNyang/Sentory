@@ -560,6 +560,188 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             fileDeleteFailures);
     }
 
+    public async Task<DataStatistics> GetDataStatisticsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT COUNT(*),
+                   COALESCE(SUM(CASE WHEN is_favorite = 1 THEN 1 ELSE 0 END), 0),
+                   COALESCE(SUM(CASE WHEN kind = $urlKind THEN 1 ELSE 0 END), 0),
+                   COALESCE(SUM(CASE WHEN kind = $imageKind THEN 1 ELSE 0 END), 0),
+                   COALESCE(SUM(CASE WHEN kind = $imageKind
+                                     THEN COALESCE(byte_size, 0) ELSE 0 END), 0)
+            FROM items;
+            """;
+        command.Parameters.AddWithValue("$urlKind", ContentKind.Url.ToString());
+        command.Parameters.AddWithValue(
+            "$imageKind",
+            ContentKind.Image.ToString());
+        await using var reader = await command.ExecuteReaderAsync(
+            cancellationToken);
+        await reader.ReadAsync(cancellationToken);
+        return new DataStatistics(
+            reader.GetInt32(0),
+            reader.GetInt32(1),
+            reader.GetInt32(2),
+            reader.GetInt32(3),
+            reader.GetInt64(4));
+    }
+
+    public async Task<DataCleanupPreview> PreviewCleanupAsync(
+        DateTimeOffset? olderThan,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        return await ReadCleanupPreviewAsync(
+            connection,
+            transaction: null,
+            olderThan,
+            cancellationToken);
+    }
+
+    public async Task<DataCleanupResult> CleanupAsync(
+        DateTimeOffset? olderThan,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var transaction =
+            (SqliteTransaction)await connection.BeginTransactionAsync(
+                cancellationToken);
+        var preview = await ReadCleanupPreviewAsync(
+            connection,
+            transaction,
+            olderThan,
+            cancellationToken);
+        var imagePaths = new List<string>();
+        await using (var select = connection.CreateCommand())
+        {
+            select.Transaction = transaction;
+            select.CommandText =
+                $"""
+                SELECT content_path
+                FROM items
+                WHERE {CleanupPredicate}
+                  AND content_path IS NOT NULL;
+                """;
+            AddCleanupParameters(select, olderThan);
+            await using var reader = await select.ExecuteReaderAsync(
+                cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                imagePaths.Add(reader.GetString(0));
+            }
+        }
+
+        await using (var deleteEvents = connection.CreateCommand())
+        {
+            deleteEvents.Transaction = transaction;
+            deleteEvents.CommandText =
+                $"""
+                DELETE FROM capture_events
+                WHERE item_id IN (
+                    SELECT id FROM items WHERE {CleanupPredicate}
+                );
+                """;
+            AddCleanupParameters(deleteEvents, olderThan);
+            await deleteEvents.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using (var deleteItems = connection.CreateCommand())
+        {
+            deleteItems.Transaction = transaction;
+            deleteItems.CommandText =
+                $"DELETE FROM items WHERE {CleanupPredicate};";
+            AddCleanupParameters(deleteItems, olderThan);
+            await deleteItems.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+
+        var deletedImageFiles = 0;
+        var fileDeleteFailures = 0;
+        foreach (var relativePath in imagePaths)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                var target = TryResolveContentPath(relativePath);
+                if (target is null)
+                {
+                    fileDeleteFailures++;
+                    continue;
+                }
+
+                if (File.Exists(target))
+                {
+                    File.Delete(target);
+                    deletedImageFiles++;
+                }
+            }
+            catch (Exception exception)
+                when (exception is IOException or UnauthorizedAccessException)
+            {
+                fileDeleteFailures++;
+            }
+        }
+
+        return new DataCleanupResult(
+            preview,
+            deletedImageFiles,
+            fileDeleteFailures);
+    }
+
+    private const string CleanupPredicate =
+        "is_favorite = 0 AND " +
+        "($olderThan IS NULL OR " +
+        "julianday(last_captured_at) < julianday($olderThan))";
+
+    private static async Task<DataCleanupPreview> ReadCleanupPreviewAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        DateTimeOffset? olderThan,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            $"""
+            SELECT COUNT(*),
+                   COALESCE(SUM(CASE WHEN kind = $urlKind THEN 1 ELSE 0 END), 0),
+                   COALESCE(SUM(CASE WHEN kind = $imageKind THEN 1 ELSE 0 END), 0),
+                   COALESCE(SUM(CASE WHEN kind = $imageKind
+                                     THEN COALESCE(byte_size, 0) ELSE 0 END), 0)
+            FROM items
+            WHERE {CleanupPredicate};
+            """;
+        command.Parameters.AddWithValue("$urlKind", ContentKind.Url.ToString());
+        command.Parameters.AddWithValue(
+            "$imageKind",
+            ContentKind.Image.ToString());
+        AddCleanupParameters(command, olderThan);
+        await using var reader = await command.ExecuteReaderAsync(
+            cancellationToken);
+        await reader.ReadAsync(cancellationToken);
+        return new DataCleanupPreview(
+            reader.GetInt32(0),
+            reader.GetInt32(1),
+            reader.GetInt32(2),
+            reader.GetInt64(3));
+    }
+
+    private static void AddCleanupParameters(
+        SqliteCommand command,
+        DateTimeOffset? olderThan)
+    {
+        command.Parameters.AddWithValue(
+            "$olderThan",
+            olderThan is null
+                ? DBNull.Value
+                : olderThan.Value.ToString("O"));
+    }
+
     private async Task<SqliteConnection> OpenConnectionAsync(
         CancellationToken cancellationToken)
     {

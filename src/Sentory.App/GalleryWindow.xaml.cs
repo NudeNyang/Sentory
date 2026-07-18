@@ -293,6 +293,26 @@ public partial class GalleryWindow : Window
         SortPopup.IsOpen = !SortPopup.IsOpen;
     }
 
+    private async void DataManagementButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        DateFilterPopup.IsOpen = false;
+        SortPopup.IsOpen = false;
+        var window = new DataManagementWindow(
+            _repository,
+            _settingsStore,
+            _isDarkTheme)
+        {
+            Owner = this
+        };
+        window.ShowDialog();
+        if (window.HasDataChanged)
+        {
+            await RefreshAsync();
+        }
+    }
+
     private void DateOptionButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not System.Windows.Controls.Button
@@ -554,6 +574,9 @@ public partial class GalleryWindow : Window
     {
         try
         {
+            var current = _settingsStore.Load();
+            _settings.AutoCleanupDays = current.AutoCleanupDays;
+            _settings.LastAutoCleanupAt = current.LastAutoCleanupAt;
             _settingsStore.Save(_settings);
         }
         catch (Exception exception)

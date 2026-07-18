@@ -85,6 +85,24 @@ public sealed record StorageRepairResult(
     int MissingImageFiles,
     int FileDeleteFailures);
 
+public sealed record DataStatistics(
+    int TotalItems,
+    int FavoriteItems,
+    int UrlItems,
+    int ImageItems,
+    long ImageBytes);
+
+public sealed record DataCleanupPreview(
+    int TotalItems,
+    int UrlItems,
+    int ImageItems,
+    long ImageBytes);
+
+public sealed record DataCleanupResult(
+    DataCleanupPreview Deleted,
+    int DeletedImageFiles,
+    int FileDeleteFailures);
+
 public interface ICaptureRepository
 {
     Task InitializeAsync(CancellationToken cancellationToken = default);
@@ -116,5 +134,16 @@ public interface ICaptureRepository
         CancellationToken cancellationToken = default);
 
     Task<StorageRepairResult> RepairStorageAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<DataStatistics> GetDataStatisticsAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<DataCleanupPreview> PreviewCleanupAsync(
+        DateTimeOffset? olderThan,
+        CancellationToken cancellationToken = default);
+
+    Task<DataCleanupResult> CleanupAsync(
+        DateTimeOffset? olderThan,
         CancellationToken cancellationToken = default);
 }

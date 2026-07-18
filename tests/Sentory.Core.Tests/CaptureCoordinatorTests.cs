@@ -80,5 +80,22 @@ public sealed class CaptureCoordinatorTests
         public Task<StorageRepairResult> RepairStorageAsync(
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new StorageRepairResult(0, 0, 0, 0));
+
+        public Task<DataStatistics> GetDataStatisticsAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new DataStatistics(0, 0, 0, 0, 0));
+
+        public Task<DataCleanupPreview> PreviewCleanupAsync(
+            DateTimeOffset? olderThan,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new DataCleanupPreview(0, 0, 0, 0));
+
+        public Task<DataCleanupResult> CleanupAsync(
+            DateTimeOffset? olderThan,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new DataCleanupResult(
+                new DataCleanupPreview(0, 0, 0, 0),
+                0,
+                0));
     }
 }

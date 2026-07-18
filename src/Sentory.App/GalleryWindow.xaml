@@ -444,6 +444,22 @@
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
+                        <Button x:Name="DataManagementButton"
+                                AutomationProperties.AutomationId="DataManagementButton"
+                                Margin="4,0,0,0"
+                                Style="{StaticResource ToolbarButtonStyle}"
+                                ToolTip="데이터 관리"
+                                Click="DataManagementButton_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE713;"
+                                           FontFamily="Segoe Fluent Icons"
+                                           FontSize="13"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Margin="7,0,0,0"
+                                           Text="데이터 관리"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
 
                     <Popup x:Name="DateFilterPopup"
