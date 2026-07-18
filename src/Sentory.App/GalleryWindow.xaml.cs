@@ -90,12 +90,22 @@ public partial class GalleryWindow : Window
         var isImage = item.Kind == ContentKind.Image;
         var title = isImage
             ? "클립보드 이미지"
+            : !string.IsNullOrWhiteSpace(item.PageTitle)
+                ? item.PageTitle
             : string.IsNullOrWhiteSpace(item.Domain)
                 ? "저장된 링크"
                 : item.Domain;
         var subtitle = isImage
             ? "PNG 이미지"
+            : !string.IsNullOrWhiteSpace(item.PageDescription)
+                ? item.PageDescription
             : item.OriginalUrl;
+        var thumbnail = isImage
+            ? LoadThumbnail(item.ContentPath)
+            : LoadThumbnail(item.PreviewImagePath);
+        var siteIcon = isImage
+            ? null
+            : LoadThumbnail(item.SiteIconPath);
         return new GalleryItemViewModel(
             item,
             isImage,
@@ -107,7 +117,12 @@ public partial class GalleryWindow : Window
                 ? "입력 시 저장됨"
                 : "전송 확인됨",
             GetInitial(title),
-            isImage ? LoadThumbnail(item.ContentPath) : null);
+            thumbnail,
+            siteIcon,
+            thumbnail is not null,
+            siteIcon is not null,
+            isImage ? Stretch.Uniform : Stretch.UniformToFill,
+            isImage ? new Thickness(8) : new Thickness(0));
     }
 
     private ImageSource? LoadThumbnail(string? relativePath)
@@ -129,11 +144,7 @@ public partial class GalleryWindow : Window
             image.Freeze();
             return image;
         }
-        catch (IOException)
-        {
-            return null;
-        }
-        catch (NotSupportedException)
+        catch (Exception)
         {
             return null;
         }
@@ -995,7 +1006,12 @@ public sealed record GalleryItemViewModel(
     string DateLabel,
     string StatusLabel,
     string Initial,
-    ImageSource? Thumbnail)
+    ImageSource? Thumbnail,
+    ImageSource? SiteIcon,
+    bool HasPrimaryArtwork,
+    bool HasSiteIcon,
+    Stretch ThumbnailStretch,
+    Thickness ThumbnailMargin)
 {
     public string Domain => Item.Domain;
 

@@ -322,7 +322,7 @@
                                      Foreground="{DynamicResource TextBrush}"
                                      TextChanged="SearchBox_TextChanged" />
                             <TextBlock IsHitTestVisible="False"
-                                       Text="URL, 도메인 검색"
+                                       Text="제목, URL, 도메인 검색"
                                        VerticalAlignment="Center"
                                        FontSize="13"
                                        Foreground="{DynamicResource SoftTextBrush}">
@@ -610,12 +610,21 @@
                                                             BorderBrush="{DynamicResource LineBrush}"
                                                             BorderThickness="1"
                                                             CornerRadius="14">
-                                                        <TextBlock Text="{Binding Initial}"
-                                                                   FontSize="23"
-                                                                   FontWeight="SemiBold"
-                                                                   Foreground="{DynamicResource AccentBrush}"
-                                                                   HorizontalAlignment="Center"
-                                                                   VerticalAlignment="Center" />
+                                                        <Grid>
+                                                            <TextBlock x:Name="UrlInitial"
+                                                                       Text="{Binding Initial}"
+                                                                       FontSize="23"
+                                                                       FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource AccentBrush}"
+                                                                       HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center" />
+                                                            <Image x:Name="UrlSiteIcon"
+                                                                   Width="34"
+                                                                   Height="34"
+                                                                   Source="{Binding SiteIcon}"
+                                                                   Stretch="Uniform"
+                                                                   Visibility="Collapsed" />
+                                                        </Grid>
                                                     </Border>
                                                     <TextBlock Margin="0,11,0,0"
                                                                Text="{Binding Domain}"
@@ -627,9 +636,9 @@
                                             </Grid>
 
                                             <Image x:Name="ThumbnailImage"
-                                                   Margin="8"
+                                                   Margin="{Binding ThumbnailMargin}"
                                                    Source="{Binding Thumbnail}"
-                                                   Stretch="Uniform"
+                                                   Stretch="{Binding ThumbnailStretch}"
                                                    Visibility="Collapsed" />
                                         </Grid>
                                     </Border>
@@ -656,10 +665,19 @@
                                             <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
                                         <Grid Grid.Row="0">
-                                            <TextBlock Text="{Binding TypeLabel}"
+                                            <StackPanel Orientation="Horizontal">
+                                                <Image x:Name="CardSiteIcon"
+                                                       Width="13"
+                                                       Height="13"
+                                                       Margin="0,0,5,0"
+                                                       Source="{Binding SiteIcon}"
+                                                       Stretch="Uniform"
+                                                       Visibility="Collapsed" />
+                                                <TextBlock Text="{Binding TypeLabel}"
                                                        FontSize="11"
                                                        FontWeight="SemiBold"
                                                        Foreground="{DynamicResource AccentBrush}" />
+                                            </StackPanel>
                                             <TextBlock HorizontalAlignment="Right"
                                                        Text="{Binding DateLabel}"
                                                        FontSize="11"
@@ -754,12 +772,24 @@
                                 </Grid>
                             </Border>
                             <DataTemplate.Triggers>
-                                <DataTrigger Binding="{Binding IsImage}"
+                                <DataTrigger Binding="{Binding HasPrimaryArtwork}"
                                              Value="True">
                                     <Setter TargetName="UrlArtwork"
                                             Property="Visibility"
                                             Value="Collapsed" />
                                     <Setter TargetName="ThumbnailImage"
+                                            Property="Visibility"
+                                            Value="Visible" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding HasSiteIcon}"
+                                             Value="True">
+                                    <Setter TargetName="UrlInitial"
+                                            Property="Visibility"
+                                            Value="Collapsed" />
+                                    <Setter TargetName="UrlSiteIcon"
+                                            Property="Visibility"
+                                            Value="Visible" />
+                                    <Setter TargetName="CardSiteIcon"
                                             Property="Visibility"
                                             Value="Visible" />
                                 </DataTrigger>

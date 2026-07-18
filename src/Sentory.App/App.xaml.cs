@@ -5,6 +5,7 @@ using System.Threading;
 using System.Windows;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
+using Sentory.Infrastructure.Links;
 using Sentory.Platform.Windows.Runtime;
 using Forms = System.Windows.Forms;
 
@@ -29,6 +30,10 @@ public partial class App : System.Windows.Application
     private GalleryWindow? _galleryWindow;
     private readonly CancellationTokenSource _maintenanceCancellation = new();
     private Task? _maintenanceTask;
+    private readonly SemaphoreSlim _linkPreviewWakeSignal = new(0, 1);
+    private LinkPreviewFetcher? _linkPreviewFetcher;
+    private LinkPreviewEnrichmentService? _linkPreviewService;
+    private Task? _linkPreviewTask;
     private readonly WindowsStartupManager _startupManager = new();
     private bool _shuttingDown;
 
@@ -58,6 +63,10 @@ public partial class App : System.Windows.Application
             _repository = new SqliteCaptureRepository(_paths);
             await _repository.InitializeAsync();
             var repairResult = await _repository.RepairStorageAsync();
+            _linkPreviewFetcher = new LinkPreviewFetcher(_paths);
+            _linkPreviewService = new LinkPreviewEnrichmentService(
+                _repository,
+                _linkPreviewFetcher);
 
             var acceptInjectedInput = string.Equals(
                 Environment.GetEnvironmentVariable(
@@ -82,6 +91,8 @@ public partial class App : System.Windows.Application
             }
             await ApplyAutomaticCleanupAsync();
             _maintenanceTask = RunMaintenanceLoopAsync(
+                _maintenanceCancellation.Token);
+            _linkPreviewTask = RunLinkPreviewLoopAsync(
                 _maintenanceCancellation.Token);
             _runtime.Start();
             UpdatePauseUi();
@@ -251,6 +262,11 @@ public partial class App : System.Windows.Application
             {
                 _ = _galleryWindow.RefreshAsync();
             }
+
+            if (notification.Kind == ContentKind.Url)
+            {
+                WakeLinkPreviewWorker();
+            }
         });
     }
 
@@ -339,6 +355,81 @@ public partial class App : System.Windows.Application
         }
     }
 
+    private async Task RunLinkPreviewLoopAsync(
+        CancellationToken cancellationToken)
+    {
+        if (_linkPreviewService is null)
+        {
+            return;
+        }
+
+        try
+        {
+            while (true)
+            {
+                var updated = 0;
+                try
+                {
+                    updated = await _linkPreviewService.EnrichBatchAsync(
+                        4,
+                        DateTimeOffset.UtcNow.AddDays(-30),
+                        cancellationToken);
+                }
+                catch (OperationCanceledException)
+                    when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception)
+                {
+                }
+
+                if (updated > 0)
+                {
+                    Task refreshTask = Task.CompletedTask;
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        if (_galleryWindow is { IsLoaded: true })
+                        {
+                            refreshTask = _galleryWindow.RefreshAsync();
+                        }
+                    });
+                    await refreshTask;
+                }
+
+                if (updated == 4)
+                {
+                    await Task.Delay(
+                        TimeSpan.FromSeconds(1),
+                        cancellationToken);
+                    continue;
+                }
+
+                await _linkPreviewWakeSignal.WaitAsync(
+                    TimeSpan.FromMinutes(15),
+                    cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private void WakeLinkPreviewWorker()
+    {
+        if (_linkPreviewWakeSignal.CurrentCount == 0)
+        {
+            try
+            {
+                _linkPreviewWakeSignal.Release();
+            }
+            catch (SemaphoreFullException)
+            {
+            }
+        }
+    }
+
     private async Task ApplyAutomaticCleanupAsync(
         CancellationToken cancellationToken = default)
     {
@@ -409,6 +500,14 @@ public partial class App : System.Windows.Application
             await _maintenanceTask;
             _maintenanceTask = null;
         }
+        if (_linkPreviewTask is not null)
+        {
+            await _linkPreviewTask;
+            _linkPreviewTask = null;
+        }
+        _linkPreviewFetcher?.Dispose();
+        _linkPreviewFetcher = null;
+        _linkPreviewService = null;
         _galleryWindow?.Close();
         _galleryWindow = null;
         if (_runtime is not null)
@@ -441,6 +540,7 @@ public partial class App : System.Windows.Application
 
         _singleInstanceMutex?.Dispose();
         _maintenanceCancellation.Dispose();
+        _linkPreviewWakeSignal.Dispose();
         base.OnExit(e);
     }
 }

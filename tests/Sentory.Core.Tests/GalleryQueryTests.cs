@@ -160,6 +160,42 @@ public sealed class GalleryQueryTests
         Assert.Equal(match.ItemId, Assert.Single(results).ItemId);
     }
 
+    [Fact]
+    public void SearchesLinkPreviewTitleAndDescription()
+    {
+        var titleMatch = Create("one.example", Now) with
+        {
+            PageTitle = "Sentory guide"
+        };
+        var descriptionMatch = Create("two.example", Now) with
+        {
+            PageDescription = "A useful clipboard archive"
+        };
+        var other = Create("other.example", Now);
+
+        var titleResults = GalleryQuery.Apply(
+            [other, descriptionMatch, titleMatch],
+            new GalleryQueryOptions(
+                ContentKind.Url,
+                "guide",
+                GalleryDateRange.All,
+                GallerySortMode.Newest),
+            Now);
+        var descriptionResults = GalleryQuery.Apply(
+            [other, descriptionMatch, titleMatch],
+            new GalleryQueryOptions(
+                ContentKind.Url,
+                "clipboard archive",
+                GalleryDateRange.All,
+                GallerySortMode.Newest),
+            Now);
+
+        Assert.Equal(titleMatch.ItemId, Assert.Single(titleResults).ItemId);
+        Assert.Equal(
+            descriptionMatch.ItemId,
+            Assert.Single(descriptionResults).ItemId);
+    }
+
     private static IReadOnlyList<CapturedItemSummary> Apply(
         IEnumerable<CapturedItemSummary> items,
         GallerySortMode sortMode) =>

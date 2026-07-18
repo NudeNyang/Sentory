@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using Microsoft.Data.Sqlite;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
 using Sentory.Infrastructure.Links;
@@ -130,6 +131,62 @@ public sealed class LinkPreviewTests : IDisposable
         Assert.Equal(1, handler.RequestCount);
     }
 
+    [Fact]
+    public async Task EnrichmentServiceUpdatesStoredLinkPreview()
+    {
+        const string url = "https://example.com/article";
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var repository = new SqliteCaptureRepository(paths);
+        await repository.InitializeAsync();
+        Assert.True(UrlNormalizer.TryNormalize(url, out var normalized));
+        await repository.UpsertUrlAsync(new UrlCaptureRequest(
+            Guid.NewGuid(),
+            url,
+            normalized,
+            SourceApp.KakaoTalk,
+            CaptureMethod.KakaoCtrlVUrl,
+            DeliveryStatus.NotObserved,
+            "preview-test",
+            DateTimeOffset.UtcNow,
+            ["test"]));
+
+        var handler = new RouteHandler(request =>
+            request.RequestUri!.AbsoluteUri switch
+            {
+                url => HtmlResponse(
+                    """
+                    <meta property="og:title" content="Enriched title">
+                    <meta name="description" content="Enriched description">
+                    <meta property="og:image" content="/cover.jpg">
+                    """),
+                "https://example.com/cover.jpg" => ImageResponse(
+                    [9, 8, 7],
+                    "image/jpeg"),
+                "https://example.com/favicon.ico" => ImageResponse(
+                    [6, 5],
+                    "image/x-icon"),
+                _ => new HttpResponseMessage(HttpStatusCode.NotFound)
+            });
+        using var httpClient = new HttpClient(handler);
+        using var fetcher = new LinkPreviewFetcher(
+            paths,
+            httpClient,
+            new FixedResolver(IPAddress.Parse("93.184.216.34")));
+        var service = new LinkPreviewEnrichmentService(repository, fetcher);
+
+        var updated = await service.EnrichBatchAsync(
+            4,
+            DateTimeOffset.UtcNow.AddDays(-30));
+        var item = Assert.Single(await repository.GetRecentAsync(10));
+
+        Assert.Equal(1, updated);
+        Assert.Equal(LinkPreviewStatus.Available, item.PreviewStatus);
+        Assert.Equal("Enriched title", item.PageTitle);
+        Assert.Equal("Enriched description", item.PageDescription);
+        Assert.NotNull(item.SiteIconPath);
+        Assert.NotNull(item.PreviewImagePath);
+    }
+
     private static HttpResponseMessage HtmlResponse(string html)
     {
         var response = new HttpResponseMessage(HttpStatusCode.OK)
@@ -184,6 +241,7 @@ public sealed class LinkPreviewTests : IDisposable
 
     public void Dispose()
     {
+        SqliteConnection.ClearAllPools();
         if (Directory.Exists(_root))
         {
             Directory.Delete(_root, recursive: true);

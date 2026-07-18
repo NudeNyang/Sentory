@@ -94,7 +94,13 @@ public static class GalleryQuery
                    StringComparison.OrdinalIgnoreCase) ||
                item.Domain.Contains(
                    search,
-                   StringComparison.OrdinalIgnoreCase);
+                   StringComparison.OrdinalIgnoreCase) ||
+               (item.PageTitle?.Contains(
+                    search,
+                    StringComparison.OrdinalIgnoreCase) ?? false) ||
+               (item.PageDescription?.Contains(
+                    search,
+                    StringComparison.OrdinalIgnoreCase) ?? false);
     }
 
     private static bool IsInDateRange(
@@ -121,6 +127,8 @@ public static class GalleryQuery
     private static string GetNameKey(CapturedItemSummary item) =>
         item.Kind switch
         {
+            ContentKind.Url when !string.IsNullOrWhiteSpace(item.PageTitle) =>
+                item.PageTitle,
             ContentKind.Url when !string.IsNullOrWhiteSpace(item.Domain) =>
                 item.Domain,
             ContentKind.Image => "클립보드 이미지",
