@@ -199,6 +199,21 @@ Discord URL 전송은 다음 신호를 모두 요구하면 `Confirmed` 판정이
 
 현재 타당성이 확인된 범위는 Discord의 URL 붙여넣기 전송이다.
 
+### Discord 1.0.9248 실앱 재검증
+
+2026-07-18에 Discord 1.0.9248과 Sentory 실앱을 사용해 비공개 채널에서
+고유한 `example.com` URL을 붙여넣고 전송했다.
+
+- 접근성 플래그 없이 실행한 Discord에서는 캡처 이벤트가 생성되지 않았다.
+- `--force-renderer-accessibility`로 다시 시작한 뒤에는 확인 워커가 생성됐다.
+- 입력창 URL 일치, 입력창 비움, 직접 메시지 항목 증가, 최신 메시지 URL
+  일치를 모두 통과했다.
+- `capture_events`에 `DiscordConfirmedSend`, `Confirmed` 기록이 생성됐다.
+
+Discord 재시작은 작성 중인 메시지와 통화에 영향을 줄 수 있으므로 자동으로
+수행하지 않는다. Sentory 트레이 메뉴의 `Discord 연결 복구`에서 사용자 확인을
+받은 뒤 접근성 플래그를 포함해 Discord를 다시 시작하도록 보완했다.
+
 아직 검증되지 않은 범위:
 
 - 전송 버튼 클릭

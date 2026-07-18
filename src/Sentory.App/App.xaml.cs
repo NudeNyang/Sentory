@@ -36,6 +36,8 @@ public partial class App : System.Windows.Application
     private LinkPreviewEnrichmentService? _linkPreviewService;
     private Task? _linkPreviewTask;
     private readonly WindowsStartupManager _startupManager = new();
+    private readonly DiscordAccessibilityLauncher _discordLauncher = new();
+    private Forms.ToolStripMenuItem? _discordRepairItem;
     private bool _shuttingDown;
 
     protected override async void OnStartup(StartupEventArgs e)
@@ -163,6 +165,11 @@ public partial class App : System.Windows.Application
         var openDataItem = new Forms.ToolStripMenuItem("데이터 폴더 열기");
         openDataItem.Click += (_, _) => OpenDataFolder();
 
+        _discordRepairItem = new Forms.ToolStripMenuItem(
+            "Discord 연결 복구");
+        _discordRepairItem.Click += async (_, _) =>
+            await RepairDiscordConnectionAsync();
+
         var exitItem = new Forms.ToolStripMenuItem("종료");
         exitItem.Click += async (_, _) =>
         {
@@ -176,6 +183,7 @@ public partial class App : System.Windows.Application
         menu.Items.Add(openGalleryItem);
         menu.Items.Add(_pauseItem);
         menu.Items.Add(_startupItem);
+        menu.Items.Add(_discordRepairItem);
         menu.Items.Add(openDataItem);
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(exitItem);
@@ -305,15 +313,80 @@ public partial class App : System.Windows.Application
     {
         Dispatcher.BeginInvoke(() =>
         {
+            var discordUnavailable = string.Equals(
+                issue.Code,
+                "discord-detection-unavailable",
+                StringComparison.Ordinal);
             SetStatus(
-                "상태: 일부 입력 처리에 실패했지만 감지 중입니다.",
-                "Sentory - 메신저 감지 중");
+                discordUnavailable
+                    ? "상태: Discord 연결 복구가 필요합니다."
+                    : "상태: 일부 입력 처리에 실패했지만 감지 중입니다.",
+                discordUnavailable
+                    ? "Sentory - Discord 연결 복구 필요"
+                    : "Sentory - 메신저 감지 중");
             _trayIcon?.ShowBalloonTip(
-                2500,
+                discordUnavailable ? 4500 : 2500,
                 "Sentory",
-                issue.UserMessage,
+                discordUnavailable
+                    ? "트레이 메뉴에서 'Discord 연결 복구'를 실행해 주세요."
+                    : issue.UserMessage,
                 Forms.ToolTipIcon.Warning);
         });
+    }
+
+    private async Task RepairDiscordConnectionAsync()
+    {
+        if (_discordRepairItem is null || !_discordRepairItem.Enabled)
+        {
+            return;
+        }
+
+        var result = System.Windows.MessageBox.Show(
+            "Discord를 접근성 모드로 다시 시작합니다.\n\n" +
+            "작성 중인 메시지와 진행 중인 통화가 종료될 수 있습니다. " +
+            "계속할까요?",
+            "Discord 연결 복구",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No);
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        _discordRepairItem.Enabled = false;
+        try
+        {
+            await _discordLauncher.RestartAsync();
+            SetStatus(
+                _runtime?.IsPaused == true
+                    ? "상태: 감지가 일시정지되었습니다."
+                    : "상태: Discord와 카카오톡을 감지하고 있습니다.",
+                _runtime?.IsPaused == true
+                    ? "Sentory - 감지 일시정지됨"
+                    : "Sentory - 메신저 감지 중");
+            _trayIcon?.ShowBalloonTip(
+                3500,
+                "Sentory",
+                "Discord를 연결 복구 모드로 다시 시작했습니다.",
+                Forms.ToolTipIcon.Info);
+        }
+        catch (Exception exception)
+            when (exception is IOException or
+                  InvalidOperationException or
+                  System.ComponentModel.Win32Exception or
+                  UnauthorizedAccessException)
+        {
+            _trayIcon?.ShowBalloonTip(
+                4000,
+                "Sentory",
+                "Discord 연결을 복구하지 못했습니다. Discord를 종료한 뒤 다시 시도해 주세요.",
+                Forms.ToolTipIcon.Warning);
+        }
+        finally
+        {
+            _discordRepairItem.Enabled = true;
+        }
     }
 
     private void SetStatus(string status, string trayText)
