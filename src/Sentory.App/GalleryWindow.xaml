@@ -404,19 +404,34 @@
                     </StackPanel>
                     <StackPanel HorizontalAlignment="Right"
                                 Orientation="Horizontal">
-                        <Button x:Name="DateFilterButton"
-                                AutomationProperties.AutomationId="DateFilterButton"
+                        <Button x:Name="IntegratedFilterButton"
+                                AutomationProperties.AutomationId="IntegratedFilterButton"
                                 Style="{StaticResource ToolbarButtonStyle}"
-                                Click="DateFilterButton_Click">
+                                Click="IntegratedFilterButton_Click">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE71C;"
                                            FontFamily="Segoe Fluent Icons"
                                            FontSize="13"
                                            VerticalAlignment="Center" />
-                                <TextBlock x:Name="DateFilterText"
+                                <TextBlock
                                            Margin="7,0,0,0"
-                                           Text="기간 전체"
+                                           Text="필터"
                                            VerticalAlignment="Center" />
+                                <Border x:Name="FilterCountBadge"
+                                        MinWidth="18"
+                                        Height="18"
+                                        Margin="6,0,0,0"
+                                        Padding="5,0"
+                                        Background="{DynamicResource AccentBrush}"
+                                        CornerRadius="9"
+                                        Visibility="Collapsed">
+                                    <TextBlock x:Name="FilterCountText"
+                                               Foreground="{DynamicResource AccentTextBrush}"
+                                               FontSize="10"
+                                               FontWeight="SemiBold"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" />
+                                </Border>
                                 <TextBlock Margin="7,0,0,0"
                                            Text="&#xE70D;"
                                            FontFamily="Segoe Fluent Icons"
@@ -462,20 +477,51 @@
                         </Button>
                     </StackPanel>
 
-                    <Popup x:Name="DateFilterPopup"
-                           PlacementTarget="{Binding ElementName=DateFilterButton}"
+                    <Popup x:Name="IntegratedFilterPopup"
+                           PlacementTarget="{Binding ElementName=IntegratedFilterButton}"
                            Placement="Bottom"
                            VerticalOffset="6"
                            AllowsTransparency="True"
                            PopupAnimation="Fade"
                            StaysOpen="False">
-                        <Border Width="156"
-                                Padding="6"
+                        <Border Width="236"
+                                Padding="10"
                                 Background="{DynamicResource SurfaceBrush}"
                                 BorderBrush="{DynamicResource LineBrush}"
                                 BorderThickness="1"
                                 CornerRadius="12">
                             <StackPanel>
+                                <Grid Margin="4,0,4,5">
+                                    <TextBlock Text="필터"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextBrush}"
+                                               VerticalAlignment="Center" />
+                                    <Button x:Name="FilterResetButton"
+                                            HorizontalAlignment="Right"
+                                            Height="28"
+                                            Padding="8,0"
+                                            Content="초기화"
+                                            Style="{StaticResource ToolbarButtonStyle}"
+                                            Click="FilterResetButton_Click" />
+                                </Grid>
+
+                                <TextBlock Margin="11,6,0,3"
+                                           Text="메신저"
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource SoftTextBrush}" />
+                                <StackPanel x:Name="SourceOptionsPanel" />
+
+                                <Border Height="1"
+                                        Margin="8,8,8,7"
+                                        Background="{DynamicResource LineBrush}" />
+
+                                <TextBlock Margin="11,0,0,3"
+                                           Text="기간"
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource SoftTextBrush}" />
                                 <Button x:Name="DateAllButton"
                                         Content="전체 기간"
                                         Tag="All"

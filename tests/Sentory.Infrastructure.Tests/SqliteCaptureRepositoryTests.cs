@@ -109,6 +109,36 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task RecentItemIncludesEveryMessengerFromCaptureHistory()
+    {
+        var repository = CreateRepository();
+        await repository.InitializeAsync();
+        await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/shared",
+            DeliveryStatus.NotObserved));
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/shared",
+            out var normalized));
+        await repository.UpsertUrlAsync(new UrlCaptureRequest(
+            Guid.NewGuid(),
+            normalized.Original,
+            normalized,
+            SourceApp.Discord,
+            CaptureMethod.DiscordConfirmedSend,
+            DeliveryStatus.Confirmed,
+            "discord-context",
+            DateTimeOffset.UtcNow,
+            ["newest-message-url-match"]));
+
+        var item = Assert.Single(await repository.GetRecentAsync(10));
+
+        Assert.Equal(
+            new[] { SourceApp.Discord, SourceApp.KakaoTalk }.Order(),
+            item.SourceApps!.Order());
+    }
+
+    [Fact]
     public async Task ImageIsStoredByHashAndDeduplicated()
     {
         var repository = CreateRepository();
@@ -439,6 +469,23 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         Assert.Equal(1100, restored.WindowWidth);
         Assert.Equal(720, restored.WindowHeight);
         Assert.True(restored.WindowMaximized);
+    }
+
+    [Fact]
+    public void SettingsStorePersistsAndNormalizesIntegratedFilters()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var store = new SentorySettingsStore(paths);
+        store.Save(new SentorySettings
+        {
+            FilterDateRange = "Last7Days",
+            FilterSourceApps = ["Discord", "Discord", "Unknown"]
+        });
+
+        var restored = store.Load();
+
+        Assert.Equal("Last7Days", restored.FilterDateRange);
+        Assert.Equal(["Discord"], restored.FilterSourceApps);
     }
 
     [Fact]

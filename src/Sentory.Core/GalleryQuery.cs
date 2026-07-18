@@ -23,7 +23,8 @@ public sealed record GalleryQueryOptions(
     string SearchText,
     GalleryDateRange DateRange,
     GallerySortMode SortMode,
-    bool FavoritesOnly = false);
+    bool FavoritesOnly = false,
+    IReadOnlySet<SourceApp>? SourceApps = null);
 
 public static class GalleryQuery
 {
@@ -39,6 +40,7 @@ public static class GalleryQuery
         var filtered = items.Where(item =>
             (options.Kind is null || item.Kind == options.Kind) &&
             (!options.FavoritesOnly || item.IsFavorite) &&
+            MatchesSource(item, options.SourceApps) &&
             IsInDateRange(item.LastCapturedAt, options.DateRange, now) &&
             MatchesSearch(item, search));
 
@@ -101,6 +103,21 @@ public static class GalleryQuery
                (item.PageDescription?.Contains(
                     search,
                     StringComparison.OrdinalIgnoreCase) ?? false);
+    }
+
+    private static bool MatchesSource(
+        CapturedItemSummary item,
+        IReadOnlySet<SourceApp>? selectedSources)
+    {
+        if (selectedSources is null || selectedSources.Count == 0)
+        {
+            return true;
+        }
+
+        var itemSources = item.SourceApps is { Count: > 0 }
+            ? item.SourceApps
+            : [item.LastSourceApp];
+        return itemSources.Any(selectedSources.Contains);
     }
 
     private static bool IsInDateRange(

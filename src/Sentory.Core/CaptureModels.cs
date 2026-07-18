@@ -89,7 +89,8 @@ public sealed record CapturedItemSummary(
     string? SiteIconPath = null,
     string? PreviewImagePath = null,
     LinkPreviewStatus? PreviewStatus = null,
-    DateTimeOffset? PreviewFetchedAt = null);
+    DateTimeOffset? PreviewFetchedAt = null,
+    IReadOnlyList<SourceApp>? SourceApps = null);
 
 public sealed record LinkPreviewCandidate(
     Guid ItemId,

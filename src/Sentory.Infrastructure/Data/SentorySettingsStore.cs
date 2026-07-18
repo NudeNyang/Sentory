@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using Sentory.Core;
 
 namespace Sentory.Infrastructure.Data;
 
@@ -8,6 +9,10 @@ public sealed class SentorySettings
     private static readonly int[] SupportedCleanupDays = [0, 30, 90, 180];
 
     public string SortMode { get; set; } = "Newest";
+
+    public string FilterDateRange { get; set; } = "All";
+
+    public List<string> FilterSourceApps { get; set; } = [];
 
     public bool IsDarkTheme { get; set; }
 
@@ -31,6 +36,16 @@ public sealed class SentorySettings
         {
             AutoCleanupDays = 0;
         }
+
+        if (!Enum.TryParse<GalleryDateRange>(FilterDateRange, out _))
+        {
+            FilterDateRange = GalleryDateRange.All.ToString();
+        }
+
+        FilterSourceApps = (FilterSourceApps ?? [])
+            .Where(value => Enum.TryParse<SourceApp>(value, out _))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
     }
 }
 

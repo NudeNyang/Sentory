@@ -23,6 +23,11 @@ public partial class GalleryWindow : Window
     private readonly ObservableCollection<GalleryItemViewModel> _visibleItems =
         [];
     private readonly List<GalleryItemViewModel> _allItems = [];
+    private readonly HashSet<SourceApp> _sourceApps = [];
+    private readonly Dictionary<string, System.Windows.Controls.Button>
+        _sourceOptionButtons = [];
+    private readonly Dictionary<string, System.Windows.Controls.TextBlock>
+        _sourceOptionChecks = [];
     private GalleryFilter _filter = GalleryFilter.All;
     private GalleryDateRange _dateRange = GalleryDateRange.All;
     private GallerySortMode _sortMode = GallerySortMode.Newest;
@@ -41,12 +46,19 @@ public partial class GalleryWindow : Window
         _settingsStore = settingsStore;
         _settings = settingsStore.Load();
         _sortMode = LoadSortPreference(_settings.SortMode);
+        _dateRange = LoadDatePreference(_settings.FilterDateRange);
+        foreach (var source in LoadSourcePreferences(
+                     _settings.FilterSourceApps))
+        {
+            _sourceApps.Add(source);
+        }
         _isDarkTheme = _settings.IsDarkTheme;
         RestoreWindowPlacement();
         ApplyTheme(_isDarkTheme);
         GalleryItems.ItemsSource = _visibleItems;
+        BuildSourceOptions();
         UpdateSortControls();
-        UpdateDateControls();
+        UpdateIntegratedFilterControls();
         Loaded += OnLoaded;
         SourceInitialized += (_, _) => ApplyTitleBarTheme();
     }
@@ -111,7 +123,8 @@ public partial class GalleryWindow : Window
             isImage,
             title,
             subtitle,
-            isImage ? "사진" : "링크",
+            $"{(isImage ? "사진" : "링크")} · " +
+            GetSourceLabel(item.LastSourceApp),
             item.LastCapturedAt.LocalDateTime.ToString("M월 d일 · HH:mm"),
             item.DeliveryStatus == DeliveryStatus.NotObserved
                 ? "입력 시 저장됨"
@@ -198,7 +211,8 @@ public partial class GalleryWindow : Window
                 SearchBox.Text,
                 _dateRange,
                 _sortMode,
-                favoritesOnly),
+                favoritesOnly,
+                _sourceApps),
             DateTimeOffset.Now);
         var viewModels = _allItems.ToDictionary(
             item => item.Item.ItemId);
@@ -219,7 +233,7 @@ public partial class GalleryWindow : Window
         {
             EmptyTitleText.Text = "아직 보관된 항목이 없습니다";
             EmptyDescriptionText.Text =
-                "카카오톡 개별 채팅창에 URL이나 사진을 붙여넣어 보세요.";
+                "Discord에서 URL을 전송하거나 카카오톡에 URL이나 사진을 붙여넣어 보세요.";
         }
 
         SetViewState(
@@ -294,15 +308,17 @@ public partial class GalleryWindow : Window
         }
     }
 
-    private void DateFilterButton_Click(object sender, RoutedEventArgs e)
+    private void IntegratedFilterButton_Click(
+        object sender,
+        RoutedEventArgs e)
     {
         SortPopup.IsOpen = false;
-        DateFilterPopup.IsOpen = !DateFilterPopup.IsOpen;
+        IntegratedFilterPopup.IsOpen = !IntegratedFilterPopup.IsOpen;
     }
 
     private void SortButton_Click(object sender, RoutedEventArgs e)
     {
-        DateFilterPopup.IsOpen = false;
+        IntegratedFilterPopup.IsOpen = false;
         SortPopup.IsOpen = !SortPopup.IsOpen;
     }
 
@@ -310,7 +326,7 @@ public partial class GalleryWindow : Window
         object sender,
         RoutedEventArgs e)
     {
-        DateFilterPopup.IsOpen = false;
+        IntegratedFilterPopup.IsOpen = false;
         SortPopup.IsOpen = false;
         var window = new DataManagementWindow(
             _repository,
@@ -338,9 +354,9 @@ public partial class GalleryWindow : Window
         }
 
         _dateRange = dateRange;
-        DateFilterPopup.IsOpen = false;
-        UpdateDateControls();
+        UpdateIntegratedFilterControls();
         ApplyFilter();
+        SaveFilterPreferences();
     }
 
     private void SortOptionButton_Click(
@@ -364,24 +380,77 @@ public partial class GalleryWindow : Window
         SaveSettings("정렬 설정을 저장하지 못했습니다.");
     }
 
-    private void UpdateDateControls()
+    private void SourceOptionButton_Click(
+        object sender,
+        RoutedEventArgs e)
     {
-        DateFilterText.Text = _dateRange switch
+        if (sender is not System.Windows.Controls.Button
+            {
+                Tag: string value
+            })
         {
-            GalleryDateRange.All => "기간 전체",
-            GalleryDateRange.Today => "기간 오늘",
-            GalleryDateRange.Last7Days => "기간 7일",
-            GalleryDateRange.Last30Days => "기간 30일",
-            _ => "기간 전체"
-        };
+            return;
+        }
+
+        if (value == "All")
+        {
+            _sourceApps.Clear();
+        }
+        else if (Enum.TryParse(value, out SourceApp sourceApp))
+        {
+            if (!_sourceApps.Add(sourceApp))
+            {
+                _sourceApps.Remove(sourceApp);
+            }
+        }
+
+        UpdateIntegratedFilterControls();
+        ApplyFilter();
+        SaveFilterPreferences();
+    }
+
+    private void FilterResetButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        _sourceApps.Clear();
+        _dateRange = GalleryDateRange.All;
+        UpdateIntegratedFilterControls();
+        ApplyFilter();
+        SaveFilterPreferences();
+    }
+
+    private void UpdateIntegratedFilterControls()
+    {
+        var activeFilterCount =
+            (_sourceApps.Count > 0 ? 1 : 0) +
+            (_dateRange != GalleryDateRange.All ? 1 : 0);
+        FilterCountText.Text = activeFilterCount.ToString();
+        FilterCountBadge.Visibility = activeFilterCount > 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        FilterResetButton.IsEnabled = activeFilterCount > 0;
         System.Windows.Automation.AutomationProperties.SetName(
-            DateFilterButton,
-            DateFilterText.Text);
-        DateFilterButton.SetResourceReference(
+            IntegratedFilterButton,
+            activeFilterCount == 0
+                ? "필터"
+                : $"필터 {activeFilterCount}개 적용됨");
+        IntegratedFilterButton.SetResourceReference(
             System.Windows.Controls.Control.ForegroundProperty,
-            _dateRange == GalleryDateRange.All
-                ? "MutedTextBrush"
-                : "AccentBrush");
+            activeFilterCount == 0 ? "MutedTextBrush" : "AccentBrush");
+
+        foreach (var (value, button) in _sourceOptionButtons)
+        {
+            var selected = value == "All"
+                ? _sourceApps.Count == 0
+                : Enum.TryParse<SourceApp>(value, out var source) &&
+                  _sourceApps.Contains(source);
+            SetOptionButtonState(
+                button,
+                _sourceOptionChecks[value],
+                selected);
+        }
+
         UpdateOptionButtons(
             [
                 DateAllButton,
@@ -390,6 +459,66 @@ public partial class GalleryWindow : Window
                 Date30DaysButton
             ],
             _dateRange.ToString());
+    }
+
+    private void BuildSourceOptions()
+    {
+        AddSourceOption("All", "전체 메신저");
+        foreach (var source in Enum.GetValues<SourceApp>())
+        {
+            AddSourceOption(source.ToString(), GetSourceLabel(source));
+        }
+    }
+
+    private void AddSourceOption(string value, string label)
+    {
+        var check = new System.Windows.Controls.TextBlock
+        {
+            Width = 18,
+            Text = "\uE73E",
+            FontFamily = new System.Windows.Media.FontFamily(
+                "Segoe Fluent Icons"),
+            FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center,
+            Visibility = Visibility.Hidden
+        };
+        var content = new System.Windows.Controls.StackPanel
+        {
+            Orientation = System.Windows.Controls.Orientation.Horizontal
+        };
+        content.Children.Add(check);
+        content.Children.Add(new System.Windows.Controls.TextBlock
+        {
+            Text = label,
+            VerticalAlignment = VerticalAlignment.Center
+        });
+
+        var button = new System.Windows.Controls.Button
+        {
+            Tag = value,
+            Content = content,
+            Style = (Style)FindResource("MenuOptionButtonStyle")
+        };
+        button.Click += SourceOptionButton_Click;
+        SourceOptionsPanel.Children.Add(button);
+        _sourceOptionButtons[value] = button;
+        _sourceOptionChecks[value] = check;
+    }
+
+    private static void SetOptionButtonState(
+        System.Windows.Controls.Button button,
+        System.Windows.Controls.TextBlock check,
+        bool selected)
+    {
+        button.FontWeight = selected
+            ? FontWeights.SemiBold
+            : FontWeights.Normal;
+        button.SetResourceReference(
+            System.Windows.Controls.Control.ForegroundProperty,
+            selected ? "AccentBrush" : "MutedTextBrush");
+        check.Visibility = selected
+            ? Visibility.Visible
+            : Visibility.Hidden;
     }
 
     private void UpdateSortControls()
@@ -442,6 +571,38 @@ public partial class GalleryWindow : Window
         Enum.TryParse(value, out GallerySortMode sortMode)
             ? sortMode
             : GallerySortMode.Newest;
+
+    private static GalleryDateRange LoadDatePreference(string value) =>
+        Enum.TryParse(value, out GalleryDateRange dateRange)
+            ? dateRange
+            : GalleryDateRange.All;
+
+    private static IEnumerable<SourceApp> LoadSourcePreferences(
+        IEnumerable<string> values) =>
+        values
+            .Select(value => Enum.TryParse<SourceApp>(value, out var source)
+                ? source
+                : (SourceApp?)null)
+            .OfType<SourceApp>()
+            .Distinct();
+
+    private void SaveFilterPreferences()
+    {
+        _settings.FilterDateRange = _dateRange.ToString();
+        _settings.FilterSourceApps = _sourceApps
+            .OrderBy(source => source)
+            .Select(source => source.ToString())
+            .ToList();
+        SaveSettings("필터 설정을 저장하지 못했습니다.");
+    }
+
+    private static string GetSourceLabel(SourceApp sourceApp) =>
+        sourceApp switch
+        {
+            SourceApp.Discord => "Discord",
+            SourceApp.KakaoTalk => "카카오톡",
+            _ => sourceApp.ToString()
+        };
 
     private void ThemeButton_Click(object sender, RoutedEventArgs e)
     {

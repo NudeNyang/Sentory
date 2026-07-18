@@ -389,7 +389,10 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                    content_path, content_hash, is_favorite, copy_count,
                    last_copied_at, page_title, page_description,
                    site_icon_path, preview_image_path, preview_status,
-                   preview_fetched_at
+                   preview_fetched_at,
+                   (SELECT GROUP_CONCAT(DISTINCT source_app)
+                    FROM capture_events
+                    WHERE item_id = items.id) AS source_apps
             FROM items
             ORDER BY last_captured_at DESC
             LIMIT $limit;
@@ -429,10 +432,34 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                     : Enum.Parse<LinkPreviewStatus>(reader.GetString(21)),
                 reader.IsDBNull(22)
                     ? null
-                    : DateTimeOffset.Parse(reader.GetString(22))));
+                    : DateTimeOffset.Parse(reader.GetString(22)),
+                ParseSourceApps(
+                    reader.IsDBNull(23) ? null : reader.GetString(23),
+                    Enum.Parse<SourceApp>(reader.GetString(5)))));
         }
 
         return results;
+    }
+
+    private static IReadOnlyList<SourceApp> ParseSourceApps(
+        string? value,
+        SourceApp fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return [fallback];
+        }
+
+        var sources = value
+            .Split(',', StringSplitOptions.RemoveEmptyEntries |
+                        StringSplitOptions.TrimEntries)
+            .Select(source => Enum.TryParse<SourceApp>(source, out var parsed)
+                ? parsed
+                : (SourceApp?)null)
+            .OfType<SourceApp>()
+            .Distinct()
+            .ToArray();
+        return sources.Length > 0 ? sources : [fallback];
     }
 
     public async Task<bool> SetFavoriteAsync(

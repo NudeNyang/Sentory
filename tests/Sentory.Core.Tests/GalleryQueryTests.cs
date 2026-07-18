@@ -139,6 +139,39 @@ public sealed class GalleryQueryTests
     }
 
     [Fact]
+    public void FiltersByAnyMessengerInCaptureHistory()
+    {
+        var bothMessengers = Create(
+            "both.example",
+            Now,
+            sourceApp: SourceApp.KakaoTalk) with
+        {
+            SourceApps = [SourceApp.Discord, SourceApp.KakaoTalk]
+        };
+        var kakaoOnly = Create(
+            "kakao.example",
+            Now.AddMinutes(-1),
+            sourceApp: SourceApp.KakaoTalk);
+
+        var results = GalleryQuery.Apply(
+            [kakaoOnly, bothMessengers],
+            new GalleryQueryOptions(
+                null,
+                string.Empty,
+                GalleryDateRange.All,
+                GallerySortMode.Newest,
+                SourceApps: new HashSet<SourceApp>
+                {
+                    SourceApp.Discord
+                }),
+            Now);
+
+        Assert.Equal(
+            bothMessengers.ItemId,
+            Assert.Single(results).ItemId);
+    }
+
+    [Fact]
     public void CombinesKindAndSearchFilters()
     {
         var match = Create("wanted.example", Now);
@@ -215,7 +248,8 @@ public sealed class GalleryQueryTests
         ContentKind kind = ContentKind.Url,
         bool isFavorite = false,
         int copyCount = 0,
-        DateTimeOffset? lastCopiedAt = null)
+        DateTimeOffset? lastCopiedAt = null,
+        SourceApp sourceApp = SourceApp.KakaoTalk)
     {
         var key = kind == ContentKind.Url
             ? $"https://{domain}/"
@@ -226,7 +260,7 @@ public sealed class GalleryQueryTests
             kind == ContentKind.Url ? key : string.Empty,
             key,
             domain,
-            SourceApp.KakaoTalk,
+            sourceApp,
             kind == ContentKind.Url
                 ? CaptureMethod.KakaoCtrlVUrl
                 : CaptureMethod.KakaoCtrlVImage,
@@ -237,6 +271,7 @@ public sealed class GalleryQueryTests
             lastCapturedAt,
             IsFavorite: isFavorite,
             CopyCount: copyCount,
-            LastCopiedAt: lastCopiedAt);
+            LastCopiedAt: lastCopiedAt,
+            SourceApps: [sourceApp]);
     }
 }
