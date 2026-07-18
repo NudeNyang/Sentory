@@ -9,13 +9,6 @@ namespace Sentory.App;
 
 public partial class DataManagementWindow : Window
 {
-    private static readonly CleanupOption[] ManualCleanupOptions =
-    [
-        new(30, "30일이 지난 항목"),
-        new(90, "90일이 지난 항목"),
-        new(180, "180일이 지난 항목")
-    ];
-
     private static readonly CleanupOption[] AutoCleanupOptions =
     [
         new(0, "자동 정리 사용 안 함"),
@@ -39,8 +32,6 @@ public partial class DataManagementWindow : Window
         _settingsStore = settingsStore;
         _isDarkTheme = isDarkTheme;
         ApplyPalette();
-        ManualCleanupComboBox.ItemsSource = ManualCleanupOptions;
-        ManualCleanupComboBox.SelectedIndex = 1;
         AutoCleanupComboBox.ItemsSource = AutoCleanupOptions;
         var savedDays = _settingsStore.Load().AutoCleanupDays;
         AutoCleanupComboBox.SelectedItem = AutoCleanupOptions.First(
@@ -66,18 +57,6 @@ public partial class DataManagementWindow : Window
         catch (Exception)
         {
             StatusText.Text = "데이터 현황을 불러오지 못했습니다.";
-        }
-    }
-
-    private async void ManualCleanupButton_Click(
-        object sender,
-        RoutedEventArgs e)
-    {
-        if (ManualCleanupComboBox.SelectedItem is CleanupOption option)
-        {
-            await ConfirmAndCleanupAsync(
-                DateTimeOffset.Now.AddDays(-option.Days),
-                $"{option.Days}일이 지난 항목");
         }
     }
 
@@ -167,10 +146,8 @@ public partial class DataManagementWindow : Window
     private void SetBusy(bool busy)
     {
         _busy = busy;
-        ManualCleanupButton.IsEnabled = !busy;
         DeleteNonFavoritesButton.IsEnabled = !busy;
         SaveAutoCleanupButton.IsEnabled = !busy;
-        ManualCleanupComboBox.IsEnabled = !busy;
         AutoCleanupComboBox.IsEnabled = !busy;
         if (busy)
         {

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Sentory 데이터 관리"
         Width="520"
-        Height="650"
+        Height="505"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource WindowBackgroundBrush}"
@@ -55,7 +55,6 @@
 
     <Grid Margin="28,24,28,26">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -126,42 +125,6 @@
                 BorderThickness="1"
                 CornerRadius="14">
             <StackPanel>
-                <TextBlock Text="기간이 지난 항목 정리"
-                           FontSize="14"
-                           FontWeight="SemiBold"
-                           Foreground="{DynamicResource TextBrush}" />
-                <TextBlock Margin="0,5,0,0"
-                           Text="마지막으로 저장된 시점을 기준으로 정리합니다."
-                           FontSize="11"
-                           Foreground="{DynamicResource MutedTextBrush}" />
-                <Grid Margin="0,14,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <ComboBox x:Name="ManualCleanupComboBox"
-                              Height="38"
-                              Padding="9,0"
-                              DisplayMemberPath="Label"
-                              VerticalContentAlignment="Center" />
-                    <Button x:Name="ManualCleanupButton"
-                            Grid.Column="2"
-                            Content="지금 정리"
-                            Style="{StaticResource ActionButtonStyle}"
-                            Click="ManualCleanupButton_Click" />
-                </Grid>
-            </StackPanel>
-        </Border>
-
-        <Border Grid.Row="3"
-                Margin="0,14,0,0"
-                Padding="18"
-                Background="{DynamicResource SurfaceBrush}"
-                BorderBrush="{DynamicResource LineBrush}"
-                BorderThickness="1"
-                CornerRadius="14">
-            <StackPanel>
                 <TextBlock Text="자동 정리"
                            FontSize="14"
                            FontWeight="SemiBold"
@@ -190,14 +153,14 @@
             </StackPanel>
         </Border>
 
-        <Grid Grid.Row="4" Margin="0,14,0,0">
+        <Grid Grid.Row="3" Margin="0,14,0,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
             <Button x:Name="DeleteNonFavoritesButton"
                     Height="40"
-                    Content="즐겨찾기 제외 모두 삭제"
+                    Content="즐겨찾기 제외 항목 모두 삭제"
                     Background="{DynamicResource DangerBrush}"
                     Foreground="White"
                     BorderThickness="0"
