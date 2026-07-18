@@ -6,6 +6,9 @@ Sentory는 메신저에서 다룬 URL과 사진을 로컬에 보관하는 데스
 
 현재 제품 런타임에서 활성화된 범위:
 
+- Discord 채팅 입력창의 Ctrl+V URL과 실제 전송 확인
+- Discord 채팅 입력창의 Ctrl+V 사진과 실제 전송 확인
+- Discord는 붙여넣기만 하거나 첨부를 취소하면 저장하지 않음
 - KakaoTalk 개별 채팅 입력창의 Ctrl+V URL
 - KakaoTalk 개별 채팅 입력창의 Ctrl+V 사진
 - 전송 여부는 관찰하지 않고 `입력 시 저장됨`으로 기록

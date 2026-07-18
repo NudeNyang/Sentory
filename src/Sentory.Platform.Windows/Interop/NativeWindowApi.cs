@@ -169,6 +169,8 @@ internal static class NativeMethods
     internal const int WmKeyDown = 0x0100;
     internal const int WmSysKeyDown = 0x0104;
     internal const int VkControl = 0x11;
+    internal const int VkShift = 0x10;
+    internal const int VkReturn = 0x0D;
     internal const int VkV = 0x56;
     internal const uint LlkhfInjected = 0x10;
 

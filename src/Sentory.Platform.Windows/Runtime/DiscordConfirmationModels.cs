@@ -8,23 +8,32 @@ public enum DiscordConfirmationOutcome
     DetectionUnavailable
 }
 
+public enum DiscordConfirmationContentKind
+{
+    Url,
+    Image
+}
+
 public sealed record DiscordConfirmationRequest(
     long MainWindowHandle,
     long RendererWindowHandle,
     uint ProcessId,
+    DiscordConfirmationContentKind ContentKind,
     IReadOnlyList<string> NormalizedUrls,
-    int TimeoutMilliseconds = 300_000);
+    int TimeoutMilliseconds = 300_000,
+    bool ExplicitSendObserved = false);
 
 public sealed record DiscordConfirmationResponse(
     DiscordConfirmationOutcome Outcome,
     DateTimeOffset? ConfirmedAt,
     IReadOnlyList<string> ConfirmationSignals)
 {
-    public static DiscordConfirmationResponse Unavailable() =>
+    public static DiscordConfirmationResponse Unavailable(
+        params string[] signals) =>
         new(
             DiscordConfirmationOutcome.DetectionUnavailable,
             null,
-            []);
+            signals);
 }
 
 public interface IDiscordConfirmationClient
@@ -45,8 +54,15 @@ internal readonly record struct DiscordCandidateObservation(
     bool ContextValid,
     bool InputContainsExpectedUrls,
     bool InputIsEmpty,
+    int NewMessageCount,
     int DirectMessageCount,
-    bool LatestNewMessageContainsExpectedUrls);
+    bool MatchingNewMessageFound);
+
+internal readonly record struct DiscordImageCandidateObservation(
+    bool ContextValid,
+    int NewMessageCount,
+    int DirectMessageCount,
+    bool MatchingNewOwnedImageFound);
 
 internal static class DiscordConfirmationEvaluator
 {
@@ -60,8 +76,7 @@ internal static class DiscordConfirmationEvaluator
         }
 
         if (observation.InputIsEmpty &&
-            observation.DirectMessageCount > baselineDirectMessageCount &&
-            observation.LatestNewMessageContainsExpectedUrls)
+            observation.MatchingNewMessageFound)
         {
             return DiscordCandidateDecision.Confirmed;
         }
@@ -70,6 +85,26 @@ internal static class DiscordConfirmationEvaluator
             !observation.InputIsEmpty)
         {
             return DiscordCandidateDecision.Cancelled;
+        }
+
+        return DiscordCandidateDecision.Pending;
+    }
+}
+
+internal static class DiscordImageConfirmationEvaluator
+{
+    public static DiscordCandidateDecision Evaluate(
+        int baselineDirectMessageCount,
+        DiscordImageCandidateObservation observation)
+    {
+        if (!observation.ContextValid)
+        {
+            return DiscordCandidateDecision.Cancelled;
+        }
+
+        if (observation.MatchingNewOwnedImageFound)
+        {
+            return DiscordCandidateDecision.Confirmed;
         }
 
         return DiscordCandidateDecision.Pending;

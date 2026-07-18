@@ -109,6 +109,38 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task DiscordConfirmedImageStoresSourceAndShareCount()
+    {
+        var repository = CreateRepository();
+        await repository.InitializeAsync();
+        byte[] bytes = [5, 4, 3, 2, 1];
+        var hash = Convert.ToHexString(SHA256.HashData(bytes));
+
+        var result = await repository.UpsertImageAsync(
+            new ImageCaptureRequest(
+                Guid.NewGuid(),
+                bytes,
+                hash,
+                48,
+                32,
+                SourceApp.Discord,
+                CaptureMethod.DiscordConfirmedImage,
+                DeliveryStatus.Confirmed,
+                "discord-context",
+                DateTimeOffset.UtcNow,
+                ["newest-message-image-attachment"]));
+        var item = Assert.Single(await repository.GetRecentAsync(10));
+
+        Assert.Equal(1, result.ShareCount);
+        Assert.Equal(ContentKind.Image, item.Kind);
+        Assert.Equal(SourceApp.Discord, item.LastSourceApp);
+        Assert.Equal(
+            CaptureMethod.DiscordConfirmedImage,
+            item.LastCaptureMethod);
+        Assert.Equal(DeliveryStatus.Confirmed, item.DeliveryStatus);
+    }
+
+    [Fact]
     public async Task RecentItemIncludesEveryMessengerFromCaptureHistory()
     {
         var repository = CreateRepository();

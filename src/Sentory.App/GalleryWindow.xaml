@@ -664,7 +664,7 @@
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextBrush}" />
                     <TextBlock Margin="0,3,0,0"
-                               Text="Discord를 접근성 모드로 다시 시작하면 링크 전송을 확인할 수 있습니다."
+                               Text="Discord를 접근성 모드로 다시 시작하면 링크와 사진 전송을 확인할 수 있습니다."
                                FontSize="10.5"
                                Foreground="{DynamicResource MutedTextBrush}" />
                 </StackPanel>

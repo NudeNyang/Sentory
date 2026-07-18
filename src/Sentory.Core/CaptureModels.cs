@@ -22,6 +22,7 @@ public enum DeliveryStatus
 public enum CaptureMethod
 {
     DiscordConfirmedSend,
+    DiscordConfirmedImage,
     KakaoCtrlVUrl,
     KakaoCtrlVImage,
     KakaoTypedUrl,

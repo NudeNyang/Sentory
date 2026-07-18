@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Accessibility;
@@ -13,8 +14,10 @@ public static class DiscordAccessibilityWorker
 {
     private const uint ObjectIdClient = 0xFFFFFFFC;
     private const uint GetAncestorRoot = 2;
+    private const int RoleSystemDocument = 15;
     private const int RoleSystemList = 33;
     private const int RoleSystemListItem = 34;
+    private const int RoleSystemGraphic = 40;
     private const int RoleSystemText = 42;
     private const int MessageListState = 1_048_640;
     private const int VisibleListItemState = 64;
@@ -44,9 +47,10 @@ public static class DiscordAccessibilityWorker
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception exception)
         {
-            response = DiscordConfirmationResponse.Unavailable();
+            response = DiscordConfirmationResponse.Unavailable(
+                $"worker-exception:{exception.GetType().Name}");
         }
 
         await output.WriteLineAsync(JsonSerializer.Serialize(response));
@@ -58,26 +62,86 @@ public static class DiscordAccessibilityWorker
         DiscordConfirmationRequest request,
         CancellationToken cancellationToken)
     {
-        if (!TryValidateRequest(request, out var expectedUrls) ||
-            !TryCreateAccessible(
+        if (!TryValidateRequest(request, out var expectedUrls))
+        {
+            return DiscordConfirmationResponse.Unavailable(
+                "request-or-window-validation-failed");
+        }
+
+        if (!TryCreateAccessible(
                 new nint(request.RendererWindowHandle),
                 out var accessibleRoot))
         {
-            return DiscordConfirmationResponse.Unavailable();
+            return DiscordConfirmationResponse.Unavailable(
+                "renderer-accessibility-root-unavailable");
         }
 
-        var targets = FindTargets(accessibleRoot, expectedUrls);
-        if (targets.InputCandidates.Count != 1 ||
-            targets.MessageLists.Count == 0)
+        var requireMatchingUrlInput = RequiresMatchingUrlInput(request);
+        var targets = FindTargets(
+            accessibleRoot,
+            expectedUrls,
+            requireMatchingUrlInput);
+        if (targets.MessageLists.Count == 0)
         {
-            return DiscordConfirmationResponse.Unavailable();
+            return DiscordConfirmationResponse.Unavailable(
+                "message-list-unavailable");
         }
 
-        var inputTarget = targets.InputCandidates[0];
+        if (requireMatchingUrlInput &&
+            targets.InputCandidates.Count != 1)
+        {
+            return DiscordConfirmationResponse.Unavailable(
+                $"url-input-candidate-count:{targets.InputCandidates.Count}");
+        }
+
         var messageList = targets.MessageLists
             .OrderByDescending(target => GetDirectListItems(target).Count)
             .First();
-        var baselineMessageCount = GetDirectListItems(messageList).Count;
+        var baselineMessages = GetDirectListItems(messageList);
+        var baselineMessageCount = baselineMessages.Count;
+        var baselineFingerprints = CreateMessageFingerprintSet(
+            baselineMessages);
+        if (request.ContentKind == DiscordConfirmationContentKind.Image)
+        {
+            if (request.ExplicitSendObserved &&
+                baselineMessages.Count > 0 &&
+                IsVisibleOwnedImageMessage(baselineMessages[^1]))
+            {
+                return CreateConfirmedImageResponse(
+                    DateTimeOffset.UtcNow,
+                    "send-key-and-current-message-match");
+            }
+
+            ExcludeLatestFromBaselineWhenSendWasObserved(
+                request,
+                baselineMessages,
+                baselineFingerprints);
+            return await ConfirmImageAsync(
+                request,
+                accessibleRoot,
+                messageList,
+                baselineMessageCount,
+                baselineFingerprints,
+                cancellationToken);
+        }
+
+        var inputTarget = requireMatchingUrlInput
+            ? targets.InputCandidates[0]
+            : null;
+        if (request.ExplicitSendObserved &&
+            baselineMessages.Count > 0 &&
+            IsVisibleUrlMessage(baselineMessages[^1], expectedUrls))
+        {
+                return CreateConfirmedUrlResponse(
+                    DateTimeOffset.UtcNow,
+                    "send-key-and-current-message-match",
+                    request.ExplicitSendObserved);
+        }
+
+        ExcludeLatestFromBaselineWhenSendWasObserved(
+            request,
+            baselineMessages,
+            baselineFingerprints);
         var timeout = TimeSpan.FromMilliseconds(
             Math.Clamp(request.TimeoutMilliseconds, 1_000, 300_000));
         var startedAt = DateTimeOffset.UtcNow;
@@ -87,39 +151,38 @@ public static class DiscordAccessibilityWorker
         {
             await Task.Delay(180, cancellationToken);
             var contextValid = IsContextValid(request);
-            var inputValue = SafeValue(
-                inputTarget.Accessible,
-                inputTarget.ChildId);
+            var inputValue = inputTarget is null
+                ? null
+                : SafeValue(
+                    inputTarget.Accessible,
+                    inputTarget.ChildId);
             var inputContains = ContainsAllUrls(inputValue, expectedUrls);
             var inputIsEmpty = IsEmptyInput(inputValue);
-            var messages = GetDirectListItems(messageList);
-            var latestMatches =
-                messages.Count > baselineMessageCount &&
-                SafeState(
-                    messages[^1].Accessible,
-                    messages[^1].ChildId) == VisibleListItemState &&
-                SubtreeContainsAllUrls(messages[^1], expectedUrls);
+            var messages = GetMessagesWithRefresh(
+                accessibleRoot,
+                ref messageList);
+            var newMessages = GetNewMessages(
+                messages,
+                baselineMessageCount,
+                baselineFingerprints);
+            var matchingMessageFound = newMessages.Any(message =>
+                IsVisibleUrlMessage(message, expectedUrls));
             var decision = DiscordConfirmationEvaluator.Evaluate(
                 baselineMessageCount,
                 new DiscordCandidateObservation(
                     contextValid,
                     inputContains,
                     inputIsEmpty,
+                    newMessages.Count,
                     messages.Count,
-                    latestMatches));
+                    matchingMessageFound));
 
             if (decision == DiscordCandidateDecision.Confirmed)
             {
-                return new DiscordConfirmationResponse(
-                    DiscordConfirmationOutcome.Confirmed,
+                return CreateConfirmedUrlResponse(
                     DateTimeOffset.UtcNow,
-                    [
-                        "discord-process-and-window",
-                        "msaa-input-url-match",
-                        "input-cleared-after-send",
-                        "direct-message-list-item-increased",
-                        "newest-message-url-match"
-                    ]);
+                    "new-message-set-url-match",
+                    request.ExplicitSendObserved);
             }
 
             if (decision == DiscordCandidateDecision.Cancelled)
@@ -154,15 +217,240 @@ public static class DiscordAccessibilityWorker
             []);
     }
 
+    private static async Task<DiscordConfirmationResponse> ConfirmImageAsync(
+        DiscordConfirmationRequest request,
+        IAccessible accessibleRoot,
+        AccessibleTarget messageList,
+        int baselineMessageCount,
+        IReadOnlySet<string> baselineFingerprints,
+        CancellationToken cancellationToken)
+    {
+        var timeout = TimeSpan.FromMilliseconds(
+            Math.Clamp(request.TimeoutMilliseconds, 1_000, 120_000));
+        var startedAt = DateTimeOffset.UtcNow;
+        var latestMessageCount = baselineMessageCount;
+        var latestNewMessageCount = 0;
+        var matchingOwnedImageFound = false;
+
+        while (DateTimeOffset.UtcNow - startedAt < timeout)
+        {
+            await Task.Delay(180, cancellationToken);
+            var now = DateTimeOffset.UtcNow;
+            var contextValid = IsContextValid(request);
+            var messages = GetMessagesWithRefresh(
+                accessibleRoot,
+                ref messageList);
+            latestMessageCount = messages.Count;
+            var newMessages = GetNewMessages(
+                messages,
+                baselineMessageCount,
+                baselineFingerprints);
+            latestNewMessageCount = newMessages.Count;
+            matchingOwnedImageFound = newMessages.Any(
+                IsVisibleOwnedImageMessage);
+            var decision = DiscordImageConfirmationEvaluator.Evaluate(
+                baselineMessageCount,
+                new DiscordImageCandidateObservation(
+                    contextValid,
+                    newMessages.Count,
+                    messages.Count,
+                    matchingOwnedImageFound));
+
+            if (decision == DiscordCandidateDecision.Confirmed)
+            {
+                return CreateConfirmedImageResponse(
+                    now,
+                    "new-message-set-owned-image-match");
+            }
+
+            if (decision == DiscordCandidateDecision.Cancelled)
+            {
+                return new DiscordConfirmationResponse(
+                    DiscordConfirmationOutcome.Cancelled,
+                    null,
+                    BuildImageDiagnosticSignals(
+                        baselineMessageCount,
+                        latestMessageCount,
+                        latestNewMessageCount,
+                        matchingOwnedImageFound));
+            }
+        }
+
+        return new DiscordConfirmationResponse(
+            DiscordConfirmationOutcome.Expired,
+            null,
+            BuildImageDiagnosticSignals(
+                baselineMessageCount,
+                latestMessageCount,
+                latestNewMessageCount,
+                matchingOwnedImageFound));
+    }
+
+    private static IReadOnlyList<string> BuildImageDiagnosticSignals(
+        int baselineMessageCount,
+        int latestMessageCount,
+        int newMessageCount,
+        bool matchingOwnedImageFound) =>
+        [
+            $"baseline-count:{baselineMessageCount}",
+            $"latest-count:{latestMessageCount}",
+            $"new-message-count:{newMessageCount}",
+            $"matching-owned-image:{matchingOwnedImageFound}"
+        ];
+
+    private static DiscordConfirmationResponse CreateConfirmedUrlResponse(
+        DateTimeOffset confirmedAt,
+        string correlationSignal,
+        bool explicitSendObserved) =>
+        new(
+            DiscordConfirmationOutcome.Confirmed,
+            confirmedAt,
+            [
+                "discord-process-and-window",
+                explicitSendObserved
+                    ? "validated-discord-send-key"
+                    : "msaa-input-url-match",
+                explicitSendObserved
+                    ? "post-send-message-url-match"
+                    : "input-cleared-after-send",
+                correlationSignal
+            ]);
+
+    private static DiscordConfirmationResponse CreateConfirmedImageResponse(
+        DateTimeOffset confirmedAt,
+        string correlationSignal) =>
+        new(
+            DiscordConfirmationOutcome.Confirmed,
+            confirmedAt,
+            [
+                "discord-process-and-window",
+                "clipboard-image-paste-in-discord-input",
+                correlationSignal
+            ]);
+
+    private static bool IsVisibleUrlMessage(
+        AccessibleTarget message,
+        IReadOnlySet<string> expectedUrls) =>
+        SafeState(message.Accessible, message.ChildId) ==
+            VisibleListItemState &&
+        SubtreeContainsAllUrls(message, expectedUrls);
+
+    private static bool IsVisibleOwnedImageMessage(
+        AccessibleTarget message) =>
+        SafeState(message.Accessible, message.ChildId) ==
+            VisibleListItemState &&
+        SubtreeContainsImageAttachment(message) &&
+        SubtreeContainsOwnedAttachmentControl(message);
+
+    private static List<AccessibleTarget> GetNewMessages(
+        IReadOnlyList<AccessibleTarget> messages,
+        int baselineMessageCount,
+        IReadOnlySet<string> baselineFingerprints)
+    {
+        var newMessages = messages
+            .Where(message =>
+            {
+                var fingerprint = CreateStableMessageFingerprint(message);
+                return fingerprint is not null &&
+                       !baselineFingerprints.Contains(fingerprint);
+            })
+            .ToList();
+        if (newMessages.Count > 0 ||
+            messages.Count <= baselineMessageCount)
+        {
+            return newMessages;
+        }
+
+        return messages
+            .Skip(Math.Min(baselineMessageCount, messages.Count))
+            .ToList();
+    }
+
+    private static HashSet<string> CreateMessageFingerprintSet(
+        IEnumerable<AccessibleTarget> messages) =>
+        messages
+            .Select(CreateStableMessageFingerprint)
+            .Where(fingerprint => fingerprint is not null)
+            .Select(fingerprint => fingerprint!)
+            .ToHashSet(StringComparer.Ordinal);
+
+    private static void ExcludeLatestFromBaselineWhenSendWasObserved(
+        DiscordConfirmationRequest request,
+        IReadOnlyList<AccessibleTarget> baselineMessages,
+        ISet<string> baselineFingerprints)
+    {
+        if (!request.ExplicitSendObserved || baselineMessages.Count == 0)
+        {
+            return;
+        }
+
+        var latest = CreateStableMessageFingerprint(baselineMessages[^1]);
+        if (latest is not null)
+        {
+            baselineFingerprints.Remove(latest);
+        }
+    }
+
+    private static string? CreateStableMessageFingerprint(
+        AccessibleTarget root)
+    {
+        var visited = new HashSet<long>();
+        var nodeCount = 0;
+        string? signature = null;
+
+        void Inspect(AccessibleTarget target, int depth)
+        {
+            if (signature is not null ||
+                depth > MaximumTraversalDepth ||
+                nodeCount++ >= MaximumTraversalNodes)
+            {
+                return;
+            }
+
+            if (SafeRole(target.Accessible, target.ChildId) ==
+                RoleSystemDocument)
+            {
+                var name = SafeName(target.Accessible, target.ChildId);
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    signature = name;
+                    return;
+                }
+            }
+
+            var nested = ToAccessible(target);
+            if (nested is null || !MarkVisited(nested, visited))
+            {
+                return;
+            }
+
+            foreach (var child in GetChildren(nested))
+            {
+                Inspect(child, depth + 1);
+            }
+        }
+
+        Inspect(root, 0);
+        return signature is null
+            ? null
+            : Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes(signature)));
+    }
+
     private static bool TryValidateRequest(
         DiscordConfirmationRequest request,
         out HashSet<string> expectedUrls)
     {
         expectedUrls = [];
-        if (request.MainWindowHandle == 0 ||
+        if (!Enum.IsDefined(request.ContentKind) ||
+            request.MainWindowHandle == 0 ||
             request.RendererWindowHandle == 0 ||
             request.ProcessId == 0 ||
-            request.NormalizedUrls.Count is < 1 or > 20)
+            request.NormalizedUrls.Count > 20 ||
+            (request.ContentKind == DiscordConfirmationContentKind.Url &&
+             request.NormalizedUrls.Count == 0) ||
+            (request.ContentKind == DiscordConfirmationContentKind.Image &&
+             request.NormalizedUrls.Count != 0))
         {
             return false;
         }
@@ -182,7 +470,9 @@ public static class DiscordAccessibilityWorker
             expectedUrls.Add(value);
         }
 
-        if (expectedUrls.Count == 0 || !IsContextValid(request))
+        if ((request.ContentKind == DiscordConfirmationContentKind.Url &&
+             expectedUrls.Count == 0) ||
+            !IsContextValid(request))
         {
             return false;
         }
@@ -205,6 +495,11 @@ public static class DiscordAccessibilityWorker
             return false;
         }
     }
+
+    internal static bool RequiresMatchingUrlInput(
+        DiscordConfirmationRequest request) =>
+        request.ContentKind == DiscordConfirmationContentKind.Url &&
+        !request.ExplicitSendObserved;
 
     private static bool IsContextValid(DiscordConfirmationRequest request)
     {
@@ -232,7 +527,8 @@ public static class DiscordAccessibilityWorker
 
     private static TargetSearchResult FindTargets(
         IAccessible root,
-        IReadOnlySet<string> expectedUrls)
+        IReadOnlySet<string> expectedUrls,
+        bool requireMatchingUrlInput)
     {
         var result = new TargetSearchResult();
         var visited = new HashSet<long>();
@@ -243,6 +539,7 @@ public static class DiscordAccessibilityWorker
             result,
             visited,
             ref nodeCount,
+            requireMatchingUrlInput,
             0);
         return result;
     }
@@ -253,16 +550,22 @@ public static class DiscordAccessibilityWorker
         TargetSearchResult result,
         ISet<long> visited,
         ref int nodeCount,
+        bool requireMatchingUrlInput,
         int depth)
     {
-        if (depth > MaximumTraversalDepth ||
+        if (IsTargetSearchComplete(
+                requireMatchingUrlInput,
+                result.MessageLists.Count,
+                result.InputCandidates.Count) ||
+            depth > MaximumTraversalDepth ||
             nodeCount++ >= MaximumTraversalNodes)
         {
             return;
         }
 
         var role = SafeRole(target.Accessible, target.ChildId);
-        if (role == RoleSystemText &&
+        if (requireMatchingUrlInput &&
+            role == RoleSystemText &&
             ContainsAllUrls(
                 SafeValue(target.Accessible, target.ChildId),
                 expectedUrls))
@@ -290,9 +593,24 @@ public static class DiscordAccessibilityWorker
                 result,
                 visited,
                 ref nodeCount,
+                requireMatchingUrlInput,
                 depth + 1);
+            if (IsTargetSearchComplete(
+                    requireMatchingUrlInput,
+                    result.MessageLists.Count,
+                    result.InputCandidates.Count))
+            {
+                break;
+            }
         }
     }
+
+    internal static bool IsTargetSearchComplete(
+        bool requireMatchingUrlInput,
+        int messageListCount,
+        int inputCandidateCount) =>
+        messageListCount > 0 &&
+        (!requireMatchingUrlInput || inputCandidateCount > 0);
 
     private static bool SubtreeContainsAllUrls(
         AccessibleTarget root,
@@ -329,6 +647,128 @@ public static class DiscordAccessibilityWorker
         return expectedUrls.All(found.Contains);
     }
 
+    private static bool SubtreeContainsImageAttachment(AccessibleTarget root)
+    {
+        var visited = new HashSet<long>();
+        var nodeCount = 0;
+        var hasVisibleGraphic = false;
+        var hasImageDescriptor = false;
+
+        void Inspect(AccessibleTarget target, int depth)
+        {
+            if (depth > MaximumTraversalDepth ||
+                nodeCount++ >= MaximumTraversalNodes ||
+                (hasVisibleGraphic && hasImageDescriptor))
+            {
+                return;
+            }
+
+            var state = SafeState(target.Accessible, target.ChildId);
+            if (SafeRole(target.Accessible, target.ChildId) ==
+                    RoleSystemGraphic &&
+                (state == 0 || (state & VisibleListItemState) != 0))
+            {
+                hasVisibleGraphic = true;
+            }
+
+            hasImageDescriptor |= LooksLikeImageDescriptor(
+                SafeName(target.Accessible, target.ChildId));
+            hasImageDescriptor |= LooksLikeImageDescriptor(
+                SafeValue(target.Accessible, target.ChildId));
+            hasImageDescriptor |= LooksLikeImageDescriptor(
+                SafeDescription(target.Accessible, target.ChildId));
+
+            var nested = ToAccessible(target);
+            if (nested is null || !MarkVisited(nested, visited))
+            {
+                return;
+            }
+
+            foreach (var child in GetChildren(nested))
+            {
+                Inspect(child, depth + 1);
+            }
+        }
+
+        Inspect(root, 0);
+        return hasVisibleGraphic && hasImageDescriptor;
+    }
+
+    private static bool SubtreeContainsOwnedAttachmentControl(
+        AccessibleTarget root)
+    {
+        var visited = new HashSet<long>();
+        var nodeCount = 0;
+        var found = false;
+
+        void Inspect(AccessibleTarget target, int depth)
+        {
+            if (found ||
+                depth > MaximumTraversalDepth ||
+                nodeCount++ >= MaximumTraversalNodes)
+            {
+                return;
+            }
+
+            found = LooksLikeOwnedAttachmentControl(
+                        SafeName(target.Accessible, target.ChildId)) ||
+                    LooksLikeOwnedAttachmentControl(
+                        SafeValue(target.Accessible, target.ChildId)) ||
+                    LooksLikeOwnedAttachmentControl(
+                        SafeDescription(target.Accessible, target.ChildId));
+            var nested = ToAccessible(target);
+            if (nested is null || !MarkVisited(nested, visited))
+            {
+                return;
+            }
+
+            foreach (var child in GetChildren(nested))
+            {
+                Inspect(child, depth + 1);
+            }
+        }
+
+        Inspect(root, 0);
+        return found;
+    }
+
+    internal static bool LooksLikeImageDescriptor(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var normalized = value.Trim().ToLowerInvariant();
+        return normalized.Contains("image", StringComparison.Ordinal) ||
+               normalized.Contains("이미지", StringComparison.Ordinal) ||
+               normalized.Contains("attachment", StringComparison.Ordinal) ||
+               normalized.Contains("첨부", StringComparison.Ordinal) ||
+               normalized.Contains(
+                   "cdn.discordapp.com/attachments/",
+                   StringComparison.Ordinal) ||
+               normalized.Contains(
+                   "media.discordapp.net/attachments/",
+                   StringComparison.Ordinal) ||
+               normalized.EndsWith(".png", StringComparison.Ordinal) ||
+               normalized.EndsWith(".jpg", StringComparison.Ordinal) ||
+               normalized.EndsWith(".jpeg", StringComparison.Ordinal) ||
+               normalized.EndsWith(".gif", StringComparison.Ordinal) ||
+               normalized.EndsWith(".webp", StringComparison.Ordinal);
+    }
+
+    internal static bool LooksLikeOwnedAttachmentControl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var normalized = value.Trim().ToLowerInvariant();
+        return normalized.Contains("첨부 파일 수정", StringComparison.Ordinal) ||
+               normalized.Contains("edit attachment", StringComparison.Ordinal);
+    }
+
     private static List<AccessibleTarget> GetDirectListItems(
         AccessibleTarget list) =>
         GetChildren(ToAccessible(list))
@@ -336,6 +776,32 @@ public static class DiscordAccessibilityWorker
                 SafeRole(child.Accessible, child.ChildId) ==
                 RoleSystemListItem)
             .ToList();
+
+    private static List<AccessibleTarget> GetMessagesWithRefresh(
+        IAccessible accessibleRoot,
+        ref AccessibleTarget messageList)
+    {
+        var messages = GetDirectListItems(messageList);
+        if (messages.Count > 0)
+        {
+            return messages;
+        }
+
+        var refreshed = FindTargets(
+                accessibleRoot,
+                new HashSet<string>(StringComparer.Ordinal),
+                requireMatchingUrlInput: false)
+            .MessageLists
+            .OrderByDescending(target => GetDirectListItems(target).Count)
+            .FirstOrDefault();
+        if (refreshed is null)
+        {
+            return [];
+        }
+
+        messageList = refreshed;
+        return GetDirectListItems(messageList);
+    }
 
     private static List<AccessibleTarget> GetChildren(IAccessible? container)
     {
@@ -352,12 +818,26 @@ public static class DiscordAccessibilityWorker
         }
 
         var children = new object[childCount];
-        var resultCode = AccessibleChildren(
-            container,
-            0,
-            childCount,
-            children,
-            out var obtained);
+        int resultCode;
+        int obtained;
+        try
+        {
+            resultCode = AccessibleChildren(
+                container,
+                0,
+                childCount,
+                children,
+                out obtained);
+        }
+        catch (COMException)
+        {
+            return results;
+        }
+        catch (InvalidCastException)
+        {
+            return results;
+        }
+
         if (resultCode is not 0 and not 1)
         {
             return results;
@@ -414,6 +894,10 @@ public static class DiscordAccessibilityWorker
         {
             return null;
         }
+        catch (InvalidCastException)
+        {
+            return null;
+        }
     }
 
     private static bool ContainsAllUrls(
@@ -458,6 +942,10 @@ public static class DiscordAccessibilityWorker
         {
             return -1;
         }
+        catch (InvalidCastException)
+        {
+            return -1;
+        }
     }
 
     private static int SafeState(IAccessible accessible, object childId)
@@ -467,6 +955,10 @@ public static class DiscordAccessibilityWorker
             return accessible.get_accState(childId) is int state ? state : -1;
         }
         catch (COMException)
+        {
+            return -1;
+        }
+        catch (InvalidCastException)
         {
             return -1;
         }
@@ -482,6 +974,10 @@ public static class DiscordAccessibilityWorker
         {
             return 0;
         }
+        catch (InvalidCastException)
+        {
+            return 0;
+        }
     }
 
     private static string? SafeName(IAccessible accessible, object childId)
@@ -494,6 +990,10 @@ public static class DiscordAccessibilityWorker
         {
             return null;
         }
+        catch (InvalidCastException)
+        {
+            return null;
+        }
     }
 
     private static string? SafeValue(IAccessible accessible, object childId)
@@ -503,6 +1003,28 @@ public static class DiscordAccessibilityWorker
             return accessible.get_accValue(childId);
         }
         catch (COMException)
+        {
+            return null;
+        }
+        catch (InvalidCastException)
+        {
+            return null;
+        }
+    }
+
+    private static string? SafeDescription(
+        IAccessible accessible,
+        object childId)
+    {
+        try
+        {
+            return accessible.get_accDescription(childId);
+        }
+        catch (COMException)
+        {
+            return null;
+        }
+        catch (InvalidCastException)
         {
             return null;
         }
@@ -519,6 +1041,10 @@ public static class DiscordAccessibilityWorker
             return visited.Add(unknown.ToInt64());
         }
         catch (COMException)
+        {
+            return true;
+        }
+        catch (InvalidCastException)
         {
             return true;
         }

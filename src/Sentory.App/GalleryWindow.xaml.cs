@@ -243,7 +243,7 @@ public partial class GalleryWindow : Window
         {
             EmptyTitleText.Text = "아직 보관된 항목이 없습니다";
             EmptyDescriptionText.Text =
-                "Discord에서 URL을 전송하거나 카카오톡에 URL이나 사진을 붙여넣어 보세요.";
+                "Discord에서 URL이나 사진을 전송하거나 카카오톡에 URL이나 사진을 붙여넣어 보세요.";
         }
 
         SetViewState(

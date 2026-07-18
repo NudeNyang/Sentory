@@ -395,9 +395,11 @@ public partial class App : System.Windows.Application
                 "Sentory",
                 notification.SourceApp == SourceApp.Discord &&
                 notification.DeliveryStatus == DeliveryStatus.Confirmed
-                    ? notification.Count == 1
-                        ? "Discord에서 URL 전송을 확인해 저장했습니다."
-                        : $"Discord에서 URL {notification.Count}개 전송을 확인해 저장했습니다."
+                    ? notification.Kind == ContentKind.Image
+                        ? "Discord에서 사진 전송을 확인해 저장했습니다."
+                        : notification.Count == 1
+                            ? "Discord에서 URL 전송을 확인해 저장했습니다."
+                            : $"Discord에서 URL {notification.Count}개 전송을 확인해 저장했습니다."
                     : notification.Kind == Sentory.Core.ContentKind.Image
                     ? "사진을 입력 시 저장했습니다."
                     : notification.Count == 1

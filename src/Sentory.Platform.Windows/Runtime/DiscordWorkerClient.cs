@@ -26,7 +26,8 @@ public sealed class DiscordWorkerClient : IDiscordConfirmationClient
         var executablePath = _processPath();
         if (string.IsNullOrWhiteSpace(executablePath))
         {
-            return DiscordConfirmationResponse.Unavailable();
+            return DiscordConfirmationResponse.Unavailable(
+                "worker-executable-path-unavailable");
         }
 
         using var process = new Process
@@ -48,7 +49,8 @@ public sealed class DiscordWorkerClient : IDiscordConfirmationClient
         {
             if (!process.Start())
             {
-                return DiscordConfirmationResponse.Unavailable();
+                return DiscordConfirmationResponse.Unavailable(
+                    "worker-process-start-failed");
             }
 
             var outputTask = process.StandardOutput.ReadToEndAsync(
@@ -76,14 +78,16 @@ public sealed class DiscordWorkerClient : IDiscordConfirmationClient
                     throw;
                 }
 
-                return DiscordConfirmationResponse.Unavailable();
+                return DiscordConfirmationResponse.Unavailable(
+                    "worker-process-timeout");
             }
 
             var output = await outputTask;
             _ = await errorTask;
             if (process.ExitCode != 0 || string.IsNullOrWhiteSpace(output))
             {
-                return DiscordConfirmationResponse.Unavailable();
+                return DiscordConfirmationResponse.Unavailable(
+                    $"worker-output-unavailable:exit-{process.ExitCode}");
             }
 
             return JsonSerializer.Deserialize<DiscordConfirmationResponse>(
@@ -99,7 +103,8 @@ public sealed class DiscordWorkerClient : IDiscordConfirmationClient
         catch (Exception)
         {
             TryKill(process);
-            return DiscordConfirmationResponse.Unavailable();
+            return DiscordConfirmationResponse.Unavailable(
+                "worker-client-exception");
         }
     }
 
