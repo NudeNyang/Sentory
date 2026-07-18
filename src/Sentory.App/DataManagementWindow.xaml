@@ -190,7 +190,7 @@
                        FontWeight="SemiBold"
                        Foreground="{DynamicResource TextBrush}" />
             <TextBlock Margin="0,5,0,0"
-                       Text="즐겨찾기에 등록된 항목은 모든 정리 작업에서 포함되지 않음."
+                       Text="즐겨찾기에 등록된 항목은 모든 정리 작업에서 포함되지 않음"
                        FontSize="12"
                        Foreground="{DynamicResource MutedTextBrush}" />
         </StackPanel>
@@ -253,7 +253,7 @@
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource TextBrush}" />
                 <TextBlock Margin="0,5,0,0"
-                           Text="기본값 사용 안 함."
+                           Text="기본값 사용 안 함"
                            FontSize="11"
                            Foreground="{DynamicResource MutedTextBrush}" />
                 <Grid Margin="0,14,0,0">
