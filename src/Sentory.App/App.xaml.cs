@@ -65,6 +65,7 @@ public partial class App : System.Windows.Application
                 _repository,
                 acceptInjectedInput);
             _runtime.Captured += OnCaptured;
+            _runtime.IssueDetected += OnCaptureIssueDetected;
 
             CreateTrayIcon();
             _runtime.Start();
@@ -238,6 +239,23 @@ public partial class App : System.Windows.Application
         });
     }
 
+    private void OnCaptureIssueDetected(
+        object? sender,
+        CaptureRuntimeIssue issue)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            SetStatus(
+                "상태: 일부 입력 처리에 실패했지만 감지 중입니다.",
+                "Sentory - 카카오톡 감지 중");
+            _trayIcon?.ShowBalloonTip(
+                2500,
+                "Sentory",
+                issue.UserMessage,
+                Forms.ToolTipIcon.Warning);
+        });
+    }
+
     private void SetStatus(string status, string trayText)
     {
         if (_statusItem is not null)
@@ -302,6 +320,7 @@ public partial class App : System.Windows.Application
         if (_runtime is not null)
         {
             _runtime.Captured -= OnCaptured;
+            _runtime.IssueDetected -= OnCaptureIssueDetected;
             await _runtime.DisposeAsync();
             _runtime = null;
         }

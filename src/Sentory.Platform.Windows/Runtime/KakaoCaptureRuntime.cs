@@ -24,6 +24,7 @@ public sealed class KakaoCaptureRuntime : ICaptureRuntime
     private readonly CancellationTokenSource _cancellation = new();
     private Task? _worker;
     private volatile bool _paused;
+    private DateTimeOffset _lastIssueReportedAt = DateTimeOffset.MinValue;
 
     public KakaoCaptureRuntime(
         ICaptureRepository repository,
@@ -39,6 +40,8 @@ public sealed class KakaoCaptureRuntime : ICaptureRuntime
     }
 
     public event EventHandler<CaptureNotification>? Captured;
+
+    public event EventHandler<CaptureRuntimeIssue>? IssueDetected;
 
     public bool IsPaused
     {
@@ -67,89 +70,114 @@ public sealed class KakaoCaptureRuntime : ICaptureRuntime
     {
         try
         {
-            await foreach (var trigger in _triggers.Reader.ReadAllAsync(
-                               cancellationToken))
-            {
-                if (_paused ||
-                    !_validator.TryValidate(trigger, out var context))
-                {
-                    continue;
-                }
-
-                var clipboard = await _clipboardReader.ReadAsync(
-                    context.ClipboardSequenceNumber,
-                    cancellationToken);
-                if (clipboard is null)
-                {
-                    continue;
-                }
-
-                if (clipboard.Image is not null)
-                {
-                    await CaptureImageIfConfirmedAsync(
-                        context,
-                        clipboard.Image,
-                        cancellationToken);
-                    continue;
-                }
-
-                if (clipboard.Text is null ||
-                    UrlExtractor.Extract(clipboard.Text).Count == 0)
-                {
-                    continue;
-                }
-
-                await Task.Delay(150, cancellationToken);
-                if (!StillMatches(context))
-                {
-                    continue;
-                }
-
-                var matchesInput =
-                    await _inputVerifier.ContainsClipboardUrlsAsync(
-                        context.InputWindow,
-                        clipboard.Text,
-                        TimeSpan.FromMilliseconds(750),
-                        cancellationToken);
-                if (!matchesInput)
-                {
-                    continue;
-                }
-
-                var results = await _coordinator.CaptureUrlsAsync(
-                    context.EventId,
-                    clipboard.Text,
-                    SourceApp.KakaoTalk,
-                    CaptureMethod.KakaoCtrlVUrl,
-                    DeliveryStatus.NotObserved,
-                    context.ContextHash,
-                    context.OccurredAt,
-                    [
-                        "ctrl-v",
-                        "kakao-process",
-                        "individual-chat-root",
-                        "input-class-and-id",
-                        "message-list-class-and-id",
-                        "clipboard-sequence-stable",
-                        "input-value-url-match"
-                    ],
-                    cancellationToken);
-                var applied = results.Count(result => result.EventApplied);
-                if (applied > 0)
-                {
-                    Captured?.Invoke(
-                        this,
-                        new CaptureNotification(
-                            ContentKind.Url,
-                            applied,
-                            context.OccurredAt));
-                }
-            }
+            await ResilientWorkLoop.RunAsync(
+                _triggers.Reader.ReadAllAsync(cancellationToken),
+                ProcessTriggerAsync,
+                ReportIssue,
+                cancellationToken);
         }
         catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested)
         {
         }
+    }
+
+    private async Task ProcessTriggerAsync(
+        PasteTrigger trigger,
+        CancellationToken cancellationToken)
+    {
+        if (_paused ||
+            !_validator.TryValidate(trigger, out var context))
+        {
+            return;
+        }
+
+        var clipboard = await _clipboardReader.ReadAsync(
+            context.ClipboardSequenceNumber,
+            cancellationToken);
+        if (clipboard is null)
+        {
+            return;
+        }
+
+        if (clipboard.Image is not null)
+        {
+            await CaptureImageIfConfirmedAsync(
+                context,
+                clipboard.Image,
+                cancellationToken);
+            return;
+        }
+
+        if (clipboard.Text is null ||
+            UrlExtractor.Extract(clipboard.Text).Count == 0)
+        {
+            return;
+        }
+
+        await Task.Delay(150, cancellationToken);
+        if (!StillMatches(context))
+        {
+            return;
+        }
+
+        var matchesInput =
+            await _inputVerifier.ContainsClipboardUrlsAsync(
+                context.InputWindow,
+                clipboard.Text,
+                TimeSpan.FromMilliseconds(750),
+                cancellationToken);
+        if (!matchesInput)
+        {
+            return;
+        }
+
+        var results = await _coordinator.CaptureUrlsAsync(
+            context.EventId,
+            clipboard.Text,
+            SourceApp.KakaoTalk,
+            CaptureMethod.KakaoCtrlVUrl,
+            DeliveryStatus.NotObserved,
+            context.ContextHash,
+            context.OccurredAt,
+            [
+                "ctrl-v",
+                "kakao-process",
+                "individual-chat-root",
+                "input-class-and-id",
+                "message-list-class-and-id",
+                "clipboard-sequence-stable",
+                "input-value-url-match"
+            ],
+            cancellationToken);
+        var applied = results.Count(result => result.EventApplied);
+        if (applied > 0)
+        {
+            Captured?.Invoke(
+                this,
+                new CaptureNotification(
+                    ContentKind.Url,
+                    applied,
+                    context.OccurredAt));
+        }
+    }
+
+    private void ReportIssue(Exception exception)
+    {
+        _ = exception;
+        var now = DateTimeOffset.UtcNow;
+        if (now - _lastIssueReportedAt < TimeSpan.FromSeconds(30))
+        {
+            return;
+        }
+
+        _lastIssueReportedAt = now;
+        IssueDetected?.Invoke(
+            this,
+            new CaptureRuntimeIssue(
+                "kakao-capture-item-failed",
+                "일부 입력을 처리하지 못했지만 감지는 계속됩니다.",
+                now));
     }
 
     private async Task CaptureImageIfConfirmedAsync(
