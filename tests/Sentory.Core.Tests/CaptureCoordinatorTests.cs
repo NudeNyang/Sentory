@@ -76,5 +76,9 @@ public sealed class CaptureCoordinatorTests
             DateTimeOffset copiedAt,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(false);
+
+        public Task<StorageRepairResult> RepairStorageAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new StorageRepairResult(0, 0, 0, 0));
     }
 }

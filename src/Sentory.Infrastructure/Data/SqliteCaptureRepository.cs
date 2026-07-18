@@ -8,6 +8,7 @@ namespace Sentory.Infrastructure.Data;
 public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
     : ICaptureRepository
 {
+    private const int CurrentSchemaVersion = 1;
     private readonly string _connectionString =
         new SqliteConnectionStringBuilder
         {
@@ -23,6 +24,16 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         paths.EnsureDirectories();
 
         await using var connection = await OpenConnectionAsync(cancellationToken);
+        var schemaVersion = await GetPragmaIntAsync(
+            connection,
+            "user_version",
+            cancellationToken);
+        if (schemaVersion > CurrentSchemaVersion)
+        {
+            throw new NotSupportedException(
+                "현재 Sentory보다 새로운 데이터베이스 형식입니다.");
+        }
+
         await ExecuteNonQueryAsync(
             connection,
             """
@@ -71,6 +82,11 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 ON capture_events(item_id);
             """,
             cancellationToken);
+        await ExecuteNonQueryAsync(
+            connection,
+            $"PRAGMA user_version = {CurrentSchemaVersion};",
+            cancellationToken);
+        await VerifyDatabaseIntegrityAsync(connection, cancellationToken);
 
         await EnsureColumnAsync(
             connection,
@@ -460,6 +476,90 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         return affected > 0;
     }
 
+    public async Task<StorageRepairResult> RepairStorageAsync(
+        CancellationToken cancellationToken = default)
+    {
+        paths.EnsureDirectories();
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal;
+        var referencedFiles = new HashSet<string>(comparison);
+        var missingImageFiles = 0;
+
+        await using (var connection = await OpenConnectionAsync(
+                         cancellationToken))
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText =
+                """
+                SELECT content_path
+                FROM items
+                WHERE kind = $kind AND content_path IS NOT NULL;
+                """;
+            command.Parameters.AddWithValue("$kind", ContentKind.Image.ToString());
+            await using var reader = await command.ExecuteReaderAsync(
+                cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                var absolutePath = TryResolveContentPath(reader.GetString(0));
+                if (absolutePath is null || !File.Exists(absolutePath))
+                {
+                    missingImageFiles++;
+                    continue;
+                }
+
+                referencedFiles.Add(absolutePath);
+            }
+        }
+
+        var orphanFilesDeleted = 0;
+        var temporaryFilesDeleted = 0;
+        var fileDeleteFailures = 0;
+        foreach (var file in Directory.EnumerateFiles(
+                     paths.ImagesDirectory,
+                     "*",
+                     SearchOption.AllDirectories))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var isTemporary = file.EndsWith(
+                ".tmp",
+                StringComparison.OrdinalIgnoreCase);
+            var isOrphanPng = string.Equals(
+                                  Path.GetExtension(file),
+                                  ".png",
+                                  StringComparison.OrdinalIgnoreCase) &&
+                              !referencedFiles.Contains(Path.GetFullPath(file));
+            if (!isTemporary && !isOrphanPng)
+            {
+                continue;
+            }
+
+            try
+            {
+                File.Delete(file);
+                if (isTemporary)
+                {
+                    temporaryFilesDeleted++;
+                }
+                else
+                {
+                    orphanFilesDeleted++;
+                }
+            }
+            catch (Exception exception)
+                when (exception is IOException or UnauthorizedAccessException)
+            {
+                fileDeleteFailures++;
+            }
+        }
+
+        return new StorageRepairResult(
+            orphanFilesDeleted,
+            temporaryFilesDeleted,
+            missingImageFiles,
+            fileDeleteFailures);
+    }
+
     private async Task<SqliteConnection> OpenConnectionAsync(
         CancellationToken cancellationToken)
     {
@@ -478,12 +578,8 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
 
     private void DeleteContentFile(string relativePath)
     {
-        var root = Path.GetFullPath(paths.RootDirectory)
-            .TrimEnd(Path.DirectorySeparatorChar) +
-            Path.DirectorySeparatorChar;
-        var target = Path.GetFullPath(
-            Path.Combine(paths.RootDirectory, relativePath));
-        if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        var target = TryResolveContentPath(relativePath);
+        if (target is null)
         {
             throw new InvalidOperationException(
                 "Stored content path escaped the Sentory data directory.");
@@ -495,6 +591,19 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         }
     }
 
+    private string? TryResolveContentPath(string relativePath)
+    {
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        var root = Path.GetFullPath(paths.RootDirectory)
+            .TrimEnd(Path.DirectorySeparatorChar) +
+            Path.DirectorySeparatorChar;
+        var target = Path.GetFullPath(
+            Path.Combine(paths.RootDirectory, relativePath));
+        return target.StartsWith(root, comparison) ? target : null;
+    }
+
     private static async Task ExecuteNonQueryAsync(
         SqliteConnection connection,
         string commandText,
@@ -503,6 +612,31 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         await using var command = connection.CreateCommand();
         command.CommandText = commandText;
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task<int> GetPragmaIntAsync(
+        SqliteConnection connection,
+        string pragmaName,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"PRAGMA {pragmaName};";
+        var value = await command.ExecuteScalarAsync(cancellationToken);
+        return Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private static async Task VerifyDatabaseIntegrityAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA quick_check;";
+        var result = await command.ExecuteScalarAsync(cancellationToken) as string;
+        if (!string.Equals(result, "ok", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException(
+                "Sentory 데이터베이스 무결성 검사에 실패했습니다.");
+        }
     }
 
     private static async Task EnsureColumnAsync(

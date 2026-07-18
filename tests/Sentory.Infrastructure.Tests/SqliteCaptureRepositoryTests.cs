@@ -173,6 +173,75 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task InitializeSetsCurrentSchemaVersion()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var repository = new SqliteCaptureRepository(paths);
+
+        await repository.InitializeAsync();
+        await using var connection = new SqliteConnection(
+            $"Data Source={paths.DatabasePath}");
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA user_version;";
+
+        Assert.Equal(1L, (long)(await command.ExecuteScalarAsync())!);
+    }
+
+    [Fact]
+    public async Task RepairRemovesOnlyUnreferencedAndTemporaryImageFiles()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var repository = new SqliteCaptureRepository(paths);
+        await repository.InitializeAsync();
+        byte[] bytes = [4, 3, 2, 1];
+        var hash = Convert.ToHexString(SHA256.HashData(bytes));
+        await repository.UpsertImageAsync(CreateImageRequest(
+            Guid.NewGuid(),
+            bytes,
+            hash));
+        var referenced = Assert.Single(await repository.GetRecentAsync(10));
+        var referencedPath = Path.Combine(_root, referenced.ContentPath!);
+        var orphanPath = Path.Combine(paths.ImagesDirectory, "orphan.png");
+        var temporaryPath = Path.Combine(paths.ImagesDirectory, "write.tmp");
+        var unrelatedPath = Path.Combine(paths.ImagesDirectory, "notes.txt");
+        await File.WriteAllBytesAsync(orphanPath, [9]);
+        await File.WriteAllBytesAsync(temporaryPath, [8]);
+        await File.WriteAllTextAsync(unrelatedPath, "keep");
+
+        var result = await repository.RepairStorageAsync();
+
+        Assert.Equal(1, result.OrphanFilesDeleted);
+        Assert.Equal(1, result.TemporaryFilesDeleted);
+        Assert.Equal(0, result.MissingImageFiles);
+        Assert.Equal(0, result.FileDeleteFailures);
+        Assert.True(File.Exists(referencedPath));
+        Assert.False(File.Exists(orphanPath));
+        Assert.False(File.Exists(temporaryPath));
+        Assert.True(File.Exists(unrelatedPath));
+    }
+
+    [Fact]
+    public async Task RepairReportsMissingReferencedImageWithoutDeletingRecord()
+    {
+        var repository = CreateRepository();
+        await repository.InitializeAsync();
+        byte[] bytes = [7, 7, 7];
+        var hash = Convert.ToHexString(SHA256.HashData(bytes));
+        await repository.UpsertImageAsync(CreateImageRequest(
+            Guid.NewGuid(),
+            bytes,
+            hash));
+        var item = Assert.Single(await repository.GetRecentAsync(10));
+        File.Delete(Path.Combine(_root, item.ContentPath!));
+
+        var result = await repository.RepairStorageAsync();
+
+        Assert.Equal(1, result.MissingImageFiles);
+        Assert.Single(await repository.GetRecentAsync(10));
+    }
+
+    [Fact]
     public void SettingsStoreReadsLegacyJsonAndPersistsWindowState()
     {
         var paths = SentoryDataPaths.ForRoot(_root);
@@ -201,6 +270,44 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         Assert.Equal(1100, restored.WindowWidth);
         Assert.Equal(720, restored.WindowHeight);
         Assert.True(restored.WindowMaximized);
+    }
+
+    [Fact]
+    public void SettingsStoreQuarantinesMalformedJson()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        paths.EnsureDirectories();
+        File.WriteAllText(paths.SettingsPath, "{broken json");
+        var store = new SentorySettingsStore(paths);
+
+        var settings = store.Load();
+
+        Assert.Equal("Newest", settings.SortMode);
+        Assert.False(File.Exists(paths.SettingsPath));
+        Assert.Single(Directory.GetFiles(
+            _root,
+            "gallery-settings.corrupt-*.json"));
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(30, 30)]
+    [InlineData(90, 90)]
+    [InlineData(180, 180)]
+    [InlineData(45, 0)]
+    public void SettingsStoreAllowsOnlySupportedCleanupDays(
+        int savedDays,
+        int expectedDays)
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        paths.EnsureDirectories();
+        File.WriteAllText(
+            paths.SettingsPath,
+            $"{{\"AutoCleanupDays\":{savedDays}}}");
+
+        var settings = new SentorySettingsStore(paths).Load();
+
+        Assert.Equal(expectedDays, settings.AutoCleanupDays);
     }
 
     private SqliteCaptureRepository CreateRepository() =>

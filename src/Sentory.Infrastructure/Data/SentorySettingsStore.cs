@@ -5,6 +5,8 @@ namespace Sentory.Infrastructure.Data;
 
 public sealed class SentorySettings
 {
+    private static readonly int[] SupportedCleanupDays = [0, 30, 90, 180];
+
     public string SortMode { get; set; } = "Newest";
 
     public bool IsDarkTheme { get; set; }
@@ -18,6 +20,18 @@ public sealed class SentorySettings
     public double? WindowHeight { get; set; }
 
     public bool WindowMaximized { get; set; }
+
+    public int AutoCleanupDays { get; set; }
+
+    public DateTimeOffset? LastAutoCleanupAt { get; set; }
+
+    internal void Normalize()
+    {
+        if (!SupportedCleanupDays.Contains(AutoCleanupDays))
+        {
+            AutoCleanupDays = 0;
+        }
+    }
 }
 
 public sealed class SentorySettingsStore(SentoryDataPaths paths)
@@ -37,15 +51,20 @@ public sealed class SentorySettingsStore(SentoryDataPaths paths)
             }
 
             var json = File.ReadAllText(paths.SettingsPath);
-            return JsonSerializer.Deserialize<SentorySettings>(
-                       json,
-                       JsonOptions) ??
-                   new SentorySettings();
+            var settings = JsonSerializer.Deserialize<SentorySettings>(
+                               json,
+                               JsonOptions) ??
+                           new SentorySettings();
+            settings.Normalize();
+            return settings;
+        }
+        catch (JsonException)
+        {
+            QuarantineInvalidSettings();
+            return new SentorySettings();
         }
         catch (Exception exception)
-            when (exception is IOException or
-                  UnauthorizedAccessException or
-                  JsonException)
+            when (exception is IOException or UnauthorizedAccessException)
         {
             return new SentorySettings();
         }
@@ -54,6 +73,7 @@ public sealed class SentorySettingsStore(SentoryDataPaths paths)
     public void Save(SentorySettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        settings.Normalize();
         paths.EnsureDirectories();
 
         var temporaryPath =
@@ -70,6 +90,28 @@ public sealed class SentorySettingsStore(SentoryDataPaths paths)
             {
                 File.Delete(temporaryPath);
             }
+        }
+    }
+
+    private void QuarantineInvalidSettings()
+    {
+        try
+        {
+            if (!File.Exists(paths.SettingsPath))
+            {
+                return;
+            }
+
+            var directory = Path.GetDirectoryName(paths.SettingsPath) ??
+                            paths.RootDirectory;
+            var quarantinePath = Path.Combine(
+                directory,
+                $"gallery-settings.corrupt-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}.json");
+            File.Move(paths.SettingsPath, quarantinePath);
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException)
+        {
         }
     }
 }

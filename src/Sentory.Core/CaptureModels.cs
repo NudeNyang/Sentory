@@ -79,6 +79,12 @@ public sealed record CapturedItemSummary(
     int CopyCount = 0,
     DateTimeOffset? LastCopiedAt = null);
 
+public sealed record StorageRepairResult(
+    int OrphanFilesDeleted,
+    int TemporaryFilesDeleted,
+    int MissingImageFiles,
+    int FileDeleteFailures);
+
 public interface ICaptureRepository
 {
     Task InitializeAsync(CancellationToken cancellationToken = default);
@@ -107,5 +113,8 @@ public interface ICaptureRepository
     Task<bool> RecordCopyAsync(
         Guid itemId,
         DateTimeOffset copiedAt,
+        CancellationToken cancellationToken = default);
+
+    Task<StorageRepairResult> RepairStorageAsync(
         CancellationToken cancellationToken = default);
 }

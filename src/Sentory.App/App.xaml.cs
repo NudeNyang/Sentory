@@ -55,6 +55,7 @@ public partial class App : System.Windows.Application
             _settingsStore = new SentorySettingsStore(_paths);
             _repository = new SqliteCaptureRepository(_paths);
             await _repository.InitializeAsync();
+            var repairResult = await _repository.RepairStorageAsync();
 
             var acceptInjectedInput = string.Equals(
                 Environment.GetEnvironmentVariable(
@@ -68,6 +69,15 @@ public partial class App : System.Windows.Application
             _runtime.IssueDetected += OnCaptureIssueDetected;
 
             CreateTrayIcon();
+            if (repairResult.FileDeleteFailures > 0 ||
+                repairResult.MissingImageFiles > 0)
+            {
+                _trayIcon?.ShowBalloonTip(
+                    3000,
+                    "Sentory 데이터 확인",
+                    "일부 사진 파일을 확인하지 못했습니다. 데이터 폴더를 확인해 주세요.",
+                    Forms.ToolTipIcon.Warning);
+            }
             _runtime.Start();
             UpdatePauseUi();
             if (e.Args.Contains("--gallery", StringComparer.OrdinalIgnoreCase))
