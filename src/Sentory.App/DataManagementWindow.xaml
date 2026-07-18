@@ -13,6 +13,8 @@
         <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#E9E4DC" />
         <SolidColorBrush x:Key="SurfaceBrush" Color="#F7F3EC" />
         <SolidColorBrush x:Key="InputBackgroundBrush" Color="#E4DED5" />
+        <SolidColorBrush x:Key="PopupBackgroundBrush" Color="#F7F3EC" />
+        <SolidColorBrush x:Key="PopupHoverBrush" Color="#E4DED5" />
         <SolidColorBrush x:Key="TextBrush" Color="#292722" />
         <SolidColorBrush x:Key="MutedTextBrush" Color="#6D6861" />
         <SolidColorBrush x:Key="LineBrush" Color="#CEC7BC" />
@@ -28,6 +30,127 @@
             <Setter Property="BorderBrush"
                     Value="{DynamicResource LineBrush}" />
             <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="MaxDropDownHeight" Value="220" />
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Padding" Value="12,9" />
+                        <Setter Property="Background"
+                                Value="{DynamicResource PopupBackgroundBrush}" />
+                        <Setter Property="Foreground"
+                                Value="{DynamicResource TextBrush}" />
+                        <Setter Property="HorizontalContentAlignment"
+                                Value="Stretch" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ComboBoxItem">
+                                    <Border x:Name="ItemBorder"
+                                            Padding="{TemplateBinding Padding}"
+                                            Background="{TemplateBinding Background}">
+                                        <ContentPresenter />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsHighlighted"
+                                                 Value="True">
+                                            <Setter TargetName="ItemBorder"
+                                                    Property="Background"
+                                                    Value="{DynamicResource PopupHoverBrush}" />
+                                        </Trigger>
+                                        <Trigger Property="IsSelected"
+                                                 Value="True">
+                                            <Setter TargetName="ItemBorder"
+                                                    Property="Background"
+                                                    Value="{DynamicResource PopupHoverBrush}" />
+                                            <Setter Property="FontWeight"
+                                                    Value="SemiBold" />
+                                        </Trigger>
+                                        <Trigger Property="IsEnabled"
+                                                 Value="False">
+                                            <Setter Property="Opacity"
+                                                    Value="0.55" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid x:Name="Root">
+                            <Border x:Name="ClosedBorder"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="8">
+                                <Grid>
+                                    <ContentPresenter Margin="12,0,38,0"
+                                                      HorizontalAlignment="Left"
+                                                      VerticalAlignment="Center"
+                                                      Content="{TemplateBinding SelectionBoxItem}"
+                                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                      ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                                      IsHitTestVisible="False" />
+                                    <TextBlock Margin="0,0,13,0"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               FontFamily="Segoe Fluent Icons"
+                                               FontSize="10"
+                                               Foreground="{TemplateBinding Foreground}"
+                                               Text="&#xE70D;" />
+                                </Grid>
+                            </Border>
+                            <ToggleButton x:Name="DropDownToggle"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          ClickMode="Press"
+                                          Focusable="False"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="Transparent" />
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <Popup x:Name="Popup"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   Placement="Bottom"
+                                   PopupAnimation="Fade">
+                                <Border Margin="0,4,0,0"
+                                        MinWidth="{Binding ActualWidth, ElementName=Root}"
+                                        MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                                        Background="{DynamicResource PopupBackgroundBrush}"
+                                        BorderBrush="{DynamicResource LineBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="8">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <StackPanel IsItemsHost="True"
+                                                    KeyboardNavigation.DirectionalNavigation="Contained" />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocusWithin"
+                                     Value="True">
+                                <Setter TargetName="ClosedBorder"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource AccentBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Root"
+                                        Property="Opacity"
+                                        Value="0.55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style x:Key="ActionButtonStyle" TargetType="Button">
@@ -67,7 +190,7 @@
                        FontWeight="SemiBold"
                        Foreground="{DynamicResource TextBrush}" />
             <TextBlock Margin="0,5,0,0"
-                       Text="즐겨찾기는 모든 정리 작업에서 항상 보존됩니다."
+                       Text="즐겨찾기에 등록된 항목은 모든 정리 작업에서 포함되지 않습니다."
                        FontSize="12"
                        Foreground="{DynamicResource MutedTextBrush}" />
         </StackPanel>
@@ -130,7 +253,7 @@
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource TextBrush}" />
                 <TextBlock Margin="0,5,0,0"
-                           Text="기본값은 사용 안 함이며, 90일을 권장합니다."
+                           Text="기본값은 사용 안 함입니다."
                            FontSize="11"
                            Foreground="{DynamicResource MutedTextBrush}" />
                 <Grid Margin="0,14,0,0">
