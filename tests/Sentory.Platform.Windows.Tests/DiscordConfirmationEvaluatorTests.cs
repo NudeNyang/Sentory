@@ -54,6 +54,51 @@ public sealed class DiscordConfirmationEvaluatorTests
     }
 
     [Fact]
+    public void InvalidatesTargetCacheWhenDiscordChannelTitleChanges()
+    {
+        var request = new DiscordConfirmationRequest(
+            10,
+            20,
+            30,
+            DiscordConfirmationContentKind.Warmup,
+            []);
+
+        Assert.False(DiscordAccessibilityWorker.IsCacheContextMatch(
+            request,
+            10,
+            20,
+            30,
+            "#이전 채널 | Discord",
+            "#현재 채널 | Discord"));
+    }
+
+    [Fact]
+    public void ReusesTargetCacheOnlyForSameDiscordWindowContext()
+    {
+        var request = new DiscordConfirmationRequest(
+            10,
+            20,
+            30,
+            DiscordConfirmationContentKind.Warmup,
+            []);
+
+        Assert.True(DiscordAccessibilityWorker.IsCacheContextMatch(
+            request,
+            10,
+            20,
+            30,
+            "#작업장 | Discord",
+            "#작업장 | Discord"));
+        Assert.False(DiscordAccessibilityWorker.IsCacheContextMatch(
+            request,
+            10,
+            99,
+            30,
+            "#작업장 | Discord",
+            "#작업장 | Discord"));
+    }
+
+    [Fact]
     public void ConfirmsOnlyClearedInputAndMatchingNewMessage()
     {
         var result = DiscordConfirmationEvaluator.Evaluate(

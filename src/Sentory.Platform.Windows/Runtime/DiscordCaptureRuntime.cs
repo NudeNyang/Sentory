@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using System.Diagnostics;
 using Sentory.Core;
 using Sentory.Platform.Windows.Interop;
 
@@ -9,6 +10,7 @@ public sealed class DiscordCaptureRuntime : ICaptureRuntime
     private const int MaximumActiveCandidates = 8;
 
     private readonly INativeWindowApi _native;
+    private readonly IDiscordWindowApi _discordWindows;
     private readonly DiscordContextValidator _validator;
     private readonly LowLevelPasteHook _hook;
     private readonly StaClipboardReader _clipboardReader;
@@ -32,6 +34,7 @@ public sealed class DiscordCaptureRuntime : ICaptureRuntime
     private readonly Dictionary<string, DateTimeOffset> _recentSendSignals =
         new(StringComparer.Ordinal);
     private Task? _worker;
+    private Task? _warmupTask;
     private volatile bool _paused;
     private DateTimeOffset _lastIssueReportedAt = DateTimeOffset.MinValue;
 
@@ -41,6 +44,7 @@ public sealed class DiscordCaptureRuntime : ICaptureRuntime
     {
         var native = new NativeWindowApi();
         _native = native;
+        _discordWindows = native;
         _validator = new DiscordContextValidator(native, native);
         _hook = new LowLevelPasteHook(native, acceptInjectedInput);
         _clipboardReader = new StaClipboardReader(native);
@@ -76,6 +80,7 @@ public sealed class DiscordCaptureRuntime : ICaptureRuntime
         _hook.SendDetected += OnSendDetected;
         _worker = Task.Run(() => ProcessTriggersAsync(_cancellation.Token));
         _hook.Start();
+        _warmupTask = WarmWorkerWithRetryAsync(_cancellation.Token);
     }
 
     private void OnPasteDetected(object? sender, PasteTrigger trigger) =>
@@ -249,44 +254,17 @@ public sealed class DiscordCaptureRuntime : ICaptureRuntime
     {
         try
         {
-            var context = registration.Context;
-            using var baselineCancellation =
-                CancellationTokenSource.CreateLinkedTokenSource(
-                    registration.Cancellation.Token);
-            var baselineTask = ConfirmAsync(
+            var sendTimeout = registration.Image is null
+                ? TimeSpan.FromMinutes(5)
+                : TimeSpan.FromMinutes(2);
+            _ = await registration.SendObserved.Task.WaitAsync(
+                sendTimeout,
+                registration.Cancellation.Token);
+            await Task.Delay(350, registration.Cancellation.Token);
+            var response = await ConfirmAsync(
                 registration,
-                explicitSendObserved: false,
-                baselineCancellation.Token);
-            var completed = await Task.WhenAny(
-                baselineTask,
-                registration.SendObserved.Task);
-
-            DiscordConfirmationResponse response;
-            if (completed == registration.SendObserved.Task ||
-                (registration.SendObserved.Task.IsCompletedSuccessfully &&
-                 baselineTask.IsCompletedSuccessfully &&
-                 baselineTask.Result.Outcome !=
-                 DiscordConfirmationOutcome.Confirmed))
-            {
-                baselineCancellation.Cancel();
-                try
-                {
-                    await baselineTask;
-                }
-                catch (OperationCanceledException)
-                {
-                }
-
-                await Task.Delay(500, registration.Cancellation.Token);
-                response = await ConfirmAsync(
-                    registration,
-                    explicitSendObserved: true,
-                    registration.Cancellation.Token);
-            }
-            else
-            {
-                response = await baselineTask;
-            }
+                explicitSendObserved: true,
+                registration.Cancellation.Token);
 
             DiscordCaptureTrace.Write(
                 registration.Image is null
@@ -332,6 +310,9 @@ public sealed class DiscordCaptureRuntime : ICaptureRuntime
             when (registration.Cancellation.IsCancellationRequested)
         {
         }
+        catch (TimeoutException)
+        {
+        }
         catch (Exception exception)
         {
             if (registration.Image is not null)
@@ -361,6 +342,95 @@ public sealed class DiscordCaptureRuntime : ICaptureRuntime
             }
 
             registration.Cancellation.Dispose();
+        }
+    }
+
+    private async Task WarmWorkerWithRetryAsync(
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 15; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (TryCreateWarmupRequest(out var request))
+            {
+                var startedAt = DateTimeOffset.UtcNow;
+                var response = await _confirmationClient.ConfirmAsync(
+                    request,
+                    cancellationToken);
+                DiscordCaptureTrace.Write(
+                    "worker-warmup-response",
+                    $"outcome={response.Outcome} elapsedMs={(DateTimeOffset.UtcNow - startedAt).TotalMilliseconds:F0} signals={string.Join(',', response.ConfirmationSignals)}");
+                if (response.Outcome == DiscordConfirmationOutcome.Confirmed)
+                {
+                    return;
+                }
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
+        }
+    }
+
+    private bool TryCreateWarmupRequest(
+        out DiscordConfirmationRequest request)
+    {
+        request = null!;
+        var processes = Process.GetProcessesByName(
+            DiscordContextValidator.DiscordProcessName);
+        try
+        {
+            foreach (var process in processes)
+            {
+                nint mainWindow;
+                try
+                {
+                    if (process.HasExited ||
+                        (mainWindow = process.MainWindowHandle) == nint.Zero)
+                    {
+                        continue;
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                    continue;
+                }
+
+                if (!string.Equals(
+                        _native.GetClassName(mainWindow),
+                        DiscordContextValidator.MainWindowClassName,
+                        StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var renderer = _discordWindows.FindDescendant(
+                    mainWindow,
+                    DiscordContextValidator.RendererClassName);
+                var processId = _native.GetProcessId(mainWindow);
+                if (renderer == nint.Zero ||
+                    processId == 0 ||
+                    _native.GetProcessId(renderer) != processId)
+                {
+                    continue;
+                }
+
+                request = new DiscordConfirmationRequest(
+                    mainWindow.ToInt64(),
+                    renderer.ToInt64(),
+                    processId,
+                    DiscordConfirmationContentKind.Warmup,
+                    [],
+                    30_000);
+                return true;
+            }
+
+            return false;
+        }
+        finally
+        {
+            foreach (var process in processes)
+            {
+                process.Dispose();
+            }
         }
     }
 
@@ -528,6 +598,16 @@ public sealed class DiscordCaptureRuntime : ICaptureRuntime
         _triggers.Writer.TryComplete();
         _cancellation.Cancel();
         CancelActiveCandidates();
+        if (_warmupTask is not null)
+        {
+            try
+            {
+                await _warmupTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
         if (_worker is not null)
         {
             try
@@ -554,6 +634,10 @@ public sealed class DiscordCaptureRuntime : ICaptureRuntime
         }
 
         _clipboardReader.Dispose();
+        if (_confirmationClient is IAsyncDisposable disposableClient)
+        {
+            await disposableClient.DisposeAsync();
+        }
         _cancellation.Dispose();
         GC.SuppressFinalize(this);
     }

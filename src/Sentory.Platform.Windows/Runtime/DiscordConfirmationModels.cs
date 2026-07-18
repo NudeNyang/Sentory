@@ -11,8 +11,24 @@ public enum DiscordConfirmationOutcome
 public enum DiscordConfirmationContentKind
 {
     Url,
-    Image
+    Image,
+    Warmup
 }
+
+public enum DiscordWorkerOperation
+{
+    Confirm,
+    Cancel
+}
+
+public sealed record DiscordWorkerMessage(
+    Guid RequestId,
+    DiscordWorkerOperation Operation,
+    DiscordConfirmationRequest? Request);
+
+public sealed record DiscordWorkerResponse(
+    Guid RequestId,
+    DiscordConfirmationResponse Response);
 
 public sealed record DiscordConfirmationRequest(
     long MainWindowHandle,

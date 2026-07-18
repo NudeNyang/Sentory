@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -31,35 +32,174 @@ public static class DiscordAccessibilityWorker
         TextWriter output,
         CancellationToken cancellationToken = default)
     {
+        var activeRequests =
+            new ConcurrentDictionary<Guid, CancellationTokenSource>();
+        var pendingResponses = new List<Task>();
+        var targetCache = new WorkerTargetCache();
+        using var outputGate = new SemaphoreSlim(1, 1);
+
+        while (true)
+        {
+            var json = await input.ReadLineAsync(cancellationToken);
+            if (json is null)
+            {
+                break;
+            }
+
+            DiscordWorkerMessage? message;
+            try
+            {
+                message = string.IsNullOrWhiteSpace(json)
+                    ? null
+                    : JsonSerializer.Deserialize<DiscordWorkerMessage>(json);
+            }
+            catch (JsonException exception)
+            {
+                await WriteResponseAsync(
+                    output,
+                    outputGate,
+                    new DiscordWorkerResponse(
+                        Guid.Empty,
+                        DiscordConfirmationResponse.Unavailable(
+                            $"worker-json:{exception.GetType().Name}")),
+                    cancellationToken);
+                continue;
+            }
+
+            if (message?.Operation == DiscordWorkerOperation.Cancel)
+            {
+                if (activeRequests.TryGetValue(
+                        message.RequestId,
+                        out var activeRequest))
+                {
+                    activeRequest.Cancel();
+                }
+
+                continue;
+            }
+
+            if (message?.Operation != DiscordWorkerOperation.Confirm ||
+                message.Request is null ||
+                message.RequestId == Guid.Empty)
+            {
+                await WriteResponseAsync(
+                    output,
+                    outputGate,
+                    new DiscordWorkerResponse(
+                        message?.RequestId ?? Guid.Empty,
+                        DiscordConfirmationResponse.Unavailable(
+                            "worker-request-invalid")),
+                    cancellationToken);
+                continue;
+            }
+
+            var requestCancellation =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken);
+            if (!activeRequests.TryAdd(
+                    message.RequestId,
+                    requestCancellation))
+            {
+                requestCancellation.Dispose();
+                await WriteResponseAsync(
+                    output,
+                    outputGate,
+                    new DiscordWorkerResponse(
+                        message.RequestId,
+                        DiscordConfirmationResponse.Unavailable(
+                            "worker-request-id-duplicate")),
+                    cancellationToken);
+                continue;
+            }
+
+            pendingResponses.RemoveAll(task => task.IsCompleted);
+            pendingResponses.Add(ProcessRequestAsync(
+                message,
+                requestCancellation,
+                activeRequests,
+                targetCache,
+                output,
+                outputGate,
+                cancellationToken));
+        }
+
+        foreach (var request in activeRequests.Values)
+        {
+            request.Cancel();
+        }
+
+        await Task.WhenAll(pendingResponses);
+
+        return 0;
+    }
+
+    private static async Task ProcessRequestAsync(
+        DiscordWorkerMessage message,
+        CancellationTokenSource requestCancellation,
+        ConcurrentDictionary<Guid, CancellationTokenSource> activeRequests,
+        WorkerTargetCache targetCache,
+        TextWriter output,
+        SemaphoreSlim outputGate,
+        CancellationToken workerCancellation)
+    {
         DiscordConfirmationResponse response;
         try
         {
-            var json = await input.ReadLineAsync(cancellationToken);
-            var request = string.IsNullOrWhiteSpace(json)
-                ? null
-                : JsonSerializer.Deserialize<DiscordConfirmationRequest>(json);
-            response = request is null
-                ? DiscordConfirmationResponse.Unavailable()
-                : await ConfirmAsync(request, cancellationToken);
+            response = await ConfirmAsync(
+                message.Request!,
+                targetCache,
+                requestCancellation.Token);
         }
         catch (OperationCanceledException)
-            when (cancellationToken.IsCancellationRequested)
+            when (requestCancellation.IsCancellationRequested)
         {
-            throw;
+            response = new DiscordConfirmationResponse(
+                DiscordConfirmationOutcome.Cancelled,
+                null,
+                ["worker-request-cancelled"]);
         }
         catch (Exception exception)
         {
             response = DiscordConfirmationResponse.Unavailable(
                 $"worker-exception:{exception.GetType().Name}");
         }
+        finally
+        {
+            activeRequests.TryRemove(message.RequestId, out _);
+            requestCancellation.Dispose();
+        }
 
-        await output.WriteLineAsync(JsonSerializer.Serialize(response));
-        await output.FlushAsync(cancellationToken);
-        return 0;
+        if (!workerCancellation.IsCancellationRequested)
+        {
+            await WriteResponseAsync(
+                output,
+                outputGate,
+                new DiscordWorkerResponse(message.RequestId, response),
+                workerCancellation);
+        }
+    }
+
+    private static async Task WriteResponseAsync(
+        TextWriter output,
+        SemaphoreSlim outputGate,
+        DiscordWorkerResponse response,
+        CancellationToken cancellationToken)
+    {
+        await outputGate.WaitAsync(cancellationToken);
+        try
+        {
+            await output.WriteLineAsync(JsonSerializer.Serialize(response));
+            await output.FlushAsync(cancellationToken);
+        }
+        finally
+        {
+            outputGate.Release();
+        }
     }
 
     private static async Task<DiscordConfirmationResponse> ConfirmAsync(
         DiscordConfirmationRequest request,
+        WorkerTargetCache targetCache,
         CancellationToken cancellationToken)
     {
         if (!TryValidateRequest(request, out var expectedUrls))
@@ -68,35 +208,29 @@ public static class DiscordAccessibilityWorker
                 "request-or-window-validation-failed");
         }
 
-        if (!TryCreateAccessible(
-                new nint(request.RendererWindowHandle),
-                out var accessibleRoot))
-        {
-            return DiscordConfirmationResponse.Unavailable(
-                "renderer-accessibility-root-unavailable");
-        }
-
         var requireMatchingUrlInput = RequiresMatchingUrlInput(request);
-        var targets = FindTargets(
-            accessibleRoot,
-            expectedUrls,
-            requireMatchingUrlInput);
-        if (targets.MessageLists.Count == 0)
+        if (!TryResolveTargets(
+                request,
+                expectedUrls,
+                requireMatchingUrlInput,
+                targetCache,
+                out var resolved,
+                out var unavailableSignal))
         {
             return DiscordConfirmationResponse.Unavailable(
-                "message-list-unavailable");
+                unavailableSignal);
         }
 
-        if (requireMatchingUrlInput &&
-            targets.InputCandidates.Count != 1)
+        if (request.ContentKind == DiscordConfirmationContentKind.Warmup)
         {
-            return DiscordConfirmationResponse.Unavailable(
-                $"url-input-candidate-count:{targets.InputCandidates.Count}");
+            return new DiscordConfirmationResponse(
+                DiscordConfirmationOutcome.Confirmed,
+                DateTimeOffset.UtcNow,
+                [resolved.CacheHit ? "target-cache-hit" : "target-cache-warmed"]);
         }
 
-        var messageList = targets.MessageLists
-            .OrderByDescending(target => GetDirectListItems(target).Count)
-            .First();
+        var accessibleRoot = resolved.AccessibleRoot;
+        var messageList = resolved.MessageList;
         var baselineMessages = GetDirectListItems(messageList);
         var baselineMessageCount = baselineMessages.Count;
         var baselineFingerprints = CreateMessageFingerprintSet(
@@ -109,7 +243,8 @@ public static class DiscordAccessibilityWorker
             {
                 return CreateConfirmedImageResponse(
                     DateTimeOffset.UtcNow,
-                    "send-key-and-current-message-match");
+                    "send-key-and-current-message-match",
+                    resolved.CacheHit);
             }
 
             ExcludeLatestFromBaselineWhenSendWasObserved(
@@ -122,20 +257,22 @@ public static class DiscordAccessibilityWorker
                 messageList,
                 baselineMessageCount,
                 baselineFingerprints,
+                resolved.CacheHit,
                 cancellationToken);
         }
 
         var inputTarget = requireMatchingUrlInput
-            ? targets.InputCandidates[0]
+            ? resolved.InputTarget
             : null;
         if (request.ExplicitSendObserved &&
             baselineMessages.Count > 0 &&
             IsVisibleUrlMessage(baselineMessages[^1], expectedUrls))
         {
-                return CreateConfirmedUrlResponse(
-                    DateTimeOffset.UtcNow,
-                    "send-key-and-current-message-match",
-                    request.ExplicitSendObserved);
+            return CreateConfirmedUrlResponse(
+                DateTimeOffset.UtcNow,
+                "send-key-and-current-message-match",
+                request.ExplicitSendObserved,
+                resolved.CacheHit);
         }
 
         ExcludeLatestFromBaselineWhenSendWasObserved(
@@ -182,7 +319,8 @@ public static class DiscordAccessibilityWorker
                 return CreateConfirmedUrlResponse(
                     DateTimeOffset.UtcNow,
                     "new-message-set-url-match",
-                    request.ExplicitSendObserved);
+                    request.ExplicitSendObserved,
+                    resolved.CacheHit);
             }
 
             if (decision == DiscordCandidateDecision.Cancelled)
@@ -223,6 +361,7 @@ public static class DiscordAccessibilityWorker
         AccessibleTarget messageList,
         int baselineMessageCount,
         IReadOnlySet<string> baselineFingerprints,
+        bool cacheHit,
         CancellationToken cancellationToken)
     {
         var timeout = TimeSpan.FromMilliseconds(
@@ -260,7 +399,8 @@ public static class DiscordAccessibilityWorker
             {
                 return CreateConfirmedImageResponse(
                     now,
-                    "new-message-set-owned-image-match");
+                    "new-message-set-owned-image-match",
+                    cacheHit);
             }
 
             if (decision == DiscordCandidateDecision.Cancelled)
@@ -301,7 +441,8 @@ public static class DiscordAccessibilityWorker
     private static DiscordConfirmationResponse CreateConfirmedUrlResponse(
         DateTimeOffset confirmedAt,
         string correlationSignal,
-        bool explicitSendObserved) =>
+        bool explicitSendObserved,
+        bool cacheHit) =>
         new(
             DiscordConfirmationOutcome.Confirmed,
             confirmedAt,
@@ -313,18 +454,21 @@ public static class DiscordAccessibilityWorker
                 explicitSendObserved
                     ? "post-send-message-url-match"
                     : "input-cleared-after-send",
+                cacheHit ? "target-cache-hit" : "target-cache-miss",
                 correlationSignal
             ]);
 
     private static DiscordConfirmationResponse CreateConfirmedImageResponse(
         DateTimeOffset confirmedAt,
-        string correlationSignal) =>
+        string correlationSignal,
+        bool cacheHit) =>
         new(
             DiscordConfirmationOutcome.Confirmed,
             confirmedAt,
             [
                 "discord-process-and-window",
                 "clipboard-image-paste-in-discord-input",
+                cacheHit ? "target-cache-hit" : "target-cache-miss",
                 correlationSignal
             ]);
 
@@ -437,6 +581,150 @@ public static class DiscordAccessibilityWorker
                 SHA256.HashData(Encoding.UTF8.GetBytes(signature)));
     }
 
+    private static bool TryResolveTargets(
+        DiscordConfirmationRequest request,
+        IReadOnlySet<string> expectedUrls,
+        bool requireMatchingUrlInput,
+        WorkerTargetCache cache,
+        out TargetResolution resolution,
+        out string unavailableSignal)
+    {
+        resolution = null!;
+        unavailableSignal = "message-list-unavailable";
+        var windowTitle = GetWindowTitle(
+            new nint(request.MainWindowHandle));
+
+        if (cache.Matches(request, windowTitle) &&
+            IsCachedMessageListUsable(cache.MessageList!))
+        {
+            if (!requireMatchingUrlInput)
+            {
+                resolution = new TargetResolution(
+                    cache.AccessibleRoot!,
+                    cache.MessageList!,
+                    null,
+                    true);
+                return true;
+            }
+
+            if (cache.InputTarget is { } cachedInput &&
+                SafeRole(cachedInput.Accessible, cachedInput.ChildId) ==
+                    RoleSystemText &&
+                ContainsAllUrls(
+                    SafeValue(cachedInput.Accessible, cachedInput.ChildId),
+                    expectedUrls))
+            {
+                resolution = new TargetResolution(
+                    cache.AccessibleRoot!,
+                    cache.MessageList!,
+                    cachedInput,
+                    true);
+                return true;
+            }
+
+            var refreshed = FindTargets(
+                cache.AccessibleRoot!,
+                expectedUrls,
+                requireMatchingUrlInput: true);
+            if (TrySelectTargets(
+                    refreshed,
+                    requireMatchingUrlInput: true,
+                    out var refreshedMessageList,
+                    out var refreshedInput,
+                    out unavailableSignal))
+            {
+                cache.Update(
+                    request,
+                    windowTitle,
+                    cache.AccessibleRoot!,
+                    refreshedMessageList,
+                    refreshedInput);
+                resolution = new TargetResolution(
+                    cache.AccessibleRoot!,
+                    refreshedMessageList,
+                    refreshedInput,
+                    false);
+                return true;
+            }
+
+            cache.Clear();
+        }
+
+        if (!TryCreateAccessible(
+                new nint(request.RendererWindowHandle),
+                out var accessibleRoot))
+        {
+            unavailableSignal = "renderer-accessibility-root-unavailable";
+            return false;
+        }
+
+        var targets = FindTargets(
+            accessibleRoot,
+            expectedUrls,
+            requireMatchingUrlInput);
+        if (!TrySelectTargets(
+                targets,
+                requireMatchingUrlInput,
+                out var messageList,
+                out var inputTarget,
+                out unavailableSignal))
+        {
+            return false;
+        }
+
+        cache.Update(
+            request,
+            windowTitle,
+            accessibleRoot,
+            messageList,
+            inputTarget);
+        resolution = new TargetResolution(
+            accessibleRoot,
+            messageList,
+            inputTarget,
+            false);
+        return true;
+    }
+
+    private static bool TrySelectTargets(
+        TargetSearchResult targets,
+        bool requireMatchingUrlInput,
+        out AccessibleTarget messageList,
+        out AccessibleTarget? inputTarget,
+        out string unavailableSignal)
+    {
+        messageList = null!;
+        inputTarget = null;
+        unavailableSignal = "message-list-unavailable";
+        if (targets.MessageLists.Count == 0)
+        {
+            return false;
+        }
+
+        if (requireMatchingUrlInput && targets.InputCandidates.Count != 1)
+        {
+            unavailableSignal =
+                $"url-input-candidate-count:{targets.InputCandidates.Count}";
+            return false;
+        }
+
+        messageList = targets.MessageLists
+            .OrderByDescending(target => GetDirectListItems(target).Count)
+            .First();
+        inputTarget = requireMatchingUrlInput
+            ? targets.InputCandidates[0]
+            : null;
+        return true;
+    }
+
+    private static bool IsCachedMessageListUsable(
+        AccessibleTarget messageList) =>
+        SafeRole(messageList.Accessible, messageList.ChildId) ==
+            RoleSystemList &&
+        SafeState(messageList.Accessible, messageList.ChildId) ==
+            MessageListState &&
+        GetDirectListItems(messageList).Count > 0;
+
     private static bool TryValidateRequest(
         DiscordConfirmationRequest request,
         out HashSet<string> expectedUrls)
@@ -500,6 +788,21 @@ public static class DiscordAccessibilityWorker
         DiscordConfirmationRequest request) =>
         request.ContentKind == DiscordConfirmationContentKind.Url &&
         !request.ExplicitSendObserved;
+
+    internal static bool IsCacheContextMatch(
+        DiscordConfirmationRequest request,
+        long cachedMainWindowHandle,
+        long cachedRendererWindowHandle,
+        uint cachedProcessId,
+        string cachedWindowTitle,
+        string currentWindowTitle) =>
+        cachedMainWindowHandle == request.MainWindowHandle &&
+        cachedRendererWindowHandle == request.RendererWindowHandle &&
+        cachedProcessId == request.ProcessId &&
+        string.Equals(
+            cachedWindowTitle,
+            currentWindowTitle,
+            StringComparison.Ordinal);
 
     private static bool IsContextValid(DiscordConfirmationRequest request)
     {
@@ -1065,9 +1368,84 @@ public static class DiscordAccessibilityWorker
             : string.Empty;
     }
 
+    private static string GetWindowTitle(nint window)
+    {
+        var title = new StringBuilder(512);
+        return GetWindowText(window, title, title.Capacity) > 0
+            ? title.ToString()
+            : string.Empty;
+    }
+
     private sealed record AccessibleTarget(
         IAccessible Accessible,
         object ChildId);
+
+    private sealed record TargetResolution(
+        IAccessible AccessibleRoot,
+        AccessibleTarget MessageList,
+        AccessibleTarget? InputTarget,
+        bool CacheHit);
+
+    private sealed class WorkerTargetCache
+    {
+        private long _mainWindowHandle;
+        private long _rendererWindowHandle;
+        private uint _processId;
+        private string _windowTitle = string.Empty;
+
+        public IAccessible? AccessibleRoot { get; private set; }
+
+        public AccessibleTarget? MessageList { get; private set; }
+
+        public AccessibleTarget? InputTarget { get; private set; }
+
+        public bool Matches(
+            DiscordConfirmationRequest request,
+            string windowTitle) =>
+            AccessibleRoot is not null &&
+            MessageList is not null &&
+            IsCacheContextMatch(
+                request,
+                _mainWindowHandle,
+                _rendererWindowHandle,
+                _processId,
+                _windowTitle,
+                windowTitle);
+
+        public void Update(
+            DiscordConfirmationRequest request,
+            string windowTitle,
+            IAccessible accessibleRoot,
+            AccessibleTarget messageList,
+            AccessibleTarget? inputTarget)
+        {
+            var sameContext = IsCacheContextMatch(
+                request,
+                _mainWindowHandle,
+                _rendererWindowHandle,
+                _processId,
+                    _windowTitle,
+                windowTitle);
+            _mainWindowHandle = request.MainWindowHandle;
+            _rendererWindowHandle = request.RendererWindowHandle;
+            _processId = request.ProcessId;
+            _windowTitle = windowTitle;
+            AccessibleRoot = accessibleRoot;
+            MessageList = messageList;
+            InputTarget = inputTarget ?? (sameContext ? InputTarget : null);
+        }
+
+        public void Clear()
+        {
+            _mainWindowHandle = 0;
+            _rendererWindowHandle = 0;
+            _processId = 0;
+            _windowTitle = string.Empty;
+            AccessibleRoot = null;
+            MessageList = null;
+            InputTarget = null;
+        }
+    }
 
     private sealed class TargetSearchResult
     {
@@ -1108,5 +1486,11 @@ public static class DiscordAccessibilityWorker
     private static extern int GetClassName(
         nint window,
         StringBuilder className,
+        int maximumCount);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetWindowText(
+        nint window,
+        StringBuilder text,
         int maximumCount);
 }
