@@ -185,7 +185,48 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         await using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version;";
 
-        Assert.Equal(1L, (long)(await command.ExecuteScalarAsync())!);
+        Assert.Equal(2L, (long)(await command.ExecuteScalarAsync())!);
+    }
+
+    [Fact]
+    public async Task LinkPreviewCandidatesAndMetadataArePersisted()
+    {
+        var repository = CreateRepository();
+        await repository.InitializeAsync();
+        var first = await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/preview",
+            DeliveryStatus.NotObserved));
+        await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.org/pending",
+            DeliveryStatus.NotObserved));
+        var fetchedAt = DateTimeOffset.UtcNow;
+
+        Assert.True(await repository.UpdateLinkPreviewAsync(
+            first.ItemId,
+            new LinkPreviewUpdate(
+                LinkPreviewStatus.Available,
+                "Example title",
+                "Example description",
+                "link-previews/example-icon.png",
+                "link-previews/example-cover.jpg",
+                fetchedAt)));
+
+        var recent = (await repository.GetRecentAsync(10))
+            .Single(item => item.ItemId == first.ItemId);
+        var candidates = await repository.GetLinkPreviewCandidatesAsync(
+            10,
+            fetchedAt.AddHours(-1));
+
+        Assert.Equal("Example title", recent.PageTitle);
+        Assert.Equal("Example description", recent.PageDescription);
+        Assert.Equal("link-previews/example-icon.png", recent.SiteIconPath);
+        Assert.Equal("link-previews/example-cover.jpg", recent.PreviewImagePath);
+        Assert.Equal(LinkPreviewStatus.Available, recent.PreviewStatus);
+        Assert.Equal(fetchedAt, recent.PreviewFetchedAt);
+        Assert.Single(candidates);
+        Assert.Equal("https://example.org/pending", candidates[0].Url);
     }
 
     [Fact]

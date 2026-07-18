@@ -12,7 +12,8 @@ public enum DesktopPlatform
 public sealed record SentoryDataPaths(
     string RootDirectory,
     string DatabasePath,
-    string ImagesDirectory)
+    string ImagesDirectory,
+    string LinkPreviewsDirectory)
 {
     public string SettingsPath =>
         Path.Combine(RootDirectory, "gallery-settings.json");
@@ -68,13 +69,15 @@ public sealed record SentoryDataPaths(
         return new SentoryDataPaths(
             root,
             Path.Combine(root, "sentory.db"),
-            Path.Combine(root, "images"));
+            Path.Combine(root, "images"),
+            Path.Combine(root, "link-previews"));
     }
 
     public void EnsureDirectories()
     {
         Directory.CreateDirectory(RootDirectory);
         Directory.CreateDirectory(ImagesDirectory);
+        Directory.CreateDirectory(LinkPreviewsDirectory);
     }
 
     private static DesktopPlatform GetCurrentPlatform()

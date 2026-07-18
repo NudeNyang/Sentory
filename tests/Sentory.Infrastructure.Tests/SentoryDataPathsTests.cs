@@ -22,6 +22,9 @@ public sealed class SentoryDataPathsTests
         Assert.Equal(
             Path.GetFullPath(Path.Combine(localAppData, "Sentory")),
             paths.RootDirectory);
+        Assert.Equal(
+            Path.Combine(paths.RootDirectory, "link-previews"),
+            paths.LinkPreviewsDirectory);
     }
 
     [Fact]

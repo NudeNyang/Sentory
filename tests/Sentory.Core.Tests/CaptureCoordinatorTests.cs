@@ -97,5 +97,18 @@ public sealed class CaptureCoordinatorTests
                 new DataCleanupPreview(0, 0, 0, 0),
                 0,
                 0));
+
+        public Task<IReadOnlyList<LinkPreviewCandidate>>
+            GetLinkPreviewCandidatesAsync(
+                int limit,
+                DateTimeOffset retryBefore,
+                CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<LinkPreviewCandidate>>([]);
+
+        public Task<bool> UpdateLinkPreviewAsync(
+            Guid itemId,
+            LinkPreviewUpdate preview,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
     }
 }

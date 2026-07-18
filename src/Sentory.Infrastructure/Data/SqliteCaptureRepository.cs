@@ -8,7 +8,7 @@ namespace Sentory.Infrastructure.Data;
 public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
     : ICaptureRepository
 {
-    private const int CurrentSchemaVersion = 1;
+    private const int CurrentSchemaVersion = 2;
     private readonly string _connectionString =
         new SqliteConnectionStringBuilder
         {
@@ -61,7 +61,13 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 image_height INTEGER NULL,
                 is_favorite INTEGER NOT NULL DEFAULT 0,
                 copy_count INTEGER NOT NULL DEFAULT 0,
-                last_copied_at TEXT NULL
+                last_copied_at TEXT NULL,
+                page_title TEXT NULL,
+                page_description TEXT NULL,
+                site_icon_path TEXT NULL,
+                preview_image_path TEXT NULL,
+                preview_status TEXT NULL,
+                preview_fetched_at TEXT NULL
             );
 
             CREATE TABLE IF NOT EXISTS capture_events (
@@ -82,12 +88,6 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 ON capture_events(item_id);
             """,
             cancellationToken);
-        await ExecuteNonQueryAsync(
-            connection,
-            $"PRAGMA user_version = {CurrentSchemaVersion};",
-            cancellationToken);
-        await VerifyDatabaseIntegrityAsync(connection, cancellationToken);
-
         await EnsureColumnAsync(
             connection,
             "items",
@@ -142,6 +142,42 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             "last_copied_at",
             "TEXT NULL",
             cancellationToken);
+        await EnsureColumnAsync(
+            connection,
+            "items",
+            "page_title",
+            "TEXT NULL",
+            cancellationToken);
+        await EnsureColumnAsync(
+            connection,
+            "items",
+            "page_description",
+            "TEXT NULL",
+            cancellationToken);
+        await EnsureColumnAsync(
+            connection,
+            "items",
+            "site_icon_path",
+            "TEXT NULL",
+            cancellationToken);
+        await EnsureColumnAsync(
+            connection,
+            "items",
+            "preview_image_path",
+            "TEXT NULL",
+            cancellationToken);
+        await EnsureColumnAsync(
+            connection,
+            "items",
+            "preview_status",
+            "TEXT NULL",
+            cancellationToken);
+        await EnsureColumnAsync(
+            connection,
+            "items",
+            "preview_fetched_at",
+            "TEXT NULL",
+            cancellationToken);
         await ExecuteNonQueryAsync(
             connection,
             """
@@ -149,8 +185,15 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 ON items(is_favorite, last_captured_at DESC);
             CREATE INDEX IF NOT EXISTS ix_items_last_copied_at
                 ON items(last_copied_at DESC);
+            CREATE INDEX IF NOT EXISTS ix_items_preview_fetched_at
+                ON items(kind, preview_fetched_at);
             """,
             cancellationToken);
+        await ExecuteNonQueryAsync(
+            connection,
+            $"PRAGMA user_version = {CurrentSchemaVersion};",
+            cancellationToken);
+        await VerifyDatabaseIntegrityAsync(connection, cancellationToken);
     }
 
     public async Task<CaptureResult> UpsertUrlAsync(
@@ -344,7 +387,9 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                    last_source_app, last_capture_method, delivery_status,
                    capture_count, share_count, created_at, last_captured_at,
                    content_path, content_hash, is_favorite, copy_count,
-                   last_copied_at
+                   last_copied_at, page_title, page_description,
+                   site_icon_path, preview_image_path, preview_status,
+                   preview_fetched_at
             FROM items
             ORDER BY last_captured_at DESC
             LIMIT $limit;
@@ -374,7 +419,17 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 reader.GetInt32(15),
                 reader.IsDBNull(16)
                     ? null
-                    : DateTimeOffset.Parse(reader.GetString(16))));
+                    : DateTimeOffset.Parse(reader.GetString(16)),
+                reader.IsDBNull(17) ? null : reader.GetString(17),
+                reader.IsDBNull(18) ? null : reader.GetString(18),
+                reader.IsDBNull(19) ? null : reader.GetString(19),
+                reader.IsDBNull(20) ? null : reader.GetString(20),
+                reader.IsDBNull(21)
+                    ? null
+                    : Enum.Parse<LinkPreviewStatus>(reader.GetString(21)),
+                reader.IsDBNull(22)
+                    ? null
+                    : DateTimeOffset.Parse(reader.GetString(22))));
         }
 
         return results;
@@ -427,21 +482,32 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         await using var transaction =
             await connection.BeginTransactionAsync(cancellationToken);
 
-        string? contentPath;
+        var storedPaths = new List<string>();
         await using (var lookup = connection.CreateCommand())
         {
             lookup.Transaction = (SqliteTransaction)transaction;
             lookup.CommandText =
-                "SELECT content_path FROM items WHERE id = $itemId;";
+                """
+                SELECT content_path, site_icon_path, preview_image_path
+                FROM items
+                WHERE id = $itemId;
+                """;
             lookup.Parameters.AddWithValue("$itemId", itemId.ToString("D"));
-            var result = await lookup.ExecuteScalarAsync(cancellationToken);
-            if (result is null)
+            await using var reader = await lookup.ExecuteReaderAsync(
+                cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
             {
                 await transaction.CommitAsync(cancellationToken);
                 return false;
             }
 
-            contentPath = result is DBNull ? null : (string)result;
+            for (var index = 0; index < 3; index++)
+            {
+                if (!reader.IsDBNull(index))
+                {
+                    storedPaths.Add(reader.GetString(index));
+                }
+            }
         }
 
         await using (var deleteEvents = connection.CreateCommand())
@@ -468,9 +534,13 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         }
 
         await transaction.CommitAsync(cancellationToken);
-        if (affected > 0 && contentPath is not null)
+        if (affected > 0)
         {
-            DeleteContentFile(contentPath);
+            foreach (var storedPath in storedPaths.Distinct(
+                         StringComparer.OrdinalIgnoreCase))
+            {
+                DeleteStoredFile(storedPath);
+            }
         }
 
         return affected > 0;
@@ -616,22 +686,33 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             olderThan,
             cancellationToken);
         var imagePaths = new List<string>();
+        var previewPaths = new List<string>();
         await using (var select = connection.CreateCommand())
         {
             select.Transaction = transaction;
             select.CommandText =
                 $"""
-                SELECT content_path
+                SELECT content_path, site_icon_path, preview_image_path
                 FROM items
                 WHERE {CleanupPredicate}
-                  AND content_path IS NOT NULL;
                 """;
             AddCleanupParameters(select, olderThan);
             await using var reader = await select.ExecuteReaderAsync(
                 cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
-                imagePaths.Add(reader.GetString(0));
+                if (!reader.IsDBNull(0))
+                {
+                    imagePaths.Add(reader.GetString(0));
+                }
+
+                for (var index = 1; index < 3; index++)
+                {
+                    if (!reader.IsDBNull(index))
+                    {
+                        previewPaths.Add(reader.GetString(index));
+                    }
+                }
             }
         }
 
@@ -679,6 +760,21 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                     File.Delete(target);
                     deletedImageFiles++;
                 }
+            }
+            catch (Exception exception)
+                when (exception is IOException or UnauthorizedAccessException)
+            {
+                fileDeleteFailures++;
+            }
+        }
+
+        foreach (var relativePath in previewPaths.Distinct(
+                     StringComparer.OrdinalIgnoreCase))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                DeleteStoredFile(relativePath);
             }
             catch (Exception exception)
                 when (exception is IOException or UnauthorizedAccessException)
@@ -758,7 +854,91 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         return connection;
     }
 
-    private void DeleteContentFile(string relativePath)
+    public async Task<IReadOnlyList<LinkPreviewCandidate>>
+        GetLinkPreviewCandidatesAsync(
+            int limit,
+            DateTimeOffset retryBefore,
+            CancellationToken cancellationToken = default)
+    {
+        if (limit <= 0)
+        {
+            return [];
+        }
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT id, original_url, normalized_key
+            FROM items
+            WHERE kind = $kind
+              AND (preview_fetched_at IS NULL OR
+                   julianday(preview_fetched_at) < julianday($retryBefore))
+            ORDER BY preview_fetched_at IS NOT NULL,
+                     last_captured_at DESC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$kind", ContentKind.Url.ToString());
+        command.Parameters.AddWithValue(
+            "$retryBefore",
+            retryBefore.ToString("O"));
+        command.Parameters.AddWithValue("$limit", limit);
+        var candidates = new List<LinkPreviewCandidate>();
+        await using var reader = await command.ExecuteReaderAsync(
+            cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            candidates.Add(new LinkPreviewCandidate(
+                Guid.Parse(reader.GetString(0)),
+                reader.GetString(1),
+                reader.GetString(2)));
+        }
+
+        return candidates;
+    }
+
+    public async Task<bool> UpdateLinkPreviewAsync(
+        Guid itemId,
+        LinkPreviewUpdate preview,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE items
+            SET page_title = $pageTitle,
+                page_description = $pageDescription,
+                site_icon_path = $siteIconPath,
+                preview_image_path = $previewImagePath,
+                preview_status = $previewStatus,
+                preview_fetched_at = $previewFetchedAt
+            WHERE id = $itemId AND kind = $kind;
+            """;
+        command.Parameters.AddWithValue(
+            "$pageTitle",
+            (object?)preview.PageTitle ?? DBNull.Value);
+        command.Parameters.AddWithValue(
+            "$pageDescription",
+            (object?)preview.PageDescription ?? DBNull.Value);
+        command.Parameters.AddWithValue(
+            "$siteIconPath",
+            (object?)preview.SiteIconPath ?? DBNull.Value);
+        command.Parameters.AddWithValue(
+            "$previewImagePath",
+            (object?)preview.PreviewImagePath ?? DBNull.Value);
+        command.Parameters.AddWithValue(
+            "$previewStatus",
+            preview.Status.ToString());
+        command.Parameters.AddWithValue(
+            "$previewFetchedAt",
+            preview.FetchedAt.ToString("O"));
+        command.Parameters.AddWithValue("$itemId", itemId.ToString("D"));
+        command.Parameters.AddWithValue("$kind", ContentKind.Url.ToString());
+        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+    }
+
+    private void DeleteStoredFile(string relativePath)
     {
         var target = TryResolveContentPath(relativePath);
         if (target is null)

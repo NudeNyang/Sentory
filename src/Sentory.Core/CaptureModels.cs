@@ -29,6 +29,12 @@ public enum CaptureMethod
     KakaoDragDrop
 }
 
+public enum LinkPreviewStatus
+{
+    Available,
+    Unavailable
+}
+
 public sealed record UrlCaptureRequest(
     Guid EventId,
     string OriginalUrl,
@@ -77,7 +83,26 @@ public sealed record CapturedItemSummary(
     string? Sha256 = null,
     bool IsFavorite = false,
     int CopyCount = 0,
-    DateTimeOffset? LastCopiedAt = null);
+    DateTimeOffset? LastCopiedAt = null,
+    string? PageTitle = null,
+    string? PageDescription = null,
+    string? SiteIconPath = null,
+    string? PreviewImagePath = null,
+    LinkPreviewStatus? PreviewStatus = null,
+    DateTimeOffset? PreviewFetchedAt = null);
+
+public sealed record LinkPreviewCandidate(
+    Guid ItemId,
+    string Url,
+    string NormalizedKey);
+
+public sealed record LinkPreviewUpdate(
+    LinkPreviewStatus Status,
+    string? PageTitle,
+    string? PageDescription,
+    string? SiteIconPath,
+    string? PreviewImagePath,
+    DateTimeOffset FetchedAt);
 
 public sealed record StorageRepairResult(
     int OrphanFilesDeleted,
@@ -145,5 +170,15 @@ public interface ICaptureRepository
 
     Task<DataCleanupResult> CleanupAsync(
         DateTimeOffset? olderThan,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<LinkPreviewCandidate>> GetLinkPreviewCandidatesAsync(
+        int limit,
+        DateTimeOffset retryBefore,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> UpdateLinkPreviewAsync(
+        Guid itemId,
+        LinkPreviewUpdate preview,
         CancellationToken cancellationToken = default);
 }
