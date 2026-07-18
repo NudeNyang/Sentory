@@ -582,6 +582,38 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             }
         }
 
+        await using (var connection = await OpenConnectionAsync(
+                         cancellationToken))
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText =
+                """
+                SELECT site_icon_path, preview_image_path
+                FROM items
+                WHERE site_icon_path IS NOT NULL OR
+                      preview_image_path IS NOT NULL;
+                """;
+            await using var reader = await command.ExecuteReaderAsync(
+                cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                for (var index = 0; index < 2; index++)
+                {
+                    if (reader.IsDBNull(index))
+                    {
+                        continue;
+                    }
+
+                    var absolutePath = TryResolveContentPath(
+                        reader.GetString(index));
+                    if (absolutePath is not null && File.Exists(absolutePath))
+                    {
+                        referencedFiles.Add(absolutePath);
+                    }
+                }
+            }
+        }
+
         var orphanFilesDeleted = 0;
         var temporaryFilesDeleted = 0;
         var fileDeleteFailures = 0;
@@ -600,6 +632,39 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                                   StringComparison.OrdinalIgnoreCase) &&
                               !referencedFiles.Contains(Path.GetFullPath(file));
             if (!isTemporary && !isOrphanPng)
+            {
+                continue;
+            }
+
+            try
+            {
+                File.Delete(file);
+                if (isTemporary)
+                {
+                    temporaryFilesDeleted++;
+                }
+                else
+                {
+                    orphanFilesDeleted++;
+                }
+            }
+            catch (Exception exception)
+                when (exception is IOException or UnauthorizedAccessException)
+            {
+                fileDeleteFailures++;
+            }
+        }
+
+        foreach (var file in Directory.EnumerateFiles(
+                     paths.LinkPreviewsDirectory,
+                     "*",
+                     SearchOption.AllDirectories))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var isTemporary = file.EndsWith(
+                ".tmp",
+                StringComparison.OrdinalIgnoreCase);
+            if (!isTemporary && referencedFiles.Contains(Path.GetFullPath(file)))
             {
                 continue;
             }
@@ -903,7 +968,40 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var transaction =
+            (SqliteTransaction)await connection.BeginTransactionAsync(
+                cancellationToken);
+        var oldPaths = new List<string>();
+        await using (var lookup = connection.CreateCommand())
+        {
+            lookup.Transaction = transaction;
+            lookup.CommandText =
+                """
+                SELECT site_icon_path, preview_image_path
+                FROM items
+                WHERE id = $itemId AND kind = $kind;
+                """;
+            lookup.Parameters.AddWithValue("$itemId", itemId.ToString("D"));
+            lookup.Parameters.AddWithValue("$kind", ContentKind.Url.ToString());
+            await using var reader = await lookup.ExecuteReaderAsync(
+                cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return false;
+            }
+
+            for (var index = 0; index < 2; index++)
+            {
+                if (!reader.IsDBNull(index))
+                {
+                    oldPaths.Add(reader.GetString(index));
+                }
+            }
+        }
+
         await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText =
             """
             UPDATE items
@@ -935,7 +1033,31 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             preview.FetchedAt.ToString("O"));
         command.Parameters.AddWithValue("$itemId", itemId.ToString("D"));
         command.Parameters.AddWithValue("$kind", ContentKind.Url.ToString());
-        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+        var updated = await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+        await transaction.CommitAsync(cancellationToken);
+        if (updated)
+        {
+            var currentPaths = new HashSet<string>(
+                new string?[]
+                    { preview.SiteIconPath, preview.PreviewImagePath }
+                    .OfType<string>(),
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var oldPath in oldPaths
+                         .Where(path => !currentPaths.Contains(path))
+                         .Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    DeleteStoredFile(oldPath);
+                }
+                catch (Exception exception)
+                    when (exception is IOException or UnauthorizedAccessException)
+                {
+                }
+            }
+        }
+
+        return updated;
     }
 
     private void DeleteStoredFile(string relativePath)

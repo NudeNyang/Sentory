@@ -246,20 +246,30 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         var orphanPath = Path.Combine(paths.ImagesDirectory, "orphan.png");
         var temporaryPath = Path.Combine(paths.ImagesDirectory, "write.tmp");
         var unrelatedPath = Path.Combine(paths.ImagesDirectory, "notes.txt");
+        var orphanPreviewPath = Path.Combine(
+            paths.LinkPreviewsDirectory,
+            "orphan.jpg");
+        var temporaryPreviewPath = Path.Combine(
+            paths.LinkPreviewsDirectory,
+            "download.tmp");
         await File.WriteAllBytesAsync(orphanPath, [9]);
         await File.WriteAllBytesAsync(temporaryPath, [8]);
         await File.WriteAllTextAsync(unrelatedPath, "keep");
+        await File.WriteAllBytesAsync(orphanPreviewPath, [7]);
+        await File.WriteAllBytesAsync(temporaryPreviewPath, [6]);
 
         var result = await repository.RepairStorageAsync();
 
-        Assert.Equal(1, result.OrphanFilesDeleted);
-        Assert.Equal(1, result.TemporaryFilesDeleted);
+        Assert.Equal(2, result.OrphanFilesDeleted);
+        Assert.Equal(2, result.TemporaryFilesDeleted);
         Assert.Equal(0, result.MissingImageFiles);
         Assert.Equal(0, result.FileDeleteFailures);
         Assert.True(File.Exists(referencedPath));
         Assert.False(File.Exists(orphanPath));
         Assert.False(File.Exists(temporaryPath));
         Assert.True(File.Exists(unrelatedPath));
+        Assert.False(File.Exists(orphanPreviewPath));
+        Assert.False(File.Exists(temporaryPreviewPath));
     }
 
     [Fact]
