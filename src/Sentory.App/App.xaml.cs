@@ -6,6 +6,7 @@ using System.Windows;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
 using Sentory.Infrastructure.Links;
+using Sentory.Platform.Windows.Interop;
 using Sentory.Platform.Windows.Runtime;
 using Forms = System.Windows.Forms;
 
@@ -41,6 +42,25 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
 
+        if (e.Args.Contains(
+                DiscordWorkerClient.WorkerArgument,
+                StringComparer.OrdinalIgnoreCase))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            using var workerInput = new StreamReader(
+                Console.OpenStandardInput());
+            using var workerOutput = new StreamWriter(
+                Console.OpenStandardOutput())
+            {
+                AutoFlush = true
+            };
+            var exitCode = await DiscordAccessibilityWorker.RunAsync(
+                workerInput,
+                workerOutput);
+            Shutdown(exitCode);
+            return;
+        }
+
         _singleInstanceMutex = new Mutex(
             initiallyOwned: true,
             SingleInstanceMutexName,
@@ -73,9 +93,13 @@ public partial class App : System.Windows.Application
                     "SENTORY_ACCEPT_INJECTED_INPUT"),
                 "1",
                 StringComparison.Ordinal);
-            _runtime = new KakaoCaptureRuntime(
-                _repository,
-                acceptInjectedInput);
+            _runtime = new CompositeCaptureRuntime(
+                new KakaoCaptureRuntime(
+                    _repository,
+                    acceptInjectedInput),
+                new DiscordCaptureRuntime(
+                    _repository,
+                    acceptInjectedInput));
             _runtime.Captured += OnCaptured;
             _runtime.IssueDetected += OnCaptureIssueDetected;
 
@@ -188,10 +212,10 @@ public partial class App : System.Windows.Application
         SetStatus(
             _runtime.IsPaused
                 ? "상태: 감지가 일시정지되었습니다."
-                : "상태: 카카오톡을 감지하고 있습니다.",
+                : "상태: Discord와 카카오톡을 감지하고 있습니다.",
             _runtime.IsPaused
                 ? "Sentory - 감지 일시정지됨"
-                : "Sentory - 카카오톡 감지 중");
+                : "Sentory - 메신저 감지 중");
     }
 
     private bool GetStartupEnabled()
@@ -251,7 +275,12 @@ public partial class App : System.Windows.Application
             _trayIcon?.ShowBalloonTip(
                 2500,
                 "Sentory",
-                notification.Kind == Sentory.Core.ContentKind.Image
+                notification.SourceApp == SourceApp.Discord &&
+                notification.DeliveryStatus == DeliveryStatus.Confirmed
+                    ? notification.Count == 1
+                        ? "Discord에서 URL 전송을 확인해 저장했습니다."
+                        : $"Discord에서 URL {notification.Count}개 전송을 확인해 저장했습니다."
+                    : notification.Kind == Sentory.Core.ContentKind.Image
                     ? "사진을 입력 시 저장했습니다."
                     : notification.Count == 1
                         ? "URL을 입력 시 저장했습니다."
@@ -278,7 +307,7 @@ public partial class App : System.Windows.Application
         {
             SetStatus(
                 "상태: 일부 입력 처리에 실패했지만 감지 중입니다.",
-                "Sentory - 카카오톡 감지 중");
+                "Sentory - 메신저 감지 중");
             _trayIcon?.ShowBalloonTip(
                 2500,
                 "Sentory",

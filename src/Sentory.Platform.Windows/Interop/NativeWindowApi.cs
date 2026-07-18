@@ -29,7 +29,12 @@ public interface INativeWindowApi
     uint GetClipboardSequenceNumber();
 }
 
-public sealed class NativeWindowApi : INativeWindowApi
+public interface IDiscordWindowApi
+{
+    nint FindDescendant(nint root, string className);
+}
+
+public sealed class NativeWindowApi : INativeWindowApi, IDiscordWindowApi
 {
     public nint GetForegroundWindow() =>
         NativeMethods.GetForegroundWindow();
@@ -125,6 +130,28 @@ public sealed class NativeWindowApi : INativeWindowApi
                 }
 
                 return true;
+            },
+            nint.Zero);
+        return found;
+    }
+
+    public nint FindDescendant(nint root, string className)
+    {
+        var found = nint.Zero;
+        NativeMethods.EnumChildWindows(
+            root,
+            (window, _) =>
+            {
+                if (!string.Equals(
+                        GetClassName(window),
+                        className,
+                        StringComparison.Ordinal))
+                {
+                    return true;
+                }
+
+                found = window;
+                return false;
             },
             nint.Zero);
         return found;

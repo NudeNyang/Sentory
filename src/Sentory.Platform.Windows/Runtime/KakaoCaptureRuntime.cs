@@ -158,7 +158,9 @@ public sealed class KakaoCaptureRuntime : ICaptureRuntime
                 new CaptureNotification(
                     ContentKind.Url,
                     applied,
-                    context.OccurredAt));
+                    context.OccurredAt,
+                    SourceApp.KakaoTalk,
+                    DeliveryStatus.NotObserved));
         }
     }
 
@@ -230,7 +232,9 @@ public sealed class KakaoCaptureRuntime : ICaptureRuntime
                 new CaptureNotification(
                     ContentKind.Image,
                     1,
-                    context.OccurredAt));
+                    context.OccurredAt,
+                    SourceApp.KakaoTalk,
+                    DeliveryStatus.NotObserved));
         }
     }
 

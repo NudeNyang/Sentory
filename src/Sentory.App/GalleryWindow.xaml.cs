@@ -115,7 +115,9 @@ public partial class GalleryWindow : Window
             item.LastCapturedAt.LocalDateTime.ToString("M월 d일 · HH:mm"),
             item.DeliveryStatus == DeliveryStatus.NotObserved
                 ? "입력 시 저장됨"
-                : "전송 확인됨",
+                : item.LastSourceApp == SourceApp.Discord
+                    ? "Discord 전송 확인됨"
+                    : "전송 확인됨",
             GetInitial(title),
             thumbnail,
             siteIcon,

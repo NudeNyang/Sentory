@@ -3,7 +3,9 @@ namespace Sentory.Core;
 public sealed record CaptureNotification(
     ContentKind Kind,
     int Count,
-    DateTimeOffset CapturedAt);
+    DateTimeOffset CapturedAt,
+    SourceApp? SourceApp = null,
+    DeliveryStatus? DeliveryStatus = null);
 
 public sealed record CaptureRuntimeIssue(
     string Code,

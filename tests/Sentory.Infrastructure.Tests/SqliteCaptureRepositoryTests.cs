@@ -80,6 +80,35 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task DiscordConfirmedUrlStoresSourceAndShareCount()
+    {
+        var repository = CreateRepository();
+        await repository.InitializeAsync();
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/discord",
+            out var normalized));
+
+        var result = await repository.UpsertUrlAsync(new UrlCaptureRequest(
+            Guid.NewGuid(),
+            normalized.Original,
+            normalized,
+            SourceApp.Discord,
+            CaptureMethod.DiscordConfirmedSend,
+            DeliveryStatus.Confirmed,
+            "discord-context",
+            DateTimeOffset.UtcNow,
+            ["newest-message-url-match"]));
+        var item = Assert.Single(await repository.GetRecentAsync(10));
+
+        Assert.Equal(1, result.ShareCount);
+        Assert.Equal(SourceApp.Discord, item.LastSourceApp);
+        Assert.Equal(
+            CaptureMethod.DiscordConfirmedSend,
+            item.LastCaptureMethod);
+        Assert.Equal(DeliveryStatus.Confirmed, item.DeliveryStatus);
+    }
+
+    [Fact]
     public async Task ImageIsStoredByHashAndDeduplicated()
     {
         var repository = CreateRepository();
