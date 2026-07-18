@@ -5,7 +5,6 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Sentory.Core;
@@ -34,6 +33,10 @@ public partial class GalleryWindow : Window
     private CancellationTokenSource? _feedbackCancellation;
     private bool _loaded;
     private bool _isDarkTheme;
+
+    public event EventHandler? DiscordRepairRequested;
+
+    public bool IsDarkTheme => _isDarkTheme;
 
     public GalleryWindow(
         ICaptureRepository repository,
@@ -95,6 +98,13 @@ public partial class GalleryWindow : Window
             ErrorText.Text = exception.Message;
             SetViewState(ViewState.Error);
         }
+    }
+
+    public void SetDiscordRepairNeeded(bool needed)
+    {
+        DiscordConnectionBanner.Visibility = needed
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private GalleryItemViewModel CreateViewModel(CapturedItemSummary item)
@@ -614,17 +624,7 @@ public partial class GalleryWindow : Window
 
     private void ApplyTheme(bool dark)
     {
-        var palette = dark
-            ? DarkPalette
-            : WarmPalette;
-        foreach (var (key, color) in palette)
-        {
-            var brush = new SolidColorBrush(
-                (System.Windows.Media.Color)
-                System.Windows.Media.ColorConverter.ConvertFromString(color));
-            brush.Freeze();
-            Resources[key] = brush;
-        }
+        SentoryTheme.Apply(Resources, dark);
 
         ThemeIcon.Text = dark ? "\uE706" : "\uE708";
         var label = dark
@@ -638,43 +638,7 @@ public partial class GalleryWindow : Window
     }
 
     private void ApplyTitleBarTheme()
-    {
-        var handle = new WindowInteropHelper(this).Handle;
-        if (handle == nint.Zero)
-        {
-            return;
-        }
-
-        var enabled = _isDarkTheme ? 1 : 0;
-        _ = DwmSetWindowAttribute(
-            handle,
-            DwmUseImmersiveDarkMode,
-            ref enabled,
-            sizeof(int));
-
-        var captionColor = ToColorRef(
-            _isDarkTheme ? DarkTitleBarColor : WarmTitleBarColor);
-        _ = DwmSetWindowAttribute(
-            handle,
-            DwmCaptionColor,
-            ref captionColor,
-            sizeof(int));
-
-        var captionTextColor = ToColorRef(
-            _isDarkTheme ? "#ECEBE7" : "#292722");
-        _ = DwmSetWindowAttribute(
-            handle,
-            DwmTextColor,
-            ref captionTextColor,
-            sizeof(int));
-    }
-
-    private static int ToColorRef(string hexColor)
-    {
-        var color = (System.Windows.Media.Color)
-            System.Windows.Media.ColorConverter.ConvertFromString(hexColor);
-        return color.R | color.G << 8 | color.B << 16;
-    }
+        => SentoryTheme.ApplyTitleBar(this, _isDarkTheme);
 
     private void RestoreWindowPlacement()
     {
@@ -751,6 +715,10 @@ public partial class GalleryWindow : Window
             var current = _settingsStore.Load();
             _settings.AutoCleanupDays = current.AutoCleanupDays;
             _settings.LastAutoCleanupAt = current.LastAutoCleanupAt;
+            _settings.DiscordSupportEnabled =
+                current.DiscordSupportEnabled;
+            _settings.DiscordAccessibilityPrepared =
+                current.DiscordAccessibilityPrepared;
             _settingsStore.Save(_settings);
         }
         catch (Exception exception)
@@ -1005,12 +973,13 @@ public partial class GalleryWindow : Window
 
     private async Task DeleteAsync(GalleryItemViewModel item)
     {
-        var result = System.Windows.MessageBox.Show(
-            "이 항목을 보관함에서 삭제하시겠습니까?",
-            "Sentory",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-        if (result != MessageBoxResult.Yes)
+        if (!SentoryDialogWindow.Confirm(
+                this,
+                "항목을 삭제할까요?",
+                "이 항목을 보관함에서 삭제합니다. 이 작업은 되돌릴 수 없습니다.",
+                "삭제",
+                _isDarkTheme,
+                danger: true))
         {
             return;
         }
@@ -1033,6 +1002,16 @@ public partial class GalleryWindow : Window
 
     private async void RetryButton_Click(object sender, RoutedEventArgs e) =>
         await RefreshAsync();
+
+    private void DiscordRepairButton_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        DiscordRepairRequested?.Invoke(this, EventArgs.Empty);
+
+    private void DiscordLaterButton_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        DiscordConnectionBanner.Visibility = Visibility.Collapsed;
 
     private async void ShowFeedback(string message)
     {
@@ -1090,74 +1069,6 @@ public partial class GalleryWindow : Window
         Error
     }
 
-    private const int DwmUseImmersiveDarkMode = 20;
-    private const int DwmCaptionColor = 35;
-    private const int DwmTextColor = 36;
-    private const string WarmTitleBarColor = "#DED6CA";
-    private const string DarkTitleBarColor = "#15181B";
-
-    private static readonly IReadOnlyDictionary<string, string> DarkPalette =
-        new Dictionary<string, string>
-        {
-            ["WindowBackgroundBrush"] = "#151719",
-            ["HeaderBackgroundBrush"] = "#1B1E21",
-            ["SurfaceBrush"] = "#202428",
-            ["SurfaceSecondaryBrush"] = "#191C20",
-            ["InputBackgroundBrush"] = "#24282D",
-            ["AccentBrush"] = "#7295FF",
-            ["FavoriteBrush"] = "#D4B15A",
-            ["AccentTextBrush"] = "#10141C",
-            ["TextBrush"] = "#ECEBE7",
-            ["MutedTextBrush"] = "#AAA69F",
-            ["SoftTextBrush"] = "#858B93",
-            ["LineBrush"] = "#32373D",
-            ["CopyButtonBackgroundBrush"] = "#E6282C31",
-            ["CopyButtonHoverBrush"] = "#363B41",
-            ["CopyButtonBorderBrush"] = "#454B53",
-            ["CardHoverBorderBrush"] = "#69778E",
-            ["StatusBackgroundBrush"] = "#2A2E33",
-            ["StatusTextBrush"] = "#BEC2C8",
-            ["SkeletonBrush"] = "#24282D",
-            ["EmptyIconBackgroundBrush"] = "#252C3B",
-            ["ToastBackgroundBrush"] = "#ECEBE7",
-            ["ToastTextBrush"] = "#1A1C1F",
-            ["DangerBrush"] = "#F08A82"
-        };
-
-    private static readonly IReadOnlyDictionary<string, string> WarmPalette =
-        new Dictionary<string, string>
-        {
-            ["WindowBackgroundBrush"] = "#E9E4DC",
-            ["HeaderBackgroundBrush"] = "#F2EEE7",
-            ["SurfaceBrush"] = "#F7F3EC",
-            ["SurfaceSecondaryBrush"] = "#DED8CF",
-            ["InputBackgroundBrush"] = "#E4DED5",
-            ["AccentBrush"] = "#756655",
-            ["FavoriteBrush"] = "#B1842F",
-            ["AccentTextBrush"] = "#F7F4EE",
-            ["TextBrush"] = "#292722",
-            ["MutedTextBrush"] = "#6D6861",
-            ["SoftTextBrush"] = "#89827A",
-            ["LineBrush"] = "#CEC7BC",
-            ["CopyButtonBackgroundBrush"] = "#EDF3EEE7",
-            ["CopyButtonHoverBrush"] = "#FAF7F1",
-            ["CopyButtonBorderBrush"] = "#C8C0B5",
-            ["CardHoverBorderBrush"] = "#9A8976",
-            ["StatusBackgroundBrush"] = "#E2DDD5",
-            ["StatusTextBrush"] = "#5E5952",
-            ["SkeletonBrush"] = "#D9D3CA",
-            ["EmptyIconBackgroundBrush"] = "#DCE3F1",
-            ["ToastBackgroundBrush"] = "#292722",
-            ["ToastTextBrush"] = "#F2EEE7",
-            ["DangerBrush"] = "#B85A52"
-        };
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(
-        nint window,
-        int attribute,
-        ref int value,
-        int valueSize);
 }
 
 public sealed record GalleryItemViewModel(

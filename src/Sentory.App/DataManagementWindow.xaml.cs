@@ -1,7 +1,4 @@
-using System.Runtime.InteropServices;
 using System.Windows;
-using System.Windows.Interop;
-using System.Windows.Media;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
 
@@ -114,13 +111,13 @@ public partial class DataManagementWindow : Window
                 $"링크 {preview.UrlItems:N0}개 · 사진 {preview.ImageItems:N0}개 " +
                 $"({FormatBytes(preview.ImageBytes)})\n" +
                 "즐겨찾기는 삭제되지 않습니다.";
-            var confirmation = System.Windows.MessageBox.Show(
-                this,
-                message,
-                "Sentory 데이터 정리",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-            if (confirmation != MessageBoxResult.Yes)
+            if (!SentoryDialogWindow.Confirm(
+                    this,
+                    "항목을 정리할까요?",
+                    message,
+                    "모두 삭제",
+                    _isDarkTheme,
+                    danger: true))
             {
                 StatusText.Text = "정리를 취소했습니다.";
                 return;
@@ -172,68 +169,10 @@ public partial class DataManagementWindow : Window
     }
 
     private void ApplyPalette()
-    {
-        var palette = _isDarkTheme
-            ? new Dictionary<string, string>
-            {
-                ["WindowBackgroundBrush"] = "#181B1E",
-                ["SurfaceBrush"] = "#202428",
-                ["InputBackgroundBrush"] = "#2A2E33",
-                ["PopupBackgroundBrush"] = "#202428",
-                ["PopupHoverBrush"] = "#343A40",
-                ["TextBrush"] = "#ECEBE7",
-                ["MutedTextBrush"] = "#AAA69F",
-                ["LineBrush"] = "#34393F",
-                ["AccentBrush"] = "#756B5E",
-                ["AccentTextBrush"] = "#F5F1EA",
-                ["DangerBrush"] = "#A95E57"
-            }
-            : new Dictionary<string, string>
-            {
-                ["WindowBackgroundBrush"] = "#E9E4DC",
-                ["SurfaceBrush"] = "#F7F3EC",
-                ["InputBackgroundBrush"] = "#E4DED5",
-                ["PopupBackgroundBrush"] = "#F7F3EC",
-                ["PopupHoverBrush"] = "#E4DED5",
-                ["TextBrush"] = "#292722",
-                ["MutedTextBrush"] = "#6D6861",
-                ["LineBrush"] = "#CEC7BC",
-                ["AccentBrush"] = "#756655",
-                ["AccentTextBrush"] = "#F7F4EE",
-                ["DangerBrush"] = "#B85A52"
-            };
-        foreach (var (key, hex) in palette)
-        {
-            var brush = new SolidColorBrush(
-                (System.Windows.Media.Color)
-                System.Windows.Media.ColorConverter.ConvertFromString(hex));
-            brush.Freeze();
-            Resources[key] = brush;
-        }
-    }
+        => SentoryTheme.Apply(Resources, _isDarkTheme);
 
     private void ApplyTitleBarTheme()
-    {
-        var handle = new WindowInteropHelper(this).Handle;
-        var dark = _isDarkTheme ? 1 : 0;
-        _ = DwmSetWindowAttribute(handle, 20, ref dark, sizeof(int));
-        var captionColor = ToColorRef(_isDarkTheme ? "#191C20" : "#DED6CA");
-        _ = DwmSetWindowAttribute(handle, 35, ref captionColor, sizeof(int));
-    }
-
-    private static int ToColorRef(string hexColor)
-    {
-        var color = (System.Windows.Media.Color)
-            System.Windows.Media.ColorConverter.ConvertFromString(hexColor);
-        return color.R | color.G << 8 | color.B << 16;
-    }
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(
-        nint window,
-        int attribute,
-        ref int value,
-        int valueSize);
+        => SentoryTheme.ApplyTitleBar(this, _isDarkTheme);
 
     private sealed record CleanupOption(int Days, string Label);
 }

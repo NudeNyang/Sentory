@@ -24,6 +24,8 @@ public sealed class DiscordAccessibilityLauncher
         "Discord",
         "Update.exe");
 
+    public bool IsInstalled => File.Exists(LauncherPath);
+
     internal ProcessStartInfo CreateStartInfo()
     {
         var startInfo = new ProcessStartInfo
@@ -36,6 +38,43 @@ public sealed class DiscordAccessibilityLauncher
         startInfo.ArgumentList.Add("--process-start-args");
         startInfo.ArgumentList.Add("--force-renderer-accessibility");
         return startInfo;
+    }
+
+    public bool IsRunning()
+    {
+        var processes = Process.GetProcessesByName(DiscordProcessName);
+        try
+        {
+            return processes.Any(IsRunning);
+        }
+        finally
+        {
+            foreach (var process in processes)
+            {
+                process.Dispose();
+            }
+        }
+    }
+
+    public void Start()
+    {
+        if (!File.Exists(LauncherPath))
+        {
+            throw new FileNotFoundException(
+                "Discord 실행 파일을 찾지 못했습니다.",
+                LauncherPath);
+        }
+
+        if (IsRunning())
+        {
+            return;
+        }
+
+        if (Process.Start(CreateStartInfo()) is null)
+        {
+            throw new InvalidOperationException(
+                "Discord를 시작하지 못했습니다.");
+        }
     }
 
     public async Task RestartAsync(

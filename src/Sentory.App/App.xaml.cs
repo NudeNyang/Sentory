@@ -22,9 +22,8 @@ public partial class App : System.Windows.Application
     private Mutex? _singleInstanceMutex;
     private bool _ownsMutex;
     private Forms.NotifyIcon? _trayIcon;
-    private Forms.ToolStripMenuItem? _statusItem;
-    private Forms.ToolStripMenuItem? _pauseItem;
-    private Forms.ToolStripMenuItem? _startupItem;
+    private TrayMenuWindow? _trayMenuWindow;
+    private string _statusText = "시작 중...";
     private ICaptureRepository? _repository;
     private SentorySettingsStore? _settingsStore;
     private ICaptureRuntime? _runtime;
@@ -37,7 +36,9 @@ public partial class App : System.Windows.Application
     private Task? _linkPreviewTask;
     private readonly WindowsStartupManager _startupManager = new();
     private readonly DiscordAccessibilityLauncher _discordLauncher = new();
-    private Forms.ToolStripMenuItem? _discordRepairItem;
+    private bool _discordSupportEnabled = true;
+    private bool _discordRepairNeeded;
+    private bool _discordRepairBusy;
     private bool _shuttingDown;
 
     protected override async void OnStartup(StartupEventArgs e)
@@ -70,11 +71,11 @@ public partial class App : System.Windows.Application
         _ownsMutex = createdNew;
         if (!createdNew)
         {
-            System.Windows.MessageBox.Show(
-                "Sentory가 이미 실행 중입니다. 작업 표시줄 알림 영역을 확인해 주세요.",
-                "Sentory",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            SentoryDialogWindow.ShowMessage(
+                null,
+                "Sentory가 이미 실행 중입니다",
+                "작업 표시줄 알림 영역의 Sentory 아이콘을 확인해 주세요.",
+                GetSavedDarkTheme());
             Shutdown();
             return;
         }
@@ -82,6 +83,7 @@ public partial class App : System.Windows.Application
         try
         {
             _settingsStore = new SentorySettingsStore(_paths);
+            PrepareDiscordDefault();
             _repository = new SqliteCaptureRepository(_paths);
             await _repository.InitializeAsync();
             var repairResult = await _repository.RepairStorageAsync();
@@ -129,11 +131,12 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
-            System.Windows.MessageBox.Show(
-                $"Sentory를 시작하지 못했습니다.\n\n{exception.Message}",
-                "Sentory 시작 오류",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+            SentoryDialogWindow.ShowMessage(
+                null,
+                "Sentory를 시작하지 못했습니다",
+                exception.Message,
+                GetSavedDarkTheme(),
+                danger: true);
             await ShutdownRuntimeAsync();
             Shutdown(1);
         }
@@ -141,82 +144,179 @@ public partial class App : System.Windows.Application
 
     private void CreateTrayIcon()
     {
-        _statusItem = new Forms.ToolStripMenuItem("시작 중...")
+        _trayIcon = new Forms.NotifyIcon
         {
-            Enabled = false
+            Text = "Sentory",
+            Icon = SystemIcons.Application,
+            Visible = true
         };
-        _pauseItem = new Forms.ToolStripMenuItem("감지 일시정지")
+        _trayIcon.DoubleClick += (_, _) => OpenGallery();
+        _trayIcon.MouseUp += (_, eventArgs) =>
         {
-            CheckOnClick = true
+            if (eventArgs.Button == Forms.MouseButtons.Right)
+            {
+                ShowTrayMenu();
+            }
         };
-        _pauseItem.Click += (_, _) => ApplyPauseState();
+    }
 
-        _startupItem = new Forms.ToolStripMenuItem(
-            "Windows 시작 시 자동 실행")
+    private void ShowTrayMenu()
+    {
+        _trayMenuWindow?.Close();
+        var isDarkTheme = _settingsStore?.Load().IsDarkTheme == true;
+        var menu = new TrayMenuWindow(
+            _statusText,
+            _runtime?.IsPaused == true,
+            GetStartupEnabled(),
+            _discordSupportEnabled,
+            isDarkTheme);
+        _trayMenuWindow = menu;
+        menu.Closed += (_, _) =>
         {
-            CheckOnClick = true,
-            Checked = GetStartupEnabled()
+            if (ReferenceEquals(_trayMenuWindow, menu))
+            {
+                _trayMenuWindow = null;
+            }
         };
-        _startupItem.Click += (_, _) => ApplyStartupState();
-
-        var openGalleryItem = new Forms.ToolStripMenuItem("갤러리 열기");
-        openGalleryItem.Click += (_, _) => OpenGallery();
-
-        var openDataItem = new Forms.ToolStripMenuItem("데이터 폴더 열기");
-        openDataItem.Click += (_, _) => OpenDataFolder();
-
-        _discordRepairItem = new Forms.ToolStripMenuItem(
-            "Discord 연결 복구");
-        _discordRepairItem.Click += async (_, _) =>
+        menu.OpenGalleryRequested += (_, _) => OpenGallery();
+        menu.PauseToggleRequested += (_, _) => ApplyPauseState();
+        menu.StartupToggleRequested += (_, _) => ApplyStartupState();
+        menu.DiscordSupportToggleRequested += (_, _) =>
+            ApplyDiscordSupportState();
+        menu.DiscordRepairRequested += async (_, _) =>
             await RepairDiscordConnectionAsync();
-
-        var exitItem = new Forms.ToolStripMenuItem("종료");
-        exitItem.Click += async (_, _) =>
+        menu.OpenDataRequested += (_, _) => OpenDataFolder();
+        menu.ExitRequested += async (_, _) =>
         {
             await ShutdownRuntimeAsync();
             Shutdown();
         };
 
-        var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add(_statusItem);
-        menu.Items.Add(new Forms.ToolStripSeparator());
-        menu.Items.Add(openGalleryItem);
-        menu.Items.Add(_pauseItem);
-        menu.Items.Add(_startupItem);
-        menu.Items.Add(_discordRepairItem);
-        menu.Items.Add(openDataItem);
-        menu.Items.Add(new Forms.ToolStripSeparator());
-        menu.Items.Add(exitItem);
+        var cursor = Forms.Cursor.Position;
+        menu.WindowStartupLocation = WindowStartupLocation.Manual;
+        menu.Left = cursor.X;
+        menu.Top = cursor.Y;
+        menu.Show();
 
-        _trayIcon = new Forms.NotifyIcon
-        {
-            Text = "Sentory",
-            Icon = SystemIcons.Application,
-            ContextMenuStrip = menu,
-            Visible = true
-        };
-        _trayIcon.DoubleClick += (_, _) => OpenGallery();
+        var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(menu);
+        var screen = Forms.Screen.FromPoint(cursor).WorkingArea;
+        var widthInPixels = menu.ActualWidth * dpi.DpiScaleX;
+        var heightInPixels = menu.ActualHeight * dpi.DpiScaleY;
+        var leftInPixels = Math.Clamp(
+            cursor.X - widthInPixels + 12,
+            screen.Left,
+            screen.Right - widthInPixels);
+        var topInPixels = Math.Clamp(
+            cursor.Y - heightInPixels + 12,
+            screen.Top,
+            screen.Bottom - heightInPixels);
+        menu.Left = leftInPixels / dpi.DpiScaleX;
+        menu.Top = topInPixels / dpi.DpiScaleY;
+        menu.Activate();
     }
 
-    private void ApplyPauseState()
+    private void PrepareDiscordDefault()
     {
-        if (_runtime is null || _pauseItem is null)
+        if (_settingsStore is null)
         {
             return;
         }
 
-        _runtime.IsPaused = _pauseItem.Checked;
+        var settings = _settingsStore.Load();
+        _discordSupportEnabled = settings.DiscordSupportEnabled;
+        if (!_discordSupportEnabled || !_discordLauncher.IsInstalled)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!_discordLauncher.IsRunning())
+            {
+                _discordLauncher.Start();
+                settings.DiscordAccessibilityPrepared = true;
+                _settingsStore.Save(settings);
+            }
+            else if (!settings.DiscordAccessibilityPrepared)
+            {
+                _discordRepairNeeded = true;
+            }
+        }
+        catch (Exception exception)
+            when (exception is IOException or
+                  InvalidOperationException or
+                  System.ComponentModel.Win32Exception or
+                  UnauthorizedAccessException)
+        {
+            _discordRepairNeeded = true;
+        }
+    }
+
+    private void ApplyDiscordSupportState()
+    {
+        if (_settingsStore is null)
+        {
+            return;
+        }
+
+        var settings = _settingsStore.Load();
+        settings.DiscordSupportEnabled =
+            !settings.DiscordSupportEnabled;
+        _discordSupportEnabled = settings.DiscordSupportEnabled;
+        if (!_discordSupportEnabled)
+        {
+            _discordRepairNeeded = false;
+            _galleryWindow?.SetDiscordRepairNeeded(false);
+            _settingsStore.Save(settings);
+            return;
+        }
+
+        try
+        {
+            if (_discordLauncher.IsInstalled &&
+                !_discordLauncher.IsRunning())
+            {
+                _discordLauncher.Start();
+                settings.DiscordAccessibilityPrepared = true;
+                _discordRepairNeeded = false;
+            }
+            else if (_discordLauncher.IsInstalled &&
+                     !settings.DiscordAccessibilityPrepared)
+            {
+                _discordRepairNeeded = true;
+            }
+        }
+        catch (Exception exception)
+            when (exception is IOException or
+                  InvalidOperationException or
+                  System.ComponentModel.Win32Exception or
+                  UnauthorizedAccessException)
+        {
+            _discordRepairNeeded = true;
+        }
+
+        _settingsStore.Save(settings);
+        _galleryWindow?.SetDiscordRepairNeeded(_discordRepairNeeded);
+    }
+
+    private void ApplyPauseState()
+    {
+        if (_runtime is null)
+        {
+            return;
+        }
+
+        _runtime.IsPaused = !_runtime.IsPaused;
         UpdatePauseUi();
     }
 
     private void UpdatePauseUi()
     {
-        if (_runtime is null || _pauseItem is null)
+        if (_runtime is null)
         {
             return;
         }
 
-        _pauseItem.Checked = _runtime.IsPaused;
         SetStatus(
             _runtime.IsPaused
                 ? "상태: 감지가 일시정지되었습니다."
@@ -241,20 +341,31 @@ public partial class App : System.Windows.Application
         }
     }
 
-    private void ApplyStartupState()
+    private bool GetSavedDarkTheme()
     {
-        if (_startupItem is null)
-        {
-            return;
-        }
-
         try
         {
-            _startupManager.SetEnabled(_startupItem.Checked);
+            return (_settingsStore ?? new SentorySettingsStore(_paths))
+                .Load()
+                .IsDarkTheme;
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private void ApplyStartupState()
+    {
+        var enabled = !GetStartupEnabled();
+        try
+        {
+            _startupManager.SetEnabled(enabled);
             _trayIcon?.ShowBalloonTip(
                 1800,
                 "Sentory",
-                _startupItem.Checked
+                enabled
                     ? "Windows 자동 실행을 켰습니다."
                     : "Windows 자동 실행을 껐습니다.",
                 Forms.ToolTipIcon.Info);
@@ -265,7 +376,6 @@ public partial class App : System.Windows.Application
                   IOException or
                   InvalidOperationException)
         {
-            _startupItem.Checked = !_startupItem.Checked;
             _trayIcon?.ShowBalloonTip(
                 2200,
                 "Sentory",
@@ -317,6 +427,10 @@ public partial class App : System.Windows.Application
                 issue.Code,
                 "discord-detection-unavailable",
                 StringComparison.Ordinal);
+            if (discordUnavailable && _discordSupportEnabled)
+            {
+                SetDiscordRepairNeeded(true, persistPrepared: false);
+            }
             SetStatus(
                 discordUnavailable
                     ? "상태: Discord 연결 복구가 필요합니다."
@@ -328,7 +442,7 @@ public partial class App : System.Windows.Application
                 discordUnavailable ? 4500 : 2500,
                 "Sentory",
                 discordUnavailable
-                    ? "트레이 메뉴에서 'Discord 연결 복구'를 실행해 주세요."
+                    ? "Sentory 보관함에서 Discord 연결을 적용해 주세요."
                     : issue.UserMessage,
                 Forms.ToolTipIcon.Warning);
         });
@@ -336,28 +450,27 @@ public partial class App : System.Windows.Application
 
     private async Task RepairDiscordConnectionAsync()
     {
-        if (_discordRepairItem is null || !_discordRepairItem.Enabled)
+        if (_discordRepairBusy || !_discordSupportEnabled)
         {
             return;
         }
 
-        var result = System.Windows.MessageBox.Show(
-            "Discord를 접근성 모드로 다시 시작합니다.\n\n" +
-            "작성 중인 메시지와 진행 중인 통화가 종료될 수 있습니다. " +
-            "계속할까요?",
-            "Discord 연결 복구",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning,
-            MessageBoxResult.No);
-        if (result != MessageBoxResult.Yes)
+        var dark = _settingsStore?.Load().IsDarkTheme == true;
+        if (!SentoryDialogWindow.Confirm(
+                _galleryWindow,
+                "Discord를 다시 연결할까요?",
+                "Discord를 접근성 모드로 다시 시작합니다. 작성 중인 메시지와 진행 중인 통화가 종료될 수 있습니다.",
+                "다시 시작",
+                dark))
         {
             return;
         }
 
-        _discordRepairItem.Enabled = false;
+        _discordRepairBusy = true;
         try
         {
             await _discordLauncher.RestartAsync();
+            SetDiscordRepairNeeded(false, persistPrepared: true);
             SetStatus(
                 _runtime?.IsPaused == true
                     ? "상태: 감지가 일시정지되었습니다."
@@ -385,16 +498,37 @@ public partial class App : System.Windows.Application
         }
         finally
         {
-            _discordRepairItem.Enabled = true;
+            _discordRepairBusy = false;
+        }
+    }
+
+    private void SetDiscordRepairNeeded(
+        bool needed,
+        bool? persistPrepared = null)
+    {
+        _discordRepairNeeded = needed;
+        _galleryWindow?.SetDiscordRepairNeeded(needed);
+        if (_settingsStore is null || persistPrepared is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var settings = _settingsStore.Load();
+            settings.DiscordAccessibilityPrepared =
+                persistPrepared.Value;
+            _settingsStore.Save(settings);
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException)
+        {
         }
     }
 
     private void SetStatus(string status, string trayText)
     {
-        if (_statusItem is not null)
-        {
-            _statusItem.Text = status;
-        }
+        _statusText = status;
 
         if (_trayIcon is not null)
         {
@@ -426,6 +560,10 @@ public partial class App : System.Windows.Application
                 _repository,
                 _paths,
                 _settingsStore);
+            _galleryWindow.DiscordRepairRequested += async (_, _) =>
+                await RepairDiscordConnectionAsync();
+            _galleryWindow.SetDiscordRepairNeeded(
+                _discordSupportEnabled && _discordRepairNeeded);
             _galleryWindow.Closed += (_, _) => _galleryWindow = null;
             _galleryWindow.Show();
             return;
@@ -610,6 +748,8 @@ public partial class App : System.Windows.Application
         _linkPreviewFetcher?.Dispose();
         _linkPreviewFetcher = null;
         _linkPreviewService = null;
+        _trayMenuWindow?.Close();
+        _trayMenuWindow = null;
         _galleryWindow?.Close();
         _galleryWindow = null;
         if (_runtime is not null)
