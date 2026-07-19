@@ -56,8 +56,8 @@ public partial class ItemDetailWindow : Window
 
         if (item.Thumbnail is not null)
         {
-            ArtworkImage.Source = item.Thumbnail;
-            ArtworkImage.Stretch = item.IsImage
+            ArtworkImageBrush.ImageSource = item.Thumbnail;
+            ArtworkImageBrush.Stretch = item.IsImage
                 ? Stretch.Uniform
                 : Stretch.UniformToFill;
             ArtworkImage.Visibility = Visibility.Visible;

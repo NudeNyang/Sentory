@@ -139,10 +139,16 @@
                                    Foreground="{DynamicResource MutedTextBrush}"
                                    TextTrimming="CharacterEllipsis" />
                     </StackPanel>
-                    <Image x:Name="ArtworkImage"
-                           Margin="12"
-                           Stretch="Uniform"
-                           Visibility="Collapsed" />
+                    <Border x:Name="ArtworkImage"
+                            Margin="12"
+                            Visibility="Collapsed">
+                        <Border.Background>
+                            <ImageBrush x:Name="ArtworkImageBrush"
+                                        Stretch="Uniform"
+                                        AlignmentX="Center"
+                                        AlignmentY="Center" />
+                        </Border.Background>
+                    </Border>
                 </Grid>
             </Border>
 

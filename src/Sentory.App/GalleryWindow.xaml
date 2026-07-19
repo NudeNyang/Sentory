@@ -918,11 +918,16 @@
                                                 </StackPanel>
                                             </Grid>
 
-                                            <Image x:Name="ThumbnailImage"
-                                                   Margin="{Binding ThumbnailMargin}"
-                                                   Source="{Binding Thumbnail}"
-                                                   Stretch="{Binding ThumbnailStretch}"
-                                                   Visibility="Collapsed" />
+                                            <Border x:Name="ThumbnailImage"
+                                                    Margin="{Binding ThumbnailMargin}"
+                                                    Visibility="Collapsed">
+                                                <Border.Background>
+                                                    <ImageBrush ImageSource="{Binding Thumbnail}"
+                                                                Stretch="{Binding ThumbnailStretch}"
+                                                                AlignmentX="Center"
+                                                                AlignmentY="Center" />
+                                                </Border.Background>
+                                            </Border>
                                         </Grid>
                                     </Border>
 
