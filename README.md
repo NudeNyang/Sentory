@@ -88,19 +88,6 @@ ARM64 패키지는 교차 빌드와 실행 파일 구조 검증을 마쳤지만 
 Windows 버전, 사용한 메신저와 재현 순서를 알려주시면 됩니다. 자세한 내용은
 [지원 정책](./SUPPORT.md)을 참고해 주세요.
 
-## 개발 및 빌드
-
-```powershell
-dotnet build .\Sentory.sln --configuration Release
-dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 0.9.0-beta
-```
-
-배포 스크립트는 Windows x64·ARM64 설치형과 포터블 패키지, SHA-256 확인값,
-`release-manifest.json`을 `artifacts` 폴더에 만듭니다. 세부 구현과 배포 절차는
-[PROJECT.md](./PROJECT.md)와 [공개 배포 문서](./docs/05-release-and-distribution.md)에
-정리돼 있습니다.
-
 ## 라이선스
 
 Sentory는 개인적이고 비상업적인 용도로만 사용할 수 있습니다. NudeNyang의 사전 서면
