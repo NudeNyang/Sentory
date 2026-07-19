@@ -7,6 +7,8 @@ namespace Sentory.Infrastructure.Data;
 public sealed class SentorySettings
 {
     private static readonly int[] SupportedCleanupDays = [0, 30, 90, 180];
+    private static readonly string[] SupportedLanguages =
+        ["ko-KR", "en-US", "ja-JP", "zh-CN"];
 
     public string SortMode { get; set; } = "Newest";
 
@@ -15,6 +17,8 @@ public sealed class SentorySettings
     public List<string> FilterSourceApps { get; set; } = [];
 
     public bool IsDarkTheme { get; set; }
+
+    public string Language { get; set; } = "ko-KR";
 
     public bool DiscordSupportEnabled { get; set; } = true;
 
@@ -36,6 +40,21 @@ public sealed class SentorySettings
 
     internal void Normalize()
     {
+        if (!SupportedLanguages.Contains(
+                Language,
+                StringComparer.OrdinalIgnoreCase))
+        {
+            Language = "ko-KR";
+        }
+        else
+        {
+            Language = SupportedLanguages.First(value =>
+                string.Equals(
+                    value,
+                    Language,
+                    StringComparison.OrdinalIgnoreCase));
+        }
+
         if (!SupportedCleanupDays.Contains(AutoCleanupDays))
         {
             AutoCleanupDays = 0;

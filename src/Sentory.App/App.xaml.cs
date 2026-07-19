@@ -52,6 +52,11 @@ public partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        _settingsStore = new SentorySettingsStore(_paths);
+        SentoryLocalization.Apply(
+            Resources,
+            _settingsStore.Load().Language);
+        _statusText = SentoryLocalization.Text("Starting");
         _diagnosticsLog = new SentoryDiagnosticsLog(_paths);
         var isInstallationVerification = e.Args.Contains(
             InstallationVerificationArgument,
@@ -91,8 +96,8 @@ public partial class App : System.Windows.Application
             {
                 SentoryDialogWindow.ShowMessage(
                     null,
-                    "Sentory가 이미 실행 중입니다",
-                    "작업 표시줄 알림 영역의 Sentory 아이콘을 확인해 주세요.",
+                    SentoryLocalization.Text("AlreadyRunningHeading"),
+                    SentoryLocalization.Text("AlreadyRunningMessage"),
                     GetSavedDarkTheme());
                 Shutdown();
                 return;
@@ -101,7 +106,6 @@ public partial class App : System.Windows.Application
 
         try
         {
-            _settingsStore = new SentorySettingsStore(_paths);
             PrepareDiscordDefault();
             _repository = new SqliteCaptureRepository(_paths);
             await _repository.InitializeAsync();
@@ -147,14 +151,14 @@ public partial class App : System.Windows.Application
                 repairResult.MissingImageFiles > 0)
             {
                 _lastRuntimeIssue =
-                    "일부 사진 파일을 확인하지 못했습니다. 설정에서 데이터 폴더를 확인해 주세요.";
+                    SentoryLocalization.Text("StorageRepairIssue");
                 _diagnosticsLog.Write(
                     "storage-repair",
                     $"missing={repairResult.MissingImageFiles}, deleteFailures={repairResult.FileDeleteFailures}");
                 _trayIcon?.ShowBalloonTip(
                     3000,
-                    "Sentory 데이터 확인",
-                    "일부 사진 파일을 확인하지 못했습니다. 데이터 폴더를 확인해 주세요.",
+                    SentoryLocalization.Text("StorageCheckTitle"),
+                    SentoryLocalization.Text("StorageCheckMessage"),
                     Forms.ToolTipIcon.Warning);
             }
             await ApplyAutomaticCleanupAsync();
@@ -178,8 +182,8 @@ public partial class App : System.Windows.Application
             if (!isInstallationVerification)
             {
                 SentoryDialogWindow.ShowMessage(
-                    null,
-                    "Sentory를 시작하지 못했습니다",
+                null,
+                SentoryLocalization.Text("StartupFailedHeading"),
                     exception.Message,
                     GetSavedDarkTheme(),
                     danger: true);
@@ -380,11 +384,11 @@ public partial class App : System.Windows.Application
 
         SetStatus(
             _runtime.IsPaused
-                ? "상태: 감지가 일시정지되었습니다."
-                : "상태: Discord와 카카오톡을 감지하고 있습니다.",
+                ? SentoryLocalization.Text("StatusPaused")
+                : SentoryLocalization.Text("StatusDetecting"),
             _runtime.IsPaused
-                ? "Sentory - 감지 일시정지됨"
-                : "Sentory - 메신저 감지 중");
+                ? SentoryLocalization.Text("TrayPaused")
+                : SentoryLocalization.Text("TrayDetecting"));
     }
 
     private bool GetStartupEnabled()
@@ -427,8 +431,8 @@ public partial class App : System.Windows.Application
                 1800,
                 "Sentory",
                 enabled
-                    ? "Windows 자동 실행을 켰습니다."
-                    : "Windows 자동 실행을 껐습니다.",
+                    ? SentoryLocalization.Text("StartupEnabled")
+                    : SentoryLocalization.Text("StartupDisabled"),
                 Forms.ToolTipIcon.Info);
         }
         catch (Exception exception)
@@ -440,7 +444,7 @@ public partial class App : System.Windows.Application
             _trayIcon?.ShowBalloonTip(
                 2200,
                 "Sentory",
-                "자동 실행 설정을 변경하지 못했습니다.",
+                SentoryLocalization.Text("StartupChangeFailed"),
                 Forms.ToolTipIcon.Warning);
         }
     }
@@ -459,15 +463,19 @@ public partial class App : System.Windows.Application
                 notification.SourceApp == SourceApp.Discord &&
                 notification.DeliveryStatus == DeliveryStatus.Confirmed
                     ? notification.Kind == ContentKind.Image
-                        ? "Discord에서 사진 전송을 확인해 저장했습니다."
+                        ? SentoryLocalization.Text("DiscordPhotoSaved")
                         : notification.Count == 1
-                            ? "Discord에서 URL 전송을 확인해 저장했습니다."
-                            : $"Discord에서 URL {notification.Count}개 전송을 확인해 저장했습니다."
+                            ? SentoryLocalization.Text("DiscordUrlSaved")
+                            : SentoryLocalization.Format(
+                                "DiscordUrlsSavedFormat",
+                                notification.Count)
                     : notification.Kind == Sentory.Core.ContentKind.Image
-                    ? "사진을 입력 시 저장했습니다."
+                    ? SentoryLocalization.Text("InputPhotoSaved")
                     : notification.Count == 1
-                        ? "URL을 입력 시 저장했습니다."
-                        : $"URL {notification.Count}개를 입력 시 저장했습니다.",
+                        ? SentoryLocalization.Text("InputUrlSaved")
+                        : SentoryLocalization.Format(
+                            "InputUrlsSavedFormat",
+                            notification.Count),
                 Forms.ToolTipIcon.Info);
 
             if (_galleryWindow is { IsLoaded: true })
@@ -497,25 +505,25 @@ public partial class App : System.Windows.Application
                 SetDiscordRepairNeeded(true, persistPrepared: false);
             }
             _lastRuntimeIssue = discordUnavailable
-                ? "Discord 연결 복구가 필요합니다. 설정에서 다시 연결해 주세요."
-                : issue.UserMessage;
+                ? SentoryLocalization.Text("DiscordRecoveryIssue")
+                : SentoryLocalization.Text("CaptureIssue");
             _galleryWindow?.SetRuntimeIssue(_lastRuntimeIssue);
             _diagnosticsLog?.Write(
                 issue.Code,
                 issue.UserMessage);
             SetStatus(
                 discordUnavailable
-                    ? "상태: Discord 연결 복구가 필요합니다."
-                    : "상태: 일부 입력 처리에 실패했지만 감지 중입니다.",
+                    ? SentoryLocalization.Text("StatusDiscordRecovery")
+                    : SentoryLocalization.Text("StatusCaptureIssue"),
                 discordUnavailable
-                    ? "Sentory - Discord 연결 복구 필요"
-                    : "Sentory - 메신저 감지 중");
+                    ? SentoryLocalization.Text("TrayDiscordRecovery")
+                    : SentoryLocalization.Text("TrayDetecting"));
             _trayIcon?.ShowBalloonTip(
                 discordUnavailable ? 4500 : 2500,
                 "Sentory",
                 discordUnavailable
-                    ? "Sentory 보관함에서 Discord 연결을 적용해 주세요."
-                    : issue.UserMessage,
+                    ? SentoryLocalization.Text("ApplyDiscordRecovery")
+                    : SentoryLocalization.Text("CaptureIssue"),
                 Forms.ToolTipIcon.Warning);
         });
     }
@@ -548,7 +556,9 @@ public partial class App : System.Windows.Application
             if (_runtime?.IsPaused != true)
             {
                 SetStatus(
-                    $"상태: {DiscordDetectionPresentation.GetLabel(status.State)}",
+                    SentoryLocalization.Format(
+                        "StatusFormat",
+                        DiscordDetectionPresentation.GetLabel(status.State)),
                     $"Sentory - {DiscordDetectionPresentation.GetLabel(status.State)}");
             }
         });
@@ -564,9 +574,9 @@ public partial class App : System.Windows.Application
         var dark = _settingsStore?.Load().IsDarkTheme == true;
         if (!SentoryDialogWindow.Confirm(
                 _galleryWindow,
-                "Discord를 다시 연결할까요?",
-                "Discord를 접근성 모드로 다시 시작합니다. 작성 중인 메시지와 진행 중인 통화가 종료될 수 있습니다.",
-                "다시 시작",
+                SentoryLocalization.Text("ReconnectConfirmHeading"),
+                SentoryLocalization.Text("ReconnectConfirmMessage"),
+                SentoryLocalization.Text("Restart"),
                 dark))
         {
             return;
@@ -586,15 +596,15 @@ public partial class App : System.Windows.Application
             }
             SetStatus(
                 _runtime?.IsPaused == true
-                    ? "상태: 감지가 일시정지되었습니다."
-                    : "상태: Discord와 카카오톡을 감지하고 있습니다.",
+                    ? SentoryLocalization.Text("StatusPaused")
+                    : SentoryLocalization.Text("StatusDetecting"),
                 _runtime?.IsPaused == true
-                    ? "Sentory - 감지 일시정지됨"
-                    : "Sentory - 메신저 감지 중");
+                    ? SentoryLocalization.Text("TrayPaused")
+                    : SentoryLocalization.Text("TrayDetecting"));
             _trayIcon?.ShowBalloonTip(
                 3500,
                 "Sentory",
-                "Discord를 연결 복구 모드로 다시 시작했습니다.",
+                SentoryLocalization.Text("DiscordRestarted"),
                 Forms.ToolTipIcon.Info);
         }
         catch (Exception exception)
@@ -610,7 +620,7 @@ public partial class App : System.Windows.Application
             _trayIcon?.ShowBalloonTip(
                 4000,
                 "Sentory",
-                "Discord 연결을 복구하지 못했습니다. Discord를 종료한 뒤 다시 시도해 주세요.",
+                SentoryLocalization.Text("DiscordRepairFailed"),
                 Forms.ToolTipIcon.Warning);
         }
         finally
@@ -685,6 +695,7 @@ public partial class App : System.Windows.Application
                 await RepairDiscordConnectionAsync();
             _galleryWindow.DiscordSupportChanged += (_, _) =>
                 ApplyDiscordSupportSetting();
+            _galleryWindow.LanguageChanged += (_, _) => UpdatePauseUi();
             _galleryWindow.SetDiscordRepairNeeded(
                 _discordSupportEnabled && _discordRepairNeeded);
             _galleryWindow.SetDiscordDetectionState(
@@ -832,8 +843,10 @@ public partial class App : System.Windows.Application
             {
                 _trayIcon?.ShowBalloonTip(
                     2600,
-                    "Sentory 자동 정리",
-                    $"즐겨찾기를 제외한 {result.Deleted.TotalItems:N0}개 항목을 정리했습니다.",
+                    SentoryLocalization.Text("AutoCleanupTitle"),
+                    SentoryLocalization.Format(
+                        "AutoCleanupCompletedFormat",
+                        result.Deleted.TotalItems),
                     Forms.ToolTipIcon.Info);
                 if (_galleryWindow is { IsLoaded: true })
                 {
@@ -849,7 +862,7 @@ public partial class App : System.Windows.Application
         catch (Exception exception)
         {
             _lastRuntimeIssue =
-                "자동 정리를 완료하지 못했습니다. 다음 실행 때 다시 시도합니다.";
+                SentoryLocalization.Text("AutoCleanupFailedNextTime");
             _galleryWindow?.SetRuntimeIssue(_lastRuntimeIssue);
             _diagnosticsLog?.Write(
                 "auto-cleanup-failed",
@@ -857,8 +870,8 @@ public partial class App : System.Windows.Application
                 exception);
             _trayIcon?.ShowBalloonTip(
                 2600,
-                "Sentory 자동 정리",
-                "자동 정리를 완료하지 못했습니다. 다음 실행 때 다시 시도합니다.",
+                SentoryLocalization.Text("AutoCleanupTitle"),
+                SentoryLocalization.Text("AutoCleanupFailedNextTime"),
                 Forms.ToolTipIcon.Warning);
         }
     }

@@ -7,9 +7,12 @@ internal static class DiscordDetectionPresentation
     public static string GetLabel(CaptureRuntimeState state) =>
         state switch
         {
-            CaptureRuntimeState.Ready => "감지 준비 완료",
-            CaptureRuntimeState.ReconnectRequired => "Discord 재연결 필요",
-            CaptureRuntimeState.Recovering => "워커 복구 중",
-            _ => "연결 준비 중"
+            CaptureRuntimeState.Ready =>
+                SentoryLocalization.Text("StateReady"),
+            CaptureRuntimeState.ReconnectRequired =>
+                SentoryLocalization.Text("StateReconnect"),
+            CaptureRuntimeState.Recovering =>
+                SentoryLocalization.Text("StateRecovering"),
+            _ => SentoryLocalization.Text("StateConnecting")
         };
 }

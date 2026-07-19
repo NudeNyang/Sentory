@@ -43,6 +43,8 @@ public partial class GalleryWindow : Window
 
     public event EventHandler? DiscordSupportChanged;
 
+    public event EventHandler? LanguageChanged;
+
     public bool IsDarkTheme => _isDarkTheme;
 
     public GalleryWindow(
@@ -135,22 +137,22 @@ public partial class GalleryWindow : Window
         System.Windows.Automation.AutomationProperties.SetName(
             RuntimeIssueChip,
             string.IsNullOrWhiteSpace(message)
-                ? "최근 문제 없음"
-                : $"최근 문제 {message}");
+                ? SentoryLocalization.Text("NoRecentIssue")
+                : SentoryLocalization.Format("RecentIssueFormat", message));
     }
 
     private GalleryItemViewModel CreateViewModel(CapturedItemSummary item)
     {
         var isImage = item.Kind == ContentKind.Image;
         var title = isImage
-            ? "클립보드 이미지"
+            ? SentoryLocalization.Text("ClipboardImage")
             : !string.IsNullOrWhiteSpace(item.PageTitle)
                 ? item.PageTitle
             : string.IsNullOrWhiteSpace(item.Domain)
-                ? "저장된 링크"
+                ? SentoryLocalization.Text("SavedLink")
                 : item.Domain;
         var subtitle = isImage
-            ? "PNG 이미지"
+            ? SentoryLocalization.Text("PngImage")
             : !string.IsNullOrWhiteSpace(item.PageDescription)
                 ? item.PageDescription
             : item.OriginalUrl;
@@ -165,14 +167,14 @@ public partial class GalleryWindow : Window
             isImage,
             title,
             subtitle,
-            $"{(isImage ? "사진" : "링크")} · " +
+            $"{SentoryLocalization.Text(isImage ? "Image" : "Link")} · " +
             GetSourceLabel(item.LastSourceApp),
-            item.LastCapturedAt.LocalDateTime.ToString("M월 d일 · HH:mm"),
+            SentoryLocalization.FormatDate(item.LastCapturedAt.LocalDateTime),
             item.DeliveryStatus == DeliveryStatus.NotObserved
-                ? "입력 시 저장됨"
+                ? SentoryLocalization.Text("SavedOnInput")
                 : item.LastSourceApp == SourceApp.Discord
-                    ? "Discord 전송 확인됨"
-                    : "전송 확인됨",
+                    ? SentoryLocalization.Text("DiscordSent")
+                    : SentoryLocalization.Text("SentConfirmed"),
             GetInitial(title),
             thumbnail,
             siteIcon,
@@ -271,15 +273,15 @@ public partial class GalleryWindow : Window
 
         if (_allItems.Count > 0 && _visibleItems.Count == 0)
         {
-            EmptyTitleText.Text = "검색 결과가 없습니다";
-            EmptyDescriptionText.Text =
-                "다른 검색어나 필터로 다시 찾아보세요.";
+            EmptyTitleText.Text = SentoryLocalization.Text("NoSearchResults");
+            EmptyDescriptionText.Text = SentoryLocalization.Text(
+                "NoSearchResultsDescription");
         }
         else
         {
-            EmptyTitleText.Text = "아직 보관된 항목이 없습니다";
+            EmptyTitleText.Text = SentoryLocalization.Text("NoItems");
             EmptyDescriptionText.Text =
-                "Discord에서 URL이나 사진을 전송하거나 카카오톡에 URL이나 사진을 붙여넣어 보세요.";
+                SentoryLocalization.Text("NoItemsDescription");
         }
 
         SetViewState(
@@ -397,6 +399,13 @@ public partial class GalleryWindow : Window
             ApplyTheme(_isDarkTheme);
         }
 
+        if (window.LanguageChanged)
+        {
+            _settings.Language = _settingsStore.Load().Language;
+            RebuildLocalizedControls();
+            LanguageChanged?.Invoke(this, EventArgs.Empty);
+        }
+
         if (window.DiscordSupportChanged)
         {
             DiscordSupportChanged?.Invoke(this, EventArgs.Empty);
@@ -461,15 +470,19 @@ public partial class GalleryWindow : Window
 
         var favoriteCount = selectedItems.Count(item => item.Item.IsFavorite);
         var favoriteWarning = favoriteCount > 0
-            ? $"\n\n즐겨찾기 {favoriteCount:N0}개도 선택되어 함께 삭제됩니다."
+            ? SentoryLocalization.Format(
+                "SelectedFavoritesWarningFormat",
+                favoriteCount)
             : string.Empty;
         if (!SentoryDialogWindow.Confirm(
                 this,
-                $"선택한 {selectedItems.Length:N0}개 항목을 삭제할까요?",
-                "선택한 항목과 저장된 사진 파일을 보관함에서 삭제합니다." +
+                SentoryLocalization.Format(
+                    "DeleteSelectedHeadingFormat",
+                    selectedItems.Length),
+                SentoryLocalization.Text("DeleteSelectedMessage") +
                 favoriteWarning +
-                "\n이 작업은 되돌릴 수 없습니다.",
-                "선택 항목 삭제",
+                SentoryLocalization.Text("CannotUndoLine"),
+                SentoryLocalization.Text("DeleteSelected"),
                 _isDarkTheme,
                 danger: true))
         {
@@ -486,12 +499,17 @@ public partial class GalleryWindow : Window
             SetSelectionMode(false);
             ShowFeedback(
                 result.MissingItems == 0
-                    ? $"{result.DeletedItems:N0}개 항목을 삭제했습니다."
-                    : $"{result.DeletedItems:N0}개를 삭제했고 {result.MissingItems:N0}개는 이미 없었습니다.");
+                    ? SentoryLocalization.Format(
+                        "DeletedItemsFormat",
+                        result.DeletedItems)
+                    : SentoryLocalization.Format(
+                        "DeletedItemsMissingFormat",
+                        result.DeletedItems,
+                        result.MissingItems));
         }
         catch (Exception)
         {
-            ShowFeedback("선택한 항목을 삭제하지 못했습니다.");
+            ShowFeedback(SentoryLocalization.Text("DeleteSelectedFailed"));
         }
         finally
         {
@@ -535,15 +553,19 @@ public partial class GalleryWindow : Window
         SelectionBar.Visibility = _selectionMode
             ? Visibility.Visible
             : Visibility.Collapsed;
-        SelectedCountText.Text = $"{_selectedItemIds.Count:N0}개 선택";
+        SelectedCountText.Text = SentoryLocalization.Format(
+            "SelectedCountFormat",
+            _selectedItemIds.Count);
         DeleteSelectedButton.IsEnabled = _selectedItemIds.Count > 0;
-        SelectModeButtonText.Text = _selectionMode ? "선택 종료" : "선택";
+        SelectModeButtonText.Text = SentoryLocalization.Text(
+            _selectionMode ? "SelectExit" : "Select");
         SelectModeButton.ToolTip = _selectionMode
-            ? "선택 모드 종료"
-            : "여러 항목 선택";
+            ? SentoryLocalization.Text("SelectExit")
+            : SentoryLocalization.Text("Select");
         System.Windows.Automation.AutomationProperties.SetName(
             SelectModeButton,
-            SelectModeButton.ToolTip?.ToString() ?? "여러 항목 선택");
+            SelectModeButton.ToolTip?.ToString() ??
+            SentoryLocalization.Text("Select"));
         SearchBox.IsEnabled = !_selectionMode;
         IntegratedFilterButton.IsEnabled = !_selectionMode;
         SortButton.IsEnabled = !_selectionMode;
@@ -589,7 +611,7 @@ public partial class GalleryWindow : Window
         UpdateSortControls();
         ApplyFilter();
         _settings.SortMode = _sortMode.ToString();
-        SaveSettings("정렬 설정을 저장하지 못했습니다.");
+        SaveSettings(SentoryLocalization.Text("SortSaveFailed"));
     }
 
     private void SourceOptionButton_Click(
@@ -645,8 +667,10 @@ public partial class GalleryWindow : Window
         System.Windows.Automation.AutomationProperties.SetName(
             IntegratedFilterButton,
             activeFilterCount == 0
-                ? "필터"
-                : $"필터 {activeFilterCount}개 적용됨");
+                ? SentoryLocalization.Text("Filter")
+                : SentoryLocalization.Format(
+                    "FilterActiveFormat",
+                    activeFilterCount));
         IntegratedFilterButton.SetResourceReference(
             System.Windows.Controls.Control.ForegroundProperty,
             activeFilterCount == 0 ? "MutedTextBrush" : "AccentBrush");
@@ -675,11 +699,26 @@ public partial class GalleryWindow : Window
 
     private void BuildSourceOptions()
     {
-        AddSourceOption("All", "전체 메신저");
+        SourceOptionsPanel.Children.Clear();
+        _sourceOptionButtons.Clear();
+        _sourceOptionChecks.Clear();
+        AddSourceOption(
+            "All",
+            SentoryLocalization.Text("AllMessengers"));
         foreach (var source in Enum.GetValues<SourceApp>())
         {
             AddSourceOption(source.ToString(), GetSourceLabel(source));
         }
+    }
+
+    private void RebuildLocalizedControls()
+    {
+        BuildSourceOptions();
+        UpdateSortControls();
+        UpdateIntegratedFilterControls();
+        SetDiscordDetectionState(_discordDetectionState);
+        ApplyTheme(_isDarkTheme);
+        RebuildItemViewModels();
     }
 
     private void AddSourceOption(string value, string label)
@@ -735,16 +774,19 @@ public partial class GalleryWindow : Window
 
     private void UpdateSortControls()
     {
-        SortButtonText.Text = _sortMode switch
+        var sortLabel = SentoryLocalization.Text(_sortMode switch
         {
-            GallerySortMode.Newest => "정렬 최신순",
-            GallerySortMode.Oldest => "정렬 오래된순",
-            GallerySortMode.MostCaptured => "정렬 많이 저장한 순",
-            GallerySortMode.MostCopied => "정렬 많이 복사한 순",
-            GallerySortMode.RecentlyCopied => "정렬 최근 복사한 순",
-            GallerySortMode.Name => "정렬 이름순",
-            _ => "정렬 최신순"
-        };
+            GallerySortMode.Newest => "SortNewest",
+            GallerySortMode.Oldest => "SortOldest",
+            GallerySortMode.MostCaptured => "SortMostCaptured",
+            GallerySortMode.MostCopied => "SortMostCopied",
+            GallerySortMode.RecentlyCopied => "SortRecentlyCopied",
+            GallerySortMode.Name => "SortName",
+            _ => "SortNewest"
+        });
+        SortButtonText.Text = SentoryLocalization.Format(
+            "SortLabelFormat",
+            sortLabel);
         System.Windows.Automation.AutomationProperties.SetName(
             SortButton,
             SortButtonText.Text);
@@ -805,14 +847,14 @@ public partial class GalleryWindow : Window
             .OrderBy(source => source)
             .Select(source => source.ToString())
             .ToList();
-        SaveSettings("필터 설정을 저장하지 못했습니다.");
+        SaveSettings(SentoryLocalization.Text("FilterSaveFailed"));
     }
 
     private static string GetSourceLabel(SourceApp sourceApp) =>
         sourceApp switch
         {
             SourceApp.Discord => "Discord",
-            SourceApp.KakaoTalk => "카카오톡",
+            SourceApp.KakaoTalk => SentoryLocalization.Text("KakaoTalk"),
             _ => sourceApp.ToString()
         };
 
@@ -821,7 +863,7 @@ public partial class GalleryWindow : Window
         _isDarkTheme = !_isDarkTheme;
         ApplyTheme(_isDarkTheme);
         _settings.IsDarkTheme = _isDarkTheme;
-        SaveSettings("테마 설정을 저장하지 못했습니다.");
+        SaveSettings(SentoryLocalization.Text("ThemeSaveFailed"));
     }
 
     private void ApplyTheme(bool dark)
@@ -834,8 +876,8 @@ public partial class GalleryWindow : Window
 
         ThemeIcon.Text = dark ? "\uE706" : "\uE708";
         var label = dark
-            ? "밝은 테마로 전환"
-            : "다크 테마로 전환";
+            ? SentoryLocalization.Text("SwitchToLight")
+            : SentoryLocalization.Text("SwitchToDark");
         ThemeButton.ToolTip = label;
         System.Windows.Automation.AutomationProperties.SetName(
             ThemeButton,
@@ -973,7 +1015,7 @@ public partial class GalleryWindow : Window
                     item.Item.ItemId,
                     isFavorite))
             {
-                ShowFeedback("항목을 찾지 못했습니다.");
+                ShowFeedback(SentoryLocalization.Text("ItemNotFound"));
                 return;
             }
 
@@ -983,12 +1025,12 @@ public partial class GalleryWindow : Window
             });
             ShowFeedback(
                 isFavorite
-                    ? "즐겨찾기에 추가했습니다."
-                    : "즐겨찾기에서 제거했습니다.");
+                    ? SentoryLocalization.Text("FavoriteAdded")
+                    : SentoryLocalization.Text("FavoriteRemoved"));
         }
         catch (Exception)
         {
-            ShowFeedback("즐겨찾기를 변경하지 못했습니다.");
+            ShowFeedback(SentoryLocalization.Text("FavoriteChangeFailed"));
         }
     }
 
@@ -1057,6 +1099,28 @@ public partial class GalleryWindow : Window
         }
     }
 
+    private void Artwork_MouseLeftButtonUp(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is not System.Windows.Controls.Border
+            {
+                Tag: GalleryItemViewModel item
+            })
+        {
+            return;
+        }
+
+        if (_selectionMode)
+        {
+            ToggleSelection(item.Item.ItemId);
+            return;
+        }
+
+        OpenItem(item);
+    }
+
     private void Card_ContextMenuOpening(
         object sender,
         System.Windows.Controls.ContextMenuEventArgs e)
@@ -1098,25 +1162,25 @@ public partial class GalleryWindow : Window
                 var path = ResolveContentPath(item.Item.ContentPath);
                 if (path is null || !File.Exists(path))
                 {
-                    ShowFeedback("사진 파일을 찾지 못했습니다.");
+                    ShowFeedback(SentoryLocalization.Text("PhotoFileNotFound"));
                     return;
                 }
 
                 var image = LoadClipboardImage(path);
                 await SetClipboardWithRetryAsync(() => WpfClipboard.SetImage(image));
-                successMessage = "사진을 복사했습니다.";
+                successMessage = SentoryLocalization.Text("PhotoCopied");
             }
             else
             {
                 await SetClipboardWithRetryAsync(
                     () => WpfClipboard.SetText(item.Item.OriginalUrl));
-                successMessage = "URL을 복사했습니다.";
+                successMessage = SentoryLocalization.Text("UrlCopied");
             }
         }
         catch (Exception exception)
             when (exception is COMException or ExternalException)
         {
-            ShowFeedback("클립보드가 사용 중입니다. 다시 눌러 주세요.");
+            ShowFeedback(SentoryLocalization.Text("ClipboardBusy"));
             return;
         }
 
@@ -1136,7 +1200,7 @@ public partial class GalleryWindow : Window
         }
         catch (Exception)
         {
-            ShowFeedback("복사했지만 사용 기록을 저장하지 못했습니다.");
+            ShowFeedback(SentoryLocalization.Text("CopyHistorySaveFailed"));
             return;
         }
 
@@ -1197,7 +1261,7 @@ public partial class GalleryWindow : Window
             : item.Item.OriginalUrl;
         if (string.IsNullOrWhiteSpace(target))
         {
-            ShowFeedback("원본을 찾지 못했습니다.");
+            ShowFeedback(SentoryLocalization.Text("OriginalNotFound"));
             return;
         }
 
@@ -1211,22 +1275,22 @@ public partial class GalleryWindow : Window
         }
         catch (Win32Exception)
         {
-            ShowFeedback("원본을 열지 못했습니다.");
+            ShowFeedback(SentoryLocalization.Text("OpenOriginalFailed"));
         }
     }
 
     private async Task DeleteAsync(GalleryItemViewModel item)
     {
         var favoriteWarning = item.Item.IsFavorite
-            ? "\n\n이 항목은 즐겨찾기에 등록되어 있습니다."
+            ? SentoryLocalization.Text("FavoriteDeleteWarning")
             : string.Empty;
         if (!SentoryDialogWindow.Confirm(
                 this,
-                "항목을 삭제할까요?",
-                "이 항목을 보관함에서 삭제합니다." +
+                SentoryLocalization.Text("DeleteItemHeading"),
+                SentoryLocalization.Text("DeleteItemMessage") +
                 favoriteWarning +
-                "\n이 작업은 되돌릴 수 없습니다.",
-                "삭제",
+                SentoryLocalization.Text("CannotUndoLine"),
+                SentoryLocalization.Text("Delete"),
                 _isDarkTheme,
                 danger: true))
         {
@@ -1239,13 +1303,13 @@ public partial class GalleryWindow : Window
             {
                 _allItems.Remove(item);
                 ApplyFilter();
-                ShowFeedback("삭제했습니다.");
+                ShowFeedback(SentoryLocalization.Text("Deleted"));
             }
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException)
         {
-            ShowFeedback("파일을 삭제하지 못했습니다.");
+            ShowFeedback(SentoryLocalization.Text("DeleteFileFailed"));
         }
     }
 
@@ -1350,20 +1414,28 @@ public sealed record GalleryItemViewModel(
 
     public string FavoriteToolTip =>
         Item.IsFavorite
-            ? "즐겨찾기에서 제거"
-            : "즐겨찾기에 추가";
+            ? SentoryLocalization.Text("FavoriteRemove")
+            : SentoryLocalization.Text("FavoriteAdd");
 
     public string FavoriteMenuLabel => FavoriteToolTip;
 
     public bool HasBeenCopied => Item.CopyCount > 0;
 
-    public string CopyUsageLabel => $"복사 {Item.CopyCount:N0}회";
+    public string CopyUsageLabel => SentoryLocalization.Format(
+        "CopyUsageFormat",
+        Item.CopyCount);
 
     public string SelectionIcon => IsSelected ? "\uE73E" : string.Empty;
 
-    public string SelectionToolTip => IsSelected ? "선택 해제" : "항목 선택";
+    public string SelectionToolTip => SentoryLocalization.Text(
+        IsSelected ? "DeselectItem" : "SelectItem");
 
     public string AutomationName =>
-        $"{TypeLabel}, {Title}, {DateLabel}, {Item.CaptureCount}회 저장, " +
-        $"{Item.CopyCount}회 복사";
+        SentoryLocalization.Format(
+            "ItemAutomationFormat",
+            TypeLabel,
+            Title,
+            DateLabel,
+            Item.CaptureCount,
+            Item.CopyCount);
 }

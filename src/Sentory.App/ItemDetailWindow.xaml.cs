@@ -30,20 +30,29 @@ public partial class ItemDetailWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
         InitialText.Text = item.Initial;
-        DomainText.Text = item.IsImage ? "저장된 사진" : item.Domain;
+        DomainText.Text = item.IsImage
+            ? SentoryLocalization.Text("StoredPhoto")
+            : item.Domain;
         OriginalText.Text = item.IsImage
-            ? item.Item.ContentPath ?? "사진 파일 경로를 찾지 못했습니다."
+            ? item.Item.ContentPath ??
+              SentoryLocalization.Text("MissingPhotoPath")
             : item.Item.OriginalUrl;
-        CaptureCountText.Text = $"{item.Item.CaptureCount:N0}회";
-        CopyCountText.Text = $"{item.Item.CopyCount:N0}회";
+        CaptureCountText.Text = SentoryLocalization.Format(
+            "TimesFormat",
+            item.Item.CaptureCount);
+        CopyCountText.Text = SentoryLocalization.Format(
+            "TimesFormat",
+            item.Item.CopyCount);
         SourceText.Text = item.Item.LastSourceApp == SourceApp.Discord
             ? "Discord"
-            : "카카오톡";
+            : SentoryLocalization.Text("KakaoTalk");
         SavedAtText.Text = item.Item.LastCapturedAt.LocalDateTime
             .ToString("yyyy. M. d. HH:mm");
         DeliveryText.Text = item.StatusLabel;
-        OpenButton.Content = item.IsImage ? "사진 열기" : "링크 열기";
-        CopyButton.Content = item.IsImage ? "사진 복사" : "URL 복사";
+        OpenButton.Content = SentoryLocalization.Text(
+            item.IsImage ? "OpenPhoto" : "OpenLink");
+        CopyButton.Content = SentoryLocalization.Text(
+            item.IsImage ? "CopyPhoto" : "CopyUrl");
 
         if (item.Thumbnail is not null)
         {

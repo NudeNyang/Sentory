@@ -1,7 +1,7 @@
 <Window x:Class="Sentory.App.DataManagementWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Sentory 설정"
+        Title="{DynamicResource Loc.SettingsTitle}"
         Width="680"
         Height="760"
         MinWidth="620"
@@ -127,6 +127,8 @@
                                                       HorizontalAlignment="Left"
                                                       VerticalAlignment="Center"
                                                       Content="{TemplateBinding SelectionBoxItem}"
+                                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                      ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
                                                       IsHitTestVisible="False" />
                                     <TextBlock Margin="0,0,13,0"
                                                HorizontalAlignment="Right"
@@ -179,12 +181,12 @@
         </Grid.RowDefinitions>
 
         <StackPanel>
-            <TextBlock Text="설정"
+            <TextBlock Text="{DynamicResource Loc.SettingsHeading}"
                        FontSize="24"
                        FontWeight="SemiBold"
                        Foreground="{DynamicResource TextBrush}" />
             <TextBlock Margin="0,5,0,0"
-                       Text="Sentory의 실행, 메신저 감지와 보관 데이터를 한곳에서 관리합니다"
+                       Text="{DynamicResource Loc.SettingsDescription}"
                        FontSize="12"
                        Foreground="{DynamicResource MutedTextBrush}" />
         </StackPanel>
@@ -194,7 +196,7 @@
                       Padding="0,0,8,0"
                       VerticalScrollBarVisibility="Auto">
             <StackPanel>
-                <TextBlock Text="일반"
+                <TextBlock Text="{DynamicResource Loc.General}"
                            Margin="2,0,0,8"
                            FontSize="12"
                            FontWeight="SemiBold"
@@ -203,12 +205,12 @@
                     <StackPanel>
                         <Grid>
                             <StackPanel>
-                                <TextBlock Text="화면 테마"
+                                <TextBlock Text="{DynamicResource Loc.ScreenTheme}"
                                            FontSize="13"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextBrush}" />
                                 <TextBlock Margin="0,4,0,0"
-                                           Text="라이트 모드와 다크 모드를 선택합니다"
+                                           Text="{DynamicResource Loc.ScreenThemeDescription}"
                                            FontSize="11"
                                            Foreground="{DynamicResource MutedTextBrush}" />
                             </StackPanel>
@@ -223,7 +225,27 @@
                                 Background="{DynamicResource LineBrush}" />
                         <Grid>
                             <StackPanel>
-                                <TextBlock Text="Windows 시작 시 실행"
+                                <TextBlock Text="{DynamicResource Loc.Language}"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextBrush}" />
+                                <TextBlock Margin="0,4,0,0"
+                                           Text="{DynamicResource Loc.LanguageDescription}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource MutedTextBrush}" />
+                            </StackPanel>
+                            <ComboBox x:Name="LanguageComboBox"
+                                      Width="150"
+                                      HorizontalAlignment="Right"
+                                      DisplayMemberPath="Label"
+                                      SelectionChanged="LanguageComboBox_SelectionChanged" />
+                        </Grid>
+                        <Border Height="1"
+                                Margin="0,16"
+                                Background="{DynamicResource LineBrush}" />
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource Loc.WindowsStartup}"
                                            FontSize="13"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextBrush}" />
@@ -241,7 +263,7 @@
                     </StackPanel>
                 </Border>
 
-                <TextBlock Text="메신저 감지"
+                <TextBlock Text="{DynamicResource Loc.MessengerDetection}"
                            Margin="2,20,0,8"
                            FontSize="12"
                            FontWeight="SemiBold"
@@ -262,7 +284,7 @@
                             <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
                                 <Button x:Name="DiscordRepairButton"
                                         Margin="0,0,7,0"
-                                        Content="다시 연결"
+                                        Content="{DynamicResource Loc.Reconnect}"
                                         Style="{StaticResource SecondaryButtonStyle}"
                                         Click="DiscordRepairButton_Click" />
                                 <Button x:Name="DiscordSupportToggleButton"
@@ -276,18 +298,18 @@
                                 Background="{DynamicResource LineBrush}" />
                         <Grid>
                             <StackPanel>
-                                <TextBlock Text="카카오톡"
+                                <TextBlock Text="{DynamicResource Loc.KakaoTalk}"
                                            FontSize="13"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextBrush}" />
                                 <TextBlock Margin="0,4,0,0"
-                                           Text="채팅 입력창의 사진과 붙여넣은 링크를 감지합니다"
+                                           Text="{DynamicResource Loc.KakaoDescription}"
                                            FontSize="11"
                                            Foreground="{DynamicResource MutedTextBrush}" />
                             </StackPanel>
                             <TextBlock HorizontalAlignment="Right"
                                        VerticalAlignment="Center"
-                                       Text="감지 준비 완료"
+                                       Text="{DynamicResource Loc.DetectionReady}"
                                        FontSize="11"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource AccentBrush}" />
@@ -295,14 +317,14 @@
                     </StackPanel>
                 </Border>
 
-                <TextBlock Text="데이터 관리"
+                <TextBlock Text="{DynamicResource Loc.DataManagement}"
                            Margin="2,20,0,8"
                            FontSize="12"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource MutedTextBrush}" />
                 <Border Style="{StaticResource SettingCardStyle}">
                     <StackPanel>
-                        <TextBlock Text="즐겨찾기에 등록된 항목은 자동 정리에서 포함되지 않음"
+                        <TextBlock Text="{DynamicResource Loc.FavoriteCleanupExclusion}"
                                    FontSize="11"
                                    Foreground="{DynamicResource MutedTextBrush}" />
                         <Grid Margin="0,15,0,0">
@@ -311,7 +333,7 @@
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <StackPanel>
-                                <TextBlock Text="보관 중"
+                                <TextBlock Text="{DynamicResource Loc.Stored}"
                                            FontSize="10.5"
                                            Foreground="{DynamicResource SoftTextBrush}" />
                                 <TextBlock x:Name="TotalItemsText"
@@ -326,7 +348,7 @@
                                            Foreground="{DynamicResource MutedTextBrush}" />
                             </StackPanel>
                             <StackPanel Grid.Column="1">
-                                <TextBlock Text="사진 저장 용량"
+                                <TextBlock Text="{DynamicResource Loc.ImageStorage}"
                                            FontSize="10.5"
                                            Foreground="{DynamicResource SoftTextBrush}" />
                                 <TextBlock x:Name="ImageBytesText"
@@ -344,12 +366,12 @@
                         <Border Height="1"
                                 Margin="0,17"
                                 Background="{DynamicResource LineBrush}" />
-                        <TextBlock Text="자동 정리"
+                        <TextBlock Text="{DynamicResource Loc.AutoCleanup}"
                                    FontSize="13"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextBrush}" />
                         <TextBlock Margin="0,4,0,0"
-                                   Text="기본값 사용 안 함"
+                                   Text="{DynamicResource Loc.AutoCleanupDefault}"
                                    FontSize="11"
                                    Foreground="{DynamicResource MutedTextBrush}" />
                         <Grid Margin="0,12,0,0">
@@ -362,7 +384,7 @@
                                       DisplayMemberPath="Label" />
                             <Button x:Name="SaveAutoCleanupButton"
                                     Grid.Column="2"
-                                    Content="설정 저장"
+                                    Content="{DynamicResource Loc.SaveSettings}"
                                     Style="{StaticResource ActionButtonStyle}"
                                     Click="SaveAutoCleanupButton_Click" />
                         </Grid>
@@ -373,12 +395,12 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <Button x:Name="OpenDataFolderButton"
-                                    Content="데이터 폴더 열기"
+                                    Content="{DynamicResource Loc.OpenDataFolder}"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Click="OpenDataFolderButton_Click" />
                             <Button x:Name="DeleteNonFavoritesButton"
                                     Grid.Column="2"
-                                    Content="즐겨찾기 제외 항목 모두 삭제"
+                                    Content="{DynamicResource Loc.DeleteNonFavorites}"
                                     Background="{DynamicResource DangerBrush}"
                                     Style="{StaticResource ActionButtonStyle}"
                                     Click="DeleteNonFavoritesButton_Click" />
@@ -386,7 +408,7 @@
                     </StackPanel>
                 </Border>
 
-                <TextBlock Text="앱 정보"
+                <TextBlock Text="{DynamicResource Loc.AppInfo}"
                            Margin="2,20,0,8"
                            FontSize="12"
                            FontWeight="SemiBold"
@@ -405,7 +427,7 @@
                         </StackPanel>
                         <TextBlock HorizontalAlignment="Right"
                                    VerticalAlignment="Center"
-                                   AutomationProperties.Name="저작자 © 2026 NudeNyang GitHub"
+                                   AutomationProperties.Name="{DynamicResource Loc.Author}"
                                    FontSize="10">
                             <Run Text="© 2026" Foreground="{DynamicResource MutedTextBrush}" />
                             <Run Text=" · " Foreground="{DynamicResource LineBrush}" />

@@ -1,7 +1,7 @@
 <Window x:Class="Sentory.App.ItemDetailWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Sentory 항목 상세"
+        Title="{DynamicResource Loc.DetailTitle}"
         Width="790"
         Height="610"
         MinWidth="700"
@@ -86,7 +86,7 @@
                                Foreground="{DynamicResource AccentBrush}" />
                     <TextBlock x:Name="FavoriteText"
                                Margin="9,0,0,0"
-                               Text="★ 즐겨찾기"
+                               Text="{DynamicResource Loc.FavoriteMarked}"
                                FontSize="11"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource FavoriteBrush}"
@@ -102,7 +102,7 @@
             </StackPanel>
             <Button HorizontalAlignment="Right"
                     VerticalAlignment="Top"
-                    Content="닫기"
+                    Content="{DynamicResource Loc.Close}"
                     Style="{StaticResource DetailButtonStyle}"
                     Click="CloseButton_Click" />
         </Grid>
@@ -179,7 +179,7 @@
                                 BorderThickness="1"
                                 CornerRadius="10">
                             <StackPanel>
-                                <TextBlock Text="저장 횟수"
+                                <TextBlock Text="{DynamicResource Loc.CaptureCount}"
                                            FontSize="10.5"
                                            Foreground="{DynamicResource SoftTextBrush}" />
                                 <TextBlock x:Name="CaptureCountText"
@@ -196,7 +196,7 @@
                                 BorderThickness="1"
                                 CornerRadius="10">
                             <StackPanel>
-                                <TextBlock Text="복사 횟수"
+                                <TextBlock Text="{DynamicResource Loc.CopyCount}"
                                            FontSize="10.5"
                                            Foreground="{DynamicResource SoftTextBrush}" />
                                 <TextBlock x:Name="CopyCountText"
@@ -213,7 +213,7 @@
                                 BorderThickness="1"
                                 CornerRadius="10">
                             <StackPanel>
-                                <TextBlock Text="마지막 출처"
+                                <TextBlock Text="{DynamicResource Loc.LastSource}"
                                            FontSize="10.5"
                                            Foreground="{DynamicResource SoftTextBrush}" />
                                 <TextBlock x:Name="SourceText"
@@ -230,7 +230,7 @@
                                 BorderThickness="1"
                                 CornerRadius="10">
                             <StackPanel>
-                                <TextBlock Text="마지막 저장"
+                                <TextBlock Text="{DynamicResource Loc.LastSaved}"
                                            FontSize="10.5"
                                            Foreground="{DynamicResource SoftTextBrush}" />
                                 <TextBlock x:Name="SavedAtText"
@@ -251,7 +251,7 @@
         </Grid>
 
         <Grid Grid.Row="2">
-            <Button Content="삭제"
+            <Button Content="{DynamicResource Loc.Delete}"
                     HorizontalAlignment="Left"
                     Foreground="{DynamicResource DangerBrush}"
                     Style="{StaticResource DetailButtonStyle}"
@@ -259,11 +259,11 @@
             <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
                 <Button x:Name="OpenButton"
                         Margin="0,0,7,0"
-                        Content="원본 열기"
+                        Content="{DynamicResource Loc.OpenOriginal}"
                         Style="{StaticResource DetailButtonStyle}"
                         Click="OpenButton_Click" />
                 <Button x:Name="CopyButton"
-                        Content="클립보드에 복사"
+                        Content="{DynamicResource Loc.CopyToClipboard}"
                         Style="{StaticResource PrimaryDetailButtonStyle}"
                         Click="CopyButton_Click" />
             </StackPanel>

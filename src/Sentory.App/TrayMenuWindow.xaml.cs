@@ -22,7 +22,8 @@ public partial class TrayMenuWindow : Window
         StatusText.Text = status;
         DiscordDetectionStatusText.Text =
             DiscordDetectionPresentation.GetLabel(discordDetectionState);
-        PauseText.Text = paused ? "감지 다시 시작" : "감지 일시정지";
+        PauseText.Text = SentoryLocalization.Text(
+            paused ? "ResumeDetection" : "PauseDetection");
         PauseIcon.Text = paused ? "\uE768" : "\uE769";
         PauseSwitchThumb.HorizontalAlignment = paused
             ? System.Windows.HorizontalAlignment.Right

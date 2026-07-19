@@ -60,7 +60,7 @@ public partial class SentoryDialogWindow : Window
         var dialog = new SentoryDialogWindow(
             heading,
             message,
-            "확인",
+            SentoryLocalization.Text("Confirm"),
             isDarkTheme,
             danger);
         dialog.CancelButton.Visibility = Visibility.Collapsed;

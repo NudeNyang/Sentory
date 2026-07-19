@@ -551,6 +551,26 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         Assert.Equal(["Discord"], restored.FilterSourceApps);
     }
 
+    [Theory]
+    [InlineData("ko-KR", "ko-KR")]
+    [InlineData("en-us", "en-US")]
+    [InlineData("ja-JP", "ja-JP")]
+    [InlineData("zh-CN", "zh-CN")]
+    [InlineData("fr-FR", "ko-KR")]
+    public void SettingsStoreNormalizesSupportedLanguage(
+        string savedLanguage,
+        string expectedLanguage)
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var store = new SentorySettingsStore(paths);
+        store.Save(new SentorySettings
+        {
+            Language = savedLanguage
+        });
+
+        Assert.Equal(expectedLanguage, store.Load().Language);
+    }
+
     [Fact]
     public void SettingsStoreQuarantinesMalformedJson()
     {

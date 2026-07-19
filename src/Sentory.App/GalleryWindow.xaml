@@ -384,17 +384,17 @@
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextBrush}" />
                     <TextBlock Margin="0,4,0,0"
-                               Text="붙여넣기한 사진과 링크를 한 곳에서"
+                               Text="{DynamicResource Loc.Tagline}"
                                FontSize="13"
                                Foreground="{DynamicResource MutedTextBrush}" />
                     <StackPanel Margin="0,9,0,0"
                                 Orientation="Horizontal"
-                                AutomationProperties.Name="Discord 감지 상태">
+                                AutomationProperties.Name="{DynamicResource Loc.DiscordDetection}">
                         <Ellipse Width="8" Height="8"
                                  Margin="0,0,7,0"
                                  Fill="{DynamicResource DiscordDetectionBrush}"
                                  VerticalAlignment="Center" />
-                        <TextBlock Text="Discord 감지"
+                        <TextBlock Text="{DynamicResource Loc.DiscordDetection}"
                                    FontSize="11"
                                    Foreground="{DynamicResource MutedTextBrush}"
                                    VerticalAlignment="Center" />
@@ -433,7 +433,7 @@
                                     Content="&#xE711;"
                                     FontFamily="Segoe Fluent Icons"
                                     Style="{StaticResource ToolbarButtonStyle}"
-                                    ToolTip="알림 닫기"
+                                    ToolTip="{DynamicResource Loc.CloseNotification}"
                                     Click="DismissRuntimeIssueButton_Click" />
                         </StackPanel>
                     </Border>
@@ -462,7 +462,7 @@
                             <TextBox x:Name="SearchBox"
                                      Margin="0,0,12,0"
                                      Padding="0"
-                                     AutomationProperties.Name="보관함 검색"
+                                     AutomationProperties.Name="{DynamicResource Loc.Search}"
                                      Background="Transparent"
                                      BorderThickness="0"
                                      VerticalContentAlignment="Center"
@@ -470,7 +470,7 @@
                                      Foreground="{DynamicResource TextBrush}"
                                      TextChanged="SearchBox_TextChanged" />
                             <TextBlock IsHitTestVisible="False"
-                                       Text="제목, URL, 도메인 검색"
+                                       Text="{DynamicResource Loc.SearchPlaceholder}"
                                        VerticalAlignment="Center"
                                        FontSize="13"
                                        Foreground="{DynamicResource SoftTextBrush}">
@@ -497,8 +497,8 @@
                         Grid.Column="2"
                         Margin="10,3,0,3"
                         Style="{StaticResource CopyButtonStyle}"
-                        AutomationProperties.Name="다크 테마로 전환"
-                        ToolTip="다크 테마로 전환"
+                        AutomationProperties.Name="{DynamicResource Loc.SwitchToDark}"
+                        ToolTip="{DynamicResource Loc.SwitchToDark}"
                         Click="ThemeButton_Click">
                     <TextBlock x:Name="ThemeIcon"
                                Text="&#xE708;"
@@ -513,7 +513,7 @@
                                 Orientation="Horizontal">
                         <ToggleButton x:Name="AllFilterButton"
                                       AutomationProperties.AutomationId="FilterAll"
-                                      Content="전체"
+                                      Content="{DynamicResource Loc.All}"
                                       IsChecked="True"
                                       Style="{StaticResource FilterButtonStyle}"
                                       Checked="FilterButton_Checked"
@@ -521,14 +521,14 @@
                         <ToggleButton x:Name="UrlFilterButton"
                                       AutomationProperties.AutomationId="FilterUrl"
                                       Margin="4,0,0,0"
-                                      Content="링크"
+                                      Content="{DynamicResource Loc.Links}"
                                       Style="{StaticResource FilterButtonStyle}"
                                       Checked="FilterButton_Checked"
                                       Unchecked="FilterButton_Unchecked" />
                         <ToggleButton x:Name="ImageFilterButton"
                                       AutomationProperties.AutomationId="FilterImage"
                                       Margin="4,0,0,0"
-                                      Content="사진"
+                                      Content="{DynamicResource Loc.Photos}"
                                       Style="{StaticResource FilterButtonStyle}"
                                       Checked="FilterButton_Checked"
                                       Unchecked="FilterButton_Unchecked" />
@@ -545,7 +545,7 @@
                                            Foreground="{DynamicResource FavoriteBrush}"
                                            VerticalAlignment="Center" />
                                 <TextBlock Margin="6,0,0,0"
-                                           Text="즐겨찾기"
+                                           Text="{DynamicResource Loc.Favorites}"
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </ToggleButton>
@@ -563,7 +563,7 @@
                                            VerticalAlignment="Center" />
                                 <TextBlock
                                            Margin="7,0,0,0"
-                                           Text="필터"
+                                           Text="{DynamicResource Loc.Filter}"
                                            VerticalAlignment="Center" />
                                 <Border x:Name="FilterCountBadge"
                                         MinWidth="18"
@@ -599,7 +599,7 @@
                                            VerticalAlignment="Center" />
                                 <TextBlock x:Name="SortButtonText"
                                            Margin="7,0,8,0"
-                                           Text="정렬 최신순"
+                                           Text="{DynamicResource Loc.SortNewest}"
                                            VerticalAlignment="Center" />
                                 <TextBlock Text="&#xE70D;"
                                            FontFamily="Segoe Fluent Icons"
@@ -611,7 +611,7 @@
                                 AutomationProperties.AutomationId="DataManagementButton"
                                 Margin="4,0,0,0"
                                 Style="{StaticResource ToolbarButtonStyle}"
-                                ToolTip="설정"
+                                ToolTip="{DynamicResource Loc.Settings}"
                                 Click="DataManagementButton_Click">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE713;"
@@ -619,7 +619,7 @@
                                            FontSize="13"
                                            VerticalAlignment="Center" />
                                 <TextBlock Margin="7,0,0,0"
-                                           Text="설정"
+                                           Text="{DynamicResource Loc.Settings}"
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
@@ -627,7 +627,7 @@
                                 AutomationProperties.AutomationId="SelectModeButton"
                                 Margin="4,0,0,0"
                                 Style="{StaticResource ToolbarButtonStyle}"
-                                ToolTip="여러 항목 선택"
+                                ToolTip="{DynamicResource Loc.Select}"
                                 Click="SelectModeButton_Click">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE762;"
@@ -636,7 +636,7 @@
                                            VerticalAlignment="Center" />
                                 <TextBlock x:Name="SelectModeButtonText"
                                            Margin="7,0,0,0"
-                                           Text="선택"
+                                           Text="{DynamicResource Loc.Select}"
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
@@ -657,7 +657,7 @@
                                 CornerRadius="12">
                             <StackPanel>
                                 <Grid Margin="4,0,4,5">
-                                    <TextBlock Text="필터"
+                                    <TextBlock Text="{DynamicResource Loc.Filter}"
                                                FontSize="13"
                                                FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextBrush}"
@@ -666,13 +666,13 @@
                                             HorizontalAlignment="Right"
                                             Height="28"
                                             Padding="8,0"
-                                            Content="초기화"
+                                            Content="{DynamicResource Loc.Reset}"
                                             Style="{StaticResource ToolbarButtonStyle}"
                                             Click="FilterResetButton_Click" />
                                 </Grid>
 
                                 <TextBlock Margin="11,6,0,3"
-                                           Text="메신저"
+                                           Text="{DynamicResource Loc.Messenger}"
                                            FontSize="11"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource SoftTextBrush}" />
@@ -683,27 +683,27 @@
                                         Background="{DynamicResource LineBrush}" />
 
                                 <TextBlock Margin="11,0,0,3"
-                                           Text="기간"
+                                           Text="{DynamicResource Loc.Period}"
                                            FontSize="11"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource SoftTextBrush}" />
                                 <Button x:Name="DateAllButton"
-                                        Content="전체 기간"
+                                        Content="{DynamicResource Loc.AllPeriod}"
                                         Tag="All"
                                         Style="{StaticResource MenuOptionButtonStyle}"
                                         Click="DateOptionButton_Click" />
                                 <Button x:Name="DateTodayButton"
-                                        Content="오늘"
+                                        Content="{DynamicResource Loc.Today}"
                                         Tag="Today"
                                         Style="{StaticResource MenuOptionButtonStyle}"
                                         Click="DateOptionButton_Click" />
                                 <Button x:Name="Date7DaysButton"
-                                        Content="최근 7일"
+                                        Content="{DynamicResource Loc.Last7Days}"
                                         Tag="Last7Days"
                                         Style="{StaticResource MenuOptionButtonStyle}"
                                         Click="DateOptionButton_Click" />
                                 <Button x:Name="Date30DaysButton"
-                                        Content="최근 30일"
+                                        Content="{DynamicResource Loc.Last30Days}"
                                         Tag="Last30Days"
                                         Style="{StaticResource MenuOptionButtonStyle}"
                                         Click="DateOptionButton_Click" />
@@ -726,32 +726,32 @@
                                 CornerRadius="12">
                             <StackPanel>
                                 <Button x:Name="SortNewestButton"
-                                        Content="최신순"
+                                        Content="{DynamicResource Loc.SortNewest}"
                                         Tag="Newest"
                                         Style="{StaticResource MenuOptionButtonStyle}"
                                         Click="SortOptionButton_Click" />
                                 <Button x:Name="SortOldestButton"
-                                        Content="오래된순"
+                                        Content="{DynamicResource Loc.SortOldest}"
                                         Tag="Oldest"
                                         Style="{StaticResource MenuOptionButtonStyle}"
                                         Click="SortOptionButton_Click" />
                                 <Button x:Name="SortMostCapturedButton"
-                                        Content="많이 저장한 순"
+                                        Content="{DynamicResource Loc.SortMostCaptured}"
                                         Tag="MostCaptured"
                                         Style="{StaticResource MenuOptionButtonStyle}"
                                         Click="SortOptionButton_Click" />
                                 <Button x:Name="SortMostCopiedButton"
-                                        Content="많이 복사한 순"
+                                        Content="{DynamicResource Loc.SortMostCopied}"
                                         Tag="MostCopied"
                                         Style="{StaticResource MenuOptionButtonStyle}"
                                         Click="SortOptionButton_Click" />
                                 <Button x:Name="SortRecentlyCopiedButton"
-                                        Content="최근 복사한 순"
+                                        Content="{DynamicResource Loc.SortRecentlyCopied}"
                                         Tag="RecentlyCopied"
                                         Style="{StaticResource MenuOptionButtonStyle}"
                                         Click="SortOptionButton_Click" />
                                 <Button x:Name="SortNameButton"
-                                        Content="이름순"
+                                        Content="{DynamicResource Loc.SortName}"
                                         Tag="Name"
                                         Style="{StaticResource MenuOptionButtonStyle}"
                                         Click="SortOptionButton_Click" />
@@ -789,23 +789,23 @@
                                VerticalAlignment="Center" />
                 </Border>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="Discord 연결을 한 번 준비해 주세요"
+                    <TextBlock Text="{DynamicResource Loc.DiscordPrepareHeading}"
                                FontSize="12.5"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextBrush}" />
                     <TextBlock Margin="0,3,0,0"
-                               Text="Discord를 접근성 모드로 다시 시작하면 링크와 사진 전송을 확인할 수 있습니다."
+                               Text="{DynamicResource Loc.DiscordPrepareDescription}"
                                FontSize="10.5"
                                Foreground="{DynamicResource MutedTextBrush}" />
                 </StackPanel>
                 <Button Grid.Column="2"
                         Margin="14,0,0,0"
-                        Content="나중에"
+                        Content="{DynamicResource Loc.Later}"
                         Style="{StaticResource ToolbarButtonStyle}"
                         Click="DiscordLaterButton_Click" />
                 <Button Grid.Column="3"
                         Margin="6,0,0,0"
-                        Content="지금 적용"
+                        Content="{DynamicResource Loc.ApplyNow}"
                         Style="{StaticResource BannerActionButtonStyle}"
                         Click="DiscordRepairButton_Click" />
             </Grid>
@@ -841,12 +841,12 @@
                                         <MenuItem Header="{Binding FavoriteMenuLabel}"
                                                   Click="FavoriteMenuItem_Click" />
                                         <Separator />
-                                        <MenuItem Header="복사"
+                                        <MenuItem Header="{DynamicResource Loc.Copy}"
                                                   Click="CopyMenuItem_Click" />
-                                        <MenuItem Header="원본 열기"
+                                        <MenuItem Header="{DynamicResource Loc.OpenOriginal}"
                                                   Click="OpenMenuItem_Click" />
                                         <Separator />
-                                        <MenuItem Header="삭제"
+                                        <MenuItem Header="{DynamicResource Loc.Delete}"
                                                   Foreground="{DynamicResource DangerBrush}"
                                                   Click="DeleteMenuItem_Click" />
                                     </ContextMenu>
@@ -860,7 +860,11 @@
                                     <Border Grid.Row="0"
                                             Margin="10,10,10,0"
                                             Background="{DynamicResource SurfaceSecondaryBrush}"
-                                            CornerRadius="12">
+                                            CornerRadius="12"
+                                            Cursor="Hand"
+                                            ToolTip="{DynamicResource Loc.OpenPreview}"
+                                            Tag="{Binding}"
+                                            MouseLeftButtonUp="Artwork_MouseLeftButtonUp">
                                         <Grid>
                                             <Grid x:Name="UrlArtwork">
                                                 <StackPanel HorizontalAlignment="Center"
@@ -910,8 +914,8 @@
                                             HorizontalAlignment="Right"
                                             VerticalAlignment="Top"
                                             Style="{StaticResource CopyButtonStyle}"
-                                            ToolTip="클립보드에 복사"
-                                            AutomationProperties.Name="복사"
+                                            ToolTip="{DynamicResource Loc.CopyToClipboard}"
+                                            AutomationProperties.Name="{DynamicResource Loc.Copy}"
                                             Tag="{Binding}"
                                             Click="CopyButton_Click">
                                         <TextBlock Text="&#xE8C8;"
@@ -1142,21 +1146,21 @@
                 <StackPanel Orientation="Horizontal">
                     <TextBlock x:Name="SelectedCountText"
                                Margin="2,0,12,0"
-                               Text="0개 선택"
+                               Text="{DynamicResource Loc.SelectedCountFormat}"
                                FontSize="12"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextBrush}"
                                VerticalAlignment="Center" />
                     <Button Margin="0,0,4,0"
-                            Content="현재 화면 전체 선택"
+                            Content="{DynamicResource Loc.SelectVisible}"
                             Style="{StaticResource ToolbarButtonStyle}"
                             Click="SelectVisibleItemsButton_Click" />
                     <Button Margin="0,0,4,0"
-                            Content="선택 취소"
+                            Content="{DynamicResource Loc.ClearSelection}"
                             Style="{StaticResource ToolbarButtonStyle}"
                             Click="ClearSelectionButton_Click" />
                     <Button x:Name="DeleteSelectedButton"
-                            Content="선택 항목 삭제"
+                            Content="{DynamicResource Loc.DeleteSelected}"
                             Background="{DynamicResource DangerBrush}"
                             Style="{StaticResource BannerActionButtonStyle}"
                             Click="DeleteSelectedButton_Click" />
@@ -1168,7 +1172,7 @@
                         HorizontalAlignment="Center"
                         VerticalAlignment="Top"
                         Margin="0,56,0,0">
-                <TextBlock Text="보관함을 불러오는 중"
+                <TextBlock Text="{DynamicResource Loc.LoadingLibrary}"
                            FontSize="13"
                            Foreground="{DynamicResource MutedTextBrush}"
                            HorizontalAlignment="Center" />
@@ -1205,14 +1209,14 @@
                 </Border>
                 <TextBlock x:Name="EmptyTitleText"
                            Margin="0,18,0,0"
-                           Text="아직 보관된 항목이 없습니다"
+                           Text="{DynamicResource Loc.NoItems}"
                            FontSize="17"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource TextBrush}"
                            HorizontalAlignment="Center" />
                 <TextBlock x:Name="EmptyDescriptionText"
                            Margin="0,7,0,0"
-                           Text="카카오톡 개별 채팅창에 URL이나 사진을 붙여넣어 보세요."
+                           Text="{DynamicResource Loc.NoItemsDescription}"
                            FontSize="12"
                            Foreground="{DynamicResource MutedTextBrush}"
                            HorizontalAlignment="Center" />
@@ -1222,7 +1226,7 @@
                         Visibility="Collapsed"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center">
-                <TextBlock Text="보관함을 불러오지 못했습니다"
+                <TextBlock Text="{DynamicResource Loc.LoadFailed}"
                            FontSize="17"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource TextBrush}" />
@@ -1235,7 +1239,7 @@
                            Foreground="{DynamicResource MutedTextBrush}" />
                 <Button Margin="0,18,0,0"
                         Padding="16,8"
-                        Content="다시 시도"
+                        Content="{DynamicResource Loc.Retry}"
                         Click="RetryButton_Click" />
             </StackPanel>
 

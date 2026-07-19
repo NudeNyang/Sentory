@@ -10,20 +10,6 @@ namespace Sentory.App;
 
 public partial class DataManagementWindow : Window
 {
-    private static readonly CleanupOption[] AutoCleanupOptions =
-    [
-        new(0, "자동 정리 사용 안 함"),
-        new(30, "30일 기준으로 정리"),
-        new(90, "90일 기준으로 정리"),
-        new(180, "180일 기준으로 정리")
-    ];
-
-    private static readonly ThemeOption[] ThemeOptions =
-    [
-        new(false, "라이트 모드"),
-        new(true, "다크 모드")
-    ];
-
     private readonly ICaptureRepository _repository;
     private readonly SentorySettingsStore _settingsStore;
     private readonly SentoryDataPaths _paths;
@@ -52,13 +38,10 @@ public partial class DataManagementWindow : Window
         ApplyPalette();
 
         var settings = _settingsStore.Load();
-        ThemeComboBox.ItemsSource = ThemeOptions;
-        ThemeComboBox.SelectedItem = ThemeOptions.First(
-            option => option.IsDark == settings.IsDarkTheme);
-        AutoCleanupComboBox.ItemsSource = AutoCleanupOptions;
-        AutoCleanupComboBox.SelectedItem = AutoCleanupOptions.First(
-            option => option.Days == settings.AutoCleanupDays);
-        VersionText.Text = $"버전 {GetVersionLabel()}";
+        RefreshLocalizedOptions(settings);
+        VersionText.Text = SentoryLocalization.Format(
+            "VersionFormat",
+            GetVersionLabel());
         UpdateStartupControls();
         UpdateDiscordControls(settings.DiscordSupportEnabled);
         _initializing = false;
@@ -71,6 +54,8 @@ public partial class DataManagementWindow : Window
 
     public bool ThemeChanged { get; private set; }
 
+    public bool LanguageChanged { get; private set; }
+
     public bool DiscordSupportChanged { get; private set; }
 
     public bool DiscordRepairRequested { get; private set; }
@@ -80,16 +65,22 @@ public partial class DataManagementWindow : Window
         try
         {
             var statistics = await _repository.GetDataStatisticsAsync();
-            TotalItemsText.Text = $"{statistics.TotalItems:N0}개";
-            KindsText.Text =
-                $"링크 {statistics.UrlItems:N0} · 사진 {statistics.ImageItems:N0}";
+            TotalItemsText.Text = SentoryLocalization.Format(
+                "ItemsCountFormat",
+                statistics.TotalItems);
+            KindsText.Text = SentoryLocalization.Format(
+                "KindsCountFormat",
+                statistics.UrlItems,
+                statistics.ImageItems);
             ImageBytesText.Text = FormatBytes(statistics.ImageBytes);
             FavoriteItemsText.Text =
-                $"즐겨찾기 {statistics.FavoriteItems:N0}개 보존 중";
+                SentoryLocalization.Format(
+                    "FavoritesPreservedFormat",
+                    statistics.FavoriteItems);
         }
         catch (Exception)
         {
-            StatusText.Text = "데이터 현황을 불러오지 못했습니다.";
+            StatusText.Text = SentoryLocalization.Text("StatisticsLoadFailed");
         }
     }
 
@@ -113,13 +104,49 @@ public partial class DataManagementWindow : Window
             ApplyPalette();
             ApplyTitleBarTheme();
             StatusText.Text = option.IsDark
-                ? "다크 모드를 적용했습니다."
-                : "라이트 모드를 적용했습니다.";
+                ? SentoryLocalization.Text("DarkModeApplied")
+                : SentoryLocalization.Text("LightModeApplied");
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException)
         {
-            StatusText.Text = "테마 설정을 저장하지 못했습니다.";
+            StatusText.Text = SentoryLocalization.Text("ThemeSaveFailed");
+        }
+    }
+
+    private void LanguageComboBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (_initializing ||
+            LanguageComboBox.SelectedItem is not
+                SentoryLocalization.LanguageOption option)
+        {
+            return;
+        }
+
+        try
+        {
+            var settings = _settingsStore.Load();
+            settings.Language = option.Code;
+            _settingsStore.Save(settings);
+            SentoryLocalization.Apply(
+                System.Windows.Application.Current.Resources,
+                settings.Language);
+            LanguageChanged = true;
+            RefreshLocalizedOptions(settings);
+            VersionText.Text = SentoryLocalization.Format(
+                "VersionFormat",
+                GetVersionLabel());
+            UpdateStartupControls();
+            UpdateDiscordControls(settings.DiscordSupportEnabled);
+            _ = RefreshStatisticsAsync();
+            StatusText.Text = SentoryLocalization.Text("LanguageApplied");
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException)
+        {
+            StatusText.Text = SentoryLocalization.Text("LanguageSaveFailed");
         }
     }
 
@@ -132,14 +159,14 @@ public partial class DataManagementWindow : Window
             _startupManager.SetEnabled(!_startupManager.IsEnabled());
             UpdateStartupControls();
             StatusText.Text = _startupManager.IsEnabled()
-                ? "Windows 자동 실행을 켰습니다."
-                : "Windows 자동 실행을 껐습니다.";
+                ? SentoryLocalization.Text("StartupEnabled")
+                : SentoryLocalization.Text("StartupDisabled");
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException or
                   System.Security.SecurityException or InvalidOperationException)
         {
-            StatusText.Text = "자동 실행 설정을 변경하지 못했습니다.";
+            StatusText.Text = SentoryLocalization.Text("StartupChangeFailed");
         }
     }
 
@@ -155,13 +182,13 @@ public partial class DataManagementWindow : Window
             DiscordSupportChanged = true;
             UpdateDiscordControls(settings.DiscordSupportEnabled);
             StatusText.Text = settings.DiscordSupportEnabled
-                ? "Discord 감지를 켰습니다."
-                : "Discord 감지를 껐습니다.";
+                ? SentoryLocalization.Text("DiscordDetectionEnabled")
+                : SentoryLocalization.Text("DiscordDetectionDisabled");
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException)
         {
-            StatusText.Text = "Discord 감지 설정을 저장하지 못했습니다.";
+            StatusText.Text = SentoryLocalization.Text("DiscordSettingFailed");
         }
     }
 
@@ -190,14 +217,16 @@ public partial class DataManagementWindow : Window
             when (exception is IOException or UnauthorizedAccessException or
                   System.ComponentModel.Win32Exception)
         {
-            StatusText.Text = "데이터 폴더를 열지 못했습니다.";
+            StatusText.Text = SentoryLocalization.Text("OpenDataFolderFailed");
         }
     }
 
     private async void DeleteNonFavoritesButton_Click(
         object sender,
         RoutedEventArgs e) =>
-        await ConfirmAndCleanupAsync(null, "즐겨찾기가 아닌 모든 항목");
+        await ConfirmAndCleanupAsync(
+            null,
+            SentoryLocalization.Text("AllNonFavoriteItems"));
 
     private void SaveAutoCleanupButton_Click(
         object sender,
@@ -215,12 +244,14 @@ public partial class DataManagementWindow : Window
             settings.LastAutoCleanupAt = null;
             _settingsStore.Save(settings);
             StatusText.Text = option.Days == 0
-                ? "자동 정리를 사용하지 않습니다."
-                : $"{option.Days}일 기준 자동 정리를 저장했습니다.";
+                ? SentoryLocalization.Text("AutoCleanupDisabled")
+                : SentoryLocalization.Format(
+                    "AutoCleanupSavedFormat",
+                    option.Days);
         }
         catch (Exception)
         {
-            StatusText.Text = "자동 정리 설정을 저장하지 못했습니다.";
+            StatusText.Text = SentoryLocalization.Text("AutoCleanupSaveFailed");
         }
     }
 
@@ -239,37 +270,43 @@ public partial class DataManagementWindow : Window
             var preview = await _repository.PreviewCleanupAsync(olderThan);
             if (preview.TotalItems == 0)
             {
-                StatusText.Text = "정리할 항목이 없습니다.";
+                StatusText.Text = SentoryLocalization.Text("NothingToCleanup");
                 return;
             }
 
-            var message =
-                $"{targetDescription} {preview.TotalItems:N0}개를 삭제할까요?\n\n" +
-                $"링크 {preview.UrlItems:N0}개 · 사진 {preview.ImageItems:N0}개 " +
-                $"({FormatBytes(preview.ImageBytes)})\n" +
-                "즐겨찾기는 삭제되지 않습니다.";
+            var message = SentoryLocalization.Format(
+                "CleanupConfirmMessage",
+                targetDescription,
+                preview.TotalItems,
+                preview.UrlItems,
+                preview.ImageItems,
+                FormatBytes(preview.ImageBytes));
             if (!SentoryDialogWindow.Confirm(
                     this,
-                    "항목을 정리할까요?",
+                    SentoryLocalization.Text("CleanupConfirmHeading"),
                     message,
-                    "모두 삭제",
+                    SentoryLocalization.Text("DeleteAll"),
                     _isDarkTheme,
                     danger: true))
             {
-                StatusText.Text = "정리를 취소했습니다.";
+                StatusText.Text = SentoryLocalization.Text("CleanupCancelled");
                 return;
             }
 
             var result = await _repository.CleanupAsync(olderThan);
             HasDataChanged = result.Deleted.TotalItems > 0;
             StatusText.Text = result.FileDeleteFailures == 0
-                ? $"{result.Deleted.TotalItems:N0}개 항목을 정리했습니다."
-                : $"{result.Deleted.TotalItems:N0}개를 정리했지만 일부 사진 파일은 다음 실행 때 다시 정리합니다.";
+                ? SentoryLocalization.Format(
+                    "CleanupCompleteFormat",
+                    result.Deleted.TotalItems)
+                : SentoryLocalization.Format(
+                    "CleanupPartialFormat",
+                    result.Deleted.TotalItems);
             await RefreshStatisticsAsync();
         }
         catch (Exception)
         {
-            StatusText.Text = "데이터를 정리하지 못했습니다.";
+            StatusText.Text = SentoryLocalization.Text("CleanupFailed");
         }
         finally
         {
@@ -286,7 +323,7 @@ public partial class DataManagementWindow : Window
         OpenDataFolderButton.IsEnabled = !busy;
         if (busy)
         {
-            StatusText.Text = "삭제 대상을 확인하고 있습니다...";
+            StatusText.Text = SentoryLocalization.Text("CheckingCleanup");
         }
     }
 
@@ -296,26 +333,67 @@ public partial class DataManagementWindow : Window
         {
             var enabled = _startupManager.IsEnabled();
             StartupDescriptionText.Text = enabled
-                ? "현재 Windows 로그인 시 자동으로 실행됩니다"
-                : "현재 자동 실행을 사용하지 않습니다";
-            StartupToggleButton.Content = enabled ? "끄기" : "켜기";
+                ? SentoryLocalization.Text("StartupCurrentlyEnabled")
+                : SentoryLocalization.Text("StartupCurrentlyDisabled");
+            StartupToggleButton.Content = enabled
+                ? SentoryLocalization.Text("TurnOff")
+                : SentoryLocalization.Text("TurnOn");
         }
         catch (Exception)
         {
-            StartupDescriptionText.Text = "자동 실행 상태를 확인하지 못했습니다";
-            StartupToggleButton.Content = "다시 시도";
+            StartupDescriptionText.Text =
+                SentoryLocalization.Text("StartupStatusFailed");
+            StartupToggleButton.Content = SentoryLocalization.Text("Retry");
         }
     }
 
     private void UpdateDiscordControls(bool enabled)
     {
-        DiscordSupportToggleButton.Content = enabled ? "사용 중" : "사용 안 함";
+        DiscordSupportToggleButton.Content = enabled
+            ? SentoryLocalization.Text("InUse")
+            : SentoryLocalization.Text("NotInUse");
         DiscordRepairButton.IsEnabled = enabled;
         DiscordStatusText.Text = !enabled
-            ? "Discord 감지를 사용하지 않습니다"
+            ? SentoryLocalization.Text("DiscordNotInUse")
             : _discordRepairNeeded
-                ? "Discord 재연결 필요"
+                ? SentoryLocalization.Text("StateReconnect")
                 : DiscordDetectionPresentation.GetLabel(_discordState);
+    }
+
+    private void RefreshLocalizedOptions(SentorySettings settings)
+    {
+        _initializing = true;
+        try
+        {
+            var themeOptions = new[]
+            {
+                new ThemeOption(false, SentoryLocalization.Text("LightMode")),
+                new ThemeOption(true, SentoryLocalization.Text("DarkMode"))
+            };
+            ThemeComboBox.ItemsSource = themeOptions;
+            ThemeComboBox.SelectedItem = themeOptions.First(option =>
+                option.IsDark == settings.IsDarkTheme);
+
+            var cleanupOptions = new[]
+            {
+                new CleanupOption(0, SentoryLocalization.Text("CleanupOff")),
+                new CleanupOption(30, SentoryLocalization.Text("Cleanup30")),
+                new CleanupOption(90, SentoryLocalization.Text("Cleanup90")),
+                new CleanupOption(180, SentoryLocalization.Text("Cleanup180"))
+            };
+            AutoCleanupComboBox.ItemsSource = cleanupOptions;
+            AutoCleanupComboBox.SelectedItem = cleanupOptions.First(option =>
+                option.Days == settings.AutoCleanupDays);
+
+            var languageOptions = SentoryLocalization.GetLanguageOptions();
+            LanguageComboBox.ItemsSource = languageOptions;
+            LanguageComboBox.SelectedItem = languageOptions.First(option =>
+                option.Code == settings.Language);
+        }
+        finally
+        {
+            _initializing = false;
+        }
     }
 
     private static string FormatBytes(long bytes)
@@ -338,7 +416,7 @@ public partial class DataManagementWindow : Window
     {
         var version = Assembly.GetExecutingAssembly().GetName().Version;
         return version is null
-            ? "개발 버전"
+            ? SentoryLocalization.Text("DevelopmentVersion")
             : $"{version.Major}.{version.Minor}.{version.Build}";
     }
 
@@ -348,7 +426,13 @@ public partial class DataManagementWindow : Window
     private void ApplyTitleBarTheme() =>
         SentoryTheme.ApplyTitleBar(this, _isDarkTheme);
 
-    private sealed record CleanupOption(int Days, string Label);
+    private sealed record CleanupOption(int Days, string Label)
+    {
+        public override string ToString() => Label;
+    }
 
-    private sealed record ThemeOption(bool IsDark, string Label);
+    private sealed record ThemeOption(bool IsDark, string Label)
+    {
+        public override string ToString() => Label;
+    }
 }

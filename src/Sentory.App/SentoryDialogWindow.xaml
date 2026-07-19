@@ -92,7 +92,7 @@
                 Background="{DynamicResource LineBrush}" />
         <StackPanel Grid.Row="2" HorizontalAlignment="Right" Orientation="Horizontal">
             <Button x:Name="CancelButton"
-                    Content="취소"
+                    Content="{DynamicResource Loc.Cancel}"
                     Background="{DynamicResource SurfaceBrush}"
                     Foreground="{DynamicResource TextBrush}"
                     Style="{StaticResource DialogButtonStyle}"
