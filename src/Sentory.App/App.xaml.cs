@@ -290,9 +290,9 @@ public partial class App : System.Windows.Application
                 settings.DiscordAccessibilityPrepared = true;
                 _settingsStore.Save(settings);
             }
-            else if (!settings.DiscordAccessibilityPrepared)
+            else
             {
-                _discordRepairNeeded = true;
+                _discordRepairNeeded = false;
             }
         }
         catch (Exception exception)
@@ -345,10 +345,9 @@ public partial class App : System.Windows.Application
                 settings.DiscordAccessibilityPrepared = true;
                 _discordRepairNeeded = false;
             }
-            else if (_discordLauncher.IsInstalled &&
-                     !settings.DiscordAccessibilityPrepared)
+            else if (_discordLauncher.IsInstalled)
             {
-                _discordRepairNeeded = true;
+                _discordRepairNeeded = false;
             }
         }
         catch (Exception exception)
@@ -547,9 +546,13 @@ public partial class App : System.Windows.Application
                 {
                     SetDiscordRepairNeeded(true, persistPrepared: false);
                 }
-                else if (status.State == CaptureRuntimeState.Ready)
+                else
                 {
-                    SetDiscordRepairNeeded(false, persistPrepared: true);
+                    SetDiscordRepairNeeded(
+                        false,
+                        status.State == CaptureRuntimeState.Ready
+                            ? true
+                            : null);
                 }
             }
 

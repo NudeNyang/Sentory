@@ -43,4 +43,28 @@ public sealed class DiscordDetectionStatusTrackerTests
             expected,
             DiscordCaptureRuntime.IsWorkerFailure(response));
     }
+
+    [Theory]
+    [InlineData(
+        "worker-process-exited",
+        CaptureRuntimeState.Recovering)]
+    [InlineData(
+        "renderer-accessibility-root-unavailable",
+        CaptureRuntimeState.ReconnectRequired)]
+    [InlineData(
+        "message-list-unavailable",
+        CaptureRuntimeState.Connecting)]
+    [InlineData(
+        "request-or-window-validation-failed",
+        CaptureRuntimeState.Connecting)]
+    public void ClassifiesUnavailableSignalsWithoutFalseReconnect(
+        string signal,
+        CaptureRuntimeState expected)
+    {
+        var response = DiscordConfirmationResponse.Unavailable(signal);
+
+        Assert.Equal(
+            expected,
+            DiscordCaptureRuntime.ClassifyUnavailableState(response));
+    }
 }

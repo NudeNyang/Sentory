@@ -304,16 +304,23 @@ public sealed class DiscordCaptureRuntime :
             if (response.Outcome ==
                 DiscordConfirmationOutcome.DetectionUnavailable)
             {
-                if (IsWorkerFailure(response))
+                var unavailableState =
+                    ClassifyUnavailableState(response);
+                _statusTracker.Publish(unavailableState);
+                if (unavailableState == CaptureRuntimeState.Recovering)
                 {
-                    _statusTracker.Publish(CaptureRuntimeState.Recovering);
                     BeginWorkerWarmup(recovering: true);
+                }
+                else if (unavailableState ==
+                         CaptureRuntimeState.ReconnectRequired)
+                {
+                    ReportDetectionUnavailable();
                 }
                 else
                 {
-                    _statusTracker.Publish(
-                        CaptureRuntimeState.ReconnectRequired);
-                    ReportDetectionUnavailable();
+                    DiscordCaptureTrace.Write(
+                        "discord-target-waiting",
+                        $"signals={string.Join(',', response.ConfirmationSignals)}");
                 }
                 return;
             }
@@ -410,6 +417,7 @@ public sealed class DiscordCaptureRuntime :
             recovering
                 ? CaptureRuntimeState.Recovering
                 : CaptureRuntimeState.Connecting);
+        var lastUnavailableState = CaptureRuntimeState.Connecting;
         for (var attempt = 0; attempt < 15; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -427,13 +435,29 @@ public sealed class DiscordCaptureRuntime :
                     _statusTracker.Publish(CaptureRuntimeState.Ready);
                     return;
                 }
+
+                lastUnavailableState =
+                    ClassifyUnavailableState(response);
+            }
+            else
+            {
+                lastUnavailableState = CaptureRuntimeState.Connecting;
             }
 
             await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
         }
 
-        _statusTracker.Publish(CaptureRuntimeState.ReconnectRequired);
-        ReportDetectionUnavailable();
+        _statusTracker.Publish(lastUnavailableState);
+        if (lastUnavailableState == CaptureRuntimeState.ReconnectRequired)
+        {
+            ReportDetectionUnavailable();
+        }
+        else
+        {
+            DiscordCaptureTrace.Write(
+                "worker-warmup-deferred",
+                $"state={lastUnavailableState}");
+        }
     }
 
     private void OnWorkerRecoveryRequired(object? sender, EventArgs eventArgs)
@@ -453,6 +477,23 @@ public sealed class DiscordCaptureRuntime :
         response.Outcome == DiscordConfirmationOutcome.DetectionUnavailable &&
         response.ConfirmationSignals.Any(signal =>
             signal.StartsWith("worker-", StringComparison.Ordinal));
+
+    internal static CaptureRuntimeState ClassifyUnavailableState(
+        DiscordConfirmationResponse response)
+    {
+        if (IsWorkerFailure(response))
+        {
+            return CaptureRuntimeState.Recovering;
+        }
+
+        return response.Outcome ==
+                   DiscordConfirmationOutcome.DetectionUnavailable &&
+               response.ConfirmationSignals.Contains(
+                   "renderer-accessibility-root-unavailable",
+                   StringComparer.Ordinal)
+            ? CaptureRuntimeState.ReconnectRequired
+            : CaptureRuntimeState.Connecting;
+    }
 
     private bool TryCreateWarmupRequest(
         out DiscordConfirmationRequest request)
