@@ -7,13 +7,30 @@
 - 첫 공개 후보 버전: `0.9.0-beta`
 - 라이선스: Sentory Personal Use License 1.0
 - 사용 범위: 개인적·비상업적 용도
-- 지원 운영체제: Windows 10/11 64비트
+- 현재 배포 운영체제: Windows 10/11 64비트
 - 지원 아키텍처: x64, ARM64
 
 Sentory는 오픈소스 소프트웨어가 아니다. 소스 저장소를 공개하더라도 라이선스가
 허용하는 범위를 넘어 수정, 재배포 또는 상업적으로 사용할 수 없다. 현재 권장
 운영 방식은 소스 저장소를 비공개로 유지하고 배포 전용 저장소에 바이너리와
 문서만 공개하는 것이다.
+
+## 저장소 구성
+
+2026년 7월 20일 기준으로 소스 저장소와 공개 배포 저장소를 분리해 구성했다.
+
+| 구분 | GitHub 저장소 | 로컬 폴더 | 기본 브랜치 | 공개 범위와 역할 |
+|---|---|---|---|---|
+| 비공개 소스 | `NudeNyang/Sentory-source` | `C:\Users\awds4\Documents\Sentory` | `master` | 전체 소스, 테스트, 빌드 스크립트와 내부 문서 관리 |
+| 공개 배포 | `NudeNyang/Sentory` | `C:\Users\awds4\Documents\GitHub\Sentory` | `main` | 사용자용 README, 라이선스 문서와 GitHub Release 제공 |
+
+공개 배포 저장소 주소는 `https://github.com/NudeNyang/Sentory`다. 현재 배포판은
+Windows용이지만 향후 지원 메신저를 추가하고 macOS와 Linux로 지원 범위를 넓힐
+예정이다. 공개 저장소에는 전체 소스를 복사하지 않고 사용자에게 필요한 문서와
+배포 파일만 게시한다.
+
+두 저장소의 커밋은 로컬에서 따로 관리한다. 문서와 배포 파일을 준비한 뒤 실제
+GitHub 푸시와 Release 발행은 저장소 소유자가 직접 수행한다.
 
 ## 배포 파일
 
