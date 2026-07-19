@@ -280,6 +280,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Button x:Name="DeleteNonFavoritesButton"
                     Height="40"
@@ -297,6 +298,22 @@
                        TextWrapping="Wrap"
                        FontSize="11"
                        Foreground="{DynamicResource MutedTextBrush}" />
+            <TextBlock Grid.Row="2"
+                       Margin="0,12,0,0"
+                       HorizontalAlignment="Center"
+                       AutomationProperties.Name="저작자 © 2026 NudeNyang GitHub"
+                       FontFamily="Segoe UI Variable Display"
+                       FontSize="9.5">
+                <Run Text="© 2026"
+                     Foreground="{DynamicResource MutedTextBrush}" />
+                <Run Text=" · "
+                     Foreground="{DynamicResource LineBrush}" />
+                <Run Text="NudeNyang"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource AccentBrush}" />
+                <Run Text=" · GitHub"
+                     Foreground="{DynamicResource MutedTextBrush}" />
+            </TextBlock>
         </Grid>
     </Grid>
 </Window>
