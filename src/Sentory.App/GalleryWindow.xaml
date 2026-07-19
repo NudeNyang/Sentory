@@ -819,11 +819,13 @@
               PreviewMouseLeftButtonDown="GallerySelectionSurface_PreviewMouseLeftButtonDown"
               PreviewMouseMove="GallerySelectionSurface_PreviewMouseMove"
               PreviewMouseLeftButtonUp="GallerySelectionSurface_PreviewMouseLeftButtonUp"
-              LostMouseCapture="GallerySelectionSurface_LostMouseCapture">
+              LostMouseCapture="GallerySelectionSurface_LostMouseCapture"
+              MouseLeave="GallerySelectionSurface_MouseLeave">
             <ScrollViewer x:Name="GalleryScrollViewer"
                           Padding="22,20,14,28"
                           HorizontalScrollBarVisibility="Disabled"
-                          VerticalScrollBarVisibility="Auto">
+                          VerticalScrollBarVisibility="Hidden"
+                          ScrollChanged="GalleryScrollViewer_ScrollChanged">
                 <ItemsControl x:Name="GalleryItems">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -1174,6 +1176,44 @@
                             Opacity="0.2" />
                 </Border>
             </Canvas>
+
+            <Border x:Name="GalleryScrollIndicator"
+                    Panel.ZIndex="40"
+                    Width="10"
+                    Margin="0,0,1,0"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Stretch"
+                    Background="Transparent"
+                    Cursor="Arrow"
+                    IsHitTestVisible="False"
+                    Opacity="0"
+                    SnapsToDevicePixels="True"
+                    Visibility="Collapsed"
+                    MouseEnter="GalleryScrollIndicator_MouseEnter"
+                    MouseLeave="GalleryScrollIndicator_MouseLeave"
+                    PreviewMouseLeftButtonDown="GalleryScrollIndicator_PreviewMouseLeftButtonDown"
+                    PreviewMouseMove="GalleryScrollIndicator_PreviewMouseMove"
+                    PreviewMouseLeftButtonUp="GalleryScrollIndicator_PreviewMouseLeftButtonUp"
+                    PreviewMouseWheel="GalleryScrollIndicator_PreviewMouseWheel"
+                    LostMouseCapture="GalleryScrollIndicator_LostMouseCapture"
+                    SizeChanged="GalleryScrollIndicator_SizeChanged">
+                <Grid ClipToBounds="True">
+                    <Border x:Name="GalleryScrollIndicatorThumb"
+                            Width="3"
+                            Height="32"
+                            Margin="0,0,3,0"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Background="{DynamicResource AccentBrush}"
+                            CornerRadius="3"
+                            Opacity="0.46"
+                            SnapsToDevicePixels="True">
+                        <Border.RenderTransform>
+                            <TranslateTransform x:Name="GalleryScrollIndicatorThumbTransform" />
+                        </Border.RenderTransform>
+                    </Border>
+                </Grid>
+            </Border>
 
             <Border x:Name="SelectionBar"
                     Panel.ZIndex="20"

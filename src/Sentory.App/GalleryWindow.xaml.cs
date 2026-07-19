@@ -6,7 +6,9 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
@@ -18,6 +20,8 @@ namespace Sentory.App;
 public partial class GalleryWindow : Window
 {
     private const string SelectionCheckGlyph = "\uE73E";
+    private const double ScrollIndicatorRevealDistance = 44;
+    private const int ScrollIndicatorActiveMilliseconds = 1200;
 
     private readonly ICaptureRepository _repository;
     private readonly SentoryDataPaths _paths;
@@ -45,6 +49,12 @@ public partial class GalleryWindow : Window
     private bool _selectionDragStartedOnItem;
     private readonly HashSet<Guid> _selectionDragBaseIds = [];
     private readonly HashSet<Guid> _selectionDragPreviewIds = [];
+    private readonly DispatcherTimer _scrollIndicatorHideTimer;
+    private bool _scrollIndicatorNear;
+    private bool _scrollIndicatorActive;
+    private bool _scrollIndicatorDragging;
+    private bool _scrollIndicatorShown;
+    private bool _scrollIndicatorThumbEmphasized;
     private bool _discordRepairNeeded;
     private CaptureRuntimeState _discordDetectionState =
         CaptureRuntimeState.Connecting;
@@ -81,6 +91,14 @@ public partial class GalleryWindow : Window
         BuildSourceOptions();
         UpdateSortControls();
         UpdateIntegratedFilterControls();
+        _scrollIndicatorHideTimer = new DispatcherTimer(
+            DispatcherPriority.Background)
+        {
+            Interval = TimeSpan.FromMilliseconds(
+                ScrollIndicatorActiveMilliseconds)
+        };
+        _scrollIndicatorHideTimer.Tick +=
+            ScrollIndicatorHideTimer_Tick;
         Loaded += OnLoaded;
         SourceInitialized += (_, _) => ApplyTitleBarTheme();
     }
@@ -94,6 +112,9 @@ public partial class GalleryWindow : Window
 
         _loaded = true;
         await RefreshAsync();
+        await Dispatcher.InvokeAsync(
+            UpdateGalleryScrollIndicator,
+            DispatcherPriority.Loaded);
     }
 
     public async Task RefreshAsync()
@@ -546,6 +567,7 @@ public partial class GalleryWindow : Window
         if (!_selectionMode ||
             e.ChangedButton != MouseButton.Left ||
             !GalleryScrollViewer.IsMouseOver ||
+            GalleryScrollIndicator.IsMouseOver ||
             IsDragSelectionExcludedSource(e.OriginalSource as DependencyObject))
         {
             return;
@@ -569,6 +591,9 @@ public partial class GalleryWindow : Window
         object sender,
         MouseEventArgs e)
     {
+        UpdateGalleryScrollIndicatorProximity(
+            e.GetPosition(GallerySelectionSurface));
+
         if (!_selectionMode ||
             _selectionDragStart is not Point start ||
             e.LeftButton != MouseButtonState.Pressed)
@@ -648,6 +673,361 @@ public partial class GalleryWindow : Window
         {
             CancelSelectionDrag();
         }
+    }
+
+    private void GallerySelectionSurface_MouseLeave(
+        object sender,
+        MouseEventArgs e)
+    {
+        if (_scrollIndicatorDragging)
+        {
+            return;
+        }
+
+        SetGalleryScrollIndicatorNear(false);
+    }
+
+    private void GalleryScrollViewer_ScrollChanged(
+        object sender,
+        System.Windows.Controls.ScrollChangedEventArgs e)
+    {
+        UpdateGalleryScrollIndicator();
+        if (Math.Abs(e.VerticalChange) > double.Epsilon)
+        {
+            ShowGalleryScrollIndicatorAfterScroll();
+        }
+    }
+
+    private void GalleryScrollIndicator_SizeChanged(
+        object sender,
+        SizeChangedEventArgs e) =>
+        UpdateGalleryScrollIndicator();
+
+    private void GalleryScrollIndicator_MouseEnter(
+        object sender,
+        MouseEventArgs e)
+    {
+        SetGalleryScrollIndicatorNear(true);
+        SetGalleryScrollIndicatorThumbEmphasis(true);
+    }
+
+    private void GalleryScrollIndicator_MouseLeave(
+        object sender,
+        MouseEventArgs e)
+    {
+        SetGalleryScrollIndicatorThumbEmphasis(
+            _scrollIndicatorDragging);
+        if (!_scrollIndicatorDragging)
+        {
+            UpdateGalleryScrollIndicatorProximity(
+                Mouse.GetPosition(GallerySelectionSurface));
+        }
+    }
+
+    private void GalleryScrollIndicator_PreviewMouseLeftButtonDown(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left ||
+            !GalleryScrollIndicator.IsHitTestVisible)
+        {
+            return;
+        }
+
+        _scrollIndicatorDragging = true;
+        _scrollIndicatorActive = true;
+        _scrollIndicatorHideTimer.Stop();
+        SetGalleryScrollIndicatorNear(true);
+        SetGalleryScrollIndicatorThumbEmphasis(true);
+        GalleryScrollIndicator.CaptureMouse();
+        ScrollGalleryToIndicatorPointer(
+            e.GetPosition(GalleryScrollIndicator).Y);
+        e.Handled = true;
+    }
+
+    private void GalleryScrollIndicator_PreviewMouseMove(
+        object sender,
+        MouseEventArgs e)
+    {
+        if (!_scrollIndicatorDragging ||
+            e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        ScrollGalleryToIndicatorPointer(
+            e.GetPosition(GalleryScrollIndicator).Y);
+        e.Handled = true;
+    }
+
+    private void GalleryScrollIndicator_PreviewMouseLeftButtonUp(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (!_scrollIndicatorDragging ||
+            e.ChangedButton != MouseButton.Left)
+        {
+            return;
+        }
+
+        FinishGalleryScrollIndicatorDrag();
+        e.Handled = true;
+    }
+
+    private void GalleryScrollIndicator_LostMouseCapture(
+        object sender,
+        MouseEventArgs e)
+    {
+        if (_scrollIndicatorDragging)
+        {
+            FinishGalleryScrollIndicatorDrag();
+        }
+    }
+
+    private void GalleryScrollIndicator_PreviewMouseWheel(
+        object sender,
+        MouseWheelEventArgs e)
+    {
+        if (!GalleryScrollIndicator.IsHitTestVisible || e.Delta == 0)
+        {
+            return;
+        }
+
+        var wheelLines = SystemParameters.WheelScrollLines;
+        if (wheelLines == 0)
+        {
+            return;
+        }
+
+        var notches = Math.Max(
+            1,
+            Math.Abs(e.Delta) / Mouse.MouseWheelDeltaForOneLine);
+        if (wheelLines < 0)
+        {
+            for (var index = 0; index < notches; index++)
+            {
+                if (e.Delta > 0)
+                {
+                    GalleryScrollViewer.PageUp();
+                }
+                else
+                {
+                    GalleryScrollViewer.PageDown();
+                }
+            }
+        }
+        else
+        {
+            var lineCount = notches * wheelLines;
+            for (var index = 0; index < lineCount; index++)
+            {
+                if (e.Delta > 0)
+                {
+                    GalleryScrollViewer.LineUp();
+                }
+                else
+                {
+                    GalleryScrollViewer.LineDown();
+                }
+            }
+        }
+
+        e.Handled = true;
+    }
+
+    private void ScrollIndicatorHideTimer_Tick(
+        object? sender,
+        EventArgs e)
+    {
+        _scrollIndicatorHideTimer.Stop();
+        _scrollIndicatorActive = false;
+        UpdateGalleryScrollIndicatorVisibility();
+    }
+
+    private void ShowGalleryScrollIndicatorAfterScroll()
+    {
+        if (!GalleryScrollIndicator.IsHitTestVisible)
+        {
+            return;
+        }
+
+        _scrollIndicatorActive = true;
+        _scrollIndicatorHideTimer.Stop();
+        _scrollIndicatorHideTimer.Start();
+        UpdateGalleryScrollIndicatorVisibility();
+    }
+
+    private void UpdateGalleryScrollIndicator()
+    {
+        var metrics = ScrollIndicatorMetrics.Calculate(
+            GalleryScrollIndicator.ActualHeight,
+            GalleryScrollViewer.ExtentHeight,
+            GalleryScrollViewer.ViewportHeight,
+            GalleryScrollViewer.VerticalOffset);
+        GalleryScrollIndicator.IsHitTestVisible = metrics.IsScrollable;
+        if (!metrics.IsScrollable)
+        {
+            _scrollIndicatorHideTimer.Stop();
+            _scrollIndicatorNear = false;
+            _scrollIndicatorActive = false;
+            SetGalleryScrollIndicatorThumbEmphasis(false);
+            SetGalleryScrollIndicatorShown(false);
+            return;
+        }
+
+        GalleryScrollIndicatorThumb.Height = metrics.ThumbHeight;
+        GalleryScrollIndicatorThumbTransform.Y = metrics.ThumbTop;
+        UpdateGalleryScrollIndicatorVisibility();
+    }
+
+    private void UpdateGalleryScrollIndicatorProximity(Point position)
+    {
+        if (_scrollIndicatorDragging)
+        {
+            SetGalleryScrollIndicatorNear(true);
+            return;
+        }
+
+        if (!GalleryScrollIndicator.IsHitTestVisible ||
+            GalleryScrollIndicator.ActualHeight <= 0)
+        {
+            SetGalleryScrollIndicatorNear(false);
+            return;
+        }
+
+        var topLeft = GalleryScrollIndicator.TranslatePoint(
+            new Point(0, 0),
+            GallerySelectionSurface);
+        var bounds = new Rect(
+            topLeft,
+            GalleryScrollIndicator.RenderSize);
+        var distanceX = Math.Max(
+            Math.Max(bounds.Left - position.X, 0),
+            position.X - bounds.Right);
+        var distanceY = Math.Max(
+            Math.Max(bounds.Top - position.Y, 0),
+            position.Y - bounds.Bottom);
+        var isNear = Math.Sqrt(
+            distanceX * distanceX + distanceY * distanceY) <=
+            ScrollIndicatorRevealDistance;
+        SetGalleryScrollIndicatorNear(isNear);
+    }
+
+    private void SetGalleryScrollIndicatorNear(bool isNear)
+    {
+        if (_scrollIndicatorNear == isNear)
+        {
+            return;
+        }
+
+        _scrollIndicatorNear = isNear;
+        UpdateGalleryScrollIndicatorVisibility();
+    }
+
+    private void UpdateGalleryScrollIndicatorVisibility() =>
+        SetGalleryScrollIndicatorShown(
+            GalleryScrollIndicator.IsHitTestVisible &&
+            (_scrollIndicatorNear ||
+             _scrollIndicatorActive ||
+             _scrollIndicatorDragging));
+
+    private void SetGalleryScrollIndicatorShown(bool shown)
+    {
+        if (_scrollIndicatorShown == shown)
+        {
+            return;
+        }
+
+        _scrollIndicatorShown = shown;
+        GalleryScrollIndicator.BeginAnimation(
+            OpacityProperty,
+            CreateScrollIndicatorAnimation(
+                shown ? 1 : 0,
+                160));
+    }
+
+    private void SetGalleryScrollIndicatorThumbEmphasis(bool emphasized)
+    {
+        if (_scrollIndicatorThumbEmphasized == emphasized)
+        {
+            return;
+        }
+
+        _scrollIndicatorThumbEmphasized = emphasized;
+        GalleryScrollIndicatorThumb.BeginAnimation(
+            WidthProperty,
+            CreateScrollIndicatorAnimation(
+                emphasized ? 6 : 3,
+                140));
+        GalleryScrollIndicatorThumb.BeginAnimation(
+            MarginProperty,
+            new ThicknessAnimation
+            {
+                To = emphasized
+                    ? new Thickness(0, 0, 2, 0)
+                    : new Thickness(0, 0, 3, 0),
+                Duration = TimeSpan.FromMilliseconds(140),
+                EasingFunction = new CubicEase
+                {
+                    EasingMode = EasingMode.EaseOut
+                },
+                FillBehavior = FillBehavior.HoldEnd
+            });
+        GalleryScrollIndicatorThumb.BeginAnimation(
+            OpacityProperty,
+            CreateScrollIndicatorAnimation(
+                emphasized ? 0.95 : 0.46,
+                140));
+    }
+
+    private static DoubleAnimation CreateScrollIndicatorAnimation(
+        double target,
+        int durationMilliseconds) =>
+        new()
+        {
+            To = target,
+            Duration = TimeSpan.FromMilliseconds(durationMilliseconds),
+            EasingFunction = new CubicEase
+            {
+                EasingMode = EasingMode.EaseOut
+            },
+            FillBehavior = FillBehavior.HoldEnd
+        };
+
+    private void ScrollGalleryToIndicatorPointer(double pointerY)
+    {
+        var metrics = ScrollIndicatorMetrics.Calculate(
+            GalleryScrollIndicator.ActualHeight,
+            GalleryScrollViewer.ExtentHeight,
+            GalleryScrollViewer.ViewportHeight,
+            GalleryScrollViewer.VerticalOffset);
+        if (!metrics.IsScrollable || metrics.ThumbTravel <= 0)
+        {
+            return;
+        }
+
+        var thumbTop = Math.Clamp(
+            pointerY - metrics.ThumbHeight / 2,
+            0,
+            metrics.ThumbTravel);
+        var nextOffset = thumbTop / metrics.ThumbTravel *
+                         GalleryScrollViewer.ScrollableHeight;
+        GalleryScrollViewer.ScrollToVerticalOffset(nextOffset);
+    }
+
+    private void FinishGalleryScrollIndicatorDrag()
+    {
+        _scrollIndicatorDragging = false;
+        if (GalleryScrollIndicator.IsMouseCaptured)
+        {
+            GalleryScrollIndicator.ReleaseMouseCapture();
+        }
+
+        SetGalleryScrollIndicatorThumbEmphasis(
+            GalleryScrollIndicator.IsMouseOver);
+        UpdateGalleryScrollIndicatorProximity(
+            Mouse.GetPosition(GallerySelectionSurface));
+        UpdateGalleryScrollIndicatorVisibility();
     }
 
     private void UpdateDragSelectionRectangle(Point start, Point current)
@@ -1698,8 +2078,27 @@ public partial class GalleryWindow : Window
 
     private void SetViewState(ViewState state)
     {
-        GalleryScrollViewer.Visibility =
-            state == ViewState.Content ? Visibility.Visible : Visibility.Collapsed;
+        var contentVisible = state == ViewState.Content;
+        GalleryScrollViewer.Visibility = contentVisible
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        GalleryScrollIndicator.Visibility = contentVisible
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        if (contentVisible)
+        {
+            Dispatcher.BeginInvoke(
+                UpdateGalleryScrollIndicator,
+                DispatcherPriority.Loaded);
+        }
+        else
+        {
+            _scrollIndicatorHideTimer.Stop();
+            _scrollIndicatorNear = false;
+            _scrollIndicatorActive = false;
+            SetGalleryScrollIndicatorShown(false);
+        }
+
         LoadingPanel.Visibility =
             state == ViewState.Loading ? Visibility.Visible : Visibility.Collapsed;
         EmptyPanel.Visibility =
@@ -1714,6 +2113,7 @@ public partial class GalleryWindow : Window
         SaveSettings();
         _feedbackCancellation?.Cancel();
         _feedbackCancellation?.Dispose();
+        _scrollIndicatorHideTimer.Stop();
         base.OnClosing(e);
     }
 
