@@ -92,19 +92,6 @@ When reporting a problem, avoid attaching private chat content or original image
 The Sentory version, Windows version, messenger name, and reproduction steps are
 usually enough. See the [support policy](./SUPPORT.md) for details.
 
-## Development and builds
-
-```powershell
-dotnet build .\Sentory.sln --configuration Release
-dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 0.9.0-beta
-```
-
-The release script creates Windows x64 and ARM64 installers, portable packages,
-SHA-256 checksum files, and `release-manifest.json` in the `artifacts` directory.
-Implementation and release details are documented in [PROJECT.md](./PROJECT.md) and
-the [release guide](./docs/05-release-and-distribution.md).
-
 ## License
 
 Sentory may be used only for personal, non-commercial purposes. Modification, reverse
