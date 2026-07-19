@@ -863,6 +863,15 @@
                                         <RowDefinition Height="*" />
                                     </Grid.RowDefinitions>
 
+                                    <Border x:Name="CardSelectionOverlay"
+                                            Grid.RowSpan="2"
+                                            Margin="1"
+                                            Background="{DynamicResource AccentBrush}"
+                                            CornerRadius="15"
+                                            IsHitTestVisible="False"
+                                            Opacity="0.07"
+                                            Visibility="Collapsed" />
+
                                     <Border Grid.Row="0"
                                             Margin="10,10,10,0"
                                             Background="{DynamicResource SurfaceSecondaryBrush}"
@@ -955,7 +964,8 @@
                                                 </Border>
                                             </ControlTemplate>
                                         </Button.Template>
-                                        <TextBlock Text="{Binding SelectionIcon}"
+                                        <TextBlock x:Name="SelectionIconText"
+                                                   Text="{Binding SelectionIcon}"
                                                    FontFamily="Segoe Fluent Icons"
                                                    FontSize="14"
                                                    Foreground="{DynamicResource AccentBrush}" />
@@ -1112,12 +1122,15 @@
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding IsSelected}"
                                              Value="True">
-                                    <Setter TargetName="Card"
-                                            Property="BorderBrush"
+                                    <Setter TargetName="CardSelectionOverlay"
+                                            Property="Visibility"
+                                            Value="Visible" />
+                                    <Setter TargetName="SelectionButton"
+                                            Property="Background"
                                             Value="{DynamicResource AccentBrush}" />
-                                    <Setter TargetName="Card"
-                                            Property="BorderThickness"
-                                            Value="2" />
+                                    <Setter TargetName="SelectionIconText"
+                                            Property="Foreground"
+                                            Value="{DynamicResource AccentTextBrush}" />
                                 </DataTrigger>
                                 <Trigger SourceName="Card"
                                          Property="IsMouseOver"

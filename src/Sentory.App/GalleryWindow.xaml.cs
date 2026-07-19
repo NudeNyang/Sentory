@@ -699,19 +699,19 @@ public partial class GalleryWindow : Window
     {
         foreach (var item in _visibleItems)
         {
-            if (GetCardBorder(item) is not { } card)
+            if (GetCardTemplateElement<
+                    System.Windows.Controls.Border>(
+                    item,
+                    "CardSelectionOverlay") is not { } overlay)
             {
                 continue;
             }
 
             var selected = _selectionDragPreviewIds.Contains(
                 item.Item.ItemId);
-            card.SetResourceReference(
-                System.Windows.Controls.Border.BorderBrushProperty,
-                selected ? "AccentBrush" : "LineBrush");
-            card.BorderThickness = selected
-                ? new Thickness(2)
-                : new Thickness(1);
+            overlay.Visibility = selected
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
     }
 
@@ -719,20 +719,22 @@ public partial class GalleryWindow : Window
     {
         foreach (var item in _visibleItems)
         {
-            if (GetCardBorder(item) is not { } card)
+            if (GetCardTemplateElement<
+                    System.Windows.Controls.Border>(
+                    item,
+                    "CardSelectionOverlay") is not { } overlay)
             {
                 continue;
             }
 
-            card.ClearValue(
-                System.Windows.Controls.Border.BorderBrushProperty);
-            card.ClearValue(
-                System.Windows.Controls.Border.BorderThicknessProperty);
+            overlay.ClearValue(UIElement.VisibilityProperty);
         }
     }
 
-    private System.Windows.Controls.Border? GetCardBorder(
-        GalleryItemViewModel item)
+    private T? GetCardTemplateElement<T>(
+        GalleryItemViewModel item,
+        string elementName)
+        where T : FrameworkElement
     {
         if (GalleryItems.ItemContainerGenerator.ContainerFromItem(item)
                 is not System.Windows.Controls.ContentPresenter presenter)
@@ -740,8 +742,8 @@ public partial class GalleryWindow : Window
             return null;
         }
 
-        return presenter.ContentTemplate?.FindName("Card", presenter)
-            as System.Windows.Controls.Border;
+        return presenter.ContentTemplate?.FindName(elementName, presenter)
+            as T;
     }
 
     private void CancelSelectionDrag()
