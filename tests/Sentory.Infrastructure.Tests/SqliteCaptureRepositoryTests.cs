@@ -568,6 +568,58 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
             "gallery-settings.corrupt-*.json"));
     }
 
+    [Fact]
+    public async Task RepeatedRepositoryRestartsPreserveContinuousCaptures()
+    {
+        const int captureCount = 30;
+
+        for (var index = 0; index < captureCount; index++)
+        {
+            var repository = CreateRepository();
+            await repository.InitializeAsync();
+
+            if (index % 2 == 0)
+            {
+                await repository.UpsertUrlAsync(CreateRequest(
+                    Guid.NewGuid(),
+                    $"https://example.com/restart/{index}",
+                    DeliveryStatus.NotObserved));
+            }
+            else
+            {
+                var bytes = new byte[]
+                {
+                    0x89,
+                    0x50,
+                    0x4E,
+                    0x47,
+                    (byte)index
+                };
+                await repository.UpsertImageAsync(CreateImageRequest(
+                    Guid.NewGuid(),
+                    bytes,
+                    Convert.ToHexString(SHA256.HashData(bytes))));
+            }
+        }
+
+        var restartedRepository = CreateRepository();
+        await restartedRepository.InitializeAsync();
+        var restored = await restartedRepository.GetRecentAsync(100);
+
+        Assert.Equal(captureCount, restored.Count);
+        Assert.Equal(
+            captureCount / 2,
+            restored.Count(item => item.Kind == ContentKind.Url));
+        Assert.Equal(
+            captureCount / 2,
+            restored.Count(item => item.Kind == ContentKind.Image));
+        Assert.Equal(
+            captureCount / 2,
+            Directory.GetFiles(
+                SentoryDataPaths.ForRoot(_root).ImagesDirectory,
+                "*.png").Length);
+    }
+
     [Theory]
     [InlineData(0, 0)]
     [InlineData(30, 30)]
