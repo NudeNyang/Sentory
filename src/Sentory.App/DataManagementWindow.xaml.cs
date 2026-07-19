@@ -1,4 +1,8 @@
+using System.Diagnostics;
+using System.IO;
+using System.Reflection;
 using System.Windows;
+using System.Windows.Controls;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
 
@@ -14,30 +18,62 @@ public partial class DataManagementWindow : Window
         new(180, "180일 기준으로 정리")
     ];
 
+    private static readonly ThemeOption[] ThemeOptions =
+    [
+        new(false, "라이트 모드"),
+        new(true, "다크 모드")
+    ];
+
     private readonly ICaptureRepository _repository;
     private readonly SentorySettingsStore _settingsStore;
-    private readonly bool _isDarkTheme;
+    private readonly SentoryDataPaths _paths;
+    private readonly WindowsStartupManager _startupManager = new();
+    private readonly CaptureRuntimeState _discordState;
+    private readonly bool _discordRepairNeeded;
+    private bool _isDarkTheme;
     private bool _busy;
+    private bool _initializing = true;
 
     public DataManagementWindow(
         ICaptureRepository repository,
         SentorySettingsStore settingsStore,
+        SentoryDataPaths paths,
+        CaptureRuntimeState discordState,
+        bool discordRepairNeeded,
         bool isDarkTheme)
     {
         InitializeComponent();
         _repository = repository;
         _settingsStore = settingsStore;
+        _paths = paths;
+        _discordState = discordState;
+        _discordRepairNeeded = discordRepairNeeded;
         _isDarkTheme = isDarkTheme;
         ApplyPalette();
+
+        var settings = _settingsStore.Load();
+        ThemeComboBox.ItemsSource = ThemeOptions;
+        ThemeComboBox.SelectedItem = ThemeOptions.First(
+            option => option.IsDark == settings.IsDarkTheme);
         AutoCleanupComboBox.ItemsSource = AutoCleanupOptions;
-        var savedDays = _settingsStore.Load().AutoCleanupDays;
         AutoCleanupComboBox.SelectedItem = AutoCleanupOptions.First(
-            option => option.Days == savedDays);
+            option => option.Days == settings.AutoCleanupDays);
+        VersionText.Text = $"버전 {GetVersionLabel()}";
+        UpdateStartupControls();
+        UpdateDiscordControls(settings.DiscordSupportEnabled);
+        _initializing = false;
+
         Loaded += async (_, _) => await RefreshStatisticsAsync();
         SourceInitialized += (_, _) => ApplyTitleBarTheme();
     }
 
     public bool HasDataChanged { get; private set; }
+
+    public bool ThemeChanged { get; private set; }
+
+    public bool DiscordSupportChanged { get; private set; }
+
+    public bool DiscordRepairRequested { get; private set; }
 
     private async Task RefreshStatisticsAsync()
     {
@@ -54,6 +90,107 @@ public partial class DataManagementWindow : Window
         catch (Exception)
         {
             StatusText.Text = "데이터 현황을 불러오지 못했습니다.";
+        }
+    }
+
+    private void ThemeComboBox_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (_initializing ||
+            ThemeComboBox.SelectedItem is not ThemeOption option)
+        {
+            return;
+        }
+
+        try
+        {
+            var settings = _settingsStore.Load();
+            settings.IsDarkTheme = option.IsDark;
+            _settingsStore.Save(settings);
+            _isDarkTheme = option.IsDark;
+            ThemeChanged = true;
+            ApplyPalette();
+            ApplyTitleBarTheme();
+            StatusText.Text = option.IsDark
+                ? "다크 모드를 적용했습니다."
+                : "라이트 모드를 적용했습니다.";
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException)
+        {
+            StatusText.Text = "테마 설정을 저장하지 못했습니다.";
+        }
+    }
+
+    private void StartupToggleButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        try
+        {
+            _startupManager.SetEnabled(!_startupManager.IsEnabled());
+            UpdateStartupControls();
+            StatusText.Text = _startupManager.IsEnabled()
+                ? "Windows 자동 실행을 켰습니다."
+                : "Windows 자동 실행을 껐습니다.";
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException or
+                  System.Security.SecurityException or InvalidOperationException)
+        {
+            StatusText.Text = "자동 실행 설정을 변경하지 못했습니다.";
+        }
+    }
+
+    private void DiscordSupportToggleButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        try
+        {
+            var settings = _settingsStore.Load();
+            settings.DiscordSupportEnabled = !settings.DiscordSupportEnabled;
+            _settingsStore.Save(settings);
+            DiscordSupportChanged = true;
+            UpdateDiscordControls(settings.DiscordSupportEnabled);
+            StatusText.Text = settings.DiscordSupportEnabled
+                ? "Discord 감지를 켰습니다."
+                : "Discord 감지를 껐습니다.";
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException)
+        {
+            StatusText.Text = "Discord 감지 설정을 저장하지 못했습니다.";
+        }
+    }
+
+    private void DiscordRepairButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        DiscordRepairRequested = true;
+        Close();
+    }
+
+    private void OpenDataFolderButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        try
+        {
+            _paths.EnsureDirectories();
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = _paths.RootDirectory,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException or
+                  System.ComponentModel.Win32Exception)
+        {
+            StatusText.Text = "데이터 폴더를 열지 못했습니다.";
         }
     }
 
@@ -146,10 +283,39 @@ public partial class DataManagementWindow : Window
         DeleteNonFavoritesButton.IsEnabled = !busy;
         SaveAutoCleanupButton.IsEnabled = !busy;
         AutoCleanupComboBox.IsEnabled = !busy;
+        OpenDataFolderButton.IsEnabled = !busy;
         if (busy)
         {
             StatusText.Text = "삭제 대상을 확인하고 있습니다...";
         }
+    }
+
+    private void UpdateStartupControls()
+    {
+        try
+        {
+            var enabled = _startupManager.IsEnabled();
+            StartupDescriptionText.Text = enabled
+                ? "현재 Windows 로그인 시 자동으로 실행됩니다"
+                : "현재 자동 실행을 사용하지 않습니다";
+            StartupToggleButton.Content = enabled ? "끄기" : "켜기";
+        }
+        catch (Exception)
+        {
+            StartupDescriptionText.Text = "자동 실행 상태를 확인하지 못했습니다";
+            StartupToggleButton.Content = "다시 시도";
+        }
+    }
+
+    private void UpdateDiscordControls(bool enabled)
+    {
+        DiscordSupportToggleButton.Content = enabled ? "사용 중" : "사용 안 함";
+        DiscordRepairButton.IsEnabled = enabled;
+        DiscordStatusText.Text = !enabled
+            ? "Discord 감지를 사용하지 않습니다"
+            : _discordRepairNeeded
+                ? "Discord 재연결 필요"
+                : DiscordDetectionPresentation.GetLabel(_discordState);
     }
 
     private static string FormatBytes(long bytes)
@@ -168,11 +334,21 @@ public partial class DataManagementWindow : Window
             : $"{value:N1} {units[unit]}";
     }
 
-    private void ApplyPalette()
-        => SentoryTheme.Apply(Resources, _isDarkTheme);
+    private static string GetVersionLabel()
+    {
+        var version = Assembly.GetExecutingAssembly().GetName().Version;
+        return version is null
+            ? "개발 버전"
+            : $"{version.Major}.{version.Minor}.{version.Build}";
+    }
 
-    private void ApplyTitleBarTheme()
-        => SentoryTheme.ApplyTitleBar(this, _isDarkTheme);
+    private void ApplyPalette() =>
+        SentoryTheme.Apply(Resources, _isDarkTheme);
+
+    private void ApplyTitleBarTheme() =>
+        SentoryTheme.ApplyTitleBar(this, _isDarkTheme);
 
     private sealed record CleanupOption(int Days, string Label);
+
+    private sealed record ThemeOption(bool IsDark, string Label);
 }

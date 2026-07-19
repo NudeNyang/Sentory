@@ -579,7 +579,7 @@
                                 AutomationProperties.AutomationId="DataManagementButton"
                                 Margin="4,0,0,0"
                                 Style="{StaticResource ToolbarButtonStyle}"
-                                ToolTip="데이터 관리"
+                                ToolTip="설정"
                                 Click="DataManagementButton_Click">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE713;"
@@ -587,7 +587,7 @@
                                            FontSize="13"
                                            VerticalAlignment="Center" />
                                 <TextBlock Margin="7,0,0,0"
-                                           Text="데이터 관리"
+                                           Text="설정"
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>

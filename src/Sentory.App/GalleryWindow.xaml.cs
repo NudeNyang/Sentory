@@ -35,10 +35,13 @@ public partial class GalleryWindow : Window
     private bool _loaded;
     private bool _isDarkTheme;
     private bool _selectionMode;
+    private bool _discordRepairNeeded;
     private CaptureRuntimeState _discordDetectionState =
         CaptureRuntimeState.Connecting;
 
     public event EventHandler? DiscordRepairRequested;
+
+    public event EventHandler? DiscordSupportChanged;
 
     public bool IsDarkTheme => _isDarkTheme;
 
@@ -106,6 +109,7 @@ public partial class GalleryWindow : Window
 
     public void SetDiscordRepairNeeded(bool needed)
     {
+        _discordRepairNeeded = needed;
         DiscordConnectionBanner.Visibility = needed
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -360,6 +364,9 @@ public partial class GalleryWindow : Window
         var window = new DataManagementWindow(
             _repository,
             _settingsStore,
+            _paths,
+            _discordDetectionState,
+            _discordRepairNeeded,
             _isDarkTheme)
         {
             Owner = this
@@ -368,6 +375,23 @@ public partial class GalleryWindow : Window
         if (window.HasDataChanged)
         {
             await RefreshAsync();
+        }
+
+        if (window.ThemeChanged)
+        {
+            _isDarkTheme = _settingsStore.Load().IsDarkTheme;
+            _settings.IsDarkTheme = _isDarkTheme;
+            ApplyTheme(_isDarkTheme);
+        }
+
+        if (window.DiscordSupportChanged)
+        {
+            DiscordSupportChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        if (window.DiscordRepairRequested)
+        {
+            DiscordRepairRequested?.Invoke(this, EventArgs.Empty);
         }
     }
 

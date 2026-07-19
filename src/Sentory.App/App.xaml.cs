@@ -271,6 +271,18 @@ public partial class App : System.Windows.Application
         var settings = _settingsStore.Load();
         settings.DiscordSupportEnabled =
             !settings.DiscordSupportEnabled;
+        _settingsStore.Save(settings);
+        ApplyDiscordSupportSetting();
+    }
+
+    private void ApplyDiscordSupportSetting()
+    {
+        if (_settingsStore is null)
+        {
+            return;
+        }
+
+        var settings = _settingsStore.Load();
         _discordSupportEnabled = settings.DiscordSupportEnabled;
         if (!_discordSupportEnabled)
         {
@@ -614,6 +626,8 @@ public partial class App : System.Windows.Application
                 _settingsStore);
             _galleryWindow.DiscordRepairRequested += async (_, _) =>
                 await RepairDiscordConnectionAsync();
+            _galleryWindow.DiscordSupportChanged += (_, _) =>
+                ApplyDiscordSupportSetting();
             _galleryWindow.SetDiscordRepairNeeded(
                 _discordSupportEnabled && _discordRepairNeeded);
             _galleryWindow.SetDiscordDetectionState(
