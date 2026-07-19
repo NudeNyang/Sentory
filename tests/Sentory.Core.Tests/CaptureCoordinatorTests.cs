@@ -65,6 +65,14 @@ public sealed class CaptureCoordinatorTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult(false);
 
+        public Task<BulkDeleteResult> DeleteItemsAsync(
+            IReadOnlyCollection<Guid> itemIds,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new BulkDeleteResult(
+                itemIds.Count,
+                0,
+                itemIds.Count));
+
         public Task<bool> SetFavoriteAsync(
             Guid itemId,
             bool isFavorite,

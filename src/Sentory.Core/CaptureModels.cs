@@ -130,6 +130,11 @@ public sealed record DataCleanupResult(
     int DeletedImageFiles,
     int FileDeleteFailures);
 
+public sealed record BulkDeleteResult(
+    int RequestedItems,
+    int DeletedItems,
+    int MissingItems);
+
 public interface ICaptureRepository
 {
     Task InitializeAsync(CancellationToken cancellationToken = default);
@@ -148,6 +153,10 @@ public interface ICaptureRepository
 
     Task<bool> DeleteItemAsync(
         Guid itemId,
+        CancellationToken cancellationToken = default);
+
+    Task<BulkDeleteResult> DeleteItemsAsync(
+        IReadOnlyCollection<Guid> itemIds,
         CancellationToken cancellationToken = default);
 
     Task<bool> SetFavoriteAsync(

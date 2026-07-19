@@ -573,6 +573,28 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         return affected > 0;
     }
 
+    public async Task<BulkDeleteResult> DeleteItemsAsync(
+        IReadOnlyCollection<Guid> itemIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(itemIds);
+        var requestedIds = itemIds.Distinct().ToArray();
+        var deletedItems = 0;
+        foreach (var itemId in requestedIds)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (await DeleteItemAsync(itemId, cancellationToken))
+            {
+                deletedItems++;
+            }
+        }
+
+        return new BulkDeleteResult(
+            requestedIds.Length,
+            deletedItems,
+            requestedIds.Length - deletedItems);
+    }
+
     public async Task<StorageRepairResult> RepairStorageAsync(
         CancellationToken cancellationToken = default)
     {

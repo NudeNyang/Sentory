@@ -23,6 +23,7 @@ public partial class GalleryWindow : Window
         [];
     private readonly List<GalleryItemViewModel> _allItems = [];
     private readonly HashSet<SourceApp> _sourceApps = [];
+    private readonly HashSet<Guid> _selectedItemIds = [];
     private readonly Dictionary<string, System.Windows.Controls.Button>
         _sourceOptionButtons = [];
     private readonly Dictionary<string, System.Windows.Controls.TextBlock>
@@ -33,6 +34,7 @@ public partial class GalleryWindow : Window
     private CancellationTokenSource? _feedbackCancellation;
     private bool _loaded;
     private bool _isDarkTheme;
+    private bool _selectionMode;
     private CaptureRuntimeState _discordDetectionState =
         CaptureRuntimeState.Connecting;
 
@@ -160,7 +162,9 @@ public partial class GalleryWindow : Window
             thumbnail is not null,
             siteIcon is not null,
             isImage ? Stretch.Uniform : Stretch.UniformToFill,
-            isImage ? new Thickness(8) : new Thickness(0));
+            isImage ? new Thickness(8) : new Thickness(0),
+            _selectionMode,
+            _selectedItemIds.Contains(item.ItemId));
     }
 
     private ImageSource? LoadThumbnail(string? relativePath)
@@ -245,6 +249,8 @@ public partial class GalleryWindow : Window
         {
             _visibleItems.Add(viewModels[item.ItemId]);
         }
+
+        UpdateSelectionControls();
 
         if (_allItems.Count > 0 && _visibleItems.Count == 0)
         {
@@ -363,6 +369,152 @@ public partial class GalleryWindow : Window
         {
             await RefreshAsync();
         }
+    }
+
+    private void SelectModeButton_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        SetSelectionMode(!_selectionMode);
+
+    private void SelectionButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is System.Windows.Controls.Button
+            {
+                Tag: GalleryItemViewModel item
+            })
+        {
+            ToggleSelection(item.Item.ItemId);
+        }
+    }
+
+    private void SelectVisibleItemsButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        foreach (var item in _visibleItems)
+        {
+            _selectedItemIds.Add(item.Item.ItemId);
+        }
+
+        RebuildItemViewModels();
+    }
+
+    private void ClearSelectionButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        _selectedItemIds.Clear();
+        RebuildItemViewModels();
+    }
+
+    private async void DeleteSelectedButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        var selectedItems = _allItems
+            .Where(item => _selectedItemIds.Contains(item.Item.ItemId))
+            .ToArray();
+        if (selectedItems.Length == 0)
+        {
+            return;
+        }
+
+        var favoriteCount = selectedItems.Count(item => item.Item.IsFavorite);
+        var favoriteWarning = favoriteCount > 0
+            ? $"\n\n즐겨찾기 {favoriteCount:N0}개도 선택되어 함께 삭제됩니다."
+            : string.Empty;
+        if (!SentoryDialogWindow.Confirm(
+                this,
+                $"선택한 {selectedItems.Length:N0}개 항목을 삭제할까요?",
+                "선택한 항목과 저장된 사진 파일을 보관함에서 삭제합니다." +
+                favoriteWarning +
+                "\n이 작업은 되돌릴 수 없습니다.",
+                "선택 항목 삭제",
+                _isDarkTheme,
+                danger: true))
+        {
+            return;
+        }
+
+        DeleteSelectedButton.IsEnabled = false;
+        try
+        {
+            var result = await _repository.DeleteItemsAsync(
+                selectedItems.Select(item => item.Item.ItemId).ToArray());
+            _allItems.RemoveAll(item =>
+                _selectedItemIds.Contains(item.Item.ItemId));
+            SetSelectionMode(false);
+            ShowFeedback(
+                result.MissingItems == 0
+                    ? $"{result.DeletedItems:N0}개 항목을 삭제했습니다."
+                    : $"{result.DeletedItems:N0}개를 삭제했고 {result.MissingItems:N0}개는 이미 없었습니다.");
+        }
+        catch (Exception)
+        {
+            ShowFeedback("선택한 항목을 삭제하지 못했습니다.");
+        }
+        finally
+        {
+            DeleteSelectedButton.IsEnabled = true;
+        }
+    }
+
+    private void SetSelectionMode(bool enabled)
+    {
+        _selectionMode = enabled;
+        if (!enabled)
+        {
+            _selectedItemIds.Clear();
+        }
+
+        RebuildItemViewModels();
+    }
+
+    private void ToggleSelection(Guid itemId)
+    {
+        if (!_selectedItemIds.Add(itemId))
+        {
+            _selectedItemIds.Remove(itemId);
+        }
+
+        RebuildItemViewModels();
+    }
+
+    private void RebuildItemViewModels()
+    {
+        for (var index = 0; index < _allItems.Count; index++)
+        {
+            _allItems[index] = CreateViewModel(_allItems[index].Item);
+        }
+
+        ApplyFilter();
+    }
+
+    private void UpdateSelectionControls()
+    {
+        SelectionBar.Visibility = _selectionMode
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        SelectedCountText.Text = $"{_selectedItemIds.Count:N0}개 선택";
+        DeleteSelectedButton.IsEnabled = _selectedItemIds.Count > 0;
+        SelectModeButtonText.Text = _selectionMode ? "선택 종료" : "선택";
+        SelectModeButton.ToolTip = _selectionMode
+            ? "선택 모드 종료"
+            : "여러 항목 선택";
+        System.Windows.Automation.AutomationProperties.SetName(
+            SelectModeButton,
+            SelectModeButton.ToolTip?.ToString() ?? "여러 항목 선택");
+        SearchBox.IsEnabled = !_selectionMode;
+        IntegratedFilterButton.IsEnabled = !_selectionMode;
+        SortButton.IsEnabled = !_selectionMode;
+        DataManagementButton.IsEnabled = !_selectionMode;
+        AllFilterButton.IsEnabled = !_selectionMode;
+        UrlFilterButton.IsEnabled = !_selectionMode;
+        ImageFilterButton.IsEnabled = !_selectionMode;
+        FavoriteFilterButton.IsEnabled = !_selectionMode;
     }
 
     private void DateOptionButton_Click(object sender, RoutedEventArgs e)
@@ -857,6 +1009,13 @@ public partial class GalleryWindow : Window
                 DataContext: GalleryItemViewModel item
             })
         {
+            if (_selectionMode)
+            {
+                ToggleSelection(item.Item.ItemId);
+                e.Handled = true;
+                return;
+            }
+
             OpenItem(item);
         }
     }
@@ -990,10 +1149,15 @@ public partial class GalleryWindow : Window
 
     private async Task DeleteAsync(GalleryItemViewModel item)
     {
+        var favoriteWarning = item.Item.IsFavorite
+            ? "\n\n이 항목은 즐겨찾기에 등록되어 있습니다."
+            : string.Empty;
         if (!SentoryDialogWindow.Confirm(
                 this,
                 "항목을 삭제할까요?",
-                "이 항목을 보관함에서 삭제합니다. 이 작업은 되돌릴 수 없습니다.",
+                "이 항목을 보관함에서 삭제합니다." +
+                favoriteWarning +
+                "\n이 작업은 되돌릴 수 없습니다.",
                 "삭제",
                 _isDarkTheme,
                 danger: true))
@@ -1102,7 +1266,9 @@ public sealed record GalleryItemViewModel(
     bool HasPrimaryArtwork,
     bool HasSiteIcon,
     Stretch ThumbnailStretch,
-    Thickness ThumbnailMargin)
+    Thickness ThumbnailMargin,
+    bool IsSelectionMode,
+    bool IsSelected)
 {
     public string Domain => Item.Domain;
 
@@ -1119,6 +1285,10 @@ public sealed record GalleryItemViewModel(
     public bool HasBeenCopied => Item.CopyCount > 0;
 
     public string CopyUsageLabel => $"복사 {Item.CopyCount:N0}회";
+
+    public string SelectionIcon => IsSelected ? "\uE73E" : string.Empty;
+
+    public string SelectionToolTip => IsSelected ? "선택 해제" : "항목 선택";
 
     public string AutomationName =>
         $"{TypeLabel}, {Title}, {DateLabel}, {Item.CaptureCount}회 저장, " +

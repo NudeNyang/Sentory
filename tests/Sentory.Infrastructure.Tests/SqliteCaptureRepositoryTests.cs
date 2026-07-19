@@ -264,6 +264,32 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task BulkDeleteRemovesDistinctItemsAndReportsMissingIds()
+    {
+        var repository = CreateRepository();
+        await repository.InitializeAsync();
+        var first = await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/delete-first",
+            DeliveryStatus.NotObserved));
+        var second = await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/delete-second",
+            DeliveryStatus.NotObserved));
+        var missing = Guid.NewGuid();
+
+        var result = await repository.DeleteItemsAsync(
+            [first.ItemId, first.ItemId, missing]);
+        var remaining = await repository.GetRecentAsync(10);
+
+        Assert.Equal(2, result.RequestedItems);
+        Assert.Equal(1, result.DeletedItems);
+        Assert.Equal(1, result.MissingItems);
+        Assert.DoesNotContain(remaining, item => item.ItemId == first.ItemId);
+        Assert.Contains(remaining, item => item.ItemId == second.ItemId);
+    }
+
+    [Fact]
     public async Task InitializeSetsCurrentSchemaVersion()
     {
         var paths = SentoryDataPaths.ForRoot(_root);
