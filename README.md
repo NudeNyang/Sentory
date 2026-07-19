@@ -42,15 +42,10 @@ Sentory는 메신저에서 다룬 URL과 사진을 로컬에 보관하는 데스
 dotnet run --project .\src\Sentory.App
 ```
 
-실행 후 작업 표시줄 알림 영역의 Sentory 아이콘을 우클릭하면 보관함,
+실행하면 보관함 창이 화면과 작업 표시줄에 바로 나타난다. 창을 닫은 뒤에는
+작업 표시줄 알림 영역의 Sentory 아이콘을 우클릭하면 보관함,
 감지 일시정지, Windows 자동 실행, Discord 자동 연결과 데이터 폴더를
 한 곳에서 관리할 수 있다. 트레이 아이콘을 더블클릭해도 보관함이 열린다.
-
-개발 중 갤러리를 바로 열려면 다음처럼 실행할 수 있다.
-
-```powershell
-dotnet run --project .\src\Sentory.App -- --gallery
-```
 
 기본 데이터 위치:
 

@@ -16,6 +16,8 @@ public partial class App : System.Windows.Application
 {
     private const string SingleInstanceMutexName =
         "Local\\Sentory.Desktop.Singleton";
+    private const string OpenGalleryEventName =
+        "Local\\Sentory.Desktop.OpenGallery";
     private const string InstallationVerificationArgument =
         "--verify-installation";
 
@@ -24,6 +26,8 @@ public partial class App : System.Windows.Application
             Environment.GetEnvironmentVariable("SENTORY_DATA_DIR"));
     private Mutex? _singleInstanceMutex;
     private bool _ownsMutex;
+    private EventWaitHandle? _openGalleryEvent;
+    private RegisteredWaitHandle? _openGalleryRegistration;
     private Forms.NotifyIcon? _trayIcon;
     private Icon? _trayIconImage;
     private TrayMenuWindow? _trayMenuWindow;
@@ -94,14 +98,20 @@ public partial class App : System.Windows.Application
             _ownsMutex = createdNew;
             if (!createdNew)
             {
-                SentoryDialogWindow.ShowMessage(
-                    null,
-                    SentoryLocalization.Text("AlreadyRunningHeading"),
-                    SentoryLocalization.Text("AlreadyRunningMessage"),
-                    GetSavedDarkTheme());
+                if (!RequestGalleryFromRunningInstance())
+                {
+                    SentoryDialogWindow.ShowMessage(
+                        null,
+                        SentoryLocalization.Text("AlreadyRunningHeading"),
+                        SentoryLocalization.Text("AlreadyRunningMessage"),
+                        GetSavedDarkTheme());
+                }
+
                 Shutdown();
                 return;
             }
+
+            RegisterGalleryOpenSignal();
         }
 
         try
@@ -168,10 +178,7 @@ public partial class App : System.Windows.Application
                 _maintenanceCancellation.Token);
             _runtime.Start();
             UpdatePauseUi();
-            if (e.Args.Contains("--gallery", StringComparer.OrdinalIgnoreCase))
-            {
-                OpenGallery();
-            }
+            OpenGallery();
         }
         catch (Exception exception)
         {
@@ -210,6 +217,53 @@ public partial class App : System.Windows.Application
                 ShowTrayMenu();
             }
         };
+    }
+
+    private void RegisterGalleryOpenSignal()
+    {
+        _openGalleryEvent = new EventWaitHandle(
+            false,
+            EventResetMode.AutoReset,
+            OpenGalleryEventName);
+        _openGalleryRegistration = ThreadPool.RegisterWaitForSingleObject(
+            _openGalleryEvent,
+            (_, timedOut) =>
+            {
+                if (timedOut || _shuttingDown)
+                {
+                    return;
+                }
+
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (!_shuttingDown)
+                    {
+                        OpenGallery();
+                    }
+                });
+            },
+            null,
+            Timeout.Infinite,
+            executeOnlyOnce: false);
+    }
+
+    private static bool RequestGalleryFromRunningInstance()
+    {
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            try
+            {
+                using var signal = EventWaitHandle.OpenExisting(
+                    OpenGalleryEventName);
+                return signal.Set();
+            }
+            catch (WaitHandleCannotBeOpenedException)
+            {
+                Thread.Sleep(50);
+            }
+        }
+
+        return false;
     }
 
     private void ShowTrayMenu()
@@ -953,6 +1007,10 @@ public partial class App : System.Windows.Application
         }
 
         _singleInstanceMutex?.Dispose();
+        _openGalleryRegistration?.Unregister(null);
+        _openGalleryRegistration = null;
+        _openGalleryEvent?.Dispose();
+        _openGalleryEvent = null;
         _maintenanceCancellation.Dispose();
         _linkPreviewWakeSignal.Dispose();
         base.OnExit(e);
