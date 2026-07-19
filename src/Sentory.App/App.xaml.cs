@@ -887,6 +887,11 @@ public partial class App : System.Windows.Application
         }
 
         _shuttingDown = true;
+        var shutdownTimer = Stopwatch.StartNew();
+        _diagnosticsLog?.Write(
+            "shutdown-started",
+            "Sentory shutdown started");
+        HideUserInterfaceForShutdown();
         _maintenanceCancellation.Cancel();
         if (_maintenanceTask is not null)
         {
@@ -901,10 +906,6 @@ public partial class App : System.Windows.Application
         _linkPreviewFetcher?.Dispose();
         _linkPreviewFetcher = null;
         _linkPreviewService = null;
-        _trayMenuWindow?.Close();
-        _trayMenuWindow = null;
-        _galleryWindow?.Close();
-        _galleryWindow = null;
         if (_runtime is not null)
         {
             _runtime.Captured -= OnCaptured;
@@ -917,6 +918,18 @@ public partial class App : System.Windows.Application
             _runtime = null;
         }
 
+        shutdownTimer.Stop();
+        _diagnosticsLog?.Write(
+            "shutdown-completed",
+            $"Sentory shutdown completed in {shutdownTimer.ElapsedMilliseconds} ms");
+    }
+
+    private void HideUserInterfaceForShutdown()
+    {
+        _trayMenuWindow?.Close();
+        _trayMenuWindow = null;
+        _galleryWindow?.Close();
+        _galleryWindow = null;
         if (_trayIcon is not null)
         {
             _trayIcon.Visible = false;

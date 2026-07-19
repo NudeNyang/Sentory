@@ -727,6 +727,11 @@ public sealed class DiscordCaptureRuntime :
         _triggers.Writer.TryComplete();
         _cancellation.Cancel();
         CancelActiveCandidates();
+        if (_confirmationClient is IAsyncDisposable disposableClient)
+        {
+            await disposableClient.DisposeAsync();
+        }
+
         if (_warmupTask is not null)
         {
             try
@@ -763,10 +768,6 @@ public sealed class DiscordCaptureRuntime :
         }
 
         _clipboardReader.Dispose();
-        if (_confirmationClient is IAsyncDisposable disposableClient)
-        {
-            await disposableClient.DisposeAsync();
-        }
         _cancellation.Dispose();
         GC.SuppressFinalize(this);
     }

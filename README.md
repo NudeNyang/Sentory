@@ -75,7 +75,8 @@ dotnet test .\Sentory.sln --configuration Release
 .\scripts\Publish-Portable.ps1
 ```
 
-스크립트는 실행 파일의 저장소 초기화 자체 점검을 거친 뒤
+스크립트는 실행 파일의 저장소 초기화 자체 점검을 거친 뒤 저장소 최상단에
+바로 실행할 수 있는 `Sentory.exe`를 만들고,
 `artifacts\Sentory-win-x64-portable` 폴더, ZIP 파일과 SHA-256 확인값을
 만든다. 받는 사람은 ZIP을 완전히 푼 뒤 `Sentory.App.exe`를 실행하면 된다.
 

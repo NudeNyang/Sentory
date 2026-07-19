@@ -53,6 +53,32 @@ public sealed class CompositeCaptureRuntimeTests
         Assert.True(second.Disposed);
     }
 
+    [Fact]
+    public async Task BeginsDisposingAllChildRuntimesWithoutWaitingForEachOther()
+    {
+        var first = new BlockingRuntime();
+        var second = new BlockingRuntime();
+        var composite = new CompositeCaptureRuntime(first, second);
+
+        var disposal = composite.DisposeAsync().AsTask();
+        try
+        {
+            await Task.WhenAll(
+                    first.DisposeStarted.Task,
+                    second.DisposeStarted.Task)
+                .WaitAsync(TimeSpan.FromSeconds(1));
+        }
+        finally
+        {
+            first.AllowDispose.TrySetResult();
+            second.AllowDispose.TrySetResult();
+            await disposal;
+        }
+
+        Assert.True(first.Disposed);
+        Assert.True(second.Disposed);
+    }
+
     private sealed class FakeRuntime :
         ICaptureRuntime,
         ICaptureRuntimeStatusSource,
@@ -106,5 +132,41 @@ public sealed class CompositeCaptureRuntimeTests
                     "test",
                     "test",
                     DateTimeOffset.UtcNow));
+    }
+
+    private sealed class BlockingRuntime : ICaptureRuntime
+    {
+        public event EventHandler<CaptureNotification>? Captured
+        {
+            add { }
+            remove { }
+        }
+
+        public event EventHandler<CaptureRuntimeIssue>? IssueDetected
+        {
+            add { }
+            remove { }
+        }
+
+        public TaskCompletionSource DisposeStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowDispose { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool IsPaused { get; set; }
+
+        public bool Disposed { get; private set; }
+
+        public void Start()
+        {
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            DisposeStarted.TrySetResult();
+            await AllowDispose.Task;
+            Disposed = true;
+        }
     }
 }

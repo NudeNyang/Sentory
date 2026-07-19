@@ -12,6 +12,7 @@ $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $projectPath = Join-Path $repositoryRoot "src\Sentory.App\Sentory.App.csproj"
 $publishDirectory = Join-Path $repositoryRoot "src\Sentory.App\bin\publish\win-x64"
 $guidePath = Join-Path $repositoryRoot "distribution\README-KO.txt"
+$repositoryExecutable = Join-Path $repositoryRoot "Sentory.exe"
 
 if (-not [System.IO.Path]::IsPathRooted($OutputRoot)) {
     $OutputRoot = Join-Path $repositoryRoot $OutputRoot
@@ -104,6 +105,11 @@ try {
         throw "휴대용 폴더에 디버그 심볼이 포함되어 있습니다."
     }
 
+    Copy-Item `
+        -LiteralPath $stagedExecutable `
+        -Destination $repositoryExecutable `
+        -Force
+
     Compress-Archive `
         -Path (Join-Path $stagingDirectory "*") `
         -DestinationPath $archivePath `
@@ -114,6 +120,7 @@ try {
 
     Write-Host ""
     Write-Host "Sentory 휴대용 배포 파일을 만들었습니다." -ForegroundColor Green
+    Write-Host "바로 실행: $repositoryExecutable"
     Write-Host "폴더: $stagingDirectory"
     Write-Host "압축: $archivePath"
     Write-Host "확인값: $checksumPath"

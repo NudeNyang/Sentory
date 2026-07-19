@@ -87,6 +87,7 @@ public sealed class CompositeCaptureRuntime :
 
     public async ValueTask DisposeAsync()
     {
+        var disposalTasks = new List<Task>(_runtimes.Count);
         foreach (var runtime in _runtimes)
         {
             runtime.Captured -= ForwardCaptured;
@@ -95,8 +96,11 @@ public sealed class CompositeCaptureRuntime :
             {
                 statusSource.StatusChanged -= ForwardStatus;
             }
-            await runtime.DisposeAsync();
+
+            disposalTasks.Add(runtime.DisposeAsync().AsTask());
         }
+
+        await Task.WhenAll(disposalTasks);
 
         GC.SuppressFinalize(this);
     }
