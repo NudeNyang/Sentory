@@ -28,6 +28,8 @@
         <SolidColorBrush x:Key="CopyButtonHoverBrush" Color="#FAF7F1" />
         <SolidColorBrush x:Key="CopyButtonBorderBrush" Color="#C8C0B5" />
         <SolidColorBrush x:Key="CardHoverBorderBrush" Color="#9A8976" />
+        <SolidColorBrush x:Key="SelectionTintBrush" Color="#1A756655" />
+        <SolidColorBrush x:Key="SelectionBorderBrush" Color="#66756655" />
         <SolidColorBrush x:Key="StatusBackgroundBrush" Color="#E2DDD5" />
         <SolidColorBrush x:Key="StatusTextBrush" Color="#5E5952" />
         <SolidColorBrush x:Key="NoticeBackgroundBrush" Color="#E8E2D7" />
@@ -866,10 +868,11 @@
                                     <Border x:Name="CardSelectionOverlay"
                                             Grid.RowSpan="2"
                                             Margin="1"
-                                            Background="{DynamicResource AccentBrush}"
+                                            Background="{DynamicResource SelectionTintBrush}"
+                                            BorderBrush="{DynamicResource SelectionBorderBrush}"
+                                            BorderThickness="1"
                                             CornerRadius="15"
                                             IsHitTestVisible="False"
-                                            Opacity="0.07"
                                             Visibility="Collapsed" />
 
                                     <Border Grid.Row="0"
