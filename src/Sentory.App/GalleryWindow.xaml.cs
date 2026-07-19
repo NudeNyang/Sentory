@@ -40,7 +40,9 @@ public partial class GalleryWindow : Window
     private Point? _selectionDragStart;
     private bool _selectionDragInProgress;
     private bool _selectionDragAdditive;
+    private bool _selectionDragStartedOnItem;
     private readonly HashSet<Guid> _selectionDragBaseIds = [];
+    private readonly HashSet<Guid> _selectionDragPreviewIds = [];
     private bool _discordRepairNeeded;
     private CaptureRuntimeState _discordDetectionState =
         CaptureRuntimeState.Connecting;
@@ -549,6 +551,9 @@ public partial class GalleryWindow : Window
 
         _selectionDragStart = e.GetPosition(GallerySelectionSurface);
         _selectionDragInProgress = false;
+        _selectionDragStartedOnItem =
+            FindGalleryItemFromSource(
+                e.OriginalSource as DependencyObject) is not null;
         _selectionDragAdditive =
             (Keyboard.Modifiers & ModifierKeys.Control) != 0;
         _selectionDragBaseIds.Clear();
@@ -591,6 +596,7 @@ public partial class GalleryWindow : Window
         }
 
         UpdateDragSelectionRectangle(start, current);
+        UpdateDragSelectionPreview(CreateSelectionBounds(start, current));
         e.Handled = true;
     }
 
@@ -605,15 +611,28 @@ public partial class GalleryWindow : Window
 
         if (!_selectionDragInProgress)
         {
-            _selectionDragStart = null;
-            _selectionDragBaseIds.Clear();
+            var clearSelection = !_selectionDragStartedOnItem &&
+                                 _selectedItemIds.Count > 0;
+            EndSelectionDrag();
+            if (clearSelection)
+            {
+                _selectedItemIds.Clear();
+                e.Handled = true;
+                RebuildItemViewModels();
+            }
+
             return;
         }
 
         var bounds = CreateSelectionBounds(
             start,
             e.GetPosition(GallerySelectionSurface));
-        ApplyDragSelection(bounds);
+        UpdateDragSelectionRectangle(
+            start,
+            e.GetPosition(GallerySelectionSurface));
+        UpdateDragSelectionPreview(bounds);
+        _selectedItemIds.Clear();
+        _selectedItemIds.UnionWith(_selectionDragPreviewIds);
         EndSelectionDrag();
         e.Handled = true;
         RebuildItemViewModels();
@@ -642,12 +661,12 @@ public partial class GalleryWindow : Window
         DragSelectionRectangle.Height = bounds.Height;
     }
 
-    private void ApplyDragSelection(Rect selectionBounds)
+    private void UpdateDragSelectionPreview(Rect selectionBounds)
     {
-        _selectedItemIds.Clear();
+        _selectionDragPreviewIds.Clear();
         if (_selectionDragAdditive)
         {
-            _selectedItemIds.UnionWith(_selectionDragBaseIds);
+            _selectionDragPreviewIds.UnionWith(_selectionDragBaseIds);
         }
 
         foreach (var item in _visibleItems)
@@ -664,9 +683,65 @@ public partial class GalleryWindow : Window
             var itemBounds = new Rect(topLeft, container.RenderSize);
             if (selectionBounds.IntersectsWith(itemBounds))
             {
-                _selectedItemIds.Add(item.Item.ItemId);
+                _selectionDragPreviewIds.Add(item.Item.ItemId);
             }
         }
+
+        ApplyDragSelectionPreviewVisuals();
+        SelectedCountText.Text = SentoryLocalization.Format(
+            "SelectedCountFormat",
+            _selectionDragPreviewIds.Count);
+        DeleteSelectedButton.IsEnabled =
+            _selectionDragPreviewIds.Count > 0;
+    }
+
+    private void ApplyDragSelectionPreviewVisuals()
+    {
+        foreach (var item in _visibleItems)
+        {
+            if (GetCardBorder(item) is not { } card)
+            {
+                continue;
+            }
+
+            var selected = _selectionDragPreviewIds.Contains(
+                item.Item.ItemId);
+            card.SetResourceReference(
+                System.Windows.Controls.Border.BorderBrushProperty,
+                selected ? "AccentBrush" : "LineBrush");
+            card.BorderThickness = selected
+                ? new Thickness(2)
+                : new Thickness(1);
+        }
+    }
+
+    private void ClearDragSelectionPreviewVisuals()
+    {
+        foreach (var item in _visibleItems)
+        {
+            if (GetCardBorder(item) is not { } card)
+            {
+                continue;
+            }
+
+            card.ClearValue(
+                System.Windows.Controls.Border.BorderBrushProperty);
+            card.ClearValue(
+                System.Windows.Controls.Border.BorderThicknessProperty);
+        }
+    }
+
+    private System.Windows.Controls.Border? GetCardBorder(
+        GalleryItemViewModel item)
+    {
+        if (GalleryItems.ItemContainerGenerator.ContainerFromItem(item)
+                is not System.Windows.Controls.ContentPresenter presenter)
+        {
+            return null;
+        }
+
+        return presenter.ContentTemplate?.FindName("Card", presenter)
+            as System.Windows.Controls.Border;
     }
 
     private void CancelSelectionDrag()
@@ -676,16 +751,24 @@ public partial class GalleryWindow : Window
 
     private void EndSelectionDrag()
     {
+        ClearDragSelectionPreviewVisuals();
         _selectionDragStart = null;
         _selectionDragInProgress = false;
         _selectionDragAdditive = false;
+        _selectionDragStartedOnItem = false;
         _selectionDragBaseIds.Clear();
+        _selectionDragPreviewIds.Clear();
         DragSelectionRectangle.Visibility = Visibility.Collapsed;
         DragSelectionRectangle.Width = 0;
         DragSelectionRectangle.Height = 0;
         if (Mouse.Captured == GallerySelectionSurface)
         {
             Mouse.Capture(null);
+        }
+
+        if (_selectionMode)
+        {
+            UpdateSelectionControls();
         }
     }
 
@@ -701,6 +784,25 @@ public partial class GalleryWindow : Window
         FindVisualAncestor<
             System.Windows.Controls.Primitives.ScrollBar>(source) is not null;
 
+    private static GalleryItemViewModel? FindGalleryItemFromSource(
+        DependencyObject? current)
+    {
+        while (current is not null)
+        {
+            if (current is FrameworkElement
+                {
+                    DataContext: GalleryItemViewModel item
+                })
+            {
+                return item;
+            }
+
+            current = GetVisualOrLogicalParent(current);
+        }
+
+        return null;
+    }
+
     private static T? FindVisualAncestor<T>(DependencyObject? current)
         where T : DependencyObject
     {
@@ -711,13 +813,17 @@ public partial class GalleryWindow : Window
                 return match;
             }
 
-            current = current is Visual
-                ? VisualTreeHelper.GetParent(current)
-                : LogicalTreeHelper.GetParent(current);
+            current = GetVisualOrLogicalParent(current);
         }
 
         return null;
     }
+
+    private static DependencyObject? GetVisualOrLogicalParent(
+        DependencyObject current) =>
+        current is Visual
+            ? VisualTreeHelper.GetParent(current)
+            : LogicalTreeHelper.GetParent(current);
 
     private void ToggleSelection(Guid itemId)
     {

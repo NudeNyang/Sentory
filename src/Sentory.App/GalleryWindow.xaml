@@ -1144,13 +1144,13 @@
                         Width="0"
                         Height="0"
                         BorderBrush="{DynamicResource AccentBrush}"
-                        BorderThickness="1"
+                        BorderThickness="1.5"
                         CornerRadius="4"
                         Visibility="Collapsed">
                     <Border Margin="1"
                             Background="{DynamicResource AccentBrush}"
                             CornerRadius="3"
-                            Opacity="0.14" />
+                            Opacity="0.2" />
                 </Border>
             </Canvas>
 
