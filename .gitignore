@@ -4,5 +4,6 @@
 artifacts/
 /Sentory.exe
 TestResults/
+_workspace/
 *.user
 *.suo
