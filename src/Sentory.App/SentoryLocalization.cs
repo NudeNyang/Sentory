@@ -52,10 +52,10 @@ internal static class SentoryLocalization
 
     public static IReadOnlyList<LanguageOption> GetLanguageOptions() =>
     [
-        new("ko-KR", Text("LanguageKorean")),
-        new("en-US", Text("LanguageEnglish")),
-        new("ja-JP", Text("LanguageJapanese")),
-        new("zh-CN", Text("LanguageChinese"))
+        new("ko-KR", "한국어"),
+        new("en-US", "English"),
+        new("ja-JP", "日本語"),
+        new("zh-CN", "简体中文")
     ];
 
     private static IReadOnlyDictionary<string, LocalizedText> CreateTexts()
@@ -68,12 +68,8 @@ internal static class SentoryLocalization
             L("General", "일반", "General", "一般", "常规"),
             L("ScreenTheme", "화면 테마", "Theme", "画面テーマ", "界面主题"),
             L("ScreenThemeDescription", "라이트 모드와 다크 모드를 선택합니다", "Choose light or dark mode", "ライトモードとダークモードを選択します", "选择浅色或深色模式"),
-            L("Language", "언어", "Language", "言語", "语言"),
+            L("Language", "Language", "Language", "Language", "Language"),
             L("LanguageDescription", "화면에 표시할 언어를 선택합니다", "Choose the display language", "表示する言語を選択します", "选择界面显示语言"),
-            L("LanguageKorean", "한국어", "Korean", "韓国語", "韩语"),
-            L("LanguageEnglish", "영어", "English", "英語", "英语"),
-            L("LanguageJapanese", "일본어", "Japanese", "日本語", "日语"),
-            L("LanguageChinese", "중국어", "Chinese", "中国語", "中文"),
             L("LightMode", "라이트 모드", "Light mode", "ライトモード", "浅色模式"),
             L("DarkMode", "다크 모드", "Dark mode", "ダークモード", "深色模式"),
             L("WindowsStartup", "Windows 시작 시 실행", "Start with Windows", "Windows 起動時に実行", "Windows 启动时运行"),
