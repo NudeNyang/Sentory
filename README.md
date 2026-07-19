@@ -64,12 +64,16 @@ dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
 ```
 
-다른 Windows PC에 전달할 self-contained `win-x64` 빌드는 다음
-명령으로 만든다.
+다른 Windows PC에 폴더째 전달할 self-contained `win-x64` 무설치판은
+다음 명령으로 만든다.
 
 ```powershell
-dotnet publish .\src\Sentory.App /p:PublishProfile=win-x64
+.\scripts\Publish-Portable.ps1
 ```
+
+스크립트는 실행 파일의 저장소 초기화 자체 점검을 거친 뒤
+`artifacts\Sentory-win-x64-portable` 폴더, ZIP 파일과 SHA-256 확인값을
+만든다. 받는 사람은 ZIP을 완전히 푼 뒤 `Sentory.App.exe`를 실행하면 된다.
 
 세부 구현 범위와 제한 사항은 [PROJECT.md](./PROJECT.md)와
 [KakaoTalk 구현 결과](./docs/02-kakao-immediate-capture-implementation.md),

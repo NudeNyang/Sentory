@@ -21,6 +21,24 @@ public sealed record SentoryDataPaths(
     public string LogsDirectory =>
         Path.Combine(RootDirectory, "logs");
 
+    public static SentoryDataPaths FromEnvironmentOrCurrentUser(
+        string? overrideRoot)
+    {
+        if (string.IsNullOrWhiteSpace(overrideRoot))
+        {
+            return ForCurrentUser();
+        }
+
+        if (!Path.IsPathRooted(overrideRoot))
+        {
+            throw new ArgumentException(
+                "데이터 폴더 재정의 경로는 절대 경로여야 합니다.",
+                nameof(overrideRoot));
+        }
+
+        return ForRoot(overrideRoot);
+    }
+
     public static SentoryDataPaths ForCurrentUser()
     {
         var platform = GetCurrentPlatform();

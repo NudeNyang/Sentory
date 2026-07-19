@@ -72,4 +72,25 @@ public sealed class SentoryDataPathsTests
                 Path.Combine(_home, ".local", "share", "Sentory")),
             paths.RootDirectory);
     }
+
+    [Fact]
+    public void AbsoluteEnvironmentOverrideUsesIsolatedDataRoot()
+    {
+        var overrideRoot = Path.Combine(_home, "portable-check");
+
+        var paths = SentoryDataPaths.FromEnvironmentOrCurrentUser(
+            overrideRoot);
+
+        Assert.Equal(Path.GetFullPath(overrideRoot), paths.RootDirectory);
+        Assert.Equal(
+            Path.Combine(paths.RootDirectory, "sentory.db"),
+            paths.DatabasePath);
+    }
+
+    [Fact]
+    public void RelativeEnvironmentOverrideIsRejected()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            SentoryDataPaths.FromEnvironmentOrCurrentUser("relative-path"));
+    }
 }

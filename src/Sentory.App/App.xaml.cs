@@ -16,9 +16,12 @@ public partial class App : System.Windows.Application
 {
     private const string SingleInstanceMutexName =
         "Local\\Sentory.Desktop.Singleton";
+    private const string InstallationVerificationArgument =
+        "--verify-installation";
 
     private readonly SentoryDataPaths _paths =
-        SentoryDataPaths.ForCurrentUser();
+        SentoryDataPaths.FromEnvironmentOrCurrentUser(
+            Environment.GetEnvironmentVariable("SENTORY_DATA_DIR"));
     private Mutex? _singleInstanceMutex;
     private bool _ownsMutex;
     private Forms.NotifyIcon? _trayIcon;
@@ -50,6 +53,9 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
         _diagnosticsLog = new SentoryDiagnosticsLog(_paths);
+        var isInstallationVerification = e.Args.Contains(
+            InstallationVerificationArgument,
+            StringComparer.OrdinalIgnoreCase);
 
         if (e.Args.Contains(
                 DiscordWorkerClient.WorkerArgument,
@@ -70,20 +76,27 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        _singleInstanceMutex = new Mutex(
-            initiallyOwned: true,
-            SingleInstanceMutexName,
-            out var createdNew);
-        _ownsMutex = createdNew;
-        if (!createdNew)
+        if (isInstallationVerification)
         {
-            SentoryDialogWindow.ShowMessage(
-                null,
-                "Sentory가 이미 실행 중입니다",
-                "작업 표시줄 알림 영역의 Sentory 아이콘을 확인해 주세요.",
-                GetSavedDarkTheme());
-            Shutdown();
-            return;
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        }
+        else
+        {
+            _singleInstanceMutex = new Mutex(
+                initiallyOwned: true,
+                SingleInstanceMutexName,
+                out var createdNew);
+            _ownsMutex = createdNew;
+            if (!createdNew)
+            {
+                SentoryDialogWindow.ShowMessage(
+                    null,
+                    "Sentory가 이미 실행 중입니다",
+                    "작업 표시줄 알림 영역의 Sentory 아이콘을 확인해 주세요.",
+                    GetSavedDarkTheme());
+                Shutdown();
+                return;
+            }
         }
 
         try
@@ -97,6 +110,18 @@ public partial class App : System.Windows.Application
             _linkPreviewService = new LinkPreviewEnrichmentService(
                 _repository,
                 _linkPreviewFetcher);
+
+            if (isInstallationVerification)
+            {
+                _diagnosticsLog.Write(
+                    "installation-verified",
+                    "Portable package storage initialization succeeded");
+                _linkPreviewFetcher.Dispose();
+                _linkPreviewFetcher = null;
+                _linkPreviewService = null;
+                Shutdown(0);
+                return;
+            }
 
             var acceptInjectedInput = string.Equals(
                 Environment.GetEnvironmentVariable(
@@ -150,12 +175,15 @@ public partial class App : System.Windows.Application
                 "startup-failed",
                 "Sentory startup failed",
                 exception);
-            SentoryDialogWindow.ShowMessage(
-                null,
-                "Sentory를 시작하지 못했습니다",
-                exception.Message,
-                GetSavedDarkTheme(),
-                danger: true);
+            if (!isInstallationVerification)
+            {
+                SentoryDialogWindow.ShowMessage(
+                    null,
+                    "Sentory를 시작하지 못했습니다",
+                    exception.Message,
+                    GetSavedDarkTheme(),
+                    danger: true);
+            }
             await ShutdownRuntimeAsync();
             Shutdown(1);
         }
