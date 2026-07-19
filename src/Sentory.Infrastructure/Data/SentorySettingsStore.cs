@@ -38,6 +38,8 @@ public sealed class SentorySettings
 
     public DateTimeOffset? LastAutoCleanupAt { get; set; }
 
+    public DateTimeOffset? LastUpdateCheckAt { get; set; }
+
     internal void Normalize()
     {
         if (!SupportedLanguages.Contains(

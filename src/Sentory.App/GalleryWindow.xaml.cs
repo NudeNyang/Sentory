@@ -417,7 +417,15 @@ public partial class GalleryWindow : Window
         {
             Owner = this
         };
-        window.ShowDialog();
+        window.ThemeSelectionChanged += ApplyThemeSelection;
+        try
+        {
+            window.ShowDialog();
+        }
+        finally
+        {
+            window.ThemeSelectionChanged -= ApplyThemeSelection;
+        }
         if (window.HasDataChanged)
         {
             await RefreshAsync();
@@ -446,6 +454,13 @@ public partial class GalleryWindow : Window
         {
             DiscordRepairRequested?.Invoke(this, EventArgs.Empty);
         }
+    }
+
+    private void ApplyThemeSelection(bool isDark)
+    {
+        _isDarkTheme = isDark;
+        _settings.IsDarkTheme = isDark;
+        ApplyTheme(isDark);
     }
 
     private void SelectModeButton_Click(

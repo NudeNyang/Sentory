@@ -100,11 +100,11 @@ public sealed class KakaoCaptureRuntime : ICaptureRuntime
             return;
         }
 
-        if (clipboard.Image is not null)
+        if (clipboard.Images.Count > 0)
         {
-            await CaptureImageIfConfirmedAsync(
+            await CaptureImagesIfConfirmedAsync(
                 context,
-                clipboard.Image,
+                clipboard.Images,
                 cancellationToken);
             return;
         }
@@ -182,9 +182,9 @@ public sealed class KakaoCaptureRuntime : ICaptureRuntime
                 now));
     }
 
-    private async Task CaptureImageIfConfirmedAsync(
+    private async Task CaptureImagesIfConfirmedAsync(
         ValidatedKakaoContext context,
-        ClipboardImageSnapshot image,
+        IReadOnlyList<ClipboardImageSnapshot> images,
         CancellationToken cancellationToken)
     {
         var confirmed = false;
@@ -203,35 +203,44 @@ public sealed class KakaoCaptureRuntime : ICaptureRuntime
             return;
         }
 
-        var result = await _coordinator.CaptureImageAsync(
-            context.EventId,
-            image.PngBytes,
-            image.Sha256,
-            image.PixelWidth,
-            image.PixelHeight,
-            SourceApp.KakaoTalk,
-            CaptureMethod.KakaoCtrlVImage,
-            DeliveryStatus.NotObserved,
-            context.ContextHash,
-            context.OccurredAt,
-            [
-                "ctrl-v",
-                "kakao-process",
-                "individual-chat-root",
-                "input-class-and-id",
-                "message-list-class-and-id",
-                "clipboard-image-sequence-stable",
-                "owned-image-confirmation-window",
-                "caption-edit-class-and-id"
-            ],
-            cancellationToken);
-        if (result.EventApplied)
+        var applied = 0;
+        foreach (var image in images)
+        {
+            var result = await _coordinator.CaptureImageAsync(
+                CaptureBatchIdentity.ForImage(context.EventId, image.Sha256),
+                image.PngBytes,
+                image.Sha256,
+                image.PixelWidth,
+                image.PixelHeight,
+                SourceApp.KakaoTalk,
+                CaptureMethod.KakaoCtrlVImage,
+                DeliveryStatus.NotObserved,
+                context.ContextHash,
+                context.OccurredAt,
+                [
+                    "ctrl-v",
+                    "kakao-process",
+                    "individual-chat-root",
+                    "input-class-and-id",
+                    "message-list-class-and-id",
+                    "clipboard-image-sequence-stable",
+                    "owned-image-confirmation-window",
+                    "caption-edit-class-and-id"
+                ],
+                cancellationToken);
+            if (result.EventApplied)
+            {
+                applied++;
+            }
+        }
+
+        if (applied > 0)
         {
             Captured?.Invoke(
                 this,
                 new CaptureNotification(
                     ContentKind.Image,
-                    1,
+                    applied,
                     context.OccurredAt,
                     SourceApp.KakaoTalk,
                     DeliveryStatus.NotObserved));

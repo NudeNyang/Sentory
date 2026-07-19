@@ -156,10 +156,17 @@ try {
     }
 
     if ($Runtime -eq "win-x64") {
-        Copy-Item `
-            -LiteralPath $stagedExecutable `
-            -Destination $repositoryExecutable `
-            -Force
+        try {
+            Copy-Item `
+                -LiteralPath $stagedExecutable `
+                -Destination $repositoryExecutable `
+                -Force
+        }
+        catch [System.IO.IOException] {
+            Write-Warning (
+                "루트 Sentory.exe가 실행 중이어서 교체하지 못했습니다. " +
+                "배포 패키지 생성은 계속합니다.")
+        }
     }
 
     Compress-Archive `

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$')]
-    [string]$Version = "0.9.0-beta",
+    [string]$Version = "0.9.1-beta",
     [string]$OutputRoot = "artifacts"
 )
 
@@ -100,7 +100,7 @@ $assets = foreach ($assetPath in $assetPaths) {
 $manifest = [ordered]@{
     product = "Sentory"
     version = $Version
-    channel = "beta"
+    channel = if ($Version.Contains('-')) { "beta" } else { "stable" }
     publishedAt = [DateTimeOffset]::UtcNow.ToString("O")
     assets = @($assets)
 }

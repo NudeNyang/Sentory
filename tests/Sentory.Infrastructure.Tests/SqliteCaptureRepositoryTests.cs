@@ -201,6 +201,27 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task ImageLargerThanEightMegabytesIsStoredWithoutTruncation()
+    {
+        var repository = CreateRepository();
+        await repository.InitializeAsync();
+        var bytes = RandomNumberGenerator.GetBytes(9 * 1024 * 1024);
+        var hash = Convert.ToHexString(SHA256.HashData(bytes));
+
+        var result = await repository.UpsertImageAsync(CreateImageRequest(
+            Guid.NewGuid(),
+            bytes,
+            hash));
+
+        var item = Assert.Single(await repository.GetRecentAsync(10));
+        var storedPath = Path.Combine(_root, item.ContentPath!);
+        Assert.True(result.EventApplied);
+        Assert.Equal(bytes.Length, new FileInfo(storedPath).Length);
+        Assert.Equal(hash, Convert.ToHexString(
+            SHA256.HashData(await File.ReadAllBytesAsync(storedPath))));
+    }
+
+    [Fact]
     public async Task DeleteRemovesItemEventsAndImageFile()
     {
         var repository = CreateRepository();

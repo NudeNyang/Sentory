@@ -36,6 +36,7 @@ not fill your library.
 - Switch between light and dark themes
 - Use the interface in Korean, English, Japanese, or Chinese
 - Start with Windows and manage detection from the tray in the current Windows app
+- Check GitHub Releases and update from inside the app
 
 ## Data storage
 
@@ -53,7 +54,7 @@ for details.
 
 ## Download
 
-The current release candidate is **0.9.0-beta** and is available for 64-bit Windows
+The current release candidate is **0.9.1-beta** and is available for 64-bit Windows
 10 and 11. Download the package that matches your PC from [Releases](../../releases).
 macOS and Linux versions are planned, but packages are not available yet.
 
@@ -85,8 +86,9 @@ Sentory is currently a public beta for Windows. Detection may temporarily stop w
 if Discord or KakaoTalk changes its interface structure. Support for more messengers,
 macOS, and Linux is planned, but no release schedule has been set. The ARM64 package
 has been cross-built and its executable architecture has been verified, but final
-testing on a physical Windows on ARM device is still pending. This version does not
-include in-app updates; download a new package manually when a new Release is published.
+testing on a physical Windows on ARM device is still pending. When a new Release is
+published, Sentory checks for it and applies the correct package for the current
+installation type and architecture after user confirmation.
 
 When reporting a problem, avoid attaching private chat content or original images.
 The Sentory version, Windows version, messenger name, and reproduction steps are
@@ -97,7 +99,7 @@ usually enough. See the [support policy](./SUPPORT.md) for details.
 ```powershell
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 0.9.0-beta
+.\scripts\Publish-Release.ps1 -Version 0.9.1-beta
 ```
 
 The release script creates Windows x64 and ARM64 installers, portable packages,

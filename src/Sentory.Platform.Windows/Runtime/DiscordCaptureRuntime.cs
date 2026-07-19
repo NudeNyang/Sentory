@@ -170,6 +170,7 @@ public sealed class DiscordCaptureRuntime :
             "paste-context-validated",
             $"sequence={context.ClipboardSequenceNumber}");
 
+        var readStartedAt = Stopwatch.GetTimestamp();
         var clipboard = await _clipboardReader.ReadAsync(
             context.ClipboardSequenceNumber,
             cancellationToken);
@@ -179,12 +180,15 @@ public sealed class DiscordCaptureRuntime :
             return;
         }
 
-        if (clipboard.Image is not null)
+        if (clipboard.Images.Count > 0)
         {
             DiscordCaptureTrace.Write(
                 "clipboard-image-read",
-                $"width={clipboard.Image.PixelWidth} height={clipboard.Image.PixelHeight} bytes={clipboard.Image.PngBytes.Length}");
-            StartImageCandidate(context, clipboard.Image);
+                $"count={clipboard.Images.Count} bytes={clipboard.Images.Sum(image => image.PngBytes.LongLength)} elapsedMs={Stopwatch.GetElapsedTime(readStartedAt).TotalMilliseconds:F0}");
+            foreach (var image in clipboard.Images)
+            {
+                StartImageCandidate(context, image);
+            }
             return;
         }
 
@@ -234,6 +238,7 @@ public sealed class DiscordCaptureRuntime :
                 _cancellation.Token);
             registration = new CandidateRegistration(
                 context,
+                context.EventId,
                 candidateUrls,
                 null,
                 cancellation);
@@ -268,6 +273,7 @@ public sealed class DiscordCaptureRuntime :
                 _cancellation.Token);
             registration = new CandidateRegistration(
                 context,
+                CaptureBatchIdentity.ForImage(context.EventId, image.Sha256),
                 [],
                 image,
                 cancellation);
@@ -581,19 +587,22 @@ public sealed class DiscordCaptureRuntime :
 
     private void ApplyRecentSendSignal(CandidateRegistration registration)
     {
+        var now = DateTimeOffset.UtcNow;
         if (_recentSendSignals.TryGetValue(
                 registration.Context.ContextHash,
                 out var sentAt) &&
-            sentAt >= registration.Context.OccurredAt &&
-            DateTimeOffset.UtcNow - sentAt <= TimeSpan.FromSeconds(3))
+            DiscordSendSignalPolicy.CanAssociate(
+                registration.Context.OccurredAt,
+                sentAt,
+                now,
+                registration.Image is not null))
         {
             registration.SendObserved.TrySetResult(sentAt);
         }
 
         foreach (var expired in _recentSendSignals
                      .Where(pair =>
-                         DateTimeOffset.UtcNow - pair.Value >
-                         TimeSpan.FromSeconds(10))
+                         now - pair.Value > DiscordSendSignalPolicy.Retention)
                      .Select(pair => pair.Key)
                      .ToList())
         {
@@ -609,7 +618,7 @@ public sealed class DiscordCaptureRuntime :
         var context = registration.Context;
         var capturedAt = response.ConfirmedAt ?? DateTimeOffset.UtcNow;
         var results = await _coordinator.CaptureUrlsAsync(
-            context.EventId,
+            registration.EventId,
             string.Join('\n', registration.Urls.Select(url => url.Original)),
             SourceApp.Discord,
             CaptureMethod.DiscordConfirmedSend,
@@ -641,7 +650,7 @@ public sealed class DiscordCaptureRuntime :
         var context = registration.Context;
         var capturedAt = response.ConfirmedAt ?? DateTimeOffset.UtcNow;
         var result = await _coordinator.CaptureImageAsync(
-            context.EventId,
+            registration.EventId,
             image.PngBytes,
             image.Sha256,
             image.PixelWidth,
@@ -774,11 +783,14 @@ public sealed class DiscordCaptureRuntime :
 
     private sealed class CandidateRegistration(
         ValidatedDiscordContext context,
+        Guid eventId,
         IReadOnlyList<NormalizedUrl> urls,
         ClipboardImageSnapshot? image,
         CancellationTokenSource cancellation)
     {
         public ValidatedDiscordContext Context { get; } = context;
+
+        public Guid EventId { get; } = eventId;
 
         public IReadOnlyList<NormalizedUrl> Urls { get; } = urls;
 

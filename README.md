@@ -32,6 +32,7 @@ Sentory는 메신저에서 다룬 링크와 사진을 따로 모아 관리하는
 - 링크의 페이지 제목, 사이트 아이콘, 대표 이미지와 짧은 설명 표시
 - 라이트·다크 테마 및 한국어·영어·일본어·중국어 UI
 - 현재 Windows 버전의 시작 시 자동 실행과 트레이 빠른 설정
+- GitHub Releases를 확인하는 인앱 자동 업데이트
 
 ## 데이터 저장
 
@@ -48,7 +49,7 @@ Sentory가 운영하는 서버로 보관 데이터를 전송하지 않으며 별
 
 ## 다운로드
 
-현재 배포 후보 버전은 **0.9.0-beta**입니다. 이번 버전은 Windows 10/11 64비트용으로
+현재 배포 후보 버전은 **0.9.1-beta**입니다. 이번 버전은 Windows 10/11 64비트용으로
 제공됩니다. [Releases](../../releases)에서 PC에 맞는 파일을 내려받으시면 됩니다.
 macOS와 Linux 버전도 추가할 예정이지만 아직 배포 파일은 제공하지 않습니다.
 
@@ -81,8 +82,8 @@ Sentory는 현재 Windows용 공개 베타 단계입니다. Discord나 카카오
 바뀌면 감지가 일시적으로 동작하지 않을 수 있습니다. 지원 메신저를 추가하고 macOS와
 Linux로 지원 범위를 넓힐 예정이며, 구체적인 배포 일정은 아직 정하지 않았습니다.
 ARM64 패키지는 교차 빌드와 실행 파일 구조 검증을 마쳤지만 실제 Windows on ARM
-장치에서의 최종 검수가 남아 있습니다. 이 버전은 인앱 자동 업데이트를 제공하지
-않으므로 새 Release를 직접 내려받아 업데이트해야 합니다.
+장치에서의 최종 검수가 남아 있습니다. 새 Release가 게시되면 Sentory가 자동으로
+확인하고, 사용자 승인을 받은 뒤 설치 방식과 PC 아키텍처에 맞게 업데이트합니다.
 
 문제를 발견했다면 개인정보가 담긴 원본 사진이나 대화 내용 대신 Sentory 버전,
 Windows 버전, 사용한 메신저와 재현 순서를 알려주시면 됩니다. 자세한 내용은
@@ -93,7 +94,7 @@ Windows 버전, 사용한 메신저와 재현 순서를 알려주시면 됩니�
 ```powershell
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 0.9.0-beta
+.\scripts\Publish-Release.ps1 -Version 0.9.1-beta
 ```
 
 배포 스크립트는 Windows x64·ARM64 설치형과 포터블 패키지, SHA-256 확인값,

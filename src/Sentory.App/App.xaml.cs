@@ -1,11 +1,14 @@
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
 using Sentory.Infrastructure.Links;
+using Sentory.Infrastructure.Updates;
 using Sentory.Platform.Windows.Interop;
 using Sentory.Platform.Windows.Runtime;
 using Forms = System.Windows.Forms;
@@ -52,10 +55,18 @@ public partial class App : System.Windows.Application
         CaptureRuntimeState.Connecting;
     private bool _shuttingDown;
     private string? _lastRuntimeIssue;
+    private readonly GitHubReleaseUpdateClient _updateClient = new();
 
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (PortableUpdateApplier.IsApplyCommand(e.Args))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Shutdown(await PortableUpdateApplier.RunAsync(e.Args));
+            return;
+        }
+
         _settingsStore = new SentorySettingsStore(_paths);
         SentoryLocalization.Apply(
             Resources,
@@ -179,6 +190,7 @@ public partial class App : System.Windows.Application
             _runtime.Start();
             UpdatePauseUi();
             OpenGallery();
+            _ = CheckForUpdatesAsync(_maintenanceCancellation.Token);
         }
         catch (Exception exception)
         {
@@ -198,6 +210,116 @@ public partial class App : System.Windows.Application
             await ShutdownRuntimeAsync();
             Shutdown(1);
         }
+    }
+
+    private async Task CheckForUpdatesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(6), cancellationToken);
+            if (_settingsStore is null) return;
+            var settings = _settingsStore.Load();
+            var now = DateTimeOffset.UtcNow;
+            if (settings.LastUpdateCheckAt is { } checkedAt &&
+                now - checkedAt < TimeSpan.FromHours(6))
+            {
+                return;
+            }
+
+            settings.LastUpdateCheckAt = now;
+            _settingsStore.Save(settings);
+            var packageKind = File.Exists(Path.Combine(
+                AppContext.BaseDirectory, "unins000.exe"))
+                ? UpdatePackageKind.Installer
+                : UpdatePackageKind.Portable;
+            var currentVersion = GetApplicationVersion();
+            var update = await _updateClient.CheckAsync(
+                currentVersion,
+                RuntimeInformation.ProcessArchitecture,
+                packageKind,
+                cancellationToken);
+            if (update is null || cancellationToken.IsCancellationRequested) return;
+
+            await await Dispatcher.InvokeAsync(async () =>
+            {
+                var notes = update.Notes.Replace('\r', ' ').Replace('\n', ' ').Trim();
+                if (notes.Length > 280) notes = notes[..280] + "…";
+                var accepted = SentoryDialogWindow.Confirm(
+                    _galleryWindow,
+                    SentoryLocalization.Text("UpdateAvailableHeading"),
+                    SentoryLocalization.Format(
+                        "UpdateAvailableMessage",
+                        update.Version,
+                        notes),
+                    SentoryLocalization.Text("InstallUpdate"),
+                    GetSavedDarkTheme());
+                if (!accepted) return;
+                await DownloadAndApplyUpdateAsync(update, cancellationToken);
+            });
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            _diagnosticsLog?.Write("update-check-failed", "Update check failed", exception);
+            if (_settingsStore is not null)
+            {
+                var settings = _settingsStore.Load();
+                settings.LastUpdateCheckAt = null;
+                _settingsStore.Save(settings);
+            }
+        }
+    }
+
+    private async Task DownloadAndApplyUpdateAsync(
+        ReleaseUpdate update,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var directory = Path.Combine(
+                Path.GetTempPath(), "Sentory", "downloads", update.Version);
+            var package = await _updateClient.DownloadAsync(
+                update, directory, cancellationToken);
+            if (update.PackageKind == UpdatePackageKind.Installer)
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = package,
+                    UseShellExecute = true,
+                    WorkingDirectory = directory
+                });
+            }
+            else
+            {
+                PortableUpdateApplier.PrepareAndLaunch(package);
+            }
+
+            await ShutdownRuntimeAsync();
+            Shutdown();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            _diagnosticsLog?.Write("update-apply-failed", "Update download or apply failed", exception);
+            SentoryDialogWindow.ShowMessage(
+                _galleryWindow,
+                SentoryLocalization.Text("UpdateFailedHeading"),
+                SentoryLocalization.Text("UpdateFailedMessage"),
+                GetSavedDarkTheme(),
+                danger: true);
+        }
+    }
+
+    private static string GetApplicationVersion()
+    {
+        var value = Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion ?? "0.0.0";
+        return value.Split('+', 2)[0];
     }
 
     private void CreateTrayIcon()
@@ -1013,6 +1135,7 @@ public partial class App : System.Windows.Application
         _openGalleryEvent = null;
         _maintenanceCancellation.Dispose();
         _linkPreviewWakeSignal.Dispose();
+        _updateClient.Dispose();
         base.OnExit(e);
     }
 }

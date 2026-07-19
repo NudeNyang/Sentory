@@ -173,7 +173,7 @@
         </Style>
     </Window.Resources>
 
-    <Grid Margin="28,24,20,24">
+    <Grid x:Name="SettingsScrollSurface" Margin="28,24,20,24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -191,10 +191,13 @@
                        Foreground="{DynamicResource MutedTextBrush}" />
         </StackPanel>
 
-        <ScrollViewer Grid.Row="1"
+        <ScrollViewer x:Name="SettingsScrollViewer"
+                      Grid.Row="1"
                       Margin="0,22,0,18"
                       Padding="0,0,8,0"
-                      VerticalScrollBarVisibility="Auto">
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Hidden"
+                      FocusVisualStyle="{x:Null}">
             <StackPanel>
                 <TextBlock Text="{DynamicResource Loc.General}"
                            Margin="2,0,0,8"
@@ -467,6 +470,37 @@
                 </Border>
             </StackPanel>
         </ScrollViewer>
+
+        <Border x:Name="SettingsScrollIndicator"
+                Grid.Row="1"
+                Panel.ZIndex="40"
+                Width="10"
+                Margin="0,22,0,18"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Stretch"
+                Background="Transparent"
+                Cursor="Arrow"
+                IsHitTestVisible="False"
+                Opacity="0"
+                SnapsToDevicePixels="True"
+                Visibility="Collapsed">
+            <Grid ClipToBounds="True">
+                <Border x:Name="SettingsScrollIndicatorThumb"
+                        Width="3"
+                        Height="32"
+                        Margin="0,0,3,0"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        Background="{DynamicResource AccentBrush}"
+                        CornerRadius="3"
+                        Opacity="0.46"
+                        SnapsToDevicePixels="True">
+                    <Border.RenderTransform>
+                        <TranslateTransform x:Name="SettingsScrollIndicatorThumbTransform" />
+                    </Border.RenderTransform>
+                </Border>
+            </Grid>
+        </Border>
 
         <TextBlock x:Name="StatusText"
                    Grid.Row="2"

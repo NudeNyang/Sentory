@@ -19,6 +19,7 @@ public partial class DataManagementWindow : Window
     private bool _isDarkTheme;
     private bool _busy;
     private bool _initializing = true;
+    private readonly OverlayScrollIndicatorController _scrollIndicator;
 
     public DataManagementWindow(
         ICaptureRepository repository,
@@ -36,6 +37,12 @@ public partial class DataManagementWindow : Window
         _discordRepairNeeded = discordRepairNeeded;
         _isDarkTheme = isDarkTheme;
         ApplyPalette();
+        _scrollIndicator = new OverlayScrollIndicatorController(
+            SettingsScrollViewer,
+            SettingsScrollSurface,
+            SettingsScrollIndicator,
+            SettingsScrollIndicatorThumb,
+            SettingsScrollIndicatorThumbTransform);
 
         var settings = _settingsStore.Load();
         RefreshLocalizedOptions(settings);
@@ -48,11 +55,14 @@ public partial class DataManagementWindow : Window
 
         Loaded += async (_, _) => await RefreshStatisticsAsync();
         SourceInitialized += (_, _) => ApplyTitleBarTheme();
+        Closed += (_, _) => _scrollIndicator.Dispose();
     }
 
     public bool HasDataChanged { get; private set; }
 
     public bool ThemeChanged { get; private set; }
+
+    public event Action<bool>? ThemeSelectionChanged;
 
     public bool LanguageChanged { get; private set; }
 
@@ -103,6 +113,7 @@ public partial class DataManagementWindow : Window
             ThemeChanged = true;
             ApplyPalette();
             ApplyTitleBarTheme();
+            ThemeSelectionChanged?.Invoke(option.IsDark);
             StatusText.Text = option.IsDark
                 ? SentoryLocalization.Text("DarkModeApplied")
                 : SentoryLocalization.Text("LightModeApplied");

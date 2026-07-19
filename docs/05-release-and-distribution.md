@@ -4,7 +4,7 @@
 
 - 제품명: Sentory
 - 제작자·게시자: NudeNyang
-- 첫 공개 후보 버전: `0.9.0-beta`
+- 현재 개발 버전: `0.9.1-beta`
 - 라이선스: Sentory Personal Use License 1.0
 - 사용 범위: 개인적·비상업적 용도
 - 현재 배포 운영체제: Windows 10/11 64비트
@@ -37,7 +37,7 @@ GitHub 푸시와 Release 발행은 저장소 소유자가 직접 수행한다.
 다음 명령 하나로 네 종류의 패키지와 SHA-256 확인값을 만든다.
 
 ```powershell
-.\scripts\Publish-Release.ps1 -Version 0.9.0-beta
+.\scripts\Publish-Release.ps1 -Version 0.9.1-beta
 ```
 
 | 파일 | 대상 |
@@ -48,8 +48,9 @@ GitHub 푸시와 Release 발행은 저장소 소유자가 직접 수행한다.
 | `Sentory-win-arm64-portable.zip` | Windows on ARM 포터블 |
 
 각 파일 옆에는 `.sha256` 확인값이 생성된다. `release-manifest.json`에는 버전,
-크기와 SHA-256이 기록되며 이후 인앱 자동 업데이트의 배포 메타데이터로
-재사용할 수 있다.
+크기와 SHA-256이 기록된다. 인앱 업데이트는 GitHub Releases API에서 현재
+아키텍처와 설치 방식에 맞는 파일을 선택하고, Release의 SHA-256 digest 또는
+함께 올린 `.sha256` 파일로 다운로드 결과를 검증한다.
 
 설치형 패키지는 Inno Setup 6으로 생성한다. 빌드 PC에 컴파일러가 없으면 다음
 명령으로 설치한다.
@@ -116,6 +117,9 @@ x64 설치·실행·제거 왕복 검증은 다음 명령으로 반복할 수 �
 ## 버전과 업데이트 정책
 
 베타는 `0.9.x-beta`, 정식 공개는 `1.0.0`부터 의미적 버전 형식을 사용한다.
-`0.9.0-beta`에는 자동 업데이트가 없으므로 사용자가 새 패키지를 수동으로
-받아야 한다. 다음 베타에서 GitHub Release와 `release-manifest.json`을 사용하는
-인앱 자동 업데이트를 추가한다.
+`0.9.1-beta`부터 앱 시작 뒤 GitHub Releases를 자동 확인한다. 베타 앱은 새
+베타와 정식 버전을 모두 확인하고, 정식 앱은 정식 Release만 확인한다. 확인은
+6시간에 한 번으로 제한한다. 사용자가 설치를 승인하면 설치형은 현재
+아키텍처의 설치 파일을 실행하고, 포터블은 별도 임시 업데이트 프로세스가 앱
+종료 후 파일을 교체하고 다시 실행한다. 사용자 데이터는 설치 폴더 밖에 있어
+업데이트 과정에서 유지된다.
