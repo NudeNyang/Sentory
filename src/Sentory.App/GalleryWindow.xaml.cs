@@ -9,6 +9,8 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
+using MouseEventArgs = System.Windows.Input.MouseEventArgs;
+using Point = System.Windows.Point;
 using WpfClipboard = System.Windows.Clipboard;
 
 namespace Sentory.App;
@@ -35,6 +37,10 @@ public partial class GalleryWindow : Window
     private bool _loaded;
     private bool _isDarkTheme;
     private bool _selectionMode;
+    private Point? _selectionDragStart;
+    private bool _selectionDragInProgress;
+    private bool _selectionDragAdditive;
+    private readonly HashSet<Guid> _selectionDragBaseIds = [];
     private bool _discordRepairNeeded;
     private CaptureRuntimeState _discordDetectionState =
         CaptureRuntimeState.Connecting;
@@ -519,6 +525,7 @@ public partial class GalleryWindow : Window
 
     private void SetSelectionMode(bool enabled)
     {
+        CancelSelectionDrag();
         _selectionMode = enabled;
         if (!enabled)
         {
@@ -526,6 +533,190 @@ public partial class GalleryWindow : Window
         }
 
         RebuildItemViewModels();
+    }
+
+    private void GallerySelectionSurface_PreviewMouseLeftButtonDown(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (!_selectionMode ||
+            e.ChangedButton != MouseButton.Left ||
+            !GalleryScrollViewer.IsMouseOver ||
+            IsDragSelectionExcludedSource(e.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+
+        _selectionDragStart = e.GetPosition(GallerySelectionSurface);
+        _selectionDragInProgress = false;
+        _selectionDragAdditive =
+            (Keyboard.Modifiers & ModifierKeys.Control) != 0;
+        _selectionDragBaseIds.Clear();
+        if (_selectionDragAdditive)
+        {
+            _selectionDragBaseIds.UnionWith(_selectedItemIds);
+        }
+    }
+
+    private void GallerySelectionSurface_PreviewMouseMove(
+        object sender,
+        MouseEventArgs e)
+    {
+        if (!_selectionMode ||
+            _selectionDragStart is not Point start ||
+            e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        var current = e.GetPosition(GallerySelectionSurface);
+        if (!_selectionDragInProgress)
+        {
+            if (Math.Abs(current.X - start.X) <
+                    SystemParameters.MinimumHorizontalDragDistance &&
+                Math.Abs(current.Y - start.Y) <
+                    SystemParameters.MinimumVerticalDragDistance)
+            {
+                return;
+            }
+
+            _selectionDragInProgress = true;
+            if (!Mouse.Capture(GallerySelectionSurface))
+            {
+                CancelSelectionDrag();
+                return;
+            }
+
+            DragSelectionRectangle.Visibility = Visibility.Visible;
+        }
+
+        UpdateDragSelectionRectangle(start, current);
+        e.Handled = true;
+    }
+
+    private void GallerySelectionSurface_PreviewMouseLeftButtonUp(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (_selectionDragStart is not Point start)
+        {
+            return;
+        }
+
+        if (!_selectionDragInProgress)
+        {
+            _selectionDragStart = null;
+            _selectionDragBaseIds.Clear();
+            return;
+        }
+
+        var bounds = CreateSelectionBounds(
+            start,
+            e.GetPosition(GallerySelectionSurface));
+        ApplyDragSelection(bounds);
+        EndSelectionDrag();
+        e.Handled = true;
+        RebuildItemViewModels();
+    }
+
+    private void GallerySelectionSurface_LostMouseCapture(
+        object sender,
+        MouseEventArgs e)
+    {
+        if (_selectionDragInProgress)
+        {
+            CancelSelectionDrag();
+        }
+    }
+
+    private void UpdateDragSelectionRectangle(Point start, Point current)
+    {
+        var bounds = CreateSelectionBounds(start, current);
+        System.Windows.Controls.Canvas.SetLeft(
+            DragSelectionRectangle,
+            bounds.Left);
+        System.Windows.Controls.Canvas.SetTop(
+            DragSelectionRectangle,
+            bounds.Top);
+        DragSelectionRectangle.Width = bounds.Width;
+        DragSelectionRectangle.Height = bounds.Height;
+    }
+
+    private void ApplyDragSelection(Rect selectionBounds)
+    {
+        _selectedItemIds.Clear();
+        if (_selectionDragAdditive)
+        {
+            _selectedItemIds.UnionWith(_selectionDragBaseIds);
+        }
+
+        foreach (var item in _visibleItems)
+        {
+            if (GalleryItems.ItemContainerGenerator.ContainerFromItem(item)
+                    is not FrameworkElement container)
+            {
+                continue;
+            }
+
+            var topLeft = container.TranslatePoint(
+                new Point(0, 0),
+                GallerySelectionSurface);
+            var itemBounds = new Rect(topLeft, container.RenderSize);
+            if (selectionBounds.IntersectsWith(itemBounds))
+            {
+                _selectedItemIds.Add(item.Item.ItemId);
+            }
+        }
+    }
+
+    private void CancelSelectionDrag()
+    {
+        EndSelectionDrag();
+    }
+
+    private void EndSelectionDrag()
+    {
+        _selectionDragStart = null;
+        _selectionDragInProgress = false;
+        _selectionDragAdditive = false;
+        _selectionDragBaseIds.Clear();
+        DragSelectionRectangle.Visibility = Visibility.Collapsed;
+        DragSelectionRectangle.Width = 0;
+        DragSelectionRectangle.Height = 0;
+        if (Mouse.Captured == GallerySelectionSurface)
+        {
+            Mouse.Capture(null);
+        }
+    }
+
+    private static Rect CreateSelectionBounds(Point start, Point end) =>
+        new(
+            new Point(Math.Min(start.X, end.X), Math.Min(start.Y, end.Y)),
+            new Point(Math.Max(start.X, end.X), Math.Max(start.Y, end.Y)));
+
+    private static bool IsDragSelectionExcludedSource(
+        DependencyObject? source) =>
+        FindVisualAncestor<
+            System.Windows.Controls.Primitives.ButtonBase>(source) is not null ||
+        FindVisualAncestor<
+            System.Windows.Controls.Primitives.ScrollBar>(source) is not null;
+
+    private static T? FindVisualAncestor<T>(DependencyObject? current)
+        where T : DependencyObject
+    {
+        while (current is not null)
+        {
+            if (current is T match)
+            {
+                return match;
+            }
+
+            current = current is Visual
+                ? VisualTreeHelper.GetParent(current)
+                : LogicalTreeHelper.GetParent(current);
+        }
+
+        return null;
     }
 
     private void ToggleSelection(Guid itemId)

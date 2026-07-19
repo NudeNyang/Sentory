@@ -100,11 +100,6 @@
                            Foreground="{DynamicResource TextBrush}"
                            TextTrimming="CharacterEllipsis" />
             </StackPanel>
-            <Button HorizontalAlignment="Right"
-                    VerticalAlignment="Top"
-                    Content="{DynamicResource Loc.Close}"
-                    Style="{StaticResource DetailButtonStyle}"
-                    Click="CloseButton_Click" />
         </Grid>
 
         <Grid Grid.Row="1" Margin="0,22,0,22">

@@ -70,8 +70,6 @@ public partial class ItemDetailWindow : Window
 
     public ItemDetailAction SelectedAction { get; private set; }
 
-    private void CloseButton_Click(object sender, RoutedEventArgs e) => Close();
-
     private void CopyButton_Click(object sender, RoutedEventArgs e) =>
         Complete(ItemDetailAction.Copy);
 

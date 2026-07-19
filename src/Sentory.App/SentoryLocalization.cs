@@ -144,7 +144,6 @@ internal static class SentoryLocalization
             L("CloseNotification", "알림 닫기", "Dismiss notification", "通知を閉じる", "关闭通知"),
             L("DetailTitle", "Sentory 항목 상세", "Sentory Item Details", "Sentory 項目の詳細", "Sentory 项目详情"),
             L("FavoriteMarked", "★ 즐겨찾기", "★ Favorite", "★ お気に入り", "★ 已收藏"),
-            L("Close", "닫기", "Close", "閉じる", "关闭"),
             L("CaptureCount", "저장 횟수", "Times saved", "保存回数", "保存次数"),
             L("CopyCount", "복사 횟수", "Times copied", "コピー回数", "复制次数"),
             L("LastSource", "마지막 출처", "Latest source", "最後の送信元", "最近来源"),

@@ -607,22 +607,6 @@
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
-                        <Button x:Name="DataManagementButton"
-                                AutomationProperties.AutomationId="DataManagementButton"
-                                Margin="4,0,0,0"
-                                Style="{StaticResource ToolbarButtonStyle}"
-                                ToolTip="{DynamicResource Loc.Settings}"
-                                Click="DataManagementButton_Click">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE713;"
-                                           FontFamily="Segoe Fluent Icons"
-                                           FontSize="13"
-                                           VerticalAlignment="Center" />
-                                <TextBlock Margin="7,0,0,0"
-                                           Text="{DynamicResource Loc.Settings}"
-                                           VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
                         <Button x:Name="SelectModeButton"
                                 AutomationProperties.AutomationId="SelectModeButton"
                                 Margin="4,0,0,0"
@@ -637,6 +621,22 @@
                                 <TextBlock x:Name="SelectModeButtonText"
                                            Margin="7,0,0,0"
                                            Text="{DynamicResource Loc.Select}"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="DataManagementButton"
+                                AutomationProperties.AutomationId="DataManagementButton"
+                                Margin="4,0,0,0"
+                                Style="{StaticResource ToolbarButtonStyle}"
+                                ToolTip="{DynamicResource Loc.Settings}"
+                                Click="DataManagementButton_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE713;"
+                                           FontFamily="Segoe Fluent Icons"
+                                           FontSize="13"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Margin="7,0,0,0"
+                                           Text="{DynamicResource Loc.Settings}"
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
@@ -811,7 +811,13 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Row="2">
+        <Grid x:Name="GallerySelectionSurface"
+              Grid.Row="2"
+              ClipToBounds="True"
+              PreviewMouseLeftButtonDown="GallerySelectionSurface_PreviewMouseLeftButtonDown"
+              PreviewMouseMove="GallerySelectionSurface_PreviewMouseMove"
+              PreviewMouseLeftButtonUp="GallerySelectionSurface_PreviewMouseLeftButtonUp"
+              LostMouseCapture="GallerySelectionSurface_LostMouseCapture">
             <ScrollViewer x:Name="GalleryScrollViewer"
                           Padding="22,20,14,28"
                           HorizontalScrollBarVisibility="Disabled"
@@ -1131,6 +1137,22 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </ScrollViewer>
+
+            <Canvas Panel.ZIndex="10"
+                    IsHitTestVisible="False">
+                <Border x:Name="DragSelectionRectangle"
+                        Width="0"
+                        Height="0"
+                        BorderBrush="{DynamicResource AccentBrush}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Visibility="Collapsed">
+                    <Border Margin="1"
+                            Background="{DynamicResource AccentBrush}"
+                            CornerRadius="3"
+                            Opacity="0.14" />
+                </Border>
+            </Canvas>
 
             <Border x:Name="SelectionBar"
                     Panel.ZIndex="20"
