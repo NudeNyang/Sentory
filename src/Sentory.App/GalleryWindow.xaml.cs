@@ -1000,7 +1000,7 @@ public partial class GalleryWindow : Window
         }
     }
 
-    private void Card_MouseLeftButtonUp(
+    private async void Card_MouseLeftButtonUp(
         object sender,
         MouseButtonEventArgs e)
     {
@@ -1016,7 +1016,38 @@ public partial class GalleryWindow : Window
                 return;
             }
 
-            OpenItem(item);
+            await ShowItemDetailsAsync(item);
+        }
+    }
+
+    private void Card_ContextMenuOpening(
+        object sender,
+        System.Windows.Controls.ContextMenuEventArgs e)
+    {
+        if (_selectionMode)
+        {
+            e.Handled = true;
+        }
+    }
+
+    private async Task ShowItemDetailsAsync(GalleryItemViewModel item)
+    {
+        var window = new ItemDetailWindow(item, _isDarkTheme)
+        {
+            Owner = this
+        };
+        window.ShowDialog();
+        switch (window.SelectedAction)
+        {
+            case ItemDetailAction.Copy:
+                await CopyAsync(item);
+                break;
+            case ItemDetailAction.Open:
+                OpenItem(item);
+                break;
+            case ItemDetailAction.Delete:
+                await DeleteAsync(item);
+                break;
         }
     }
 

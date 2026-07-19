@@ -292,6 +292,68 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style TargetType="ContextMenu">
+            <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="6" />
+            <Setter Property="FontFamily" Value="Segoe UI Variable Text" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10">
+                            <StackPanel IsItemsHost="True"
+                                        KeyboardNavigation.DirectionalNavigation="Cycle" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="MenuItem">
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Padding" Value="11,0" />
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="Root"
+                                Padding="{TemplateBinding Padding}"
+                                Background="Transparent"
+                                CornerRadius="7">
+                            <ContentPresenter VerticalAlignment="Center"
+                                              ContentSource="Header" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Root"
+                                        Property="Background"
+                                        Value="{DynamicResource StatusBackgroundBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="Separator">
+            <Setter Property="Margin" Value="6,4" />
+            <Setter Property="Height" Value="1" />
+            <Setter Property="Background" Value="{DynamicResource LineBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Separator">
+                        <Border Height="1"
+                                Background="{TemplateBinding Background}" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid>
@@ -740,6 +802,7 @@
                                     BorderThickness="1"
                                     CornerRadius="16"
                                     Cursor="Hand"
+                                    ContextMenuOpening="Card_ContextMenuOpening"
                                     MouseLeftButtonUp="Card_MouseLeftButtonUp">
                                 <Border.ContextMenu>
                                     <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
@@ -809,7 +872,8 @@
                                         </Grid>
                                     </Border>
 
-                                    <Button Grid.Row="0"
+                                    <Button x:Name="CardCopyButton"
+                                            Grid.Row="0"
                                             Margin="0,20,20,0"
                                             HorizontalAlignment="Right"
                                             VerticalAlignment="Top"
@@ -935,7 +999,8 @@
                                                     </Style>
                                                 </TextBlock.Style>
                                             </TextBlock>
-                                            <Button Grid.Column="2"
+                                            <Button x:Name="CardFavoriteButton"
+                                                    Grid.Column="2"
                                                     HorizontalAlignment="Right"
                                                     VerticalAlignment="Center"
                                                     Style="{StaticResource InlineFavoriteButtonStyle}"
@@ -996,6 +1061,12 @@
                                     <Setter TargetName="SelectionButton"
                                             Property="Visibility"
                                             Value="Visible" />
+                                    <Setter TargetName="CardCopyButton"
+                                            Property="Visibility"
+                                            Value="Collapsed" />
+                                    <Setter TargetName="CardFavoriteButton"
+                                            Property="Visibility"
+                                            Value="Collapsed" />
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding IsSelected}"
                                              Value="True">
