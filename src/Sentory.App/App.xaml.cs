@@ -22,6 +22,7 @@ public partial class App : System.Windows.Application
     private Mutex? _singleInstanceMutex;
     private bool _ownsMutex;
     private Forms.NotifyIcon? _trayIcon;
+    private Icon? _trayIconImage;
     private TrayMenuWindow? _trayMenuWindow;
     private string _statusText = "시작 중...";
     private ICaptureRepository? _repository;
@@ -150,10 +151,11 @@ public partial class App : System.Windows.Application
 
     private void CreateTrayIcon()
     {
+        _trayIconImage = Icon.ExtractAssociatedIcon(Environment.ProcessPath!);
         _trayIcon = new Forms.NotifyIcon
         {
             Text = "Sentory",
-            Icon = SystemIcons.Application,
+            Icon = _trayIconImage ?? SystemIcons.Application,
             Visible = true
         };
         _trayIcon.DoubleClick += (_, _) => OpenGallery();
@@ -822,6 +824,8 @@ public partial class App : System.Windows.Application
             _trayIcon.Dispose();
             _trayIcon = null;
         }
+        _trayIconImage?.Dispose();
+        _trayIconImage = null;
     }
 
     protected override void OnExit(ExitEventArgs e)

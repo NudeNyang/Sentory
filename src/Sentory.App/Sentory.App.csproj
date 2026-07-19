@@ -13,6 +13,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Assets\Sentory.ico</ApplicationIcon>
   </PropertyGroup>
 
 </Project>
