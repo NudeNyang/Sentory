@@ -54,20 +54,21 @@ macOS와 Linux에서 바로 실행되는 앱이 완성된 것은 아니다. 이�
 ## Windows 배포
 
 다른 PC에 .NET 런타임을 별도로 설치하지 않아도 실행할 수 있는
-`win-x64` self-contained 단일 파일 배포 프로필을 제공한다. 설치
-프로그램 없이 압축을 풀고 실행하는 휴대용 폴더를 기본 배포 방식으로
-사용한다.
+`win-x64`와 `win-arm64` self-contained 단일 파일 배포 프로필을 제공한다.
+설치 프로그램과 압축을 풀고 실행하는 포터블 폴더를 함께 제공한다.
 
 ```powershell
-.\scripts\Publish-Portable.ps1
+.\scripts\Publish-Release.ps1 -Version 0.9.0-beta
 ```
 
 결과 위치:
 
 ```text
-artifacts\Sentory-win-x64-portable
 artifacts\Sentory-win-x64-portable.zip
-artifacts\Sentory-win-x64-portable.zip.sha256
+artifacts\Sentory-win-x64-setup.exe
+artifacts\Sentory-win-arm64-portable.zip
+artifacts\Sentory-win-arm64-setup.exe
+artifacts\release-manifest.json
 ```
 
 배포 스크립트는 실제 배포 실행 파일을 격리된 임시 데이터 폴더에서
@@ -75,17 +76,16 @@ artifacts\Sentory-win-x64-portable.zip.sha256
 확인한다. 자체 점검 데이터는 끝난 뒤 삭제하며 실제 사용자 데이터에는
 접근하지 않는다.
 
-받는 사람은 ZIP을 완전히 푼 뒤 `Sentory.App.exe`를 실행한다. 업데이트할
+받는 사람은 ZIP을 완전히 푼 뒤 `Sentory.exe`를 실행한다. 업데이트할
 때는 Sentory를 종료하고 실행 폴더의 파일을 새 버전으로 교체한다.
 데이터는 `%LOCALAPPDATA%\Sentory`에 있으므로 실행 폴더를 바꿔도 유지된다.
 
 공개 배포 전에는 다음 작업이 추가로 필요하다.
 
-1. 앱 아이콘, 회사 또는 게시자 이름, 버전 정책 확정
-2. 코드 서명 인증서로 실행 파일 서명
-3. Windows 10/11과 메신저 지원 버전별 회귀 테스트
-4. 개인정보 처리 설명, 사용 방법과 로컬 데이터 삭제 안내 제공
-5. 공개 저장소의 라이선스와 지원 정책 확정
+1. 코드 서명 인증서로 실행 파일과 설치 프로그램 서명
+2. Windows 10/11과 메신저 지원 버전별 회귀 테스트
+3. ARM64 실제 장치에서 ARM64 패키지와 메신저 통합 검수
+4. 공식 GitHub 주소와 문의 경로 확정
 
 자동 실행은 현재 사용자가 직접 켰을 때만 등록된다. 자동 실행을 켠
 사용자는 실행 파일을 옮긴 뒤 설정에서 자동 실행을 껐다가 다시 켜 새

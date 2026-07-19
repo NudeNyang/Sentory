@@ -1,0 +1,132 @@
+Sentory Personal Use License 1.0
+
+Copyright © 2026 NudeNyang. All rights reserved.
+
+본 라이선스는 Sentory 프로그램과 NudeNyang이 저작권을 보유한 소스 코드,
+디자인 및 관련 자료(이하 "소프트웨어")에 적용됩니다.
+
+1. 사용 허가
+
+저작권자는 개인 사용자에게 소프트웨어의 변경되지 않은 공식 배포본을
+개인적이고 비상업적인 목적으로 설치하고 사용할 수 있는 제한적이고,
+비독점적이며, 양도할 수 없는 권한을 부여합니다.
+
+2. 금지 사항
+
+저작권자의 사전 서면 허가 없이 다음 행위를 할 수 없습니다.
+
+- 소프트웨어의 수정, 개조, 번역, 각색 또는 파생 저작물 제작
+- 소프트웨어의 디컴파일, 디스어셈블, 역공학 또는 소스 코드 추출 시도
+- 소프트웨어 또는 그 일부의 복제, 재배포, 미러링, 재판매, 대여 또는 양도
+- 영리 활동, 유료 서비스, 광고 수익, 기업 업무 또는 그 밖의 상업적 이용
+- 저작권, 제작자, 상표 또는 라이선스 표시의 제거 또는 변경
+
+관련 법률이 명시적으로 허용하여 계약으로 제한할 수 없는 행위는 위 제한의
+예외로 합니다.
+
+3. 별도 허가
+
+수정, 재배포 또는 상업적 이용이 필요한 경우 저작권자에게 사전에 문의하여
+별도의 서면 허가를 받아야 합니다. 전자 문서로 확인된 허가도 서면 허가에
+포함됩니다.
+
+4. 소유권
+
+본 라이선스는 소프트웨어의 소유권을 이전하지 않습니다. 명시적으로 부여되지
+않은 모든 권리는 NudeNyang에게 있습니다. Sentory 이름, 로고와 아이콘은
+저작권자의 사전 허가 없이 다른 제품이나 서비스를 나타내는 용도로 사용할 수
+없습니다.
+
+5. 제3자 구성 요소
+
+소프트웨어에 포함된 제3자 구성 요소에는 각 구성 요소의 라이선스가 별도로
+적용됩니다. 자세한 내용은 THIRD-PARTY-NOTICES.txt를 확인하십시오.
+
+6. 보증의 부인
+
+소프트웨어는 관련 법률이 허용하는 최대 범위에서 상품성, 특정 목적 적합성,
+비침해성에 대한 명시적 또는 묵시적 보증 없이 "있는 그대로" 제공됩니다.
+
+7. 책임의 제한
+
+관련 법률이 허용하는 최대 범위에서 저작권자는 소프트웨어의 사용 또는 사용
+불능으로 인해 발생하는 직접적, 간접적, 우발적, 특별 또는 결과적 손해에 대해
+책임을 지지 않습니다.
+
+8. 종료
+
+사용자가 본 라이선스를 위반하면 사용 권한은 자동으로 종료됩니다. 종료된 경우
+사용자는 보유하고 있는 소프트웨어의 모든 사본을 삭제해야 합니다.
+
+9. 언어
+
+아래 영문은 이해를 돕기 위한 번역입니다. 해석이 충돌하는 경우 대한민국 법률이
+허용하는 범위에서 한국어 문구를 우선합니다.
+
+-------------------------------------------------------------------------------
+
+Sentory Personal Use License 1.0 — English Translation
+
+Copyright © 2026 NudeNyang. All rights reserved.
+
+This license applies to the Sentory application and the source code, design,
+and related materials owned by NudeNyang (the "Software").
+
+1. License Grant
+
+The copyright holder grants an individual user a limited, non-exclusive,
+non-transferable license to install and use an unmodified official copy of the
+Software solely for personal, non-commercial purposes.
+
+2. Restrictions
+
+Without prior written permission from the copyright holder, you may not:
+
+- modify, adapt, translate, or create derivative works of the Software;
+- decompile, disassemble, reverse engineer, or attempt to extract source code;
+- copy, redistribute, mirror, resell, rent, or transfer the Software or any part;
+- use the Software for profit, paid services, advertising revenue, business
+  operations, or any other commercial purpose; or
+- remove or alter copyright, author, trademark, or license notices.
+
+These restrictions do not apply where applicable law expressly permits an act
+and does not allow that permission to be waived by contract.
+
+3. Separate Permission
+
+Modification, redistribution, or commercial use requires prior written
+permission from the copyright holder. Permission confirmed electronically is
+considered written permission.
+
+4. Ownership
+
+This license does not transfer ownership. All rights not expressly granted are
+reserved by NudeNyang. The Sentory name, logo, and icon may not be used to
+identify another product or service without prior permission.
+
+5. Third-Party Components
+
+Third-party components included with the Software remain subject to their own
+licenses. See THIRD-PARTY-NOTICES.txt for details.
+
+6. Disclaimer of Warranty
+
+To the maximum extent permitted by law, the Software is provided "AS IS",
+without express or implied warranties, including merchantability, fitness for a
+particular purpose, and non-infringement.
+
+7. Limitation of Liability
+
+To the maximum extent permitted by law, the copyright holder is not liable for
+direct, indirect, incidental, special, or consequential damages arising from
+use of or inability to use the Software.
+
+8. Termination
+
+Your permission terminates automatically if you violate this license. Upon
+termination, you must delete every copy of the Software in your possession.
+
+9. Language
+
+This English text is provided for convenience. Where interpretations conflict,
+the Korean text controls to the extent permitted by applicable law.

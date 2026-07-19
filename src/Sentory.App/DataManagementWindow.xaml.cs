@@ -221,6 +221,17 @@ public partial class DataManagementWindow : Window
         }
     }
 
+    private void ViewLicenseButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        var window = new LicenseWindow(_isDarkTheme)
+        {
+            Owner = this
+        };
+        window.ShowDialog();
+    }
+
     private async void DeleteNonFavoritesButton_Click(
         object sender,
         RoutedEventArgs e) =>
@@ -414,7 +425,19 @@ public partial class DataManagementWindow : Window
 
     private static string GetVersionLabel()
     {
-        var version = Assembly.GetExecutingAssembly().GetName().Version;
+        var assembly = Assembly.GetExecutingAssembly();
+        var informationalVersion = assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion;
+        if (!string.IsNullOrWhiteSpace(informationalVersion))
+        {
+            var metadataSeparator = informationalVersion.IndexOf('+');
+            return metadataSeparator >= 0
+                ? informationalVersion[..metadataSeparator]
+                : informationalVersion;
+        }
+
+        var version = assembly.GetName().Version;
         return version is null
             ? SentoryLocalization.Text("DevelopmentVersion")
             : $"{version.Major}.{version.Minor}.{version.Build}";

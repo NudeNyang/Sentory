@@ -26,12 +26,12 @@ Discord 감지 워커와 화면 상태 표시를 다음 기준으로 보강했�
 
 ## 자동 검증
 
-2026-07-19 기준 전체 138개 테스트가 통과하도록 구성했다.
+2026-07-20 기준 전체 153개 테스트가 통과하도록 구성했다.
 
-- Core 21개
-- Platform Windows 59개
+- Core 26개
+- Platform Windows 64개
 - Diagnostics 15개
-- Infrastructure 43개
+- Infrastructure 48개
 
 안정성 관련 자동 검증에는 다음 항목이 포함된다.
 

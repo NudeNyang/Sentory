@@ -9,12 +9,20 @@ $repositoryPrefix = $repositoryRoot.TrimEnd(
     [System.IO.Path]::AltDirectorySeparatorChar) +
     [System.IO.Path]::DirectorySeparatorChar
 $artifactsRoot = Join-Path $repositoryRoot "artifacts"
-$preservedPortableDirectory = Join-Path `
-    $artifactsRoot `
-    "Sentory-win-x64-portable"
-$preservedArtifactFiles = @(
-    (Join-Path $artifactsRoot "Sentory-win-x64-portable.zip"),
-    (Join-Path $artifactsRoot "Sentory-win-x64-portable.zip.sha256")
+$preservedPortableDirectories = @(
+    (Join-Path $artifactsRoot "Sentory-win-x64-portable"),
+    (Join-Path $artifactsRoot "Sentory-win-arm64-portable")
+)
+$preservedArtifactNames = @(
+    "Sentory-win-x64-portable.zip",
+    "Sentory-win-x64-portable.zip.sha256",
+    "Sentory-win-arm64-portable.zip",
+    "Sentory-win-arm64-portable.zip.sha256",
+    "Sentory-win-x64-setup.exe",
+    "Sentory-win-x64-setup.exe.sha256",
+    "Sentory-win-arm64-setup.exe",
+    "Sentory-win-arm64-setup.exe.sha256",
+    "release-manifest.json"
 )
 
 function Assert-RepositoryChildPath {
@@ -78,11 +86,14 @@ if (Test-Path -LiteralPath $artifactsRoot) {
             -LiteralPath $artifactsRoot `
             -Directory `
             -Force) {
-        if (-not [System.IO.Path]::GetFullPath(
-                    $artifactDirectory.FullName).Equals(
-                    [System.IO.Path]::GetFullPath(
-                        $preservedPortableDirectory),
-                    [System.StringComparison]::OrdinalIgnoreCase)) {
+        $directoryPath = [System.IO.Path]::GetFullPath(
+            $artifactDirectory.FullName)
+        $isPreservedDirectory = $preservedPortableDirectories.Where({
+            $directoryPath.Equals(
+                [System.IO.Path]::GetFullPath($_),
+                [System.StringComparison]::OrdinalIgnoreCase)
+        }).Count -gt 0
+        if (-not $isPreservedDirectory) {
             $targets.Add((Assert-RepositoryChildPath `
                 $artifactDirectory.FullName))
         }
@@ -94,11 +105,7 @@ if (Test-Path -LiteralPath $artifactsRoot) {
             -Force) {
         $fullFilePath = [System.IO.Path]::GetFullPath(
             $artifactFile.FullName)
-        $isPreserved = $preservedArtifactFiles.Where({
-            $fullFilePath.Equals(
-                [System.IO.Path]::GetFullPath($_),
-                [System.StringComparison]::OrdinalIgnoreCase)
-        }).Count -gt 0
+        $isPreserved = $preservedArtifactNames -contains $artifactFile.Name
         if (-not $isPreserved) {
             $targets.Add((Assert-RepositoryChildPath $fullFilePath))
         }
@@ -119,4 +126,4 @@ Write-Host "Sentory build cleanup completed." -ForegroundColor Green
 Write-Host "Removed paths: $($verifiedTargets.Count)"
 Write-Host ("Reclaimed space: {0:N1} MB" -f ($reclaimedBytes / 1MB))
 Write-Host "Preserved executable: $(Join-Path $repositoryRoot 'Sentory.exe')"
-Write-Host "Preserved latest portable build: $preservedPortableDirectory"
+Write-Host "Preserved latest x64 and ARM64 release packages."

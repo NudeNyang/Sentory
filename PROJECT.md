@@ -240,8 +240,12 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
   저장한다.
 - Windows 기본 경로 `%LOCALAPPDATA%\Sentory`는 기존 사용자와의
   호환을 위해 변경하지 않는다.
-- 공개 배포는 self-contained 패키지를 기본으로 하고, 정식 배포 전
-  코드 서명, 설치·업데이트 정책, 개인정보 안내를 추가한다.
+- 공개 배포는 x64·ARM64 self-contained 설치형과 포터블 패키지를 제공한다.
+- `0.9.0-beta`에는 수동 업데이트를 사용하고 다음 베타에서
+  `release-manifest.json` 기반 인앱 자동 업데이트를 추가한다.
+- Sentory Personal Use License에 따라 개인적·비상업적 사용만 허용하며,
+  수정·역공학·재배포·상업적 이용에는 제작자의 사전 서면 허가가 필요하다.
+- 정식 배포 전 코드 서명과 ARM64 실제 장치 검수를 완료한다.
 
 세부 구조와 이식 순서는
 [`docs/03-cross-platform-and-distribution-readiness.md`](./docs/03-cross-platform-and-distribution-readiness.md)에

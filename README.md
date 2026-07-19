@@ -1,5 +1,7 @@
 # Sentory
 
+> 현재 배포 후보 버전: **0.9.0-beta**
+
 Sentory는 메신저에서 다룬 URL과 사진을 로컬에 보관하는 데스크톱
 앱이다. 현재 제공되는 실행 앱과 카카오톡 감지는 Windows용이며,
 핵심 데이터·저장소 계층은 macOS와 Linux 이식을 고려해 분리돼 있다.
@@ -63,17 +65,27 @@ dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
 ```
 
-다른 Windows PC에 폴더째 전달할 self-contained `win-x64` 무설치판은
-다음 명령으로 만든다.
+Windows x64·ARM64용 설치형과 포터블 전체 배포 파일은 다음 명령으로 만든다.
 
 ```powershell
-.\scripts\Publish-Portable.ps1
+.\scripts\Publish-Release.ps1 -Version 0.9.0-beta
 ```
 
-스크립트는 실행 파일의 저장소 초기화 자체 점검을 거친 뒤 저장소 최상단에
-바로 실행할 수 있는 `Sentory.exe`를 만들고,
-`artifacts\Sentory-win-x64-portable` 폴더, ZIP 파일과 SHA-256 확인값을
-만든다. 받는 사람은 ZIP을 완전히 푼 뒤 `Sentory.App.exe`를 실행하면 된다.
+스크립트는 x64·ARM64 단일 실행 파일, 포터블 ZIP, 설치 프로그램과 SHA-256
+확인값을 `artifacts`에 만든다. x64 실행 파일은 격리된 데이터 폴더에서 저장소
+초기화 자체 점검까지 수행한다. 자세한 절차는
+[공개 배포와 라이선스 운영](./docs/05-release-and-distribution.md)을 참고한다.
+
+## 라이선스와 개인정보
+
+Sentory는 개인적이고 비상업적인 용도로만 사용할 수 있다. NudeNyang의 사전
+서면 허가 없이 수정, 역공학, 재배포 또는 상업적으로 이용할 수 없다.
+
+- 전체 사용 조건: [LICENSE.txt](./LICENSE.txt)
+- 개인정보 및 로컬 데이터: [PRIVACY.md](./PRIVACY.md)
+- 제3자 구성 요소: [THIRD-PARTY-NOTICES.txt](./THIRD-PARTY-NOTICES.txt)
+- 변경 기록: [CHANGELOG.md](./CHANGELOG.md)
+- 지원 정책: [SUPPORT.md](./SUPPORT.md)
 
 세부 구현 범위와 제한 사항은 [PROJECT.md](./PROJECT.md)와
 [KakaoTalk 구현 결과](./docs/02-kakao-immediate-capture-implementation.md),

@@ -2,7 +2,7 @@
 param(
     [ValidateSet("Release")]
     [string]$Configuration = "Release",
-    [ValidateSet("win-x64")]
+    [ValidateSet("win-x64", "win-arm64")]
     [string]$Runtime = "win-x64",
     [string]$OutputRoot = "artifacts"
 )
@@ -10,8 +10,12 @@ param(
 $ErrorActionPreference = "Stop"
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $projectPath = Join-Path $repositoryRoot "src\Sentory.App\Sentory.App.csproj"
-$publishDirectory = Join-Path $repositoryRoot "src\Sentory.App\bin\publish\win-x64"
+$publishDirectory = Join-Path $repositoryRoot "src\Sentory.App\bin\publish\$Runtime"
 $guidePath = Join-Path $repositoryRoot "distribution\README-KO.txt"
+$licensePath = Join-Path $repositoryRoot "LICENSE.txt"
+$privacyPath = Join-Path $repositoryRoot "PRIVACY.md"
+$noticesPath = Join-Path $repositoryRoot "THIRD-PARTY-NOTICES.txt"
+$thirdPartyLicensesPath = Join-Path $repositoryRoot "distribution\licenses"
 $repositoryExecutable = Join-Path $repositoryRoot "Sentory.exe"
 
 if (-not [System.IO.Path]::IsPathRooted($OutputRoot)) {
@@ -19,10 +23,10 @@ if (-not [System.IO.Path]::IsPathRooted($OutputRoot)) {
 }
 
 $outputRootFull = [System.IO.Path]::GetFullPath($OutputRoot)
-$stagingDirectory = Join-Path $outputRootFull "Sentory-win-x64-portable"
-$archivePath = Join-Path $outputRootFull "Sentory-win-x64-portable.zip"
+$stagingDirectory = Join-Path $outputRootFull "Sentory-$Runtime-portable"
+$archivePath = Join-Path $outputRootFull "Sentory-$Runtime-portable.zip"
 $checksumPath = "$archivePath.sha256"
-$healthDataDirectory = Join-Path $outputRootFull ".portable-check"
+$healthDataDirectory = Join-Path $outputRootFull ".portable-check-$Runtime"
 
 function Assert-OutputChildPath {
     param([Parameter(Mandatory)][string]$Path)
@@ -61,41 +65,87 @@ try {
     dotnet publish $projectPath `
         --configuration $Configuration `
         --runtime $Runtime `
-        /p:PublishProfile=win-x64
+        /p:PublishProfile=$Runtime
     if ($LASTEXITCODE -ne 0) {
         throw "Sentory 휴대용 빌드에 실패했습니다."
     }
 
-    $publishedExecutable = Join-Path $publishDirectory "Sentory.App.exe"
+    $publishedExecutable = Join-Path $publishDirectory "Sentory.exe"
     if (-not (Test-Path -LiteralPath $publishedExecutable)) {
         throw "배포 실행 파일을 찾지 못했습니다: $publishedExecutable"
     }
 
     New-Item -ItemType Directory -Path $stagingDirectory -Force | Out-Null
-    $stagedExecutable = Join-Path $stagingDirectory "Sentory.App.exe"
+    $stagedExecutable = Join-Path $stagingDirectory "Sentory.exe"
     $stagedGuide = Join-Path $stagingDirectory "README-KO.txt"
+    $stagedLicense = Join-Path $stagingDirectory "LICENSE.txt"
+    $stagedPrivacy = Join-Path $stagingDirectory "PRIVACY.md"
+    $stagedNotices = Join-Path $stagingDirectory "THIRD-PARTY-NOTICES.txt"
+    $stagedThirdPartyLicenses = Join-Path $stagingDirectory "licenses"
     Copy-Item -LiteralPath $publishedExecutable -Destination $stagedExecutable
     Copy-Item -LiteralPath $guidePath -Destination $stagedGuide
-    if (-not (Test-Path -LiteralPath $stagedGuide)) {
-        throw "휴대용 사용 방법 파일을 복사하지 못했습니다."
+    Copy-Item -LiteralPath $licensePath -Destination $stagedLicense
+    Copy-Item -LiteralPath $privacyPath -Destination $stagedPrivacy
+    Copy-Item -LiteralPath $noticesPath -Destination $stagedNotices
+    Copy-Item `
+        -LiteralPath $thirdPartyLicensesPath `
+        -Destination $stagedThirdPartyLicenses `
+        -Recurse
+    foreach ($requiredDocument in @(
+            $stagedGuide,
+            $stagedLicense,
+            $stagedPrivacy,
+            $stagedNotices,
+            (Join-Path $stagedThirdPartyLicenses "Apache-2.0.txt"))) {
+        if (-not (Test-Path -LiteralPath $requiredDocument)) {
+            throw "휴대용 필수 문서를 복사하지 못했습니다: $requiredDocument"
+        }
     }
 
-    $previousDataDirectory = $env:SENTORY_DATA_DIR
+    $expectedMachine = if ($Runtime -eq "win-arm64") { 0xAA64 } else { 0x8664 }
+    $stream = [System.IO.File]::OpenRead($stagedExecutable)
+    $reader = [System.IO.BinaryReader]::new($stream)
     try {
-        $env:SENTORY_DATA_DIR = $healthDataDirectory
-        $process = Start-Process `
-            -FilePath $stagedExecutable `
-            -ArgumentList "--verify-installation" `
-            -WindowStyle Hidden `
-            -Wait `
-            -PassThru
-        if ($process.ExitCode -ne 0) {
-            throw "배포 실행 파일 자체 점검에 실패했습니다. 종료 코드: $($process.ExitCode)"
+        $stream.Position = 0x3C
+        $peOffset = $reader.ReadInt32()
+        $stream.Position = $peOffset + 4
+        $actualMachine = $reader.ReadUInt16()
+        if ($actualMachine -ne $expectedMachine) {
+            throw ("배포 실행 파일 아키텍처가 올바르지 않습니다. " +
+                "예상: 0x{0:X4}, 실제: 0x{1:X4}" -f `
+                $expectedMachine, $actualMachine)
         }
     }
     finally {
-        $env:SENTORY_DATA_DIR = $previousDataDirectory
-        Remove-OutputPathIfPresent $healthDataDirectory
+        $reader.Dispose()
+        $stream.Dispose()
+    }
+
+    $hostArchitecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+    $canRunHealthCheck =
+        ($Runtime -eq "win-x64" -and $hostArchitecture -eq "X64") -or
+        ($Runtime -eq "win-arm64" -and $hostArchitecture -eq "Arm64")
+    if ($canRunHealthCheck) {
+        $previousDataDirectory = $env:SENTORY_DATA_DIR
+        try {
+            $env:SENTORY_DATA_DIR = $healthDataDirectory
+            $process = Start-Process `
+                -FilePath $stagedExecutable `
+                -ArgumentList "--verify-installation" `
+                -WindowStyle Hidden `
+                -Wait `
+                -PassThru
+            if ($process.ExitCode -ne 0) {
+                throw "배포 실행 파일 자체 점검에 실패했습니다. 종료 코드: $($process.ExitCode)"
+            }
+        }
+        finally {
+            $env:SENTORY_DATA_DIR = $previousDataDirectory
+            Remove-OutputPathIfPresent $healthDataDirectory
+        }
+    }
+    else {
+        Write-Host "$Runtime 실행 점검은 동일 아키텍처 장치에서 수행해야 합니다."
     }
 
     $publishedPdb = Get-ChildItem -LiteralPath $stagingDirectory `
@@ -105,10 +155,12 @@ try {
         throw "휴대용 폴더에 디버그 심볼이 포함되어 있습니다."
     }
 
-    Copy-Item `
-        -LiteralPath $stagedExecutable `
-        -Destination $repositoryExecutable `
-        -Force
+    if ($Runtime -eq "win-x64") {
+        Copy-Item `
+            -LiteralPath $stagedExecutable `
+            -Destination $repositoryExecutable `
+            -Force
+    }
 
     Compress-Archive `
         -Path (Join-Path $stagingDirectory "*") `
