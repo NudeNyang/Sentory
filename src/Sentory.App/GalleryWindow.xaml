@@ -405,6 +405,38 @@
                                    Foreground="{DynamicResource DiscordDetectionBrush}"
                                    VerticalAlignment="Center" />
                     </StackPanel>
+                    <Border x:Name="RuntimeIssueChip"
+                            Margin="0,7,0,0"
+                            Padding="8,4,5,4"
+                            HorizontalAlignment="Left"
+                            Background="{DynamicResource NoticeBackgroundBrush}"
+                            BorderBrush="{DynamicResource NoticeBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE7BA;"
+                                       FontFamily="Segoe Fluent Icons"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource DangerBrush}"
+                                       VerticalAlignment="Center" />
+                            <TextBlock x:Name="RuntimeIssueText"
+                                       Margin="6,0,5,0"
+                                       MaxWidth="430"
+                                       FontSize="10.5"
+                                       Foreground="{DynamicResource TextBrush}"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center" />
+                            <Button Width="24"
+                                    Height="24"
+                                    Padding="0"
+                                    Content="&#xE711;"
+                                    FontFamily="Segoe Fluent Icons"
+                                    Style="{StaticResource ToolbarButtonStyle}"
+                                    ToolTip="알림 닫기"
+                                    Click="DismissRuntimeIssueButton_Click" />
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
 
                 <Border Grid.Row="0"

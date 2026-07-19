@@ -18,6 +18,9 @@ public sealed record SentoryDataPaths(
     public string SettingsPath =>
         Path.Combine(RootDirectory, "gallery-settings.json");
 
+    public string LogsDirectory =>
+        Path.Combine(RootDirectory, "logs");
+
     public static SentoryDataPaths ForCurrentUser()
     {
         var platform = GetCurrentPlatform();
@@ -78,6 +81,7 @@ public sealed record SentoryDataPaths(
         Directory.CreateDirectory(RootDirectory);
         Directory.CreateDirectory(ImagesDirectory);
         Directory.CreateDirectory(LinkPreviewsDirectory);
+        Directory.CreateDirectory(LogsDirectory);
     }
 
     private static DesktopPlatform GetCurrentPlatform()

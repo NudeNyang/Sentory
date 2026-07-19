@@ -27,6 +27,7 @@ public partial class App : System.Windows.Application
     private string _statusText = "시작 중...";
     private ICaptureRepository? _repository;
     private SentorySettingsStore? _settingsStore;
+    private SentoryDiagnosticsLog? _diagnosticsLog;
     private ICaptureRuntime? _runtime;
     private GalleryWindow? _galleryWindow;
     private readonly CancellationTokenSource _maintenanceCancellation = new();
@@ -43,10 +44,12 @@ public partial class App : System.Windows.Application
     private CaptureRuntimeState _discordDetectionState =
         CaptureRuntimeState.Connecting;
     private bool _shuttingDown;
+    private string? _lastRuntimeIssue;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        _diagnosticsLog = new SentoryDiagnosticsLog(_paths);
 
         if (e.Args.Contains(
                 DiscordWorkerClient.WorkerArgument,
@@ -118,6 +121,11 @@ public partial class App : System.Windows.Application
             if (repairResult.FileDeleteFailures > 0 ||
                 repairResult.MissingImageFiles > 0)
             {
+                _lastRuntimeIssue =
+                    "일부 사진 파일을 확인하지 못했습니다. 설정에서 데이터 폴더를 확인해 주세요.";
+                _diagnosticsLog.Write(
+                    "storage-repair",
+                    $"missing={repairResult.MissingImageFiles}, deleteFailures={repairResult.FileDeleteFailures}");
                 _trayIcon?.ShowBalloonTip(
                     3000,
                     "Sentory 데이터 확인",
@@ -138,6 +146,10 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
+            _diagnosticsLog?.Write(
+                "startup-failed",
+                "Sentory startup failed",
+                exception);
             SentoryDialogWindow.ShowMessage(
                 null,
                 "Sentory를 시작하지 못했습니다",
@@ -411,6 +423,8 @@ public partial class App : System.Windows.Application
     {
         Dispatcher.BeginInvoke(() =>
         {
+            _lastRuntimeIssue = null;
+            _galleryWindow?.SetRuntimeIssue(null);
             _trayIcon?.ShowBalloonTip(
                 2500,
                 "Sentory",
@@ -454,6 +468,13 @@ public partial class App : System.Windows.Application
             {
                 SetDiscordRepairNeeded(true, persistPrepared: false);
             }
+            _lastRuntimeIssue = discordUnavailable
+                ? "Discord 연결 복구가 필요합니다. 설정에서 다시 연결해 주세요."
+                : issue.UserMessage;
+            _galleryWindow?.SetRuntimeIssue(_lastRuntimeIssue);
+            _diagnosticsLog?.Write(
+                issue.Code,
+                issue.UserMessage);
             SetStatus(
                 discordUnavailable
                     ? "상태: Discord 연결 복구가 필요합니다."
@@ -554,6 +575,10 @@ public partial class App : System.Windows.Application
                   System.ComponentModel.Win32Exception or
                   UnauthorizedAccessException)
         {
+            _diagnosticsLog?.Write(
+                "discord-repair-failed",
+                "Discord connection repair failed",
+                exception);
             _trayIcon?.ShowBalloonTip(
                 4000,
                 "Sentory",
@@ -587,6 +612,10 @@ public partial class App : System.Windows.Application
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException)
         {
+            _diagnosticsLog?.Write(
+                "settings-save-failed",
+                "Discord preparation state could not be saved",
+                exception);
         }
     }
 
@@ -632,6 +661,7 @@ public partial class App : System.Windows.Application
                 _discordSupportEnabled && _discordRepairNeeded);
             _galleryWindow.SetDiscordDetectionState(
                 _discordDetectionState);
+            _galleryWindow.SetRuntimeIssue(_lastRuntimeIssue);
             _galleryWindow.Closed += (_, _) => _galleryWindow = null;
             _galleryWindow.Show();
             return;
@@ -688,8 +718,12 @@ public partial class App : System.Windows.Application
                 {
                     throw;
                 }
-                catch (Exception)
+                catch (Exception exception)
                 {
+                    _diagnosticsLog?.Write(
+                        "link-preview-failed",
+                        "Link preview enrichment failed",
+                        exception);
                 }
 
                 if (updated > 0)
@@ -784,8 +818,15 @@ public partial class App : System.Windows.Application
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            _lastRuntimeIssue =
+                "자동 정리를 완료하지 못했습니다. 다음 실행 때 다시 시도합니다.";
+            _galleryWindow?.SetRuntimeIssue(_lastRuntimeIssue);
+            _diagnosticsLog?.Write(
+                "auto-cleanup-failed",
+                _lastRuntimeIssue,
+                exception);
             _trayIcon?.ShowBalloonTip(
                 2600,
                 "Sentory 자동 정리",

@@ -126,6 +126,19 @@ public partial class GalleryWindow : Window
             _isDarkTheme);
     }
 
+    public void SetRuntimeIssue(string? message)
+    {
+        RuntimeIssueText.Text = message ?? string.Empty;
+        RuntimeIssueChip.Visibility = string.IsNullOrWhiteSpace(message)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        System.Windows.Automation.AutomationProperties.SetName(
+            RuntimeIssueChip,
+            string.IsNullOrWhiteSpace(message)
+                ? "최근 문제 없음"
+                : $"최근 문제 {message}");
+    }
+
     private GalleryItemViewModel CreateViewModel(CapturedItemSummary item)
     {
         var isImage = item.Kind == ContentKind.Image;
@@ -1248,6 +1261,11 @@ public partial class GalleryWindow : Window
         object sender,
         RoutedEventArgs e) =>
         DiscordConnectionBanner.Visibility = Visibility.Collapsed;
+
+    private void DismissRuntimeIssueButton_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        SetRuntimeIssue(null);
 
     private async void ShowFeedback(string message)
     {
