@@ -17,41 +17,62 @@
             </Setter>
         </Style>
         <Style x:Key="SentoryScrollThumbStyle" TargetType="Thumb">
-            <Setter Property="MinHeight" Value="38" />
-            <Setter Property="MinWidth" Value="38" />
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Padding" Value="1,0" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Thumb">
                         <Border x:Name="ThumbBody"
-                                Margin="1"
+                                Margin="{TemplateBinding Padding}"
                                 Background="{DynamicResource LineBrush}"
-                                CornerRadius="3" />
+                                CornerRadius="2"
+                                Opacity="0.82" />
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="ThumbBody"
                                         Property="Background"
                                         Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="ThumbBody"
+                                        Property="Opacity"
+                                        Value="1" />
                             </Trigger>
                             <Trigger Property="IsDragging" Value="True">
                                 <Setter TargetName="ThumbBody"
                                         Property="Background"
                                         Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="ThumbBody"
+                                        Property="Opacity"
+                                        Value="1" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Orientation, RelativeSource={RelativeSource AncestorType={x:Type ScrollBar}}}"
+                             Value="Horizontal">
+                    <Setter Property="MinHeight" Value="0" />
+                    <Setter Property="MinWidth" Value="24" />
+                    <Setter Property="Padding" Value="0,1" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
         <Style TargetType="ScrollBar">
-            <Setter Property="Width" Value="8" />
-            <Setter Property="Height" Value="8" />
-            <Setter Property="Margin" Value="2,0,1,0" />
+            <Setter Property="Width" Value="4" />
+            <Setter Property="Margin" Value="0" />
             <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ScrollBar">
-                        <Grid Background="Transparent">
+                        <Grid Background="Transparent"
+                              SnapsToDevicePixels="True">
                             <Track x:Name="PART_Track"
+                                   Orientation="{TemplateBinding Orientation}"
                                    IsDirectionReversed="True">
                                 <Track.DecreaseRepeatButton>
                                     <RepeatButton Style="{StaticResource SentoryScrollRepeatButtonStyle}" />
@@ -74,6 +95,37 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="Width" Value="Auto" />
+                    <Setter Property="Height" Value="4" />
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="1" />
+                </Trigger>
+                <Trigger Property="Maximum" Value="0">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </Trigger>
+                <EventTrigger RoutedEvent="ScrollBar.ValueChanged">
+                    <BeginStoryboard HandoffBehavior="SnapshotAndReplace">
+                        <Storyboard>
+                            <DoubleAnimationUsingKeyFrames Storyboard.TargetProperty="Opacity"
+                                                           FillBehavior="Stop">
+                                <DiscreteDoubleKeyFrame KeyTime="0:0:0"
+                                                        Value="1" />
+                                <DiscreteDoubleKeyFrame KeyTime="0:0:0.8"
+                                                        Value="1" />
+                                <SplineDoubleKeyFrame KeyTime="0:0:1.05"
+                                                      KeySpline="0.22,1,0.36,1"
+                                                      Value="0" />
+                            </DoubleAnimationUsingKeyFrames>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </EventTrigger>
+            </Style.Triggers>
         </Style>
     </Application.Resources>
 </Application>
