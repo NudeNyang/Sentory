@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
+using Sentory.Core;
 
 namespace Sentory.App;
 
@@ -85,6 +86,29 @@ internal static class SentoryTheme
             brush.Freeze();
             resources[key] = brush;
         }
+    }
+
+    public static void ApplyDetectionStatus(
+        ResourceDictionary resources,
+        CaptureRuntimeState state,
+        bool dark)
+    {
+        var color = (state, dark) switch
+        {
+            (CaptureRuntimeState.Ready, false) => "#59663F",
+            (CaptureRuntimeState.Ready, true) => "#A9BB89",
+            (CaptureRuntimeState.ReconnectRequired, false) => "#994740",
+            (CaptureRuntimeState.ReconnectRequired, true) => "#F08A82",
+            (CaptureRuntimeState.Recovering, false) => "#7A4F32",
+            (CaptureRuntimeState.Recovering, true) => "#D5A071",
+            (_, false) => "#6F5C42",
+            _ => "#C0A77D"
+        };
+        var brush = new SolidColorBrush(
+            (System.Windows.Media.Color)
+            System.Windows.Media.ColorConverter.ConvertFromString(color));
+        brush.Freeze();
+        resources["DiscordDetectionBrush"] = brush;
     }
 
     public static void ApplyTitleBar(Window window, bool dark)

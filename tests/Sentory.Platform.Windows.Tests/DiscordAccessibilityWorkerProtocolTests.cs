@@ -30,6 +30,30 @@ public sealed class DiscordAccessibilityWorkerProtocolTests
         Assert.Equal(secondId, ReadRequestId(lines[1]));
     }
 
+    [Fact]
+    public async Task KeepsProcessingLongSequenceOfRequests()
+    {
+        var requestIds = Enumerable.Range(0, 100)
+            .Select(_ => Guid.NewGuid())
+            .ToList();
+        var input = new StringReader(string.Join(
+            Environment.NewLine,
+            requestIds.Select(requestId =>
+                $$"""{"RequestId":"{{requestId}}","Operation":0,"Request":null}""")));
+        var output = new StringWriter();
+
+        var exitCode = await DiscordAccessibilityWorker.RunAsync(
+            input,
+            output);
+
+        var responseIds = output.ToString()
+            .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
+            .Select(ReadRequestId)
+            .ToList();
+        Assert.Equal(0, exitCode);
+        Assert.Equal(requestIds, responseIds);
+    }
+
     private static Guid ReadRequestId(string json)
     {
         using var document = JsonDocument.Parse(json);

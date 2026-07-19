@@ -2,7 +2,10 @@ using Sentory.Core;
 
 namespace Sentory.Platform.Windows.Runtime;
 
-public sealed class CompositeCaptureRuntime : ICaptureRuntime
+public sealed class CompositeCaptureRuntime :
+    ICaptureRuntime,
+    ICaptureRuntimeStatusSource,
+    ICaptureRuntimeRecoveryController
 {
     private readonly IReadOnlyList<ICaptureRuntime> _runtimes;
     private bool _paused;
@@ -15,12 +18,18 @@ public sealed class CompositeCaptureRuntime : ICaptureRuntime
         {
             runtime.Captured += ForwardCaptured;
             runtime.IssueDetected += ForwardIssue;
+            if (runtime is ICaptureRuntimeStatusSource statusSource)
+            {
+                statusSource.StatusChanged += ForwardStatus;
+            }
         }
     }
 
     public event EventHandler<CaptureNotification>? Captured;
 
     public event EventHandler<CaptureRuntimeIssue>? IssueDetected;
+
+    public event EventHandler<CaptureRuntimeStatus>? StatusChanged;
 
     public bool IsPaused
     {
@@ -50,6 +59,17 @@ public sealed class CompositeCaptureRuntime : ICaptureRuntime
         _started = true;
     }
 
+    public void RequestRecovery(SourceApp sourceApp)
+    {
+        foreach (var runtime in _runtimes)
+        {
+            if (runtime is ICaptureRuntimeRecoveryController controller)
+            {
+                controller.RequestRecovery(sourceApp);
+            }
+        }
+    }
+
     private void ForwardCaptured(
         object? sender,
         CaptureNotification notification) =>
@@ -60,12 +80,21 @@ public sealed class CompositeCaptureRuntime : ICaptureRuntime
         CaptureRuntimeIssue issue) =>
         IssueDetected?.Invoke(this, issue);
 
+    private void ForwardStatus(
+        object? sender,
+        CaptureRuntimeStatus status) =>
+        StatusChanged?.Invoke(this, status);
+
     public async ValueTask DisposeAsync()
     {
         foreach (var runtime in _runtimes)
         {
             runtime.Captured -= ForwardCaptured;
             runtime.IssueDetected -= ForwardIssue;
+            if (runtime is ICaptureRuntimeStatusSource statusSource)
+            {
+                statusSource.StatusChanged -= ForwardStatus;
+            }
             await runtime.DisposeAsync();
         }
 

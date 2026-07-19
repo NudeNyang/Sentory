@@ -1,4 +1,5 @@
 using System.Windows;
+using Sentory.Core;
 
 namespace Sentory.App;
 
@@ -9,11 +10,18 @@ public partial class TrayMenuWindow : Window
         bool paused,
         bool startupEnabled,
         bool discordSupportEnabled,
+        CaptureRuntimeState discordDetectionState,
         bool isDarkTheme)
     {
         InitializeComponent();
         SentoryTheme.Apply(Resources, isDarkTheme);
+        SentoryTheme.ApplyDetectionStatus(
+            Resources,
+            discordDetectionState,
+            isDarkTheme);
         StatusText.Text = status;
+        DiscordDetectionStatusText.Text =
+            DiscordDetectionPresentation.GetLabel(discordDetectionState);
         PauseText.Text = paused ? "감지 다시 시작" : "감지 일시정지";
         PauseIcon.Text = paused ? "\uE768" : "\uE769";
         PauseSwitchThumb.HorizontalAlignment = paused

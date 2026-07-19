@@ -5,7 +5,10 @@ using Sentory.Platform.Windows.Interop;
 
 namespace Sentory.Platform.Windows.Runtime;
 
-public sealed class DiscordCaptureRuntime : ICaptureRuntime
+public sealed class DiscordCaptureRuntime :
+    ICaptureRuntime,
+    ICaptureRuntimeStatusSource,
+    ICaptureRuntimeRecoveryController
 {
     private const int MaximumActiveCandidates = 8;
 
@@ -15,6 +18,8 @@ public sealed class DiscordCaptureRuntime : ICaptureRuntime
     private readonly LowLevelPasteHook _hook;
     private readonly StaClipboardReader _clipboardReader;
     private readonly IDiscordConfirmationClient _confirmationClient;
+    private readonly IDiscordWorkerLifecycle? _workerLifecycle;
+    private readonly DiscordDetectionStatusTracker _statusTracker = new();
     private readonly CaptureCoordinator _coordinator;
     private readonly Channel<PasteTrigger> _triggers =
         Channel.CreateBounded<PasteTrigger>(
@@ -26,6 +31,7 @@ public sealed class DiscordCaptureRuntime : ICaptureRuntime
             });
     private readonly CancellationTokenSource _cancellation = new();
     private readonly object _candidateGate = new();
+    private readonly object _warmupGate = new();
     private readonly List<CandidateRegistration> _candidates = [];
     private readonly HashSet<string> _activeUrls =
         new(StringComparer.Ordinal);
@@ -49,12 +55,23 @@ public sealed class DiscordCaptureRuntime : ICaptureRuntime
         _hook = new LowLevelPasteHook(native, acceptInjectedInput);
         _clipboardReader = new StaClipboardReader(native);
         _confirmationClient = new DiscordWorkerClient();
+        _workerLifecycle = _confirmationClient as IDiscordWorkerLifecycle;
+        if (_workerLifecycle is not null)
+        {
+            _workerLifecycle.RecoveryRequired += OnWorkerRecoveryRequired;
+        }
         _coordinator = new CaptureCoordinator(repository);
     }
 
     public event EventHandler<CaptureNotification>? Captured;
 
     public event EventHandler<CaptureRuntimeIssue>? IssueDetected;
+
+    public event EventHandler<CaptureRuntimeStatus>? StatusChanged
+    {
+        add => _statusTracker.StatusChanged += value;
+        remove => _statusTracker.StatusChanged -= value;
+    }
 
     public bool IsPaused
     {
@@ -80,7 +97,20 @@ public sealed class DiscordCaptureRuntime : ICaptureRuntime
         _hook.SendDetected += OnSendDetected;
         _worker = Task.Run(() => ProcessTriggersAsync(_cancellation.Token));
         _hook.Start();
-        _warmupTask = WarmWorkerWithRetryAsync(_cancellation.Token);
+        BeginWorkerWarmup(recovering: false);
+    }
+
+    public void RequestRecovery(SourceApp sourceApp)
+    {
+        if (sourceApp != SourceApp.Discord ||
+            _cancellation.IsCancellationRequested)
+        {
+            return;
+        }
+
+        CancelActiveCandidates();
+        _statusTracker.Publish(CaptureRuntimeState.Connecting);
+        BeginWorkerWarmup(recovering: false);
     }
 
     private void OnPasteDetected(object? sender, PasteTrigger trigger) =>
@@ -274,9 +304,21 @@ public sealed class DiscordCaptureRuntime : ICaptureRuntime
             if (response.Outcome ==
                 DiscordConfirmationOutcome.DetectionUnavailable)
             {
-                ReportDetectionUnavailable();
+                if (IsWorkerFailure(response))
+                {
+                    _statusTracker.Publish(CaptureRuntimeState.Recovering);
+                    BeginWorkerWarmup(recovering: true);
+                }
+                else
+                {
+                    _statusTracker.Publish(
+                        CaptureRuntimeState.ReconnectRequired);
+                    ReportDetectionUnavailable();
+                }
                 return;
             }
+
+            _statusTracker.Publish(CaptureRuntimeState.Ready);
 
             if (response.Outcome != DiscordConfirmationOutcome.Confirmed ||
                 _paused)
@@ -345,9 +387,29 @@ public sealed class DiscordCaptureRuntime : ICaptureRuntime
         }
     }
 
+    private void BeginWorkerWarmup(bool recovering)
+    {
+        lock (_warmupGate)
+        {
+            if (_warmupTask is { IsCompleted: false })
+            {
+                return;
+            }
+
+            _warmupTask = WarmWorkerWithRetryAsync(
+                recovering,
+                _cancellation.Token);
+        }
+    }
+
     private async Task WarmWorkerWithRetryAsync(
+        bool recovering,
         CancellationToken cancellationToken)
     {
+        _statusTracker.Publish(
+            recovering
+                ? CaptureRuntimeState.Recovering
+                : CaptureRuntimeState.Connecting);
         for (var attempt = 0; attempt < 15; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -362,13 +424,35 @@ public sealed class DiscordCaptureRuntime : ICaptureRuntime
                     $"outcome={response.Outcome} elapsedMs={(DateTimeOffset.UtcNow - startedAt).TotalMilliseconds:F0} signals={string.Join(',', response.ConfirmationSignals)}");
                 if (response.Outcome == DiscordConfirmationOutcome.Confirmed)
                 {
+                    _statusTracker.Publish(CaptureRuntimeState.Ready);
                     return;
                 }
             }
 
             await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
         }
+
+        _statusTracker.Publish(CaptureRuntimeState.ReconnectRequired);
+        ReportDetectionUnavailable();
     }
+
+    private void OnWorkerRecoveryRequired(object? sender, EventArgs eventArgs)
+    {
+        if (_cancellation.IsCancellationRequested)
+        {
+            return;
+        }
+
+        DiscordCaptureTrace.Write("worker-recovery-started");
+        _statusTracker.Publish(CaptureRuntimeState.Recovering);
+        BeginWorkerWarmup(recovering: true);
+    }
+
+    internal static bool IsWorkerFailure(
+        DiscordConfirmationResponse response) =>
+        response.Outcome == DiscordConfirmationOutcome.DetectionUnavailable &&
+        response.ConfirmationSignals.Any(signal =>
+            signal.StartsWith("worker-", StringComparison.Ordinal));
 
     private bool TryCreateWarmupRequest(
         out DiscordConfirmationRequest request)
@@ -592,6 +676,10 @@ public sealed class DiscordCaptureRuntime : ICaptureRuntime
 
     public async ValueTask DisposeAsync()
     {
+        if (_workerLifecycle is not null)
+        {
+            _workerLifecycle.RecoveryRequired -= OnWorkerRecoveryRequired;
+        }
         _hook.PasteDetected -= OnPasteDetected;
         _hook.SendDetected -= OnSendDetected;
         _hook.Dispose();

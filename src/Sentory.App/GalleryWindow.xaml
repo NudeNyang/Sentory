@@ -37,6 +37,7 @@
         <SolidColorBrush x:Key="ToastBackgroundBrush" Color="#292722" />
         <SolidColorBrush x:Key="ToastTextBrush" Color="#F2EEE7" />
         <SolidColorBrush x:Key="DangerBrush" Color="#B85A52" />
+        <SolidColorBrush x:Key="DiscordDetectionBrush" Color="#8B765A" />
 
         <Style x:Key="FilterButtonStyle" TargetType="ToggleButton">
             <Setter Property="Foreground"
@@ -324,6 +325,24 @@
                                Text="붙여넣기한 사진과 링크를 한 곳에서"
                                FontSize="13"
                                Foreground="{DynamicResource MutedTextBrush}" />
+                    <StackPanel Margin="0,9,0,0"
+                                Orientation="Horizontal"
+                                AutomationProperties.Name="Discord 감지 상태">
+                        <Ellipse Width="8" Height="8"
+                                 Margin="0,0,7,0"
+                                 Fill="{DynamicResource DiscordDetectionBrush}"
+                                 VerticalAlignment="Center" />
+                        <TextBlock Text="Discord 감지"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource MutedTextBrush}"
+                                   VerticalAlignment="Center" />
+                        <TextBlock x:Name="DiscordDetectionStatusText"
+                                   Margin="8,0,0,0"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource DiscordDetectionBrush}"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
                 </StackPanel>
 
                 <Border Grid.Row="0"

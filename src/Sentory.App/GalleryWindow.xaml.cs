@@ -33,6 +33,8 @@ public partial class GalleryWindow : Window
     private CancellationTokenSource? _feedbackCancellation;
     private bool _loaded;
     private bool _isDarkTheme;
+    private CaptureRuntimeState _discordDetectionState =
+        CaptureRuntimeState.Connecting;
 
     public event EventHandler? DiscordRepairRequested;
 
@@ -105,6 +107,17 @@ public partial class GalleryWindow : Window
         DiscordConnectionBanner.Visibility = needed
             ? Visibility.Visible
             : Visibility.Collapsed;
+    }
+
+    public void SetDiscordDetectionState(CaptureRuntimeState state)
+    {
+        _discordDetectionState = state;
+        DiscordDetectionStatusText.Text =
+            DiscordDetectionPresentation.GetLabel(state);
+        SentoryTheme.ApplyDetectionStatus(
+            Resources,
+            state,
+            _isDarkTheme);
     }
 
     private GalleryItemViewModel CreateViewModel(CapturedItemSummary item)
@@ -625,6 +638,10 @@ public partial class GalleryWindow : Window
     private void ApplyTheme(bool dark)
     {
         SentoryTheme.Apply(Resources, dark);
+        SentoryTheme.ApplyDetectionStatus(
+            Resources,
+            _discordDetectionState,
+            dark);
 
         ThemeIcon.Text = dark ? "\uE706" : "\uE708";
         var label = dark

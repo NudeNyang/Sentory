@@ -59,6 +59,11 @@ public interface IDiscordConfirmationClient
         CancellationToken cancellationToken = default);
 }
 
+public interface IDiscordWorkerLifecycle
+{
+    event EventHandler? RecoveryRequired;
+}
+
 internal enum DiscordCandidateDecision
 {
     Pending,

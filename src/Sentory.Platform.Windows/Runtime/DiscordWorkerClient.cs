@@ -6,6 +6,7 @@ namespace Sentory.Platform.Windows.Runtime;
 
 public sealed class DiscordWorkerClient :
     IDiscordConfirmationClient,
+    IDiscordWorkerLifecycle,
     IAsyncDisposable
 {
     public const string WorkerArgument = "--discord-accessibility-worker";
@@ -28,6 +29,8 @@ public sealed class DiscordWorkerClient :
     {
         _processPath = processPath;
     }
+
+    public event EventHandler? RecoveryRequired;
 
     public async Task<DiscordConfirmationResponse> ConfirmAsync(
         DiscordConfirmationRequest request,
@@ -209,6 +212,7 @@ public sealed class DiscordWorkerClient :
 
     private void HandleProcessExit(Process process)
     {
+        var notifyRecovery = false;
         lock (_processGate)
         {
             if (!ReferenceEquals(_process, process))
@@ -218,6 +222,7 @@ public sealed class DiscordWorkerClient :
 
             _process = null;
             DisposeProcess(process);
+            notifyRecovery = !_disposed;
             foreach (var pair in _pending.ToArray())
             {
                 if (_pending.TryRemove(pair.Key, out var completion))
@@ -227,6 +232,11 @@ public sealed class DiscordWorkerClient :
                             "worker-process-exited"));
                 }
             }
+        }
+
+        if (notifyRecovery)
+        {
+            RecoveryRequired?.Invoke(this, EventArgs.Empty);
         }
     }
 

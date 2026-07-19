@@ -22,6 +22,7 @@
         <SolidColorBrush x:Key="LineBrush" Color="#CEC7BC" />
         <SolidColorBrush x:Key="AccentBrush" Color="#756655" />
         <SolidColorBrush x:Key="DangerBrush" Color="#B85A52" />
+        <SolidColorBrush x:Key="DiscordDetectionBrush" Color="#8B765A" />
         <Style x:Key="TrayItemStyle" TargetType="Button">
             <Setter Property="Height" Value="42" />
             <Setter Property="Padding" Value="12,0" />
@@ -81,10 +82,6 @@
         </Border.Effect>
         <StackPanel>
             <Grid Margin="8,6,8,10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
                 <StackPanel>
                     <TextBlock Text="Sentory"
                                FontSize="16"
@@ -96,13 +93,34 @@
                                TextTrimming="CharacterEllipsis"
                                Foreground="{DynamicResource MutedTextBrush}" />
                 </StackPanel>
-                <Border Grid.Column="1"
-                        Width="8" Height="8"
-                        Margin="8,2,2,0"
-                        VerticalAlignment="Top"
-                        Background="{DynamicResource AccentBrush}"
-                        CornerRadius="4" />
             </Grid>
+
+            <Border Margin="4,0,4,5"
+                    Padding="10,8"
+                    Background="{DynamicResource StatusBackgroundBrush}"
+                    CornerRadius="9">
+                <Grid AutomationProperties.Name="Discord 감지 상태">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="18" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Ellipse Width="8" Height="8"
+                             HorizontalAlignment="Left"
+                             Fill="{DynamicResource DiscordDetectionBrush}" />
+                    <TextBlock Grid.Column="1"
+                               Text="Discord 감지"
+                               FontSize="11"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               VerticalAlignment="Center" />
+                    <TextBlock x:Name="DiscordDetectionStatusText"
+                               Grid.Column="2"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource DiscordDetectionBrush}"
+                               VerticalAlignment="Center" />
+                </Grid>
+            </Border>
 
             <Border Height="1" Margin="4,0,4,5"
                     Background="{DynamicResource LineBrush}" />

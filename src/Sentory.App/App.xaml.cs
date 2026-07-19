@@ -39,6 +39,8 @@ public partial class App : System.Windows.Application
     private bool _discordSupportEnabled = true;
     private bool _discordRepairNeeded;
     private bool _discordRepairBusy;
+    private CaptureRuntimeState _discordDetectionState =
+        CaptureRuntimeState.Connecting;
     private bool _shuttingDown;
 
     protected override async void OnStartup(StartupEventArgs e)
@@ -106,6 +108,10 @@ public partial class App : System.Windows.Application
                     acceptInjectedInput));
             _runtime.Captured += OnCaptured;
             _runtime.IssueDetected += OnCaptureIssueDetected;
+            if (_runtime is ICaptureRuntimeStatusSource statusSource)
+            {
+                statusSource.StatusChanged += OnCaptureStatusChanged;
+            }
 
             CreateTrayIcon();
             if (repairResult.FileDeleteFailures > 0 ||
@@ -169,6 +175,7 @@ public partial class App : System.Windows.Application
             _runtime?.IsPaused == true,
             GetStartupEnabled(),
             _discordSupportEnabled,
+            _discordDetectionState,
             isDarkTheme);
         _trayMenuWindow = menu;
         menu.Closed += (_, _) =>
@@ -450,6 +457,40 @@ public partial class App : System.Windows.Application
         });
     }
 
+    private void OnCaptureStatusChanged(
+        object? sender,
+        CaptureRuntimeStatus status)
+    {
+        if (status.SourceApp != SourceApp.Discord)
+        {
+            return;
+        }
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            _discordDetectionState = status.State;
+            _galleryWindow?.SetDiscordDetectionState(status.State);
+            if (_discordSupportEnabled)
+            {
+                if (status.State == CaptureRuntimeState.ReconnectRequired)
+                {
+                    SetDiscordRepairNeeded(true, persistPrepared: false);
+                }
+                else if (status.State == CaptureRuntimeState.Ready)
+                {
+                    SetDiscordRepairNeeded(false, persistPrepared: true);
+                }
+            }
+
+            if (_runtime?.IsPaused != true)
+            {
+                SetStatus(
+                    $"상태: {DiscordDetectionPresentation.GetLabel(status.State)}",
+                    $"Sentory - {DiscordDetectionPresentation.GetLabel(status.State)}");
+            }
+        });
+    }
+
     private async Task RepairDiscordConnectionAsync()
     {
         if (_discordRepairBusy || !_discordSupportEnabled)
@@ -473,6 +514,13 @@ public partial class App : System.Windows.Application
         {
             await _discordLauncher.RestartAsync();
             SetDiscordRepairNeeded(false, persistPrepared: true);
+            _discordDetectionState = CaptureRuntimeState.Connecting;
+            _galleryWindow?.SetDiscordDetectionState(
+                _discordDetectionState);
+            if (_runtime is ICaptureRuntimeRecoveryController controller)
+            {
+                controller.RequestRecovery(SourceApp.Discord);
+            }
             SetStatus(
                 _runtime?.IsPaused == true
                     ? "상태: 감지가 일시정지되었습니다."
@@ -566,6 +614,8 @@ public partial class App : System.Windows.Application
                 await RepairDiscordConnectionAsync();
             _galleryWindow.SetDiscordRepairNeeded(
                 _discordSupportEnabled && _discordRepairNeeded);
+            _galleryWindow.SetDiscordDetectionState(
+                _discordDetectionState);
             _galleryWindow.Closed += (_, _) => _galleryWindow = null;
             _galleryWindow.Show();
             return;
@@ -758,6 +808,10 @@ public partial class App : System.Windows.Application
         {
             _runtime.Captured -= OnCaptured;
             _runtime.IssueDetected -= OnCaptureIssueDetected;
+            if (_runtime is ICaptureRuntimeStatusSource statusSource)
+            {
+                statusSource.StatusChanged -= OnCaptureStatusChanged;
+            }
             await _runtime.DisposeAsync();
             _runtime = null;
         }

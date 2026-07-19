@@ -12,6 +12,29 @@ public sealed record CaptureRuntimeIssue(
     string UserMessage,
     DateTimeOffset OccurredAt);
 
+public enum CaptureRuntimeState
+{
+    Connecting,
+    Ready,
+    ReconnectRequired,
+    Recovering
+}
+
+public sealed record CaptureRuntimeStatus(
+    SourceApp SourceApp,
+    CaptureRuntimeState State,
+    DateTimeOffset ChangedAt);
+
+public interface ICaptureRuntimeStatusSource
+{
+    event EventHandler<CaptureRuntimeStatus>? StatusChanged;
+}
+
+public interface ICaptureRuntimeRecoveryController
+{
+    void RequestRecovery(SourceApp sourceApp);
+}
+
 public interface ICaptureRuntime : IAsyncDisposable
 {
     event EventHandler<CaptureNotification>? Captured;
