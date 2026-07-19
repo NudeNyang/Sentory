@@ -4,14 +4,16 @@
 
 > Keep the links and images you paste in one place
 
-Finding an old link or image should not mean scrolling through days of chat history.
-Sentory keeps the links and images handled in supported messengers in a quiet,
-searchable library, ready to open or copy again when you need them.
+Sentory is an app for collecting and managing links and images handled in supported
+messengers. Saved items can be searched, opened at their original location, or copied
+again when needed.
 
-Sentory is not a system-wide clipboard logger. It checks the chat input area of a
-supported messenger and saves content only when a defined set of conditions is met.
+The current public beta supports Discord and KakaoTalk. Sentory is not a system-wide
+clipboard logger: it checks the chat input area of a supported messenger and saves
+content only when a defined set of conditions is met. Support for more messengers is
+planned.
 
-## Captured only where it belongs
+## Currently supported messengers
 
 | Messenger | When Sentory saves | What Sentory ignores |
 | --- | --- | --- |
@@ -22,7 +24,7 @@ Copying or pasting in another application does not create an item. Sentory valid
 the messenger window and its input area first, so ordinary clipboard activity does
 not fill your library.
 
-## Keep it now, find it quickly later
+## Features
 
 - Browse links and images as visual cards
 - Search by title, URL, or domain
@@ -33,11 +35,12 @@ not fill your library.
 - See page titles, site icons, preview images, and short descriptions for links
 - Switch between light and dark themes
 - Use the interface in Korean, English, Japanese, or Chinese
-- Start with Windows and manage detection from the tray
+- Start with Windows and manage detection from the tray in the current Windows app
 
-## Local by design
+## Data storage
 
-Images, links, settings, and usage history stay in this local folder:
+The current Windows app stores images, links, settings, and usage history in this local
+folder:
 
 ```text
 %LOCALAPPDATA%\Sentory
@@ -50,8 +53,9 @@ for details.
 
 ## Download
 
-The current release candidate is **0.9.0-beta**. Download the package that matches
-your PC from [Releases](../../releases).
+The current release candidate is **0.9.0-beta** and is available for 64-bit Windows
+10 and 11. Download the package that matches your PC from [Releases](../../releases).
+macOS and Linux versions are planned, but packages are not available yet.
 
 | System | Installer | Portable |
 | --- | --- | --- |
@@ -77,11 +81,12 @@ and reconnection controls are available from the Sentory library and settings.
 
 ## Beta notes
 
-Sentory is currently a public beta. Detection may temporarily stop working if Discord
-or KakaoTalk changes its interface structure. The ARM64 package has been cross-built
-and its executable architecture has been verified, but final testing on a physical
-Windows on ARM device is still pending. This version does not include in-app updates;
-download a new package manually when a new Release is published.
+Sentory is currently a public beta for Windows. Detection may temporarily stop working
+if Discord or KakaoTalk changes its interface structure. Support for more messengers,
+macOS, and Linux is planned, but no release schedule has been set. The ARM64 package
+has been cross-built and its executable architecture has been verified, but final
+testing on a physical Windows on ARM device is still pending. This version does not
+include in-app updates; download a new package manually when a new Release is published.
 
 When reporting a problem, avoid attaching private chat content or original images.
 The Sentory version, Windows version, messenger name, and reproduction steps are
