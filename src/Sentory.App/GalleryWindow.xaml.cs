@@ -17,6 +17,8 @@ namespace Sentory.App;
 
 public partial class GalleryWindow : Window
 {
+    private const string SelectionCheckGlyph = "\uE73E";
+
     private readonly ICaptureRepository _repository;
     private readonly SentoryDataPaths _paths;
     private readonly SentorySettingsStore _settingsStore;
@@ -699,19 +701,45 @@ public partial class GalleryWindow : Window
     {
         foreach (var item in _visibleItems)
         {
-            if (GetCardTemplateElement<
-                    System.Windows.Controls.Border>(
-                    item,
-                    "CardSelectionOverlay") is not { } overlay)
+            if (GetCardPresenter(item) is not { } presenter)
             {
                 continue;
             }
 
             var selected = _selectionDragPreviewIds.Contains(
                 item.Item.ItemId);
-            overlay.Visibility = selected
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            if (FindCardTemplateElement<
+                    System.Windows.Controls.Border>(
+                    presenter,
+                    "CardSelectionOverlay") is { } overlay)
+            {
+                overlay.Visibility = selected
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+            }
+
+            if (FindCardTemplateElement<
+                    System.Windows.Controls.Button>(
+                    presenter,
+                    "SelectionButton") is { } selectionButton)
+            {
+                selectionButton.SetResourceReference(
+                    System.Windows.Controls.Control.BackgroundProperty,
+                    selected ? "AccentBrush" : "SurfaceBrush");
+            }
+
+            if (FindCardTemplateElement<
+                    System.Windows.Controls.TextBlock>(
+                    presenter,
+                    "SelectionIconText") is { } selectionIcon)
+            {
+                selectionIcon.Text = selected
+                    ? SelectionCheckGlyph
+                    : string.Empty;
+                selectionIcon.SetResourceReference(
+                    System.Windows.Controls.TextBlock.ForegroundProperty,
+                    selected ? "AccentTextBrush" : "AccentBrush");
+            }
         }
     }
 
@@ -719,32 +747,51 @@ public partial class GalleryWindow : Window
     {
         foreach (var item in _visibleItems)
         {
-            if (GetCardTemplateElement<
-                    System.Windows.Controls.Border>(
-                    item,
-                    "CardSelectionOverlay") is not { } overlay)
+            if (GetCardPresenter(item) is not { } presenter)
             {
                 continue;
             }
 
-            overlay.ClearValue(UIElement.VisibilityProperty);
+            if (FindCardTemplateElement<
+                    System.Windows.Controls.Border>(
+                    presenter,
+                    "CardSelectionOverlay") is { } overlay)
+            {
+                overlay.ClearValue(UIElement.VisibilityProperty);
+            }
+
+            if (FindCardTemplateElement<
+                    System.Windows.Controls.Button>(
+                    presenter,
+                    "SelectionButton") is { } selectionButton)
+            {
+                selectionButton.ClearValue(
+                    System.Windows.Controls.Control.BackgroundProperty);
+            }
+
+            if (FindCardTemplateElement<
+                    System.Windows.Controls.TextBlock>(
+                    presenter,
+                    "SelectionIconText") is { } selectionIcon)
+            {
+                selectionIcon.ClearValue(
+                    System.Windows.Controls.TextBlock.TextProperty);
+                selectionIcon.ClearValue(
+                    System.Windows.Controls.TextBlock.ForegroundProperty);
+            }
         }
     }
 
-    private T? GetCardTemplateElement<T>(
-        GalleryItemViewModel item,
+    private System.Windows.Controls.ContentPresenter? GetCardPresenter(
+        GalleryItemViewModel item) =>
+        GalleryItems.ItemContainerGenerator.ContainerFromItem(item)
+            as System.Windows.Controls.ContentPresenter;
+
+    private static T? FindCardTemplateElement<T>(
+        System.Windows.Controls.ContentPresenter presenter,
         string elementName)
         where T : FrameworkElement
-    {
-        if (GalleryItems.ItemContainerGenerator.ContainerFromItem(item)
-                is not System.Windows.Controls.ContentPresenter presenter)
-        {
-            return null;
-        }
-
-        return presenter.ContentTemplate?.FindName(elementName, presenter)
-            as T;
-    }
+        => presenter.ContentTemplate?.FindName(elementName, presenter) as T;
 
     private void CancelSelectionDrag()
     {
