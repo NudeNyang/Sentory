@@ -35,7 +35,7 @@ and KakaoTalk can be enabled or disabled separately in settings.
 - Mark favorites, select several cards, delete in bulk, and clean up old items automatically
 - Show page titles, site icons, preview images, and descriptions for saved links
 - Use light or dark mode with Korean, English, Japanese, and Chinese interfaces
-- Start with Windows and manage the app from its tray menu
+- Start with Windows by default on new installations and manage the setting from the tray menu
 - Check GitHub Releases and update from inside the app
 
 ## Data storage
@@ -54,7 +54,7 @@ recognized text is stored in the Sentory database for search. See the
 
 ## Download
 
-The current stable version is **1.1.0**. It runs on 64-bit Windows 10 and 11. Download
+The current stable version is **1.1.1**. It runs on 64-bit Windows 10 and 11. Download
 the package for your PC from
 [Releases](https://github.com/NudeNyang/Sentory/releases). macOS and Linux versions
 are planned, but there is no release schedule yet.
@@ -78,6 +78,9 @@ Release, and compare its SHA-256 value with the accompanying `.sha256` file if n
 2. Paste a link or image into an individual KakaoTalk chat. In Discord, send the pasted
    content before Sentory saves it.
 3. Open a card in the library to review, open, or copy its contents.
+
+New installations enable Start with Windows by default. You can turn it off from
+Sentory settings or the tray menu, and later updates preserve your choice.
 
 The first Discord connection may restart Discord to apply accessibility mode. The
 current connection state and separate messenger detection controls are available in
@@ -104,7 +107,7 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 1.1.0
+.\scripts\Publish-Release.ps1 -Version 1.1.1
 ```
 
 The release script creates Windows x64 and ARM64 installers, portable packages,

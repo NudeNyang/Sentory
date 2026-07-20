@@ -33,7 +33,7 @@ Sentory는 메신저에서 주고받은 링크와 사진을 따로 모아 두는
 - 즐겨찾기, 다중 선택, 일괄 삭제와 자동 정리
 - 페이지 제목, 사이트 아이콘, 대표 이미지와 설명을 포함한 링크 미리보기
 - 라이트·다크 테마와 한국어·영어·일본어·중국어 UI
-- Windows 시작 시 자동 실행과 트레이 메뉴
+- 새 설치에서 기본 활성화되는 Windows 시작 시 자동 실행과 트레이 메뉴
 - GitHub Releases를 이용한 인앱 자동 업데이트
 
 ## 데이터 저장
@@ -52,7 +52,7 @@ Sentory가 운영하는 서버로 보관 데이터를 보내지 않으며 분석
 
 ## 다운로드
 
-현재 정식 버전은 **1.1.0**입니다. Windows 10/11 64비트에서 사용할 수 있으며,
+현재 정식 버전은 **1.1.1**입니다. Windows 10/11 64비트에서 사용할 수 있으며,
 [Releases](https://github.com/NudeNyang/Sentory/releases)에서 PC에 맞는 파일을
 내려받으면 됩니다. macOS와 Linux 버전도 계획하고 있지만 아직 배포 일정은
 정해지지 않았습니다.
@@ -77,6 +77,10 @@ SmartScreen 경고가 나타날 수 있습니다. 이 저장소의 공식 Releas
 2. 카카오톡 개별 채팅창에 링크나 사진을 붙여넣습니다. Discord에서는 붙여넣은
    내용을 전송해야 저장됩니다.
 3. 보관함에서 카드를 열어 내용을 확인하거나 다시 복사합니다.
+
+새로 설치한 Sentory는 Windows 자동 실행이 기본으로 켜집니다. 원하지 않으면
+설정 화면이나 트레이 메뉴에서 끌 수 있으며, 이후 업데이트에서도 선택한 상태가
+유지됩니다.
 
 Discord를 처음 연결할 때 접근성 모드 적용을 위해 Discord가 다시 시작될 수
 있습니다. 연결 상태와 메신저별 감지 설정은 Sentory 설정 화면에서 확인할 수
@@ -103,7 +107,7 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 1.1.0
+.\scripts\Publish-Release.ps1 -Version 1.1.1
 ```
 
 배포 스크립트는 Windows x64·ARM64 설치형과 포터블 패키지, SHA-256 확인값,
