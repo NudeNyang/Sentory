@@ -186,12 +186,13 @@ public partial class GalleryWindow : Window
 
     private void UpdateDiscordDetectionVisibility()
     {
-        DiscordDetectionPanel.Visibility =
-            _settings.DiscordSupportEnabled &&
-            (_discordRepairNeeded ||
-             _discordDetectionState != CaptureRuntimeState.Ready)
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+        var presentation = DiscordDetectionUiPolicy.Resolve(
+            _settings.DiscordSupportEnabled,
+            _discordDetectionState,
+            _discordRepairNeeded);
+        DiscordDetectionPanel.Visibility = presentation.ShowPassiveStatus
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     public void SetRuntimeIssue(string? message)

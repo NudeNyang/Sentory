@@ -442,6 +442,7 @@ public partial class App : System.Windows.Application
             GetStartupEnabled(),
             _discordSupportEnabled,
             _discordDetectionState,
+            _discordRepairNeeded,
             isDarkTheme);
         _trayMenuWindow = menu;
         menu.Closed += (_, _) =>

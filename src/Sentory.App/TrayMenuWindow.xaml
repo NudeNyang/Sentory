@@ -95,7 +95,8 @@
                 </StackPanel>
             </Grid>
 
-            <Border Margin="4,0,4,5"
+            <Border x:Name="DiscordDetectionPanel"
+                    Margin="4,0,4,5"
                     Padding="10,8"
                     Background="{DynamicResource StatusBackgroundBrush}"
                     CornerRadius="9">

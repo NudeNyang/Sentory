@@ -460,15 +460,23 @@ public partial class DataManagementWindow : Window
 
     private void UpdateDiscordControls(bool enabled)
     {
+        var presentation = DiscordDetectionUiPolicy.Resolve(
+            enabled,
+            _discordState,
+            _discordRepairNeeded);
         DiscordSupportToggleButton.Content = enabled
             ? SentoryLocalization.Text("InUse")
             : SentoryLocalization.Text("NotInUse");
-        DiscordRepairButton.IsEnabled = enabled;
+        DiscordRepairButton.Visibility = presentation.ShowRepairAction
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         DiscordStatusText.Text = !enabled
             ? SentoryLocalization.Text("DiscordNotInUse")
-            : _discordRepairNeeded
+            : presentation.ShowRepairAction
                 ? SentoryLocalization.Text("StateReconnect")
-                : DiscordDetectionPresentation.GetLabel(_discordState);
+                : presentation.ShowPassiveStatus
+                    ? DiscordDetectionPresentation.GetLabel(_discordState)
+                    : SentoryLocalization.Text("DiscordDetectionOn");
     }
 
     private void UpdateKakaoControls(bool enabled)

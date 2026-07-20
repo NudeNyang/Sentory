@@ -11,6 +11,7 @@ public partial class TrayMenuWindow : Window
         bool startupEnabled,
         bool discordSupportEnabled,
         CaptureRuntimeState discordDetectionState,
+        bool discordRepairNeeded,
         bool isDarkTheme)
     {
         InitializeComponent();
@@ -20,8 +21,16 @@ public partial class TrayMenuWindow : Window
             discordDetectionState,
             isDarkTheme);
         StatusText.Text = status;
-        DiscordDetectionStatusText.Text =
-            DiscordDetectionPresentation.GetLabel(discordDetectionState);
+        var discordPresentation = DiscordDetectionUiPolicy.Resolve(
+            discordSupportEnabled,
+            discordDetectionState,
+            discordRepairNeeded);
+        DiscordDetectionStatusText.Text = discordPresentation.ShowRepairAction
+            ? SentoryLocalization.Text("StateReconnect")
+            : DiscordDetectionPresentation.GetLabel(discordDetectionState);
+        DiscordDetectionPanel.Visibility = discordPresentation.ShowTrayStatus
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         PauseText.Text = SentoryLocalization.Text(
             paused ? "ResumeDetection" : "PauseDetection");
         PauseIcon.Text = paused ? "\uE768" : "\uE769";
@@ -32,7 +41,10 @@ public partial class TrayMenuWindow : Window
         DiscordSupportCheck.Text = discordSupportEnabled
             ? "\uE73E"
             : string.Empty;
-        DiscordRepairButton.IsEnabled = discordSupportEnabled;
+        DiscordRepairButton.Visibility =
+            discordPresentation.ShowRepairAction
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         Deactivated += (_, _) => Close();
     }
 

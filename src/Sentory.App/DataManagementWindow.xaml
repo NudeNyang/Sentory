@@ -297,7 +297,7 @@
                             <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
                                 <Button x:Name="DiscordRepairButton"
                                         Margin="0,0,7,0"
-                                        Content="{DynamicResource Loc.Reconnect}"
+                                        Content="{DynamicResource Loc.DiscordReconnect}"
                                         Style="{StaticResource SecondaryButtonStyle}"
                                         Click="DiscordRepairButton_Click" />
                                 <Button x:Name="DiscordSupportToggleButton"
