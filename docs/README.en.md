@@ -28,7 +28,9 @@ and KakaoTalk can be enabled or disabled separately in settings.
 - Keep links and images as visual cards
 - Store several links or images from one message as a single collection and copy the set again
 - Browse each item in a collection, copy it separately, or open the original
-- Search by title, URL, or domain and filter by messenger, content type, or date
+- Search by title, URL, domain, or text recognized inside an image, and filter by
+  messenger, content type, or date
+- Generate useful local image titles with multilingual PP-OCRv5 mobile models
 - Sort by newest, oldest, save count, or copy count
 - Mark favorites, select several cards, delete in bulk, and clean up old items automatically
 - Show page titles, site icons, preview images, and descriptions for saved links
@@ -46,12 +48,13 @@ Sentory stores links, images, settings, and usage history in this local folder:
 
 Your library is not uploaded to a Sentory-operated server, and the app contains no
 analytics or advertising trackers. Fetching a link preview may send a normal network
-request to the website behind that link. See the
+request to the website behind that link. Image OCR runs locally on Windows, and the
+recognized text is stored in the Sentory database for search. See the
 [privacy and local data notice](./privacy.md) for details.
 
 ## Download
 
-The current stable version is **1.0.1**. It runs on 64-bit Windows 10 and 11. Download
+The current stable version is **1.1.0**. It runs on 64-bit Windows 10 and 11. Download
 the package for your PC from
 [Releases](https://github.com/NudeNyang/Sentory/releases). macOS and Linux versions
 are planned, but there is no release schedule yet.
@@ -101,7 +104,7 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 1.0.1
+.\scripts\Publish-Release.ps1 -Version 1.1.0
 ```
 
 The release script creates Windows x64 and ARM64 installers, portable packages,
