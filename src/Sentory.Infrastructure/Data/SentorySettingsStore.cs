@@ -6,7 +6,7 @@ namespace Sentory.Infrastructure.Data;
 
 public sealed class SentorySettings
 {
-    private static readonly int[] SupportedCleanupDays = [0, 30, 90, 180];
+    private static readonly int[] SupportedCleanupDays = [0, 7, 30, 90, 180];
     private static readonly string[] SupportedLanguages =
         ["ko-KR", "en-US", "ja-JP", "zh-CN"];
 

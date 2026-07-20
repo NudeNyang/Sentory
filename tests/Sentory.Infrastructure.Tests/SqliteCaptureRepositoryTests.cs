@@ -843,6 +843,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
 
     [Theory]
     [InlineData(0, 0)]
+    [InlineData(7, 7)]
     [InlineData(30, 30)]
     [InlineData(90, 90)]
     [InlineData(180, 180)]

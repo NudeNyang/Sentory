@@ -444,7 +444,12 @@
                             <Run Text="NudeNyang"
                                  FontWeight="SemiBold"
                                  Foreground="{DynamicResource AccentBrush}" />
-                            <Run Text=" · GitHub" Foreground="{DynamicResource MutedTextBrush}" />
+                            <Run Text=" · " Foreground="{DynamicResource LineBrush}" />
+                            <Hyperlink NavigateUri="https://github.com/NudeNyang/Sentory"
+                                       RequestNavigate="GitHubLink_RequestNavigate"
+                                       Foreground="{DynamicResource AccentBrush}"
+                                       TextDecorations="{x:Null}"
+                                       Cursor="Hand">GitHub</Hyperlink>
                         </TextBlock>
                         <Border Grid.Row="1"
                                 Height="1"

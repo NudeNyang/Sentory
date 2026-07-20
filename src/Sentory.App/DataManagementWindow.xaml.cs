@@ -3,6 +3,7 @@ using System.IO;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Navigation;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
 
@@ -276,6 +277,27 @@ public partial class DataManagementWindow : Window
         window.ShowDialog();
     }
 
+    private void GitHubLink_RequestNavigate(
+        object sender,
+        RequestNavigateEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = e.Uri.AbsoluteUri,
+                UseShellExecute = true
+            });
+            e.Handled = true;
+        }
+        catch (Exception exception)
+            when (exception is InvalidOperationException or
+                  System.ComponentModel.Win32Exception)
+        {
+            StatusText.Text = SentoryLocalization.Text("OpenGitHubFailed");
+        }
+    }
+
     private async void DeleteNonFavoritesButton_Click(
         object sender,
         RoutedEventArgs e) =>
@@ -466,6 +488,7 @@ public partial class DataManagementWindow : Window
             var cleanupOptions = new[]
             {
                 new CleanupOption(0, SentoryLocalization.Text("CleanupOff")),
+                new CleanupOption(7, SentoryLocalization.Text("Cleanup7")),
                 new CleanupOption(30, SentoryLocalization.Text("Cleanup30")),
                 new CleanupOption(90, SentoryLocalization.Text("Cleanup90")),
                 new CleanupOption(180, SentoryLocalization.Text("Cleanup180"))
