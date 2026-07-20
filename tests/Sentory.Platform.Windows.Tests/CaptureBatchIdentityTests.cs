@@ -1,4 +1,5 @@
 using Sentory.Core;
+using Sentory.Platform.Windows.Interop;
 using Sentory.Platform.Windows.Runtime;
 
 namespace Sentory.Platform.Windows.Tests;
@@ -62,4 +63,31 @@ public sealed class CaptureBatchIdentityTests
             [first.Value, second.Value],
             batch.SnapshotUrls().Select(url => url.Value));
     }
+
+    [Fact]
+    public void CombinesSeparatelyPastedImagesConfirmedByOneDiscordSend()
+    {
+        var leaderEventId = Guid.Parse(
+            "2670be52-a1c6-49ba-9076-03ff706b3a66");
+        var sentAt = DateTimeOffset.Parse("2026-07-20T12:00:00Z");
+        var first = CreateImage("HASH-A");
+        var second = CreateImage("HASH-B");
+        var repeatedFirst = CreateImage("hash-a");
+
+        var batch = new DiscordImageSendBatch(
+            leaderEventId,
+            "discord-context",
+            sentAt,
+            [],
+            [first]);
+        batch.Add([], [second, repeatedFirst]);
+
+        Assert.True(batch.IsLeader(leaderEventId));
+        Assert.Equal(
+            [first.Sha256, second.Sha256],
+            batch.SnapshotImages().Select(image => image.Sha256));
+    }
+
+    private static ClipboardImageSnapshot CreateImage(string hash) =>
+        new([1, 2, 3], hash, 1, 1, "image/png", ".png");
 }
