@@ -62,7 +62,20 @@ internal static class OwnedPopupDismissBehavior
         }
 
         window.Loaded += (_, _) => AttachOwnerHandler();
-        window.Closing += (_, _) => closeRequested = true;
+        window.Closing += (_, _) =>
+        {
+            closeRequested = true;
+            if (owner is
+                {
+                    IsLoaded: true,
+                    IsVisible: true,
+                    IsActive: false,
+                    WindowState: not WindowState.Minimized
+                })
+            {
+                owner.Activate();
+            }
+        };
         window.Closed += (_, _) => DetachOwnerHandler();
         if (window.IsLoaded)
         {

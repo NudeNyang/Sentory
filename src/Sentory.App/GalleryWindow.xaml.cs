@@ -2466,14 +2466,21 @@ public partial class GalleryWindow : Window
             return;
         }
 
-        ShowInTaskbar = true;
+        if (!ShowInTaskbar)
+        {
+            ShowInTaskbar = true;
+        }
+
         if (WindowState == WindowState.Minimized)
         {
             WindowState = WindowState.Normal;
         }
 
-        Show();
-        Activate();
+        if (!IsVisible)
+        {
+            Show();
+            Activate();
+        }
     }
 
     private enum GalleryFilter
