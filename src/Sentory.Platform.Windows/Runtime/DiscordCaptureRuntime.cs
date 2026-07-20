@@ -212,16 +212,24 @@ public sealed class DiscordCaptureRuntime :
         lock (_candidateGate)
         {
             _recentSendSignals[context.ContextHash] = context.OccurredAt;
-            foreach (var candidate in _candidates.Where(candidate =>
-                         string.Equals(
-                             candidate.Context.ContextHash,
-                             context.ContextHash,
-                             StringComparison.Ordinal) &&
-                         candidate.Context.OccurredAt <= context.OccurredAt))
+            var candidates = _candidates.Where(candidate =>
+                    string.Equals(
+                        candidate.Context.ContextHash,
+                        context.ContextHash,
+                        StringComparison.Ordinal) &&
+                    candidate.Context.OccurredAt <= context.OccurredAt)
+                .ToList();
+            var pendingCandidates = candidates
+                .Where(candidate => !candidate.SendObserved.Task.IsCompleted)
+                .ToList();
+            AssignUrlSendBatch(pendingCandidates, context.OccurredAt);
+            foreach (var candidate in pendingCandidates)
             {
                 candidate.SendObserved.TrySetResult(context.OccurredAt);
-                hasClipboardImageCandidate |= candidate.HasImages;
             }
+
+            hasClipboardImageCandidate = candidates.Any(candidate =>
+                candidate.HasImages);
         }
 
         DiscordCaptureTrace.Write("discord-send-key-observed");
@@ -475,9 +483,19 @@ public sealed class DiscordCaptureRuntime :
             _ = await registration.SendObserved.Task.WaitAsync(
                 sendTimeout,
                 registration.Cancellation.Token);
+            var urlSendBatch = registration.UrlSendBatch;
+            if (urlSendBatch is not null &&
+                !urlSendBatch.IsLeader(registration.EventId))
+            {
+                return;
+            }
+
             await Task.Delay(350, registration.Cancellation.Token);
+            var confirmedUrls = urlSendBatch?.SnapshotUrls() ??
+                                registration.Urls;
             var response = await ConfirmAsync(
                 registration,
+                confirmedUrls,
                 explicitSendObserved: true,
                 registration.Cancellation.Token);
 
@@ -526,6 +544,7 @@ public sealed class DiscordCaptureRuntime :
             signals.AddRange(response.ConfirmationSignals);
             await CaptureConfirmedBatchAsync(
                 registration,
+                confirmedUrls,
                 response,
                 signals);
         }
@@ -735,6 +754,7 @@ public sealed class DiscordCaptureRuntime :
 
     private Task<DiscordConfirmationResponse> ConfirmAsync(
         CandidateRegistration registration,
+        IReadOnlyList<NormalizedUrl> urls,
         bool explicitSendObserved,
         CancellationToken cancellationToken)
     {
@@ -747,7 +767,7 @@ public sealed class DiscordCaptureRuntime :
                 !registration.HasImages
                     ? DiscordConfirmationContentKind.Url
                     : DiscordConfirmationContentKind.Image,
-                registration.Urls.Select(url => url.Value).ToList(),
+                urls.Select(url => url.Value).ToList(),
                 registration.HasImages ? 120_000 : 300_000,
                 explicitSendObserved),
             cancellationToken);
@@ -765,6 +785,33 @@ public sealed class DiscordCaptureRuntime :
                 now,
                 registration.HasImages))
         {
+            if (!registration.HasImages && registration.Urls.Count > 0)
+            {
+                var batch = _candidates
+                    .Select(candidate => candidate.UrlSendBatch)
+                    .FirstOrDefault(candidateBatch =>
+                        candidateBatch is not null &&
+                        string.Equals(
+                            candidateBatch.ContextHash,
+                            registration.Context.ContextHash,
+                            StringComparison.Ordinal) &&
+                        candidateBatch.SentAt == sentAt);
+                if (batch is null)
+                {
+                    batch = new DiscordUrlSendBatch(
+                        registration.EventId,
+                        registration.Context.ContextHash,
+                        sentAt,
+                        registration.Urls);
+                }
+                else
+                {
+                    batch.Add(registration.Urls);
+                }
+
+                registration.UrlSendBatch = batch;
+            }
+
             registration.SendObserved.TrySetResult(sentAt);
         }
 
@@ -780,6 +827,7 @@ public sealed class DiscordCaptureRuntime :
 
     private async Task CaptureConfirmedBatchAsync(
         CandidateRegistration registration,
+        IReadOnlyList<NormalizedUrl> urls,
         DiscordConfirmationResponse response,
         IReadOnlyList<string> signals)
     {
@@ -787,7 +835,7 @@ public sealed class DiscordCaptureRuntime :
         var capturedAt = response.ConfirmedAt ?? DateTimeOffset.UtcNow;
         var result = await _coordinator.CaptureBatchAsync(
             registration.EventId,
-            string.Join('\n', registration.Urls.Select(url => url.Original)),
+            string.Join('\n', urls.Select(url => url.Original)),
             registration.Images.Select(image => new ImageCapturePayload(
                 image.ContentBytes,
                 image.Sha256,
@@ -806,7 +854,7 @@ public sealed class DiscordCaptureRuntime :
             registration.Cancellation.Token);
         if (result?.EventApplied == true)
         {
-            var memberCount = registration.Urls.Count + registration.Images.Count;
+            var memberCount = urls.Count + registration.Images.Count;
             Captured?.Invoke(
                 this,
                 new CaptureNotification(
@@ -822,7 +870,40 @@ public sealed class DiscordCaptureRuntime :
         }
         DiscordCaptureTrace.Write(
             "batch-capture-result",
-            $"eventApplied={result?.EventApplied == true} urls={registration.Urls.Count} images={registration.Images.Count}");
+            $"eventApplied={result?.EventApplied == true} urls={urls.Count} images={registration.Images.Count}");
+    }
+
+    private static void AssignUrlSendBatch(
+        IReadOnlyList<CandidateRegistration> candidates,
+        DateTimeOffset sentAt)
+    {
+        var urlCandidates = candidates
+            .Where(candidate =>
+                !candidate.HasImages &&
+                candidate.Urls.Count > 0 &&
+                candidate.UrlSendBatch is null)
+            .ToList();
+        if (urlCandidates.Count == 0)
+        {
+            return;
+        }
+
+        var leader = urlCandidates[0];
+        var batch = new DiscordUrlSendBatch(
+            leader.EventId,
+            leader.Context.ContextHash,
+            sentAt,
+            leader.Urls);
+        leader.UrlSendBatch = batch;
+        foreach (var candidate in urlCandidates.Skip(1))
+        {
+            batch.Add(candidate.Urls);
+            candidate.UrlSendBatch = batch;
+        }
+
+        DiscordCaptureTrace.Write(
+            "url-send-batch-assigned",
+            $"candidates={urlCandidates.Count} urls={batch.SnapshotUrls().Count}");
     }
 
     private void CancelActiveCandidates()
@@ -962,6 +1043,8 @@ public sealed class DiscordCaptureRuntime :
         public IReadOnlyList<ClipboardImageSnapshot> Images { get; } = images;
 
         public bool HasImages => Images.Count > 0;
+
+        public DiscordUrlSendBatch? UrlSendBatch { get; set; }
 
         public CancellationTokenSource Cancellation { get; } = cancellation;
 
