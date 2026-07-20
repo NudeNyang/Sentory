@@ -133,6 +133,7 @@ public partial class ItemDetailWindow : Window
 
         SourceInitialized += (_, _) =>
             SentoryTheme.ApplyTitleBar(this, _isDarkTheme);
+        SelectableTextBlock.EnableExtendedHitTesting(this);
         OwnedPopupDismissBehavior.Enable(this);
         Closed += (_, _) => _scrollIndicator.Dispose();
     }

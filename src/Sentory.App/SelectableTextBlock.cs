@@ -18,14 +18,20 @@ using WpfSize = System.Windows.Size;
 using WpfTextAlignment = System.Windows.TextAlignment;
 using WpfTextTrimming = System.Windows.TextTrimming;
 using WpfTextWrapping = System.Windows.TextWrapping;
+using WpfWindow = System.Windows.Window;
 
 namespace Sentory.App;
 
 public sealed class SelectableTextBlock : WpfControl
 {
+    private const double ExtendedHorizontalHitArea = 22;
+    private const double ExtendedVerticalHitArea = 8;
+
     private static readonly System.Windows.Media.Brush SelectionBrush =
         new SolidColorBrush(
             System.Windows.Media.Color.FromRgb(151, 205, 239));
+
+    private static WeakReference<SelectableTextBlock>? _activeSelection;
 
     public static readonly WpfDependencyProperty TextProperty =
         WpfDependencyProperty.Register(
@@ -112,6 +118,44 @@ public sealed class SelectableTextBlock : WpfControl
         ? string.Empty
         : Text.Substring(_selectionStart, _selectionLength);
 
+    public static void EnableExtendedHitTesting(WpfWindow window)
+    {
+        MouseButtonEventHandler previewMouseDown = (_, e) =>
+        {
+            if (e.ChangedButton != MouseButton.Left ||
+                e.OriginalSource is not WpfDependencyObject source ||
+                FindAncestor<SelectableTextBlock>(source) is not null ||
+                IsInteractiveSource(source))
+            {
+                return;
+            }
+
+            var target = FindExtendedHitTarget(window, e);
+            if (target is null)
+            {
+                return;
+            }
+
+            target.BeginSelection(e.GetPosition(target), e.ClickCount);
+            e.Handled = true;
+        };
+
+        window.AddHandler(
+            Mouse.PreviewMouseDownEvent,
+            previewMouseDown,
+            handledEventsToo: true);
+        window.Closed += RemoveHandler;
+        return;
+
+        void RemoveHandler(object? sender, EventArgs e)
+        {
+            window.RemoveHandler(
+                Mouse.PreviewMouseDownEvent,
+                previewMouseDown);
+            window.Closed -= RemoveHandler;
+        }
+    }
+
     protected override WpfSize MeasureOverride(WpfSize constraint)
     {
         var availableWidth = double.IsInfinity(constraint.Width)
@@ -154,19 +198,14 @@ public sealed class SelectableTextBlock : WpfControl
             return;
         }
 
-        Focus();
-        var insertionIndex = GetTextInsertionIndex(e.GetPosition(this));
-        if (e.ClickCount > 1)
+        var pointer = e.GetPosition(this);
+        if (!IsWithinExtendedTextHitArea(pointer))
         {
-            SelectWordAt(insertionIndex);
-            e.Handled = true;
+            base.OnPreviewMouseDown(e);
             return;
         }
 
-        _selectionAnchor = insertionIndex;
-        _isSelecting = true;
-        SetSelection(_selectionAnchor, 0);
-        Mouse.Capture(this, CaptureMode.Element);
+        BeginSelection(pointer, e.ClickCount);
         e.Handled = true;
     }
 
@@ -224,6 +263,7 @@ public sealed class SelectableTextBlock : WpfControl
         if (e.Key == Key.A &&
             Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
         {
+            TakeSelectionOwnership();
             SetSelection(0, Text.Length);
             e.Handled = true;
             return;
@@ -279,6 +319,40 @@ public sealed class SelectableTextBlock : WpfControl
         SetSelection(
             selectionStart,
             Math.Abs(insertionIndex - _selectionAnchor));
+    }
+
+    private void BeginSelection(WpfPoint pointer, int clickCount)
+    {
+        TakeSelectionOwnership();
+        Focus();
+        var insertionIndex = GetTextInsertionIndex(pointer);
+        if (clickCount > 1)
+        {
+            SelectWordAt(insertionIndex);
+            return;
+        }
+
+        _selectionAnchor = insertionIndex;
+        _isSelecting = true;
+        SetSelection(_selectionAnchor, 0);
+        Mouse.Capture(this, CaptureMode.Element);
+    }
+
+    private void TakeSelectionOwnership()
+    {
+        if (_activeSelection?.TryGetTarget(out var previous) == true &&
+            !ReferenceEquals(previous, this))
+        {
+            previous.ClearSelection();
+        }
+
+        _activeSelection = new WeakReference<SelectableTextBlock>(this);
+    }
+
+    private void ClearSelection()
+    {
+        _isSelecting = false;
+        SetSelection(0, 0);
     }
 
     private int GetTextInsertionIndex(WpfPoint pointer)
@@ -453,6 +527,145 @@ public sealed class SelectableTextBlock : WpfControl
     {
         var control = (SelectableTextBlock)dependencyObject;
         control.SetSelection(0, 0);
+    }
+
+    private static SelectableTextBlock? FindExtendedHitTarget(
+        WpfWindow window,
+        MouseButtonEventArgs e)
+    {
+        SelectableTextBlock? closest = null;
+        var closestDistance = double.PositiveInfinity;
+        foreach (var candidate in FindSelectableDescendants(window))
+        {
+            if (!candidate.IsVisible ||
+                !candidate.IsEnabled ||
+                candidate.ActualWidth <= 0 ||
+                candidate.ActualHeight <= 0 ||
+                string.IsNullOrEmpty(candidate.Text))
+            {
+                continue;
+            }
+
+            var point = e.GetPosition(candidate);
+            var textBounds = candidate.GetRenderedTextBounds();
+            if (point.X < textBounds.Left - ExtendedHorizontalHitArea ||
+                point.X > textBounds.Right + ExtendedHorizontalHitArea ||
+                point.Y < textBounds.Top - ExtendedVerticalHitArea ||
+                point.Y > textBounds.Bottom + ExtendedVerticalHitArea)
+            {
+                continue;
+            }
+
+            var horizontalDistance = point.X < textBounds.Left
+                ? textBounds.Left - point.X
+                : point.X > textBounds.Right
+                    ? point.X - textBounds.Right
+                    : 0;
+            var verticalDistance = point.Y < textBounds.Top
+                ? textBounds.Top - point.Y
+                : point.Y > textBounds.Bottom
+                    ? point.Y - textBounds.Bottom
+                    : 0;
+            var distance =
+                horizontalDistance * horizontalDistance +
+                verticalDistance * verticalDistance;
+            if (distance >= closestDistance)
+            {
+                continue;
+            }
+
+            closest = candidate;
+            closestDistance = distance;
+        }
+
+        return closest;
+    }
+
+    private bool IsWithinExtendedTextHitArea(WpfPoint point)
+    {
+        var textBounds = GetRenderedTextBounds();
+        return point.X >= textBounds.Left - ExtendedHorizontalHitArea &&
+            point.X <= textBounds.Right + ExtendedHorizontalHitArea &&
+            point.Y >= textBounds.Top - ExtendedVerticalHitArea &&
+            point.Y <= textBounds.Bottom + ExtendedVerticalHitArea;
+    }
+
+    private WpfRect GetRenderedTextBounds()
+    {
+        var contentWidth = Math.Max(
+            1,
+            ActualWidth - Padding.Left - Padding.Right);
+        var boxes = GetCharacterBoxes(CreateFormattedText(contentWidth))
+            .Select(box => box.Bounds)
+            .ToArray();
+        if (boxes.Length == 0)
+        {
+            return new WpfRect(
+                Padding.Left,
+                Padding.Top,
+                0,
+                ResolveLineHeight());
+        }
+
+        var left = boxes.Min(bounds => bounds.Left);
+        var top = boxes.Min(bounds => bounds.Top);
+        var right = boxes.Max(bounds => bounds.Right);
+        var bottom = boxes.Max(bounds => bounds.Bottom);
+        return new WpfRect(
+            left,
+            top,
+            Math.Max(0, right - left),
+            Math.Max(0, bottom - top));
+    }
+
+    private static IEnumerable<SelectableTextBlock> FindSelectableDescendants(
+        WpfDependencyObject parent)
+    {
+        for (var index = 0;
+             index < VisualTreeHelper.GetChildrenCount(parent);
+             index++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, index);
+            if (child is SelectableTextBlock selectable)
+            {
+                yield return selectable;
+            }
+
+            foreach (var descendant in FindSelectableDescendants(child))
+            {
+                yield return descendant;
+            }
+        }
+    }
+
+    private static bool IsInteractiveSource(WpfDependencyObject source) =>
+        FindAncestor<System.Windows.Controls.Primitives.ButtonBase>(source)
+            is not null ||
+        FindAncestor<System.Windows.Controls.Primitives.ScrollBar>(source)
+            is not null;
+
+    private static T? FindAncestor<T>(WpfDependencyObject? source)
+        where T : WpfDependencyObject
+    {
+        while (source is not null)
+        {
+            if (source is T match)
+            {
+                return match;
+            }
+
+            source = source switch
+            {
+                System.Windows.Media.Visual or
+                System.Windows.Media.Media3D.Visual3D =>
+                    VisualTreeHelper.GetParent(source),
+                System.Windows.ContentElement content =>
+                    System.Windows.ContentOperations.GetParent(content),
+                _ => null
+            };
+        }
+
+        return null;
     }
 
     private sealed record CharacterBox(int Index, WpfRect Bounds);
