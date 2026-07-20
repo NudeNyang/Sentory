@@ -71,6 +71,7 @@ public sealed class ClipboardImageCodecTests
             Assert.Equal(original, snapshot.ContentBytes);
             Assert.Equal("image/jpeg", snapshot.MimeType);
             Assert.Equal(".jpg", snapshot.FileExtension);
+            Assert.Equal(Path.GetFileName(path), snapshot.OriginalFileName);
             Assert.Equal(width, snapshot.PixelWidth);
             Assert.Equal(height, snapshot.PixelHeight);
         }

@@ -230,6 +230,45 @@ public sealed class GalleryQueryTests
     }
 
     [Fact]
+    public void SearchesImageOcrTitleAndRecognizedText()
+    {
+        var titleMatch = Create(
+            string.Empty,
+            Now,
+            kind: ContentKind.Image) with
+        {
+            OcrDisplayName = "7월 프로젝트 일정"
+        };
+        var textMatch = Create(
+            string.Empty,
+            Now.AddMinutes(-1),
+            kind: ContentKind.Image) with
+        {
+            OcrText = "회의 장소는 센토리 작업실입니다"
+        };
+
+        var titleResults = GalleryQuery.Apply(
+            [textMatch, titleMatch],
+            new GalleryQueryOptions(
+                ContentKind.Image,
+                "프로젝트",
+                GalleryDateRange.All,
+                GallerySortMode.Newest),
+            Now);
+        var textResults = GalleryQuery.Apply(
+            [textMatch, titleMatch],
+            new GalleryQueryOptions(
+                ContentKind.Image,
+                "센토리 작업실",
+                GalleryDateRange.All,
+                GallerySortMode.Newest),
+            Now);
+
+        Assert.Equal(titleMatch.ItemId, Assert.Single(titleResults).ItemId);
+        Assert.Equal(textMatch.ItemId, Assert.Single(textResults).ItemId);
+    }
+
+    [Fact]
     public void CollectionMatchesMemberKindAndSearchText()
     {
         var collection = Create(
@@ -260,7 +299,9 @@ public sealed class GalleryQueryTests
                     "HASH",
                     "image/png",
                     32,
-                    32)
+                    32,
+                    OcrDisplayName: "영수증",
+                    OcrText: "합계 12000원")
             ]
         };
 
@@ -283,6 +324,16 @@ public sealed class GalleryQueryTests
 
         Assert.Equal(collection.ItemId, Assert.Single(linkResults).ItemId);
         Assert.Equal(collection.ItemId, Assert.Single(imageResults).ItemId);
+
+        var ocrResults = GalleryQuery.Apply(
+            [collection],
+            new GalleryQueryOptions(
+                ContentKind.Image,
+                "12000원",
+                GalleryDateRange.All,
+                GallerySortMode.Newest),
+            Now);
+        Assert.Equal(collection.ItemId, Assert.Single(ocrResults).ItemId);
     }
 
     private static IReadOnlyList<CapturedItemSummary> Apply(

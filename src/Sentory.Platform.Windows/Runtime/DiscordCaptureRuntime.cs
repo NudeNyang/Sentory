@@ -882,7 +882,8 @@ public sealed class DiscordCaptureRuntime :
                 image.PixelWidth,
                 image.PixelHeight,
                 image.MimeType,
-                image.FileExtension)).ToList(),
+                image.FileExtension,
+                image.OriginalFileName)).ToList(),
             SourceApp.Discord,
             registration.HasImages
                 ? CaptureMethod.DiscordConfirmedImage

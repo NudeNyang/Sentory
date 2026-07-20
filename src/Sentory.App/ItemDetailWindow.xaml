@@ -68,9 +68,39 @@
             <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
         </Style>
+        <Style x:Key="SelectableDetailTextStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="6,5" />
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="IsReadOnlyCaretVisible" Value="True" />
+            <Setter Property="IsTabStop" Value="False" />
+            <Setter Property="AcceptsReturn" Value="False" />
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="VerticalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="ScrollViewer.PanningMode" Value="None" />
+            <Setter Property="Cursor" Value="IBeam" />
+            <Setter Property="SpellCheck.IsEnabled" Value="False" />
+            <EventSetter Event="PreviewMouseLeftButtonDown"
+                         Handler="SelectableDetailText_PreviewMouseLeftButtonDown"
+                         HandledEventsToo="True" />
+            <EventSetter Event="PreviewMouseMove"
+                         Handler="SelectableDetailText_PreviewMouseMove"
+                         HandledEventsToo="True" />
+            <EventSetter Event="PreviewMouseLeftButtonUp"
+                         Handler="SelectableDetailText_PreviewMouseLeftButtonUp"
+                         HandledEventsToo="True" />
+            <EventSetter Event="LostMouseCapture"
+                         Handler="SelectableDetailText_LostMouseCapture"
+                         HandledEventsToo="True" />
+        </Style>
     </Window.Resources>
 
-    <Grid Margin="28,24,28,24">
+    <Viewbox Margin="28,24,28,24"
+             HorizontalAlignment="Stretch"
+             VerticalAlignment="Stretch"
+             Stretch="Uniform">
+    <Grid Width="734" Height="523">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -79,10 +109,11 @@
         <Grid>
             <StackPanel>
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock x:Name="TypeText"
-                               FontSize="11"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource AccentBrush}" />
+                    <TextBox x:Name="TypeText"
+                             FontSize="11"
+                             FontWeight="SemiBold"
+                             Foreground="{DynamicResource AccentBrush}"
+                             Style="{StaticResource SelectableDetailTextStyle}" />
                     <TextBlock x:Name="FavoriteText"
                                Margin="9,0,0,0"
                                Text="{DynamicResource Loc.FavoriteMarked}"
@@ -91,13 +122,15 @@
                                Foreground="{DynamicResource FavoriteBrush}"
                                Visibility="Collapsed" />
                 </StackPanel>
-                <TextBlock x:Name="TitleText"
-                           Margin="0,7,0,0"
-                           MaxWidth="650"
-                           FontSize="23"
-                           FontWeight="SemiBold"
-                           Foreground="{DynamicResource TextBrush}"
-                           TextTrimming="CharacterEllipsis" />
+                <TextBox x:Name="TitleText"
+                         Margin="0,7,0,0"
+                         MaxWidth="734"
+                         MaxHeight="64"
+                         FontSize="23"
+                         FontWeight="SemiBold"
+                         Foreground="{DynamicResource TextBrush}"
+                         TextWrapping="Wrap"
+                         Style="{StaticResource SelectableDetailTextStyle}" />
             </StackPanel>
         </Grid>
 
@@ -137,13 +170,13 @@
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource AccentBrush}" />
                         </Border>
-                        <TextBlock x:Name="DomainText"
-                                   Margin="0,14,0,0"
-                                   MaxWidth="260"
-                                   HorizontalAlignment="Center"
-                                   FontSize="13"
-                                   Foreground="{DynamicResource MutedTextBrush}"
-                                   TextTrimming="CharacterEllipsis" />
+                        <TextBox x:Name="DomainText"
+                                 Margin="0,14,0,0"
+                                 MaxWidth="260"
+                                 HorizontalAlignment="Center"
+                                 FontSize="13"
+                                 Foreground="{DynamicResource MutedTextBrush}"
+                                 Style="{StaticResource SelectableDetailTextStyle}" />
                     </StackPanel>
 
                     <Border x:Name="StackBackTwo"
@@ -211,11 +244,12 @@
                               VerticalScrollBarVisibility="Hidden"
                               FocusVisualStyle="{x:Null}">
                     <StackPanel>
-                    <TextBlock x:Name="DescriptionText"
-                               FontSize="13"
-                               LineHeight="20"
-                               Foreground="{DynamicResource MutedTextBrush}"
-                               TextWrapping="Wrap" />
+                    <TextBox x:Name="DescriptionText"
+                             FontSize="13"
+                             TextBlock.LineHeight="20"
+                             Foreground="{DynamicResource MutedTextBrush}"
+                             TextWrapping="Wrap"
+                             Style="{StaticResource SelectableDetailTextStyle}" />
 
                     <StackPanel x:Name="PhotoControlsSection"
                                 Margin="0,18,0,0"
@@ -233,11 +267,11 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="CurrentPhotoNameText"
-                                           VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis"
-                                           FontSize="11"
-                                           Foreground="{DynamicResource TextBrush}" />
+                                <TextBox x:Name="CurrentPhotoNameText"
+                                         VerticalAlignment="Center"
+                                         FontSize="11"
+                                         Foreground="{DynamicResource TextBrush}"
+                                         Style="{StaticResource SelectableDetailTextStyle}" />
                                 <Button x:Name="CurrentPhotoCopyButton"
                                         Grid.Column="1"
                                         Width="31"
@@ -374,11 +408,12 @@
                                 <TextBlock Text="{DynamicResource Loc.CaptureCount}"
                                            FontSize="10.5"
                                            Foreground="{DynamicResource SoftTextBrush}" />
-                                <TextBlock x:Name="CaptureCountText"
-                                           Margin="0,4,0,0"
-                                           FontSize="14"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextBrush}" />
+                                <TextBox x:Name="CaptureCountText"
+                                         Margin="0,4,0,0"
+                                         FontSize="14"
+                                         FontWeight="SemiBold"
+                                         Foreground="{DynamicResource TextBrush}"
+                                         Style="{StaticResource SelectableDetailTextStyle}" />
                             </StackPanel>
                         </Border>
                         <Border Margin="5,0,0,5"
@@ -391,11 +426,12 @@
                                 <TextBlock Text="{DynamicResource Loc.CopyCount}"
                                            FontSize="10.5"
                                            Foreground="{DynamicResource SoftTextBrush}" />
-                                <TextBlock x:Name="CopyCountText"
-                                           Margin="0,4,0,0"
-                                           FontSize="14"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextBrush}" />
+                                <TextBox x:Name="CopyCountText"
+                                         Margin="0,4,0,0"
+                                         FontSize="14"
+                                         FontWeight="SemiBold"
+                                         Foreground="{DynamicResource TextBrush}"
+                                         Style="{StaticResource SelectableDetailTextStyle}" />
                             </StackPanel>
                         </Border>
                         <Border Margin="0,5,5,0"
@@ -408,11 +444,12 @@
                                 <TextBlock Text="{DynamicResource Loc.LastSource}"
                                            FontSize="10.5"
                                            Foreground="{DynamicResource SoftTextBrush}" />
-                                <TextBlock x:Name="SourceText"
-                                           Margin="0,4,0,0"
-                                           FontSize="13"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextBrush}" />
+                                <TextBox x:Name="SourceText"
+                                         Margin="0,4,0,0"
+                                         FontSize="13"
+                                         FontWeight="SemiBold"
+                                         Foreground="{DynamicResource TextBrush}"
+                                         Style="{StaticResource SelectableDetailTextStyle}" />
                             </StackPanel>
                         </Border>
                         <Border Margin="5,5,0,0"
@@ -425,19 +462,21 @@
                                 <TextBlock Text="{DynamicResource Loc.LastSaved}"
                                            FontSize="10.5"
                                            Foreground="{DynamicResource SoftTextBrush}" />
-                                <TextBlock x:Name="SavedAtText"
-                                           Margin="0,4,0,0"
-                                           FontSize="12"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextBrush}" />
+                                <TextBox x:Name="SavedAtText"
+                                         Margin="0,4,0,0"
+                                         FontSize="12"
+                                         FontWeight="SemiBold"
+                                         Foreground="{DynamicResource TextBrush}"
+                                         Style="{StaticResource SelectableDetailTextStyle}" />
                             </StackPanel>
                         </Border>
                     </UniformGrid>
 
-                    <TextBlock x:Name="DeliveryText"
-                               Margin="0,18,0,0"
-                               FontSize="11"
-                               Foreground="{DynamicResource SoftTextBrush}" />
+                    <TextBox x:Name="DeliveryText"
+                             Margin="0,18,0,0"
+                             FontSize="11"
+                             Foreground="{DynamicResource SoftTextBrush}"
+                             Style="{StaticResource SelectableDetailTextStyle}" />
                     </StackPanel>
                 </ScrollViewer>
 
@@ -473,4 +512,5 @@
         </Grid>
 
     </Grid>
+    </Viewbox>
 </Window>

@@ -14,7 +14,8 @@ public sealed record ClipboardImageSnapshot(
     int PixelWidth,
     int PixelHeight,
     string MimeType,
-    string FileExtension);
+    string FileExtension,
+    string? OriginalFileName = null);
 
 public sealed record ClipboardSnapshot(
     uint SequenceNumber,
@@ -198,10 +199,13 @@ internal static class ClipboardImageCodec
             }
 
             var extension = NormalizeExtension(Path.GetExtension(path));
-            return TryDecode(
+            var decoded = TryDecode(
                 bytes,
                 extension,
                 MimeTypeFor(extension));
+            return decoded is null
+                ? null
+                : decoded with { OriginalFileName = Path.GetFileName(path) };
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException or

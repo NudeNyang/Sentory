@@ -62,7 +62,8 @@ public sealed record ImageCaptureRequest(
     DeliveryStatus DeliveryStatus,
     string ContextHash,
     DateTimeOffset CapturedAt,
-    IReadOnlyList<string> ConfirmationSignals);
+    IReadOnlyList<string> ConfirmationSignals,
+    string? OriginalFileName = null);
 
 public sealed record ImageCapturePayload(
     ReadOnlyMemory<byte> ContentBytes,
@@ -70,7 +71,8 @@ public sealed record ImageCapturePayload(
     int PixelWidth,
     int PixelHeight,
     string MimeType,
-    string FileExtension);
+    string FileExtension,
+    string? OriginalFileName = null);
 
 public sealed record CollectionMemberCaptureRequest(
     ContentKind Kind,
@@ -128,7 +130,11 @@ public sealed record CapturedItemSummary(
     DateTimeOffset? PreviewFetchedAt = null,
     IReadOnlyList<SourceApp>? SourceApps = null,
     string? MimeType = null,
-    IReadOnlyList<CapturedCollectionMember>? Members = null);
+    IReadOnlyList<CapturedCollectionMember>? Members = null,
+    string? OcrDisplayName = null,
+    string? OcrText = null,
+    ImageOcrStatus? OcrStatus = null,
+    string? OcrLanguage = null);
 
 public sealed record CapturedCollectionMember(
     int Position,
@@ -140,7 +146,11 @@ public sealed record CapturedCollectionMember(
     string? Sha256,
     string? MimeType,
     int PixelWidth,
-    int PixelHeight);
+    int PixelHeight,
+    string? OcrDisplayName = null,
+    string? OcrText = null,
+    ImageOcrStatus? OcrStatus = null,
+    string? OcrLanguage = null);
 
 public sealed record LinkPreviewCandidate(
     Guid ItemId,

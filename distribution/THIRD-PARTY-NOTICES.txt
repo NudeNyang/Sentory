@@ -24,6 +24,31 @@ code is distributed under GNU GPL v3 only (GPL-3.0-only).
    SQLite is in the public domain.
    https://www.sqlite.org/copyright.html
 
+5. PaddleOCR PP-OCRv5 models
+   Copyright © PaddlePaddle Authors
+   License: Apache License 2.0
+   https://github.com/PaddlePaddle/PaddleOCR
+
+6. RapidOcrNet 3.0.0
+   Copyright © BobLd and RapidOCR contributors
+   License: Apache License 2.0
+   https://github.com/BobLd/RapidOcrNet
+
+7. Microsoft ONNX Runtime 1.27.0
+   Copyright © Microsoft Corporation
+   License: MIT
+   https://github.com/microsoft/onnxruntime
+
+8. SkiaSharp 3.119.1
+   Copyright © Microsoft Corporation
+   License: MIT
+   https://github.com/mono/SkiaSharp
+
+9. Clipper2 and PContourNet
+   License: BSL-1.0 (Clipper2), Apache License 2.0 (PContourNet)
+   https://github.com/AngusJohnson/Clipper2
+   https://github.com/BobLd/PContourNet
+
 MIT License
 -----------
 

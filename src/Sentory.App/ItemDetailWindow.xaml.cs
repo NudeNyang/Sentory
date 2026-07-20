@@ -3,6 +3,10 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using Sentory.Core;
+using Sentory.Infrastructure.Ocr;
+using WpfMouseEventArgs = System.Windows.Input.MouseEventArgs;
+using WpfPoint = System.Windows.Point;
+using WpfTextBox = System.Windows.Controls.TextBox;
 
 namespace Sentory.App;
 
@@ -31,6 +35,8 @@ public partial class ItemDetailWindow : Window
     private int _linkIndex;
     private int _linkArtworkGeneration;
     private bool _artworkDisplaysLink;
+    private WpfTextBox? _selectionTextBox;
+    private int _selectionAnchor;
 
     public ItemDetailWindow(
         GalleryItemViewModel item,
@@ -53,7 +59,10 @@ public partial class ItemDetailWindow : Window
                 ? [new GalleryImageViewModel(
                     item.Item.ContentPath,
                     item.Thumbnail,
-                    GetPhotoName(item.Item.ContentPath))]
+                    GetPhotoName(
+                        item.Item.ContentPath,
+                        item.Item.OcrDisplayName,
+                        item.Item.OriginalUrl))]
                 : [];
         _detailLinks = item.IsCollection
             ? item.Item.Members?
@@ -129,10 +138,120 @@ public partial class ItemDetailWindow : Window
 
         SourceInitialized += (_, _) =>
             SentoryTheme.ApplyTitleBar(this, _isDarkTheme);
+        OwnedPopupDismissBehavior.Enable(this);
         Closed += (_, _) => _scrollIndicator.Dispose();
     }
 
     public ItemDetailAction SelectedAction { get; private set; }
+
+    private void SelectableDetailText_PreviewMouseLeftButtonDown(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (sender is not WpfTextBox textBox ||
+            e.ChangedButton != MouseButton.Left ||
+            e.ClickCount > 1)
+        {
+            return;
+        }
+
+        _selectionTextBox = textBox;
+        _selectionAnchor = GetTextInsertionIndex(
+            textBox,
+            e.GetPosition(textBox));
+        textBox.Focus();
+        textBox.Select(_selectionAnchor, 0);
+        Mouse.Capture(textBox, CaptureMode.Element);
+        e.Handled = true;
+    }
+
+    private void SelectableDetailText_PreviewMouseMove(
+        object sender,
+        WpfMouseEventArgs e)
+    {
+        if (sender is not WpfTextBox textBox ||
+            _selectionTextBox != textBox ||
+            e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        UpdateTextSelection(textBox, e.GetPosition(textBox));
+        e.Handled = true;
+    }
+
+    private void SelectableDetailText_PreviewMouseLeftButtonUp(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (sender is not WpfTextBox textBox ||
+            _selectionTextBox != textBox ||
+            e.ChangedButton != MouseButton.Left)
+        {
+            return;
+        }
+
+        UpdateTextSelection(textBox, e.GetPosition(textBox));
+        textBox.ReleaseMouseCapture();
+        _selectionTextBox = null;
+        e.Handled = true;
+    }
+
+    private void SelectableDetailText_LostMouseCapture(
+        object sender,
+        WpfMouseEventArgs e)
+    {
+        if (sender == _selectionTextBox)
+        {
+            _selectionTextBox = null;
+        }
+    }
+
+    private void UpdateTextSelection(WpfTextBox textBox, WpfPoint pointer)
+    {
+        var insertionIndex = GetTextInsertionIndex(textBox, pointer);
+        var selectionStart = Math.Min(_selectionAnchor, insertionIndex);
+        textBox.Select(
+            selectionStart,
+            Math.Abs(insertionIndex - _selectionAnchor));
+    }
+
+    private static int GetTextInsertionIndex(
+        WpfTextBox textBox,
+        WpfPoint pointer)
+    {
+        if (string.IsNullOrEmpty(textBox.Text) ||
+            textBox.ActualWidth <= 0 ||
+            textBox.ActualHeight <= 0)
+        {
+            return 0;
+        }
+
+        var clampedPoint = new WpfPoint(
+            Math.Clamp(pointer.X, 0, Math.Max(0, textBox.ActualWidth - 0.5)),
+            Math.Clamp(pointer.Y, 0, Math.Max(0, textBox.ActualHeight - 0.5)));
+        var characterIndex = textBox.GetCharacterIndexFromPoint(
+            clampedPoint,
+            snapToText: true);
+        if (characterIndex < 0)
+        {
+            return pointer.X <= textBox.ActualWidth / 2
+                ? 0
+                : textBox.Text.Length;
+        }
+
+        var characterBounds = textBox.GetRectFromCharacterIndex(
+            characterIndex,
+            trailingEdge: false);
+        var insertionIndex = characterIndex;
+        if (pointer.X >= textBox.ActualWidth ||
+            clampedPoint.X > characterBounds.X + characterBounds.Width / 2)
+        {
+            insertionIndex++;
+        }
+
+        return Math.Clamp(insertionIndex, 0, textBox.Text.Length);
+    }
 
     private void CopyButton_Click(object sender, RoutedEventArgs e) =>
         Complete(ItemDetailAction.Copy);
@@ -364,12 +483,22 @@ public partial class ItemDetailWindow : Window
         DomainText.Text = link.Domain;
     }
 
-    private static string GetPhotoName(string? contentPath)
+    private static string GetPhotoName(
+        string? contentPath,
+        string? displayName = null,
+        string? originalFileName = null)
     {
-        var fileName = System.IO.Path.GetFileName(contentPath);
-        return string.IsNullOrWhiteSpace(fileName)
-            ? SentoryLocalization.Text("Image")
-            : fileName;
+        var preferredTitle = OcrTitleGenerator.CreateBestDisplayTitle(
+            originalFileName,
+            displayName);
+        if (!string.IsNullOrWhiteSpace(preferredTitle))
+        {
+            return preferredTitle;
+        }
+
+        var usefulFileName = OcrTitleGenerator.CreateCandidate(
+            System.IO.Path.GetFileNameWithoutExtension(contentPath));
+        return usefulFileName ?? SentoryLocalization.Text("Image");
     }
 
     private void UpdatePageDots(

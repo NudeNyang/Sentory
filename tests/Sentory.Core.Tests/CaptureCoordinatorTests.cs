@@ -36,7 +36,14 @@ public sealed class CaptureCoordinatorTests
         var result = await coordinator.CaptureBatchAsync(
             Guid.NewGuid(),
             "https://example.com\nhttps://example.com/",
-            [new ImageCapturePayload(imageBytes, hash, 1, 1, "image/png", ".png")],
+            [new ImageCapturePayload(
+                imageBytes,
+                hash,
+                1,
+                1,
+                "image/png",
+                ".png",
+                "프로젝트 화면.png")],
             SourceApp.Discord,
             CaptureMethod.DiscordConfirmedImage,
             DeliveryStatus.Confirmed,
@@ -48,7 +55,41 @@ public sealed class CaptureCoordinatorTests
         var request = Assert.Single(repository.Collections);
         Assert.Equal(2, request.Members.Count);
         Assert.Single(request.Members.Where(member => member.Kind == ContentKind.Url));
-        Assert.Single(request.Members.Where(member => member.Kind == ContentKind.Image));
+        var image = Assert.Single(request.Members.Where(member =>
+            member.Kind == ContentKind.Image));
+        Assert.Equal("프로젝트 화면.png", image.OriginalUrl);
+    }
+
+    [Fact]
+    public async Task SingleImageCarriesOriginalFileNameToRepository()
+    {
+        var repository = new RecordingRepository();
+        var coordinator = new CaptureCoordinator(repository);
+        byte[] imageBytes = [4, 5, 6];
+        var hash = Convert.ToHexString(
+            System.Security.Cryptography.SHA256.HashData(imageBytes));
+
+        await coordinator.CaptureBatchAsync(
+            Guid.NewGuid(),
+            null,
+            [new ImageCapturePayload(
+                imageBytes,
+                hash,
+                1,
+                1,
+                "image/png",
+                ".png",
+                "VRChat 2025-01-28.png")],
+            SourceApp.KakaoTalk,
+            CaptureMethod.KakaoDragDrop,
+            DeliveryStatus.NotObserved,
+            "context",
+            DateTimeOffset.UtcNow,
+            ["test"]);
+
+        Assert.Equal(
+            "VRChat 2025-01-28.png",
+            Assert.Single(repository.Images).OriginalFileName);
     }
 
     private sealed class RecordingRepository : ICaptureRepository
@@ -56,6 +97,8 @@ public sealed class CaptureCoordinatorTests
         public List<UrlCaptureRequest> Requests { get; } = [];
 
         public List<CollectionCaptureRequest> Collections { get; } = [];
+
+        public List<ImageCaptureRequest> Images { get; } = [];
 
         public Task InitializeAsync(
             CancellationToken cancellationToken = default) =>
@@ -76,13 +119,16 @@ public sealed class CaptureCoordinatorTests
 
         public Task<CaptureResult> UpsertImageAsync(
             ImageCaptureRequest request,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(new CaptureResult(
+            CancellationToken cancellationToken = default)
+        {
+            Images.Add(request);
+            return Task.FromResult(new CaptureResult(
                 Guid.NewGuid(),
                 true,
                 true,
                 1,
                 0));
+        }
 
         public Task<CaptureResult> UpsertCollectionAsync(
             CollectionCaptureRequest request,

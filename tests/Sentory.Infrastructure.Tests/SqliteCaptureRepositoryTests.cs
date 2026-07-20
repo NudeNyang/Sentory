@@ -203,6 +203,26 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task ImageKeepsOriginalFileNameWhenLaterCaptureHasNoFileName()
+    {
+        var repository = CreateRepository();
+        await repository.InitializeAsync();
+        byte[] bytes = [11, 22, 33, 44];
+        var hash = Convert.ToHexString(SHA256.HashData(bytes));
+        var namedRequest = CreateImageRequest(Guid.NewGuid(), bytes, hash) with
+        {
+            OriginalFileName = "VRChat 2025-01-28 23-02-56.776 1080x1920.png"
+        };
+
+        await repository.UpsertImageAsync(namedRequest);
+        await repository.UpsertImageAsync(
+            CreateImageRequest(Guid.NewGuid(), bytes, hash));
+        var item = Assert.Single(await repository.GetRecentAsync(10));
+
+        Assert.Equal(namedRequest.OriginalFileName, item.OriginalUrl);
+    }
+
+    [Fact]
     public async Task ImageLargerThanEightMegabytesIsStoredWithoutTruncation()
     {
         var repository = CreateRepository();
@@ -325,7 +345,41 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         await using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version;";
 
-        Assert.Equal(4L, (long)(await command.ExecuteScalarAsync())!);
+        Assert.Equal(5L, (long)(await command.ExecuteScalarAsync())!);
+    }
+
+    [Fact]
+    public async Task VersionFourDatabaseAddsImageOcrStorage()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var repository = new SqliteCaptureRepository(paths);
+        await repository.InitializeAsync();
+        await using (var connection = new SqliteConnection(
+                         $"Data Source={paths.DatabasePath}"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                DROP TABLE image_ocr;
+                PRAGMA user_version = 4;
+                """;
+            await command.ExecuteNonQueryAsync();
+        }
+
+        await repository.InitializeAsync();
+        await using var migrated = new SqliteConnection(
+            $"Data Source={paths.DatabasePath}");
+        await migrated.OpenAsync();
+        await using var inspect = migrated.CreateCommand();
+        inspect.CommandText =
+            """
+            SELECT COUNT(*)
+            FROM sqlite_master
+            WHERE type = 'table' AND name = 'image_ocr';
+            """;
+
+        Assert.Equal(1L, (long)(await inspect.ExecuteScalarAsync())!);
     }
 
     [Fact]
@@ -792,6 +846,31 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
             member => member.Kind == ContentKind.Image);
         Assert.NotNull(image.ContentPath);
         Assert.True(File.Exists(Path.Combine(_root, image.ContentPath)));
+    }
+
+    [Fact]
+    public async Task CollectionKeepsImageFileNameWhenLaterCaptureHasNoName()
+    {
+        var repository = CreateRepository();
+        await repository.InitializeAsync();
+        byte[] imageBytes = [7, 6, 5, 4];
+        var hash = Convert.ToHexString(SHA256.HashData(imageBytes));
+        var original = CreateCollectionRequest(Guid.NewGuid(), imageBytes, hash);
+        var namedMembers = original.Members
+            .Select(member => member.Kind == ContentKind.Image
+                ? member with { OriginalUrl = "여행 사진 2025.png" }
+                : member)
+            .ToArray();
+        var named = original with { Members = namedMembers };
+        var unnamed = original with { EventId = Guid.NewGuid() };
+
+        await repository.UpsertCollectionAsync(named);
+        await repository.UpsertCollectionAsync(unnamed);
+        var item = Assert.Single(await repository.GetRecentAsync(10));
+        var image = Assert.Single(item.Members!, member =>
+            member.Kind == ContentKind.Image);
+
+        Assert.Equal("여행 사진 2025.png", image.OriginalUrl);
     }
 
     [Fact]

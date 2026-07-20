@@ -16,6 +16,7 @@ public sealed class CaptureCoordinator(ICaptureRepository repository)
         string contextHash,
         DateTimeOffset capturedAt,
         IReadOnlyList<string> confirmationSignals,
+        string? originalFileName = null,
         CancellationToken cancellationToken = default) =>
         repository.UpsertImageAsync(
             new ImageCaptureRequest(
@@ -31,7 +32,8 @@ public sealed class CaptureCoordinator(ICaptureRepository repository)
                 deliveryStatus,
                 contextHash,
                 capturedAt,
-                confirmationSignals),
+                confirmationSignals,
+                originalFileName),
             cancellationToken);
 
     public async Task<CaptureResult?> CaptureBatchAsync(
@@ -80,7 +82,7 @@ public sealed class CaptureCoordinator(ICaptureRepository repository)
 
             members.Add(new CollectionMemberCaptureRequest(
                 ContentKind.Image,
-                string.Empty,
+                image.OriginalFileName ?? string.Empty,
                 $"sha256:{normalizedHash}",
                 string.Empty,
                 image.ContentBytes,
@@ -127,6 +129,7 @@ public sealed class CaptureCoordinator(ICaptureRepository repository)
                 contextHash,
                 capturedAt,
                 confirmationSignals,
+                member.OriginalUrl,
                 cancellationToken);
         }
 

@@ -12,6 +12,7 @@ using System.Windows.Threading;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
 using Sentory.Infrastructure.Links;
+using Sentory.Infrastructure.Ocr;
 using Sentory.Platform.Windows.Interop;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using Point = System.Windows.Point;
@@ -213,10 +214,15 @@ public partial class GalleryWindow : Window
         var members = item.Members ?? [];
         var imageCount = members.Count(member => member.Kind == ContentKind.Image);
         var urlCount = members.Count(member => member.Kind == ContentKind.Url);
+        var imageTitle = isImage
+            ? OcrTitleGenerator.CreateBestDisplayTitle(
+                item.OriginalUrl,
+                item.OcrDisplayName)
+            : null;
         var title = isCollection
             ? SentoryLocalization.Format("CollectionTitleFormat", imageCount, urlCount)
             : isImage
-            ? SentoryLocalization.Text("ClipboardImage")
+            ? imageTitle ?? SentoryLocalization.Text("ClipboardImage")
             : !string.IsNullOrWhiteSpace(item.PageTitle)
                 ? item.PageTitle
             : string.IsNullOrWhiteSpace(item.Domain)
@@ -231,9 +237,11 @@ public partial class GalleryWindow : Window
                     ? domains
                     : SentoryLocalization.Format("CollectionItemsFormat", members.Count)
             : isImage
-            ? SentoryLocalization.Format(
-                "ImageFormatFormat",
-                GetImageFormatLabel(item))
+            ? !string.IsNullOrWhiteSpace(item.OcrText)
+                ? CreateOcrSnippet(item.OcrText)
+                : SentoryLocalization.Format(
+                    "ImageFormatFormat",
+                    GetImageFormatLabel(item))
             : !string.IsNullOrWhiteSpace(item.PageDescription)
                 ? item.PageDescription
             : item.OriginalUrl;
@@ -243,7 +251,10 @@ public partial class GalleryWindow : Window
                 .Select(member => new GalleryImageViewModel(
                     member.ContentPath,
                     LoadThumbnail(member.ContentPath),
-                    GetPhotoName(member.ContentPath)))
+                    GetPhotoName(
+                        member.ContentPath,
+                        member.OcrDisplayName,
+                        member.OriginalUrl)))
                 .Where(image => image.Thumbnail is not null)
                 .ToArray()
             : [];
@@ -510,7 +521,7 @@ public partial class GalleryWindow : Window
         SortPopup.IsOpen = !SortPopup.IsOpen;
     }
 
-    private void DataManagementButton_Click(
+    private async void DataManagementButton_Click(
         object sender,
         RoutedEventArgs e)
     {
@@ -532,7 +543,11 @@ public partial class GalleryWindow : Window
         window.DataChanged += RefreshAsync;
         try
         {
-            window.ShowDialog();
+            var closed = new TaskCompletionSource<bool>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            window.Closed += (_, _) => closed.TrySetResult(true);
+            window.Show();
+            await closed.Task;
         }
         finally
         {
@@ -2009,7 +2024,11 @@ public partial class GalleryWindow : Window
         {
             Owner = this
         };
-        window.ShowDialog();
+        var closed = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        window.Closed += (_, _) => closed.TrySetResult(true);
+        window.Show();
+        await closed.Task;
         switch (window.SelectedAction)
         {
             case ItemDetailAction.Copy:
@@ -2167,12 +2186,37 @@ public partial class GalleryWindow : Window
         }
     }
 
-    private static string GetPhotoName(string? contentPath)
+    private static string GetPhotoName(
+        string? contentPath,
+        string? displayName = null,
+        string? originalFileName = null)
     {
-        var fileName = Path.GetFileName(contentPath);
-        return string.IsNullOrWhiteSpace(fileName)
-            ? SentoryLocalization.Text("Image")
-            : fileName;
+        var preferredTitle = OcrTitleGenerator.CreateBestDisplayTitle(
+            originalFileName,
+            displayName);
+        if (!string.IsNullOrWhiteSpace(preferredTitle))
+        {
+            return preferredTitle;
+        }
+
+        var usefulFileName = OcrTitleGenerator.CreateCandidate(
+            Path.GetFileNameWithoutExtension(contentPath));
+        return usefulFileName ?? SentoryLocalization.Text("Image");
+    }
+
+    private static string CreateOcrSnippet(string text)
+    {
+        const int maximumLength = 120;
+        var normalized = string.Join(
+            " · ",
+            text.Split(
+                    ['\r', '\n'],
+                    StringSplitOptions.RemoveEmptyEntries |
+                    StringSplitOptions.TrimEntries)
+                .Take(3));
+        return normalized.Length <= maximumLength
+            ? normalized
+            : $"{normalized[..maximumLength].TrimEnd()}…";
     }
 
     private async Task<GalleryLinkArtwork?> LoadDetailLinkArtworkAsync(

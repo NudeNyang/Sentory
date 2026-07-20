@@ -2,10 +2,27 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Sentory.Core\Sentory.Core.csproj" />
+    <PackageReference Include="RapidOcrNet" Version="3.0.0" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.119.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="$(NuGetPackageRoot)rapidocrnet\3.0.0\models\v5\ch_PP-OCRv5_mobile_det.onnx"
+                      LogicalName="Sentory.Ocr.Models.PPOCRv5.det.onnx" />
+    <EmbeddedResource Include="$(NuGetPackageRoot)rapidocrnet\3.0.0\models\v5\ch_PP-LCNet_x0_25_textline_ori_cls_mobile.onnx"
+                      LogicalName="Sentory.Ocr.Models.PPOCRv5.cls.onnx" />
+    <EmbeddedResource Include="Ocr\Models\korean_PP-OCRv5_mobile_rec.onnx"
+                      LogicalName="Sentory.Ocr.Models.PPOCRv5.korean-rec.onnx" />
+    <EmbeddedResource Include="Ocr\Models\PP-OCRv5_mobile_rec.onnx"
+                      LogicalName="Sentory.Ocr.Models.PPOCRv5.cjk-rec.onnx" />
+    <EmbeddedResource Include="Ocr\Models\korean_dict.txt"
+                      LogicalName="Sentory.Ocr.Models.PPOCRv5.korean-dict.txt" />
+    <EmbeddedResource Include="Ocr\Models\ppocrv5_dict.txt"
+                      LogicalName="Sentory.Ocr.Models.PPOCRv5.cjk-dict.txt" />
   </ItemGroup>
 
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>

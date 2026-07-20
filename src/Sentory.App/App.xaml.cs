@@ -8,8 +8,10 @@ using System.Windows;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
 using Sentory.Infrastructure.Links;
+using Sentory.Infrastructure.Ocr;
 using Sentory.Infrastructure.Updates;
 using Sentory.Platform.Windows.Interop;
+using Sentory.Platform.Windows.Ocr;
 using Sentory.Platform.Windows.Runtime;
 using Forms = System.Windows.Forms;
 
@@ -48,6 +50,10 @@ public partial class App : System.Windows.Application
     private LinkPreviewFetcher? _linkPreviewFetcher;
     private LinkPreviewEnrichmentService? _linkPreviewService;
     private Task? _linkPreviewTask;
+    private readonly SemaphoreSlim _ocrWakeSignal = new(0, 1);
+    private OcrEnrichmentService? _ocrService;
+    private PaddleOcrImageTextRecognizer? _ocrRecognizer;
+    private Task? _ocrTask;
     private readonly WindowsStartupManager _startupManager = new();
     private readonly DiscordAccessibilityLauncher _discordLauncher = new();
     private bool _discordSupportEnabled = true;
@@ -151,6 +157,26 @@ public partial class App : System.Windows.Application
                 return;
             }
 
+            var ocrRecognizer = new PaddleOcrImageTextRecognizer(
+                Path.Combine(_paths.RootDirectory, "ocr-models"),
+                new WindowsImageTextRecognizer());
+            _ocrRecognizer = ocrRecognizer;
+            _ocrService = new OcrEnrichmentService(
+                (IImageOcrRepository)_repository,
+                ocrRecognizer,
+                _paths,
+                (sha256, exception) => _diagnosticsLog?.Write(
+                    "image-ocr-item-failed",
+                    $"Image OCR failed for {sha256[..Math.Min(12, sha256.Length)]}",
+                    exception),
+                new WindowsImageMetadataTitleReader());
+            if (!ocrRecognizer.IsAvailable)
+            {
+                _diagnosticsLog.Write(
+                    "image-ocr-unavailable",
+                    "No local OCR engine is available");
+            }
+
             var acceptInjectedInput = string.Equals(
                 Environment.GetEnvironmentVariable(
                     "SENTORY_ACCEPT_INJECTED_INPUT"),
@@ -203,6 +229,8 @@ public partial class App : System.Windows.Application
                 _maintenanceCancellation.Token);
             _linkPreviewTask = RunLinkPreviewLoopAsync(
                 _maintenanceCancellation.Token);
+            _ocrTask = Task.Run(() => RunOcrLoopAsync(
+                _maintenanceCancellation.Token));
             ApplyRuntimeSourceSettings();
             _runtime.Start();
             _kakaoDropOverlay.Start();
@@ -751,6 +779,11 @@ public partial class App : System.Windows.Application
             {
                 WakeLinkPreviewWorker();
             }
+
+            if (notification.Kind is ContentKind.Image or ContentKind.Collection)
+            {
+                WakeOcrWorker();
+            }
         });
     }
 
@@ -1103,6 +1136,87 @@ public partial class App : System.Windows.Application
         }
     }
 
+    private async Task RunOcrLoopAsync(
+        CancellationToken cancellationToken)
+    {
+        if (_ocrService is null)
+        {
+            return;
+        }
+
+        try
+        {
+            while (true)
+            {
+                OcrEnrichmentBatchResult result;
+                try
+                {
+                    result = await _ocrService.EnrichBatchAsync(
+                        1,
+                        cancellationToken);
+                }
+                catch (OperationCanceledException)
+                    when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    _diagnosticsLog?.Write(
+                        "image-ocr-failed",
+                        "Image OCR enrichment failed",
+                        exception);
+                    result = new OcrEnrichmentBatchResult(0, 0);
+                }
+
+                if (result.Updated > 0)
+                {
+                    Task refreshTask = Task.CompletedTask;
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        if (_galleryWindow is { IsLoaded: true })
+                        {
+                            refreshTask = _galleryWindow.RefreshAsync();
+                        }
+                    });
+                    await refreshTask;
+                }
+
+                if (result.Attempted == 1)
+                {
+                    await Task.Delay(
+                        TimeSpan.FromSeconds(2),
+                        cancellationToken);
+                    continue;
+                }
+
+                _ocrRecognizer?.ReleaseModels();
+
+                await _ocrWakeSignal.WaitAsync(
+                    TimeSpan.FromMinutes(15),
+                    cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private void WakeOcrWorker()
+    {
+        if (_ocrWakeSignal.CurrentCount == 0)
+        {
+            try
+            {
+                _ocrWakeSignal.Release();
+            }
+            catch (SemaphoreFullException)
+            {
+            }
+        }
+    }
+
     private async Task ApplyAutomaticCleanupAsync(
         CancellationToken cancellationToken = default)
     {
@@ -1192,9 +1306,17 @@ public partial class App : System.Windows.Application
             await _linkPreviewTask;
             _linkPreviewTask = null;
         }
+        if (_ocrTask is not null)
+        {
+            await _ocrTask;
+            _ocrTask = null;
+        }
         _linkPreviewFetcher?.Dispose();
         _linkPreviewFetcher = null;
         _linkPreviewService = null;
+        _ocrService = null;
+        _ocrRecognizer?.Dispose();
+        _ocrRecognizer = null;
         _kakaoDropOverlay?.Dispose();
         _kakaoDropOverlay = null;
         _discordDropOverlay?.Dispose();
@@ -1252,6 +1374,7 @@ public partial class App : System.Windows.Application
         _openGalleryEvent = null;
         _maintenanceCancellation.Dispose();
         _linkPreviewWakeSignal.Dispose();
+        _ocrWakeSignal.Dispose();
         _updateClient.Dispose();
         base.OnExit(e);
     }

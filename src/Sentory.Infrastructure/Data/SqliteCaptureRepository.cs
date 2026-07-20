@@ -6,9 +6,9 @@ using System.Security.Cryptography;
 namespace Sentory.Infrastructure.Data;
 
 public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
-    : ICaptureRepository
+    : ICaptureRepository, IImageOcrRepository
 {
-    private const int CurrentSchemaVersion = 4;
+    private const int CurrentSchemaVersion = 5;
     private static readonly HashSet<string> StoredImageExtensions = new(
         [".png", ".jpg", ".bmp", ".gif", ".tif", ".webp"],
         StringComparer.OrdinalIgnoreCase);
@@ -103,6 +103,18 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                     ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS image_ocr (
+                content_hash TEXT NOT NULL PRIMARY KEY,
+                display_name TEXT NULL,
+                recognized_text TEXT NOT NULL,
+                status TEXT NOT NULL,
+                language TEXT NULL,
+                engine_name TEXT NOT NULL,
+                processed_at TEXT NOT NULL,
+                attempt_count INTEGER NOT NULL DEFAULT 1,
+                error_code TEXT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS ix_items_last_captured_at
                 ON items(last_captured_at DESC);
             CREATE INDEX IF NOT EXISTS ix_capture_events_item_id
@@ -111,6 +123,19 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 ON collection_members(collection_id, position);
             CREATE INDEX IF NOT EXISTS ix_collection_members_normalized_key
                 ON collection_members(normalized_key);
+            CREATE INDEX IF NOT EXISTS ix_image_ocr_status
+                ON image_ocr(status, processed_at);
+
+            DELETE FROM image_ocr
+            WHERE NOT EXISTS (
+                      SELECT 1
+                      FROM items
+                      WHERE lower(items.content_hash) = image_ocr.content_hash)
+              AND NOT EXISTS (
+                      SELECT 1
+                      FROM collection_members
+                      WHERE lower(collection_members.content_hash) =
+                            image_ocr.content_hash);
             """,
             cancellationToken);
         await EnsureColumnAsync(
@@ -572,14 +597,18 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             SELECT id, kind, original_url, normalized_key, domain,
                    last_source_app, last_capture_method, delivery_status,
                    capture_count, share_count, created_at, last_captured_at,
-                   content_path, content_hash, is_favorite, copy_count,
+                   content_path, items.content_hash, is_favorite, copy_count,
                    last_copied_at, page_title, page_description,
                    site_icon_path, preview_image_path, preview_status,
                    preview_fetched_at, mime_type,
                    (SELECT GROUP_CONCAT(DISTINCT source_app)
                     FROM capture_events
-                    WHERE item_id = items.id) AS source_apps
+                    WHERE item_id = items.id) AS source_apps,
+                   image_ocr.display_name, image_ocr.recognized_text,
+                   image_ocr.status, image_ocr.language
             FROM items
+            LEFT JOIN image_ocr
+              ON image_ocr.content_hash = lower(items.content_hash)
             ORDER BY last_captured_at DESC
             LIMIT $limit;
             """;
@@ -623,7 +652,19 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                     ParseSourceApps(
                         reader.IsDBNull(24) ? null : reader.GetString(24),
                         Enum.Parse<SourceApp>(reader.GetString(5))),
-                    reader.IsDBNull(23) ? null : reader.GetString(23)));
+                    reader.IsDBNull(23) ? null : reader.GetString(23),
+                    OcrDisplayName: reader.IsDBNull(25)
+                        ? null
+                        : reader.GetString(25),
+                    OcrText: reader.IsDBNull(26)
+                        ? null
+                        : reader.GetString(26),
+                    OcrStatus: reader.IsDBNull(27)
+                        ? null
+                        : Enum.Parse<ImageOcrStatus>(reader.GetString(27)),
+                    OcrLanguage: reader.IsDBNull(28)
+                        ? null
+                        : reader.GetString(28)));
             }
         }
 
@@ -668,6 +709,133 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             .Distinct()
             .ToArray();
         return sources.Length > 0 ? sources : [fallback];
+    }
+
+    public async Task<IReadOnlyList<ImageOcrCandidate>>
+        GetPendingImageOcrAsync(
+            string engineName,
+            int limit,
+            CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(engineName);
+        if (limit <= 0)
+        {
+            return [];
+        }
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            WITH stored_images AS (
+                SELECT lower(content_hash) AS content_hash,
+                       content_path,
+                       last_captured_at
+                FROM items
+                WHERE kind = $imageKind
+                  AND content_hash IS NOT NULL
+                  AND content_path IS NOT NULL
+                UNION ALL
+                SELECT lower(members.content_hash) AS content_hash,
+                       members.content_path,
+                       items.last_captured_at
+                FROM collection_members AS members
+                INNER JOIN items ON items.id = members.collection_id
+                WHERE members.kind = $imageKind
+                  AND members.content_hash IS NOT NULL
+                  AND members.content_path IS NOT NULL
+            )
+            SELECT stored_images.content_hash,
+                   min(stored_images.content_path)
+            FROM stored_images
+            LEFT JOIN image_ocr
+              ON image_ocr.content_hash = stored_images.content_hash
+            WHERE image_ocr.content_hash IS NULL OR
+                  image_ocr.engine_name <> $engineName OR
+                  (image_ocr.status = $failedStatus AND
+                   image_ocr.attempt_count < 2 AND
+                   julianday(image_ocr.processed_at) < julianday($retryBefore))
+            GROUP BY stored_images.content_hash
+            ORDER BY max(stored_images.last_captured_at) DESC
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue(
+            "$imageKind",
+            ContentKind.Image.ToString());
+        command.Parameters.AddWithValue(
+            "$failedStatus",
+            ImageOcrStatus.Failed.ToString());
+        command.Parameters.AddWithValue("$engineName", engineName);
+        command.Parameters.AddWithValue(
+            "$retryBefore",
+            DateTimeOffset.UtcNow.AddMinutes(-30).ToString("O"));
+        command.Parameters.AddWithValue("$limit", limit);
+
+        var candidates = new List<ImageOcrCandidate>();
+        await using var reader = await command.ExecuteReaderAsync(
+            cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            candidates.Add(new ImageOcrCandidate(
+                reader.GetString(0),
+                reader.GetString(1)));
+        }
+
+        return candidates;
+    }
+
+    public async Task<bool> UpsertImageOcrAsync(
+        ImageOcrUpdate update,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(update.Sha256);
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO image_ocr (
+                content_hash, display_name, recognized_text, status,
+                language, engine_name, processed_at, attempt_count,
+                error_code
+            ) VALUES (
+                $contentHash, $displayName, $recognizedText, $status,
+                $language, $engineName, $processedAt, 1, $errorCode
+            )
+            ON CONFLICT(content_hash) DO UPDATE SET
+                display_name = excluded.display_name,
+                recognized_text = excluded.recognized_text,
+                status = excluded.status,
+                language = excluded.language,
+                engine_name = excluded.engine_name,
+                processed_at = excluded.processed_at,
+                attempt_count = CASE
+                    WHEN image_ocr.engine_name = excluded.engine_name
+                    THEN image_ocr.attempt_count + 1
+                    ELSE 1
+                END,
+                error_code = excluded.error_code;
+            """;
+        command.Parameters.AddWithValue(
+            "$contentHash",
+            update.Sha256.ToLowerInvariant());
+        command.Parameters.AddWithValue(
+            "$displayName",
+            (object?)update.DisplayName ?? DBNull.Value);
+        command.Parameters.AddWithValue(
+            "$recognizedText",
+            update.RecognizedText);
+        command.Parameters.AddWithValue("$status", update.Status.ToString());
+        command.Parameters.AddWithValue(
+            "$language",
+            (object?)update.Language ?? DBNull.Value);
+        command.Parameters.AddWithValue("$engineName", update.EngineName);
+        command.Parameters.AddWithValue(
+            "$processedAt",
+            update.ProcessedAt.ToString("O"));
+        command.Parameters.AddWithValue(
+            "$errorCode",
+            (object?)update.ErrorCode ?? DBNull.Value);
+        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
     }
 
     public async Task<bool> SetFavoriteAsync(
@@ -776,6 +944,11 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 itemId.ToString("D"));
             affected = await deleteItem.ExecuteNonQueryAsync(cancellationToken);
         }
+
+        await DeleteOrphanOcrAsync(
+            connection,
+            (SqliteTransaction)transaction,
+            cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
         if (affected > 0)
@@ -1106,6 +1279,11 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             AddCleanupParameters(deleteItems, olderThan);
             await deleteItems.ExecuteNonQueryAsync(cancellationToken);
         }
+
+        await DeleteOrphanOcrAsync(
+            connection,
+            transaction,
+            cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
 
@@ -1470,6 +1648,29 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    private static async Task DeleteOrphanOcrAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            DELETE FROM image_ocr
+            WHERE NOT EXISTS (
+                      SELECT 1
+                      FROM items
+                      WHERE lower(items.content_hash) = image_ocr.content_hash)
+              AND NOT EXISTS (
+                      SELECT 1
+                      FROM collection_members
+                      WHERE lower(collection_members.content_hash) =
+                            image_ocr.content_hash);
+            """;
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     private static async Task<int> GetPragmaIntAsync(
         SqliteConnection connection,
         string pragmaName,
@@ -1748,13 +1949,17 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 mime_type, byte_size, image_width, image_height
             )
             VALUES (
-                $id, $kind, $normalizedKey, '', '',
+                $id, $kind, $normalizedKey, $originalFileName, '',
                 $createdAt, $lastCapturedAt, $lastSourceApp,
                 $lastCaptureMethod, $deliveryStatus,
                 $captureCount, $shareCount, $contentPath, $contentHash,
                 $mimeType, $byteSize, $imageWidth, $imageHeight
             )
             ON CONFLICT(normalized_key) DO UPDATE SET
+                original_url = CASE
+                    WHEN excluded.original_url <> '' THEN excluded.original_url
+                    ELSE items.original_url
+                END,
                 last_captured_at = excluded.last_captured_at,
                 last_source_app = excluded.last_source_app,
                 last_capture_method = excluded.last_capture_method,
@@ -1771,6 +1976,9 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         command.Parameters.AddWithValue("$id", itemId.ToString("D"));
         command.Parameters.AddWithValue("$kind", ContentKind.Image.ToString());
         command.Parameters.AddWithValue("$normalizedKey", normalizedKey);
+        command.Parameters.AddWithValue(
+            "$originalFileName",
+            request.OriginalFileName ?? string.Empty);
         command.Parameters.AddWithValue(
             "$createdAt",
             request.CapturedAt.ToString("O"));
@@ -1908,6 +2116,33 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         Guid collectionId,
         CancellationToken cancellationToken)
     {
+        var previousFileNames = new Dictionary<string, string>(
+            StringComparer.OrdinalIgnoreCase);
+        await using (var previous = connection.CreateCommand())
+        {
+            previous.Transaction = (SqliteTransaction)transaction;
+            previous.CommandText =
+                """
+                SELECT normalized_key, original_url
+                FROM collection_members
+                WHERE collection_id = $collectionId
+                  AND kind = $imageKind
+                  AND original_url <> '';
+                """;
+            previous.Parameters.AddWithValue(
+                "$collectionId",
+                collectionId.ToString("D"));
+            previous.Parameters.AddWithValue(
+                "$imageKind",
+                ContentKind.Image.ToString());
+            await using var reader = await previous.ExecuteReaderAsync(
+                cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                previousFileNames[reader.GetString(0)] = reader.GetString(1);
+            }
+        }
+
         await using (var delete = connection.CreateCommand())
         {
             delete.Transaction = (SqliteTransaction)transaction;
@@ -1938,7 +2173,17 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             insert.Parameters.AddWithValue("$position", index);
             insert.Parameters.AddWithValue("$kind", member.Kind.ToString());
             insert.Parameters.AddWithValue("$normalizedKey", member.NormalizedKey);
-            insert.Parameters.AddWithValue("$originalUrl", member.OriginalUrl);
+            var originalUrl = member.OriginalUrl;
+            if (member.Kind == ContentKind.Image &&
+                string.IsNullOrWhiteSpace(originalUrl) &&
+                previousFileNames.TryGetValue(
+                    member.NormalizedKey,
+                    out var previousFileName))
+            {
+                originalUrl = previousFileName;
+            }
+
+            insert.Parameters.AddWithValue("$originalUrl", originalUrl);
             insert.Parameters.AddWithValue("$domain", member.Domain);
             insert.Parameters.AddWithValue(
                 "$contentPath",
@@ -1980,10 +2225,16 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
 
         command.CommandText =
             $"""
-            SELECT collection_id, position, kind, original_url,
-                   normalized_key, domain, content_path, content_hash,
-                   mime_type, image_width, image_height
-            FROM collection_members
+            SELECT members.collection_id, members.position, members.kind,
+                   members.original_url, members.normalized_key,
+                   members.domain, members.content_path,
+                   members.content_hash, members.mime_type,
+                   members.image_width, members.image_height,
+                   image_ocr.display_name, image_ocr.recognized_text,
+                   image_ocr.status, image_ocr.language
+            FROM collection_members AS members
+            LEFT JOIN image_ocr
+              ON image_ocr.content_hash = lower(members.content_hash)
             WHERE collection_id IN ({string.Join(',', parameterNames)})
             ORDER BY collection_id, position;
             """;
@@ -2001,7 +2252,13 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 reader.IsDBNull(7) ? null : reader.GetString(7),
                 reader.IsDBNull(8) ? null : reader.GetString(8),
                 reader.IsDBNull(9) ? 0 : reader.GetInt32(9),
-                reader.IsDBNull(10) ? 0 : reader.GetInt32(10)));
+                reader.IsDBNull(10) ? 0 : reader.GetInt32(10),
+                reader.IsDBNull(11) ? null : reader.GetString(11),
+                reader.IsDBNull(12) ? null : reader.GetString(12),
+                reader.IsDBNull(13)
+                    ? null
+                    : Enum.Parse<ImageOcrStatus>(reader.GetString(13)),
+                reader.IsDBNull(14) ? null : reader.GetString(14)));
         }
 
         return lookup.ToDictionary(

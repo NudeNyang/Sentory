@@ -19,6 +19,7 @@ public partial class DataManagementWindow : Window
     private readonly bool _discordRepairNeeded;
     private bool _isDarkTheme;
     private bool _busy;
+    private bool _suppressBackgroundDismiss;
     private bool _initializing = true;
     private readonly OverlayScrollIndicatorController _scrollIndicator;
 
@@ -56,6 +57,9 @@ public partial class DataManagementWindow : Window
 
         Loaded += async (_, _) => await RefreshStatisticsAsync();
         SourceInitialized += (_, _) => ApplyTitleBarTheme();
+        OwnedPopupDismissBehavior.Enable(
+            this,
+            () => !_busy && !_suppressBackgroundDismiss);
         Closed += (_, _) => _scrollIndicator.Dispose();
     }
 
@@ -274,7 +278,15 @@ public partial class DataManagementWindow : Window
         {
             Owner = this
         };
-        window.ShowDialog();
+        _suppressBackgroundDismiss = true;
+        try
+        {
+            window.ShowDialog();
+        }
+        finally
+        {
+            _suppressBackgroundDismiss = false;
+        }
     }
 
     private void GitHubLink_RequestNavigate(

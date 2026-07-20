@@ -103,10 +103,22 @@ public static class GalleryQuery
                (item.PageDescription?.Contains(
                     search,
                     StringComparison.OrdinalIgnoreCase) ?? false) ||
+               (item.OcrDisplayName?.Contains(
+                    search,
+                    StringComparison.OrdinalIgnoreCase) ?? false) ||
+               (item.OcrText?.Contains(
+                    search,
+                    StringComparison.OrdinalIgnoreCase) ?? false) ||
                (item.Members?.Any(member =>
                     member.OriginalUrl.Contains(search, StringComparison.OrdinalIgnoreCase) ||
                     member.NormalizedKey.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                    member.Domain.Contains(search, StringComparison.OrdinalIgnoreCase)) ?? false);
+                    member.Domain.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    (member.OcrDisplayName?.Contains(
+                        search,
+                        StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (member.OcrText?.Contains(
+                        search,
+                        StringComparison.OrdinalIgnoreCase) ?? false)) ?? false);
     }
 
     private static bool MatchesKind(
@@ -160,6 +172,8 @@ public static class GalleryQuery
                 item.PageTitle,
             ContentKind.Url when !string.IsNullOrWhiteSpace(item.Domain) =>
                 item.Domain,
+            ContentKind.Image when !string.IsNullOrWhiteSpace(item.OcrDisplayName) =>
+                item.OcrDisplayName,
             ContentKind.Image => "클립보드 이미지",
             ContentKind.Collection => item.Members is { Count: > 0 }
                 ? $"묶음 {item.Members.Count}개"
