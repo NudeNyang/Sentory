@@ -15,7 +15,8 @@ namespace Sentory.Platform.Windows.Runtime;
 
 public sealed class DiscordDropOverlayRuntime : IDisposable
 {
-    private const int MinimumDragDistance = 8;
+    private static readonly TimeSpan PollInterval =
+        TimeSpan.FromMilliseconds(16);
 
     private readonly INativeWindowApi _native;
     private readonly IKakaoDropWindowApi _dropWindows;
@@ -25,11 +26,9 @@ public sealed class DiscordDropOverlayRuntime : IDisposable
     private readonly DispatcherTimer _timer;
     private readonly Window _window;
     private readonly DiscordDropPassThroughState _passThrough = new();
+    private readonly ExplorerFileDragActivationState _dragActivation = new();
     private bool _started;
-    private bool _leftWasDown;
-    private bool _explorerDragCandidate;
     private bool _oleDragOver;
-    private (int X, int Y) _dragStart;
     private DiscordDropTarget? _currentTarget;
 
     public DiscordDropOverlayRuntime(
@@ -68,7 +67,7 @@ public sealed class DiscordDropOverlayRuntime : IDisposable
         _window.Drop += OnDrop;
 
         _timer = new DispatcherTimer(
-            TimeSpan.FromMilliseconds(33),
+            PollInterval,
             DispatcherPriority.Input,
             OnTick,
             Dispatcher.CurrentDispatcher);
@@ -114,17 +113,6 @@ public sealed class DiscordDropOverlayRuntime : IDisposable
                 out var completedPaths))
         {
             ResetDrag();
-            if (!_locator.IsWithinTargetBounds(
-                    completedTarget,
-                    cursor.X,
-                    cursor.Y))
-            {
-                _diagnostic?.Invoke(
-                    "discord-drop-cancelled",
-                    "reason=released-outside-target-bounds");
-                return;
-            }
-
             _ = RegisterPassedThroughDropAsync(
                 completedTarget,
                 completedPaths);
@@ -135,6 +123,11 @@ public sealed class DiscordDropOverlayRuntime : IDisposable
         {
             return;
         }
+
+        var shouldInspectTarget = _dragActivation.Observe(
+            leftDown,
+            cursor,
+            IsExplorerForeground);
 
         if (!leftDown)
         {
@@ -148,19 +141,7 @@ public sealed class DiscordDropOverlayRuntime : IDisposable
             return;
         }
 
-        if (!_leftWasDown)
-        {
-            _leftWasDown = true;
-            _dragStart = cursor;
-            var foreground = _native.GetForegroundWindow();
-            _explorerDragCandidate = string.Equals(
-                _native.GetProcessName(_native.GetProcessId(foreground)),
-                "explorer",
-                StringComparison.OrdinalIgnoreCase);
-        }
-
-        if (!_explorerDragCandidate ||
-            DistanceFromStart(cursor) < MinimumDragDistance)
+        if (!shouldInspectTarget)
         {
             HideOverlay();
             return;
@@ -176,11 +157,13 @@ public sealed class DiscordDropOverlayRuntime : IDisposable
         ShowOverlay(target);
     }
 
-    private double DistanceFromStart((int X, int Y) cursor)
+    private bool IsExplorerForeground()
     {
-        var x = cursor.X - _dragStart.X;
-        var y = cursor.Y - _dragStart.Y;
-        return Math.Sqrt((x * x) + (y * y));
+        var foreground = _native.GetForegroundWindow();
+        return string.Equals(
+            _native.GetProcessName(_native.GetProcessId(foreground)),
+            "explorer",
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private void ShowOverlay(DiscordDropTarget target)
@@ -276,8 +259,7 @@ public sealed class DiscordDropOverlayRuntime : IDisposable
 
     private void ResetDrag()
     {
-        _leftWasDown = false;
-        _explorerDragCandidate = false;
+        _dragActivation.ResetActiveDrag();
         _oleDragOver = false;
     }
 

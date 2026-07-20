@@ -16,7 +16,8 @@ namespace Sentory.Platform.Windows.Runtime;
 
 public sealed class KakaoDropOverlayRuntime : IDisposable
 {
-    private const int MinimumDragDistance = 8;
+    private static readonly TimeSpan PollInterval =
+        TimeSpan.FromMilliseconds(16);
 
     private readonly INativeWindowApi _native;
     private readonly IKakaoDropWindowApi _dropWindows;
@@ -32,11 +33,9 @@ public sealed class KakaoDropOverlayRuntime : IDisposable
     private readonly TextBlock _heading;
     private readonly TextBlock _description;
     private readonly KakaoDropPassThroughState _passThrough = new();
+    private readonly ExplorerFileDragActivationState _dragActivation = new();
     private bool _started;
-    private bool _leftWasDown;
-    private bool _explorerDragCandidate;
     private bool _oleDragOver;
-    private (int X, int Y) _dragStart;
     private KakaoDropTarget? _currentTarget;
 
     public KakaoDropOverlayRuntime(
@@ -107,7 +106,7 @@ public sealed class KakaoDropOverlayRuntime : IDisposable
         _window.Drop += OnDrop;
 
         _timer = new DispatcherTimer(
-            TimeSpan.FromMilliseconds(33),
+            PollInterval,
             DispatcherPriority.Input,
             OnTick,
             Dispatcher.CurrentDispatcher);
@@ -130,8 +129,7 @@ public sealed class KakaoDropOverlayRuntime : IDisposable
         if (_captureRuntime.IsPaused)
         {
             _passThrough.Cancel();
-            _leftWasDown = false;
-            _explorerDragCandidate = false;
+            _dragActivation.ResetActiveDrag();
             _oleDragOver = false;
             HideOverlay();
             return;
@@ -142,8 +140,7 @@ public sealed class KakaoDropOverlayRuntime : IDisposable
         if (_passThrough.IsActive && _dropWindows.IsEscapeKeyDown())
         {
             _passThrough.Cancel();
-            _leftWasDown = false;
-            _explorerDragCandidate = false;
+            _dragActivation.ResetActiveDrag();
             _oleDragOver = false;
             _diagnostic?.Invoke(
                 "kakao-drop-cancelled",
@@ -156,20 +153,8 @@ public sealed class KakaoDropOverlayRuntime : IDisposable
                 out var completedTarget,
                 out var completedPaths))
         {
-            _leftWasDown = false;
-            _explorerDragCandidate = false;
+            _dragActivation.ResetActiveDrag();
             _oleDragOver = false;
-            if (!_locator.IsWithinTargetBounds(
-                    completedTarget,
-                    cursor.X,
-                    cursor.Y))
-            {
-                _diagnostic?.Invoke(
-                    "kakao-drop-cancelled",
-                    "reason=released-outside-target-bounds");
-                return;
-            }
-
             _ = CapturePassedThroughDropAsync(
                 completedTarget,
                 completedPaths);
@@ -181,6 +166,11 @@ public sealed class KakaoDropOverlayRuntime : IDisposable
             return;
         }
 
+        var shouldInspectTarget = _dragActivation.Observe(
+            leftDown,
+            cursor,
+            IsExplorerForeground);
+
         if (!leftDown)
         {
             if (_oleDragOver)
@@ -188,25 +178,11 @@ public sealed class KakaoDropOverlayRuntime : IDisposable
                 return;
             }
 
-            _leftWasDown = false;
-            _explorerDragCandidate = false;
             HideOverlay();
             return;
         }
 
-        if (!_leftWasDown)
-        {
-            _leftWasDown = true;
-            _dragStart = cursor;
-            var foreground = _native.GetForegroundWindow();
-            _explorerDragCandidate = string.Equals(
-                _native.GetProcessName(_native.GetProcessId(foreground)),
-                "explorer",
-                StringComparison.OrdinalIgnoreCase);
-        }
-
-        if (!_explorerDragCandidate ||
-            DistanceFromStart(cursor) < MinimumDragDistance)
+        if (!shouldInspectTarget)
         {
             HideOverlay();
             return;
@@ -222,11 +198,13 @@ public sealed class KakaoDropOverlayRuntime : IDisposable
         ShowOverlay(target);
     }
 
-    private double DistanceFromStart((int X, int Y) cursor)
+    private bool IsExplorerForeground()
     {
-        var x = cursor.X - _dragStart.X;
-        var y = cursor.Y - _dragStart.Y;
-        return Math.Sqrt((x * x) + (y * y));
+        var foreground = _native.GetForegroundWindow();
+        return string.Equals(
+            _native.GetProcessName(_native.GetProcessId(foreground)),
+            "explorer",
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private void ShowOverlay(KakaoDropTarget target)
@@ -305,7 +283,7 @@ public sealed class KakaoDropOverlayRuntime : IDisposable
         e.Effects = WpfDragDropEffects.None;
         e.Handled = false;
         _oleDragOver = false;
-        _explorerDragCandidate = false;
+        _dragActivation.ResetActiveDrag();
         HideOverlay();
     }
 
