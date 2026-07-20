@@ -62,10 +62,14 @@ public partial class GalleryWindow : Window
     private bool _scrollIndicatorThumbEmphasized;
     private bool _discordRepairNeeded;
     private bool _allowCloseWithOwnedWindows;
+    private string? _availableUpdateVersion;
+    private bool _updateInstallationInProgress;
     private CaptureRuntimeState _discordDetectionState =
         CaptureRuntimeState.Connecting;
 
     public event EventHandler? DiscordRepairRequested;
+
+    public event EventHandler? UpdateInstallRequested;
 
     public event Action<SourceApp, bool>? MessengerSupportChanged;
 
@@ -206,6 +210,27 @@ public partial class GalleryWindow : Window
             string.IsNullOrWhiteSpace(message)
                 ? SentoryLocalization.Text("NoRecentIssue")
                 : SentoryLocalization.Format("RecentIssueFormat", message));
+    }
+
+    public void SetAvailableUpdate(
+        string? version,
+        bool installationInProgress = false)
+    {
+        _availableUpdateVersion = version;
+        _updateInstallationInProgress = installationInProgress;
+        var presentation = UpdateAvailabilityUiPolicy.Resolve(
+            version,
+            installationInProgress);
+        UpdateAvailableButton.Visibility = presentation.ShowInstallAction
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        UpdateAvailableButton.IsEnabled = presentation.EnableInstallAction;
+        UpdateAvailableText.Text = presentation.ShowInstallAction
+            ? SentoryLocalization.Format("InstallUpdateVersionFormat", version!)
+            : string.Empty;
+        System.Windows.Automation.AutomationProperties.SetName(
+            UpdateAvailableButton,
+            UpdateAvailableText.Text);
     }
 
     private GalleryItemViewModel CreateViewModel(CapturedItemSummary item)
@@ -1605,6 +1630,9 @@ public partial class GalleryWindow : Window
         UpdateSortControls();
         UpdateIntegratedFilterControls();
         SetDiscordDetectionState(_discordDetectionState);
+        SetAvailableUpdate(
+            _availableUpdateVersion,
+            _updateInstallationInProgress);
         ApplyTheme(_isDarkTheme);
         RebuildItemViewModels();
     }
@@ -2389,6 +2417,11 @@ public partial class GalleryWindow : Window
         object sender,
         RoutedEventArgs e) =>
         SetRuntimeIssue(null);
+
+    private void UpdateAvailableButton_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        UpdateInstallRequested?.Invoke(this, EventArgs.Empty);
 
     private async void ShowFeedback(string message)
     {

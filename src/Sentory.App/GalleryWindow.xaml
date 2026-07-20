@@ -443,6 +443,28 @@
                                     Click="DismissRuntimeIssueButton_Click" />
                         </StackPanel>
                     </Border>
+                    <Button x:Name="UpdateAvailableButton"
+                            Height="32"
+                            Margin="0,7,0,0"
+                            Padding="10,0"
+                            HorizontalAlignment="Left"
+                            Background="{DynamicResource NoticeBackgroundBrush}"
+                            Foreground="{DynamicResource AccentBrush}"
+                            Style="{StaticResource ToolbarButtonStyle}"
+                            Visibility="Collapsed"
+                            AutomationProperties.AutomationId="UpdateAvailableButton"
+                            Click="UpdateAvailableButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE777;"
+                                       FontFamily="Segoe Fluent Icons"
+                                       FontSize="12"
+                                       VerticalAlignment="Center" />
+                            <TextBlock x:Name="UpdateAvailableText"
+                                       Margin="7,0,0,0"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
 
                 <Border Grid.Row="0"

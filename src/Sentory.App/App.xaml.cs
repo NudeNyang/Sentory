@@ -65,6 +65,8 @@ public partial class App : System.Windows.Application
     private bool _shuttingDown;
     private string? _lastRuntimeIssue;
     private readonly GitHubReleaseUpdateClient _updateClient = new();
+    private ReleaseUpdate? _availableUpdate;
+    private bool _updateInstallationInProgress;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -296,18 +298,14 @@ public partial class App : System.Windows.Application
                 cancellationToken);
             if (update is null || cancellationToken.IsCancellationRequested) return;
 
+            _availableUpdate = update;
+            settings.LastUpdateCheckAt = null;
+            _settingsStore.Save(settings);
+
             await await Dispatcher.InvokeAsync(async () =>
             {
-                var accepted = SentoryDialogWindow.Confirm(
-                    _galleryWindow,
-                    SentoryLocalization.Text("UpdateAvailableHeading"),
-                    SentoryLocalization.Format(
-                        "UpdateAvailableMessage",
-                        update.Version),
-                    SentoryLocalization.Text("InstallUpdate"),
-                    GetSavedDarkTheme());
-                if (!accepted) return;
-                await DownloadAndApplyUpdateAsync(update, cancellationToken);
+                _galleryWindow?.SetAvailableUpdate(update.Version);
+                await PromptAndInstallUpdateAsync(update, cancellationToken);
             });
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -321,6 +319,58 @@ public partial class App : System.Windows.Application
                 var settings = _settingsStore.Load();
                 settings.LastUpdateCheckAt = null;
                 _settingsStore.Save(settings);
+            }
+        }
+    }
+
+    private async void UpdateInstallRequested(object? sender, EventArgs e)
+    {
+        if (_availableUpdate is null || _maintenanceCancellation is null)
+        {
+            return;
+        }
+
+        await PromptAndInstallUpdateAsync(
+            _availableUpdate,
+            _maintenanceCancellation.Token);
+    }
+
+    private async Task PromptAndInstallUpdateAsync(
+        ReleaseUpdate update,
+        CancellationToken cancellationToken)
+    {
+        if (_updateInstallationInProgress || cancellationToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        var accepted = SentoryDialogWindow.Confirm(
+            _galleryWindow,
+            SentoryLocalization.Text("UpdateAvailableHeading"),
+            SentoryLocalization.Format(
+                "UpdateAvailableMessage",
+                update.Version),
+            SentoryLocalization.Text("InstallUpdate"),
+            GetSavedDarkTheme());
+        if (!accepted)
+        {
+            return;
+        }
+
+        _updateInstallationInProgress = true;
+        _galleryWindow?.SetAvailableUpdate(
+            update.Version,
+            installationInProgress: true);
+        try
+        {
+            await DownloadAndApplyUpdateAsync(update, cancellationToken);
+        }
+        finally
+        {
+            _updateInstallationInProgress = false;
+            if (!_shuttingDown)
+            {
+                _galleryWindow?.SetAvailableUpdate(update.Version);
             }
         }
     }
@@ -1061,6 +1111,7 @@ public partial class App : System.Windows.Application
                 _linkPreviewFetcher);
             _galleryWindow.DiscordRepairRequested += async (_, _) =>
                 await RepairDiscordConnectionAsync();
+            _galleryWindow.UpdateInstallRequested += UpdateInstallRequested;
             _galleryWindow.MessengerSupportChanged +=
                 ApplyMessengerSupportSetting;
             _galleryWindow.LanguageChanged += (_, _) => UpdatePauseUi();
@@ -1072,6 +1123,9 @@ public partial class App : System.Windows.Application
                 _discordSupportEnabled,
                 _kakaoSupportEnabled);
             _galleryWindow.SetRuntimeIssue(_lastRuntimeIssue);
+            _galleryWindow.SetAvailableUpdate(
+                _availableUpdate?.Version,
+                _updateInstallationInProgress);
             MainWindow = _galleryWindow;
             _galleryWindow.Closed += (_, _) =>
             {
