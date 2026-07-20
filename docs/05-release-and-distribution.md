@@ -69,9 +69,10 @@ winget install --id JRSoftware.InnoSetup -e
 공개 저장소에는 최소한 다음 항목을 같은 버전으로 올립니다.
 
 - 전체 소스 코드와 `v1.0.1` 태그
-- `LICENSE.txt`와 `COPYING`의 GNU GPL v3 전문
-- `README.md`, `README.en.md`, `SOURCE.md`
-- `PRIVACY.md`, `THIRD-PARTY-NOTICES.txt`, `CHANGELOG.md`, `SUPPORT.md`
+- `LICENSE.txt`의 GNU GPL v3 전문
+- `README.md`, `docs/README.en.md`
+- `docs/privacy.md`, `distribution/THIRD-PARTY-NOTICES.txt`, `CHANGELOG.md`,
+  `docs/support.md`
 - Release의 네 가지 Windows 패키지와 소스 ZIP
 - 각 배포 파일의 `.sha256` 및 `release-manifest.json`
 
@@ -101,12 +102,12 @@ GitHub가 자동으로 제공하는 “Source code” 파일만 이용해도 소
 
 ## 문서와 라이선스 파일
 
-- `LICENSE.txt`, `COPYING`: GNU GPL v3 전체 내용
-- `SOURCE.md`: 소스 코드 위치와 빌드 방법
-- `PRIVACY.md`: 로컬 데이터, 네트워크 요청과 삭제 방법
-- `THIRD-PARTY-NOTICES.txt`: 제3자 구성 요소와 라이선스
+- `LICENSE.txt`: GNU GPL v3 전체 내용
+- `README.md`: 소개, 다운로드와 소스 빌드 방법
+- `docs/privacy.md`: 로컬 데이터, 네트워크 요청과 삭제 방법
+- `distribution/THIRD-PARTY-NOTICES.txt`: 제3자 구성 요소와 라이선스
 - `CHANGELOG.md`: 버전별 변경 내용과 알려진 제한 사항
-- `SUPPORT.md`: 지원 범위와 안전한 버그 제보 방법
+- `docs/support.md`: 지원 범위와 안전한 버그 제보 방법
 - `distribution/README-KO.txt`: 최종 사용자 설치·사용 안내
 
 현재 실행 파일과 설치 프로그램에는 코드 서명이 적용되지 않았습니다. Windows가

@@ -255,7 +255,7 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
   Windows on ARM 장치에서 별도 검수한다.
 
 세부 구조와 이식 순서는
-[`docs/03-cross-platform-and-distribution-readiness.md`](./docs/03-cross-platform-and-distribution-readiness.md)에
+[`03-cross-platform-and-distribution-readiness.md`](./03-cross-platform-and-distribution-readiness.md)에
 기록한다.
 
 ## 개발 및 Git 작업 규칙

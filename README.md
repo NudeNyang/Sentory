@@ -1,6 +1,6 @@
 # Sentory
 
-[한국어](./README.md) | [English](./README.en.md)
+[한국어](./README.md) | [English](./docs/README.en.md)
 
 > 붙여넣기한 사진과 링크를 한 곳에서
 
@@ -46,7 +46,7 @@ Sentory는 메신저에서 주고받은 링크와 사진을 따로 모아 두는
 Sentory가 운영하는 서버로 보관 데이터를 보내지 않으며 분석 도구나 광고 추적기도
 넣지 않았습니다. 링크 미리보기를 가져올 때는 해당 웹사이트에 일반적인 네트워크
 요청을 보낼 수 있습니다. 자세한 내용은
-[개인정보 및 로컬 데이터 안내](./PRIVACY.md)를 확인해 주세요.
+[개인정보 및 로컬 데이터 안내](./docs/privacy.md)를 확인해 주세요.
 
 ## 다운로드
 
@@ -88,7 +88,7 @@ Windows on ARM용 파일은 빌드와 실행 파일 구조 검증을 마쳤지�
 
 문제를 제보할 때는 개인정보가 담긴 대화나 원본 사진 대신 Sentory 버전, Windows
 버전, 사용한 메신저와 재현 순서를 적어 주세요. 자세한 내용은
-[지원 정책](./SUPPORT.md)에 정리해 두었습니다.
+[지원 정책](./docs/support.md)에 정리해 두었습니다.
 
 ## 소스 코드와 빌드
 
@@ -107,8 +107,9 @@ dotnet test .\Sentory.sln --configuration Release
 배포 스크립트는 Windows x64·ARM64 설치형과 포터블 패키지, SHA-256 확인값,
 해당 버전의 소스 ZIP, `release-manifest.json`을 `artifacts` 폴더에 만듭니다.
 구현과 배포 절차는
-[PROJECT.md](./PROJECT.md)와
+[개발 문서](./docs/development.md)와
 [공개 배포 문서](./docs/05-release-and-distribution.md)에서 확인할 수 있습니다.
+그 밖의 기록은 [문서 모음](./docs/README.md)에 정리되어 있습니다.
 
 ## 라이선스
 
@@ -121,8 +122,7 @@ Sentory는 **GNU General Public License v3.0 only**로 배포합니다. 라이�
 Copyright © 2026 NudeNyang
 
 - [GNU GPL v3 전체 내용](./LICENSE.txt)
-- [소스 코드 안내](./SOURCE.md)
-- [개인정보 및 로컬 데이터](./PRIVACY.md)
-- [제3자 구성 요소](./THIRD-PARTY-NOTICES.txt)
+- [개인정보 및 로컬 데이터](./docs/privacy.md)
+- [제3자 구성 요소](./distribution/THIRD-PARTY-NOTICES.txt)
 - [변경 기록](./CHANGELOG.md)
-- [지원 정책](./SUPPORT.md)
+- [지원 정책](./docs/support.md)

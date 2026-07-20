@@ -1,6 +1,6 @@
 # Sentory
 
-[한국어](./README.md) | [English](./README.en.md)
+[한국어](../README.md) | [English](./README.en.md)
 
 > Keep the links and images you paste in one place
 
@@ -47,7 +47,7 @@ Sentory stores links, images, settings, and usage history in this local folder:
 Your library is not uploaded to a Sentory-operated server, and the app contains no
 analytics or advertising trackers. Fetching a link preview may send a normal network
 request to the website behind that link. See the
-[privacy and local data notice](./PRIVACY.md) for details.
+[privacy and local data notice](./privacy.md) for details.
 
 ## Download
 
@@ -88,7 +88,7 @@ but final testing on a physical ARM64 device is still pending.
 
 When reporting a problem, do not attach private conversations or original images.
 The Sentory version, Windows version, messenger name, and reproduction steps are
-usually enough. See the [support policy](./SUPPORT.md) for details.
+usually enough. See the [support policy](./support.md) for details.
 
 ## Source code and builds
 
@@ -107,8 +107,9 @@ dotnet test .\Sentory.sln --configuration Release
 The release script creates Windows x64 and ARM64 installers, portable packages,
 SHA-256 checksum files, the corresponding source archive, and
 `release-manifest.json` in the `artifacts` directory.
-Implementation and release details are documented in [PROJECT.md](./PROJECT.md) and
-the [release guide](./docs/05-release-and-distribution.md).
+Implementation and release details are documented in
+[development.md](./development.md) and the
+[release guide](./05-release-and-distribution.md).
 
 ## License
 
@@ -120,9 +121,8 @@ the GPL. Third-party components remain under their respective licenses.
 
 Copyright © 2026 NudeNyang
 
-- [GNU GPL v3 license text](./LICENSE.txt)
-- [Source code notice](./SOURCE.md)
-- [Privacy and local data](./PRIVACY.md)
-- [Third-party notices](./THIRD-PARTY-NOTICES.txt)
-- [Changelog](./CHANGELOG.md)
-- [Support policy](./SUPPORT.md)
+- [GNU GPL v3 license text](../LICENSE.txt)
+- [Privacy and local data](./privacy.md)
+- [Third-party notices](../distribution/THIRD-PARTY-NOTICES.txt)
+- [Changelog](../CHANGELOG.md)
+- [Support policy](./support.md)

@@ -13,9 +13,8 @@ $projectPath = Join-Path $repositoryRoot "src\Sentory.App\Sentory.App.csproj"
 $publishDirectory = Join-Path $repositoryRoot "src\Sentory.App\bin\publish\$Runtime"
 $guidePath = Join-Path $repositoryRoot "distribution\README-KO.txt"
 $licensePath = Join-Path $repositoryRoot "LICENSE.txt"
-$copyingPath = Join-Path $repositoryRoot "COPYING"
-$privacyPath = Join-Path $repositoryRoot "PRIVACY.md"
-$noticesPath = Join-Path $repositoryRoot "THIRD-PARTY-NOTICES.txt"
+$privacyPath = Join-Path $repositoryRoot "docs\privacy.md"
+$noticesPath = Join-Path $repositoryRoot "distribution\THIRD-PARTY-NOTICES.txt"
 $thirdPartyLicensesPath = Join-Path $repositoryRoot "distribution\licenses"
 $repositoryExecutable = Join-Path $repositoryRoot "Sentory.exe"
 
@@ -80,14 +79,12 @@ try {
     $stagedExecutable = Join-Path $stagingDirectory "Sentory.exe"
     $stagedGuide = Join-Path $stagingDirectory "README-KO.txt"
     $stagedLicense = Join-Path $stagingDirectory "LICENSE.txt"
-    $stagedCopying = Join-Path $stagingDirectory "COPYING"
     $stagedPrivacy = Join-Path $stagingDirectory "PRIVACY.md"
     $stagedNotices = Join-Path $stagingDirectory "THIRD-PARTY-NOTICES.txt"
     $stagedThirdPartyLicenses = Join-Path $stagingDirectory "licenses"
     Copy-Item -LiteralPath $publishedExecutable -Destination $stagedExecutable
     Copy-Item -LiteralPath $guidePath -Destination $stagedGuide
     Copy-Item -LiteralPath $licensePath -Destination $stagedLicense
-    Copy-Item -LiteralPath $copyingPath -Destination $stagedCopying
     Copy-Item -LiteralPath $privacyPath -Destination $stagedPrivacy
     Copy-Item -LiteralPath $noticesPath -Destination $stagedNotices
     Copy-Item `
@@ -97,7 +94,6 @@ try {
     foreach ($requiredDocument in @(
             $stagedGuide,
             $stagedLicense,
-            $stagedCopying,
             $stagedPrivacy,
             $stagedNotices,
             (Join-Path $stagedThirdPartyLicenses "Apache-2.0.txt"))) {
