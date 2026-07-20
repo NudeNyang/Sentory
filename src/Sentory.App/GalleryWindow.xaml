@@ -977,7 +977,7 @@
                                             Margin="20,20,0,0"
                                             HorizontalAlignment="Left"
                                             VerticalAlignment="Top"
-                                            AutomationProperties.Name="{Binding SelectionToolTip}"
+                                            AutomationProperties.Name="{Binding SelectionState.SelectionToolTip}"
                                             Background="{DynamicResource SurfaceBrush}"
                                             BorderBrush="{DynamicResource AccentBrush}"
                                             BorderThickness="1"
@@ -997,7 +997,7 @@
                                             </ControlTemplate>
                                         </Button.Template>
                                         <TextBlock x:Name="SelectionIconText"
-                                                   Text="{Binding SelectionIcon}"
+                                                   Text="{Binding SelectionState.SelectionIcon}"
                                                    FontFamily="Segoe Fluent Icons"
                                                    FontSize="14"
                                                    Foreground="{DynamicResource AccentBrush}" />
@@ -1146,7 +1146,7 @@
                                             Property="Visibility"
                                             Value="Visible" />
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding IsSelectionMode}"
+                                <DataTrigger Binding="{Binding SelectionState.IsSelectionMode}"
                                              Value="True">
                                     <Setter TargetName="SelectionButton"
                                             Property="Visibility"
@@ -1158,7 +1158,7 @@
                                             Property="Visibility"
                                             Value="Collapsed" />
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding IsSelected}"
+                                <DataTrigger Binding="{Binding SelectionState.IsSelected}"
                                              Value="True">
                                     <Setter TargetName="CardSelectionOverlay"
                                             Property="Visibility"

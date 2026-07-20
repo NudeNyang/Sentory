@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -31,8 +30,8 @@ public partial class GalleryWindow : Window
     private readonly SentorySettingsStore _settingsStore;
     private readonly LinkPreviewFetcher _linkPreviewFetcher;
     private readonly SentorySettings _settings;
-    private readonly ObservableCollection<GalleryItemViewModel> _visibleItems =
-        [];
+    private readonly ResettableObservableCollection<GalleryItemViewModel>
+        _visibleItems = [];
     private readonly List<GalleryItemViewModel> _allItems = [];
     private readonly HashSet<SourceApp> _sourceApps = [];
     private readonly HashSet<Guid> _selectedItemIds = [];
@@ -315,8 +314,9 @@ public partial class GalleryWindow : Window
                 : string.Empty,
             isCollection,
             collectionImages,
-            _selectionMode,
-            _selectedItemIds.Contains(item.ItemId));
+            new GalleryItemSelectionState(
+                _selectionMode,
+                _selectedItemIds.Contains(item.ItemId)));
     }
 
     private ImageSource? LoadThumbnail(string? relativePath)
@@ -415,11 +415,8 @@ public partial class GalleryWindow : Window
         var viewModels = _allItems.ToDictionary(
             item => item.Item.ItemId);
 
-        _visibleItems.Clear();
-        foreach (var item in orderedItems)
-        {
-            _visibleItems.Add(viewModels[item.ItemId]);
-        }
+        _visibleItems.ReplaceAll(orderedItems.Select(
+            item => viewModels[item.ItemId]));
 
         UpdateSelectionControls();
 
@@ -459,23 +456,19 @@ public partial class GalleryWindow : Window
             return;
         }
 
-        if (sender == AllFilterButton)
+        var nextFilter = sender == AllFilterButton
+            ? GalleryFilter.All
+            : sender == UrlFilterButton
+                ? GalleryFilter.Url
+                : sender == ImageFilterButton
+                    ? GalleryFilter.Image
+                    : GalleryFilter.Favorite;
+        if (_filter == nextFilter)
         {
-            _filter = GalleryFilter.All;
-        }
-        else if (sender == UrlFilterButton)
-        {
-            _filter = GalleryFilter.Url;
-        }
-        else if (sender == ImageFilterButton)
-        {
-            _filter = GalleryFilter.Image;
-        }
-        else
-        {
-            _filter = GalleryFilter.Favorite;
+            return;
         }
 
+        _filter = nextFilter;
         AllFilterButton.IsChecked = _filter == GalleryFilter.All;
         UrlFilterButton.IsChecked = _filter == GalleryFilter.Url;
         ImageFilterButton.IsChecked = _filter == GalleryFilter.Image;
@@ -631,7 +624,7 @@ public partial class GalleryWindow : Window
             _selectedItemIds.Add(item.Item.ItemId);
         }
 
-        RebuildItemViewModels();
+        RefreshSelectionState();
     }
 
     private void ClearSelectionButton_Click(
@@ -639,7 +632,7 @@ public partial class GalleryWindow : Window
         RoutedEventArgs e)
     {
         _selectedItemIds.Clear();
-        RebuildItemViewModels();
+        RefreshSelectionState();
     }
 
     private async void DeleteSelectedButton_Click(
@@ -683,6 +676,7 @@ public partial class GalleryWindow : Window
             _allItems.RemoveAll(item =>
                 _selectedItemIds.Contains(item.Item.ItemId));
             SetSelectionMode(false);
+            ApplyFilter();
             ShowFeedback(
                 result.MissingItems == 0
                     ? SentoryLocalization.Format(
@@ -712,7 +706,7 @@ public partial class GalleryWindow : Window
             _selectedItemIds.Clear();
         }
 
-        RebuildItemViewModels();
+        RefreshSelectionState();
     }
 
     private void GallerySelectionSurface_PreviewMouseLeftButtonDown(
@@ -800,7 +794,7 @@ public partial class GalleryWindow : Window
             {
                 _selectedItemIds.Clear();
                 e.Handled = true;
-                RebuildItemViewModels();
+                RefreshSelectionState();
             }
 
             return;
@@ -817,7 +811,7 @@ public partial class GalleryWindow : Window
         _selectedItemIds.UnionWith(_selectionDragPreviewIds);
         EndSelectionDrag();
         e.Handled = true;
-        RebuildItemViewModels();
+        RefreshSelectionState();
     }
 
     private void GallerySelectionSurface_LostMouseCapture(
@@ -1416,7 +1410,19 @@ public partial class GalleryWindow : Window
             _selectedItemIds.Remove(itemId);
         }
 
-        RebuildItemViewModels();
+        RefreshSelectionState();
+    }
+
+    private void RefreshSelectionState()
+    {
+        foreach (var item in _allItems)
+        {
+            item.SelectionState.Update(
+                _selectionMode,
+                _selectedItemIds.Contains(item.Item.ItemId));
+        }
+
+        UpdateSelectionControls();
     }
 
     private void RebuildItemViewModels()
@@ -2520,8 +2526,7 @@ public sealed record GalleryItemViewModel(
     string CollectionBadgeText,
     bool HasCollectionBadge,
     IReadOnlyList<GalleryImageViewModel> CollectionImages,
-    bool IsSelectionMode,
-    bool IsSelected)
+    GalleryItemSelectionState SelectionState)
 {
     public string Domain => IsCollection
         ? Item.Members?.FirstOrDefault(member =>
@@ -2548,11 +2553,6 @@ public sealed record GalleryItemViewModel(
         "CopyUsageFormat",
         Item.CopyCount);
 
-    public string SelectionIcon => IsSelected ? "\uE73E" : string.Empty;
-
-    public string SelectionToolTip => SentoryLocalization.Text(
-        IsSelected ? "DeselectItem" : "SelectItem");
-
     public string AutomationName =>
         SentoryLocalization.Format(
             "ItemAutomationFormat",
@@ -2561,6 +2561,56 @@ public sealed record GalleryItemViewModel(
             DateLabel,
             Item.CaptureCount,
             Item.CopyCount);
+}
+
+public sealed class GalleryItemSelectionState : INotifyPropertyChanged
+{
+    private bool _isSelectionMode;
+    private bool _isSelected;
+
+    public GalleryItemSelectionState(bool isSelectionMode, bool isSelected)
+    {
+        _isSelectionMode = isSelectionMode;
+        _isSelected = isSelected;
+    }
+
+    public bool IsSelectionMode => _isSelectionMode;
+
+    public bool IsSelected => _isSelected;
+
+    public string SelectionIcon => _isSelected ? "\uE73E" : string.Empty;
+
+    public string SelectionToolTip => SentoryLocalization.Text(
+        _isSelected ? "DeselectItem" : "SelectItem");
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    internal void Update(bool isSelectionMode, bool isSelected)
+    {
+        if (_isSelectionMode != isSelectionMode)
+        {
+            _isSelectionMode = isSelectionMode;
+            PropertyChanged?.Invoke(
+                this,
+                new PropertyChangedEventArgs(nameof(IsSelectionMode)));
+        }
+
+        if (_isSelected == isSelected)
+        {
+            return;
+        }
+
+        _isSelected = isSelected;
+        PropertyChanged?.Invoke(
+            this,
+            new PropertyChangedEventArgs(nameof(IsSelected)));
+        PropertyChanged?.Invoke(
+            this,
+            new PropertyChangedEventArgs(nameof(SelectionIcon)));
+        PropertyChanged?.Invoke(
+            this,
+            new PropertyChangedEventArgs(nameof(SelectionToolTip)));
+    }
 }
 
 public sealed record GalleryImageViewModel(
