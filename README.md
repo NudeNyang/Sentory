@@ -29,6 +29,7 @@ Sentory는 메신저에서 주고받은 링크와 사진을 따로 모아 두는
 - 묶음 안의 사진과 링크를 넘겨 보며 개별 복사 또는 원본 열기
 - 제목, URL, 도메인과 사진 속 OCR 글자 검색 및 메신저·종류·기간 필터
 - PP-OCRv5 모바일 모델을 이용한 다국어 사진의 로컬 자동 이름 생성
+- 보관함에 표시된 제목과 같은 파일명으로 사진 열기
 - 최신순, 오래된순, 저장 횟수, 복사 횟수 정렬
 - 즐겨찾기, 다중 선택, 일괄 삭제와 자동 정리
 - 페이지 제목, 사이트 아이콘, 대표 이미지와 설명을 포함한 링크 미리보기
@@ -52,7 +53,7 @@ Sentory가 운영하는 서버로 보관 데이터를 보내지 않으며 분석
 
 ## 다운로드
 
-현재 정식 버전은 **1.1.1**입니다. Windows 10/11 64비트에서 사용할 수 있으며,
+현재 정식 버전은 **1.1.2**입니다. Windows 10/11 64비트에서 사용할 수 있으며,
 [Releases](https://github.com/NudeNyang/Sentory/releases)에서 PC에 맞는 파일을
 내려받으면 됩니다. macOS와 Linux 버전도 계획하고 있지만 아직 배포 일정은
 정해지지 않았습니다.
@@ -110,7 +111,7 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 1.1.1
+.\scripts\Publish-Release.ps1 -Version 1.1.2
 ```
 
 배포 스크립트는 Windows x64·ARM64 설치형과 포터블 패키지, SHA-256 확인값,

@@ -31,6 +31,7 @@ and KakaoTalk can be enabled or disabled separately in settings.
 - Search by title, URL, domain, or text recognized inside an image, and filter by
   messenger, content type, or date
 - Generate useful local image titles with multilingual PP-OCRv5 mobile models
+- Open images with a file name that matches the title shown in the library
 - Sort by newest, oldest, save count, or copy count
 - Mark favorites, select several cards, delete in bulk, and clean up old items automatically
 - Show page titles, site icons, preview images, and descriptions for saved links
@@ -54,7 +55,7 @@ recognized text is stored in the Sentory database for search. See the
 
 ## Download
 
-The current stable version is **1.1.1**. It runs on 64-bit Windows 10 and 11. Download
+The current stable version is **1.1.2**. It runs on 64-bit Windows 10 and 11. Download
 the package for your PC from
 [Releases](https://github.com/NudeNyang/Sentory/releases). macOS and Linux versions
 are planned, but there is no release schedule yet.
@@ -107,7 +108,7 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 1.1.1
+.\scripts\Publish-Release.ps1 -Version 1.1.2
 ```
 
 The release script creates Windows x64 and ARM64 installers, portable packages,

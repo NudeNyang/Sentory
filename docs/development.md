@@ -241,6 +241,9 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
   메모리를 해제한다.
 - 손글씨, 붓글씨, 매우 작은 글자와 복잡한 배치는 보조 대상이다. 낮은 품질의
   결과를 억지로 제목으로 만드는 대신 원본 파일명이나 기본 날짜 제목을 유지한다.
+- 원본 사진의 `content_path`는 중복 제거와 무결성 확인을 위해 SHA-256 기반으로
+  유지한다. 사진을 외부 앱으로 열 때만 보관함 제목으로 된 사본을 Windows 임시
+  폴더에 만들며, 7일이 지난 사본은 앱 시작 시 정리한다.
 
 ## 링크 미리보기 정책
 
@@ -330,11 +333,11 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
 모두 종료한 뒤 저장소 루트에서 다음 명령을 실행한다.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\Start-InstalledDiagnostics.ps1 -Version 1.1.0
+powershell -ExecutionPolicy Bypass -File .\scripts\Start-InstalledDiagnostics.ps1 -Version 1.1.2
 ```
 
 설치판의 데이터베이스, 설정, 캐시와 Discord 추적 로그는
-`%LOCALAPPDATA%\Sentory-Diagnostics\1.1.0` 아래에 생성된다. 환경 변수는 실행한
+`%LOCALAPPDATA%\Sentory-Diagnostics\1.1.2` 아래에 생성된다. 환경 변수는 실행한
 프로세스와 그 접근성 작업자에만 전달되므로 기본 데이터 폴더와 시스템 환경
 변수는 바뀌지 않는다. Windows 자동 실행이나 일반 바로가기로 연 Sentory는 이
 진단 폴더를 사용하지 않으므로 재현할 때마다 위 스크립트로 실행한다.
