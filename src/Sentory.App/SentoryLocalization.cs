@@ -169,6 +169,7 @@ internal static class SentoryLocalization
             L("CopyUrl", "URL 복사", "Copy URL", "URL をコピー", "复制 URL"),
             L("CopyCollection", "묶음 복사", "Copy collection", "まとめてコピー", "复制组合"),
             L("CollectionLinks", "링크", "Links", "リンク", "链接"),
+            L("CurrentPhoto", "현재 사진", "Current photo", "現在の写真", "当前图片"),
             L("PreviousPhoto", "이전 사진", "Previous photo", "前の写真", "上一张图片"),
             L("NextPhoto", "다음 사진", "Next photo", "次の写真", "下一张图片"),
             L("CopyCurrentPhoto", "현재 사진 복사", "Copy current photo", "現在の写真をコピー", "复制当前图片"),

@@ -890,7 +890,9 @@ public partial class App : System.Windows.Application
 
     private void OpenGallery()
     {
-        if (_repository is null || _settingsStore is null)
+        if (_repository is null ||
+            _settingsStore is null ||
+            _linkPreviewFetcher is null)
         {
             return;
         }
@@ -900,7 +902,8 @@ public partial class App : System.Windows.Application
             _galleryWindow = new GalleryWindow(
                 _repository,
                 _paths,
-                _settingsStore);
+                _settingsStore,
+                _linkPreviewFetcher);
             _galleryWindow.DiscordRepairRequested += async (_, _) =>
                 await RepairDiscordConnectionAsync();
             _galleryWindow.DiscordSupportChanged += (_, _) =>

@@ -74,7 +74,6 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <Grid>
@@ -197,14 +196,57 @@
                                         AlignmentY="Center" />
                         </Border.Background>
                     </Border>
-                    <Border x:Name="PhotoNavigation"
-                            Margin="0,0,0,12"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Bottom"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Visibility="Collapsed">
-                        <StackPanel Orientation="Horizontal">
+                </Grid>
+            </Border>
+
+            <ScrollViewer Grid.Column="2"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock x:Name="DescriptionText"
+                               FontSize="13"
+                               LineHeight="20"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               TextWrapping="Wrap" />
+
+                    <StackPanel x:Name="PhotoControlsSection"
+                                Margin="0,18,0,0"
+                                Visibility="Collapsed">
+                        <TextBlock Margin="2,0,0,8"
+                                   Text="{DynamicResource Loc.Photos}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource MutedTextBrush}" />
+                        <Border Padding="11,7,7,7"
+                                Background="{DynamicResource InputBackgroundBrush}"
+                                CornerRadius="9">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center"
+                                           Text="{DynamicResource Loc.CurrentPhoto}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextBrush}" />
+                                <Button x:Name="CurrentPhotoCopyButton"
+                                        Grid.Column="1"
+                                        Width="31"
+                                        Height="31"
+                                        Padding="0"
+                                        ToolTip="{DynamicResource Loc.CopyCurrentPhoto}"
+                                        Style="{StaticResource DetailButtonStyle}"
+                                        Click="CopyCurrentPhotoButton_Click">
+                                    <TextBlock x:Name="CurrentPhotoCopyIcon"
+                                               Text="&#xE8C8;"
+                                               FontFamily="Segoe Fluent Icons"
+                                               FontSize="13" />
+                                </Button>
+                            </Grid>
+                        </Border>
+                        <StackPanel x:Name="PhotoNavigation"
+                                    Margin="0,2,0,0"
+                                    HorizontalAlignment="Center"
+                                    Orientation="Horizontal">
                             <Button x:Name="PreviousPhotoButton"
                                     Width="28"
                                     Height="28"
@@ -231,36 +273,8 @@
                                     ToolTip="{DynamicResource Loc.NextPhoto}"
                                     Style="{StaticResource DetailButtonStyle}"
                                     Click="NextPhotoButton_Click" />
-                            <Border Width="1"
-                                    Height="15"
-                                    Margin="7,0"
-                                    VerticalAlignment="Center"
-                                    Background="{DynamicResource LineBrush}" />
-                            <Button x:Name="CurrentPhotoCopyButton"
-                                    Width="30"
-                                    Height="28"
-                                    Padding="0"
-                                    ToolTip="{DynamicResource Loc.CopyCurrentPhoto}"
-                                    Style="{StaticResource DetailButtonStyle}"
-                                    Click="CopyCurrentPhotoButton_Click">
-                                <TextBlock x:Name="CurrentPhotoCopyIcon"
-                                           Text="&#xE8C8;"
-                                           FontFamily="Segoe Fluent Icons"
-                                           FontSize="13" />
-                            </Button>
                         </StackPanel>
-                    </Border>
-                </Grid>
-            </Border>
-
-            <ScrollViewer Grid.Column="2"
-                          VerticalScrollBarVisibility="Auto">
-                <StackPanel>
-                    <TextBlock x:Name="DescriptionText"
-                               FontSize="13"
-                               LineHeight="20"
-                               Foreground="{DynamicResource MutedTextBrush}"
-                               TextWrapping="Wrap" />
+                    </StackPanel>
 
                     <Border x:Name="OriginalBorder"
                             Margin="0,18,0,0"
@@ -429,23 +443,5 @@
             </ScrollViewer>
         </Grid>
 
-        <Grid Grid.Row="2">
-            <Button Content="{DynamicResource Loc.Delete}"
-                    HorizontalAlignment="Left"
-                    Foreground="{DynamicResource DangerBrush}"
-                    Style="{StaticResource DetailButtonStyle}"
-                    Click="DeleteButton_Click" />
-            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-                <Button x:Name="OpenButton"
-                        Margin="0,0,7,0"
-                        Content="{DynamicResource Loc.OpenOriginal}"
-                        Style="{StaticResource DetailButtonStyle}"
-                        Click="OpenButton_Click" />
-                <Button x:Name="CopyButton"
-                        Content="{DynamicResource Loc.CopyToClipboard}"
-                        Style="{StaticResource PrimaryDetailButtonStyle}"
-                        Click="CopyButton_Click" />
-            </StackPanel>
-        </Grid>
     </Grid>
 </Window>

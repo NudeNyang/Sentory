@@ -11,6 +11,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
+using Sentory.Infrastructure.Links;
 using Sentory.Platform.Windows.Interop;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using Point = System.Windows.Point;
@@ -27,6 +28,7 @@ public partial class GalleryWindow : Window
     private readonly ICaptureRepository _repository;
     private readonly SentoryDataPaths _paths;
     private readonly SentorySettingsStore _settingsStore;
+    private readonly LinkPreviewFetcher _linkPreviewFetcher;
     private readonly SentorySettings _settings;
     private readonly ObservableCollection<GalleryItemViewModel> _visibleItems =
         [];
@@ -71,12 +73,14 @@ public partial class GalleryWindow : Window
     public GalleryWindow(
         ICaptureRepository repository,
         SentoryDataPaths paths,
-        SentorySettingsStore settingsStore)
+        SentorySettingsStore settingsStore,
+        LinkPreviewFetcher linkPreviewFetcher)
     {
         InitializeComponent();
         _repository = repository;
         _paths = paths;
         _settingsStore = settingsStore;
+        _linkPreviewFetcher = linkPreviewFetcher;
         _settings = settingsStore.Load();
         _sortMode = LoadSortPreference(_settings.SortMode);
         _dateRange = LoadDatePreference(_settings.FilterDateRange);
@@ -1951,7 +1955,8 @@ public partial class GalleryWindow : Window
         var window = new ItemDetailWindow(
             item,
             _isDarkTheme,
-            CopyDetailImageAsync)
+            CopyDetailImageAsync,
+            LoadDetailLinkArtworkAsync)
         {
             Owner = this
         };
@@ -2084,6 +2089,37 @@ public partial class GalleryWindow : Window
         {
             return false;
         }
+    }
+
+    private async Task<GalleryLinkArtwork?> LoadDetailLinkArtworkAsync(
+        DetailLinkViewModel link)
+    {
+        var cached = _linkPreviewFetcher.FindCachedArtwork(link.NormalizedKey);
+        if (cached is null)
+        {
+            var preview = await _linkPreviewFetcher.FetchAsync(
+                new LinkPreviewCandidate(
+                    Guid.Empty,
+                    link.Url,
+                    link.NormalizedKey));
+            var relativePath = preview.PreviewImagePath ?? preview.SiteIconPath;
+            if (relativePath is null)
+            {
+                return null;
+            }
+
+            cached = new CachedLinkPreviewArtwork(
+                relativePath,
+                preview.PreviewImagePath is null);
+        }
+
+        var image = LoadThumbnail(cached.RelativePath);
+        return image is null
+            ? null
+            : new GalleryLinkArtwork(
+                image,
+                cached.IsSiteIcon ? Stretch.Uniform : Stretch.UniformToFill,
+                cached.IsSiteIcon ? new Thickness(72) : new Thickness(0));
     }
 
     private System.Windows.DataObject? CreateCollectionClipboardData(
@@ -2358,3 +2394,8 @@ public sealed record GalleryItemViewModel(
 public sealed record GalleryImageViewModel(
     string? ContentPath,
     ImageSource? Thumbnail);
+
+public sealed record GalleryLinkArtwork(
+    ImageSource Image,
+    Stretch Stretch,
+    Thickness Margin);

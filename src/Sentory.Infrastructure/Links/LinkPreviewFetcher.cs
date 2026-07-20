@@ -47,9 +47,7 @@ public sealed class LinkPreviewFetcher : IDisposable
                 return Unavailable(fetchedAt);
             }
 
-            var key = Convert.ToHexString(
-                    SHA256.HashData(Encoding.UTF8.GetBytes(candidate.NormalizedKey)))
-                .ToLowerInvariant();
+            var key = CreateCacheKey(candidate.NormalizedKey);
 
             using var response = await SendWithRedirectsAsync(
                 pageUri,
@@ -123,6 +121,52 @@ public sealed class LinkPreviewFetcher : IDisposable
             return Unavailable(fetchedAt);
         }
     }
+
+    public CachedLinkPreviewArtwork? FindCachedArtwork(string normalizedKey)
+    {
+        if (string.IsNullOrWhiteSpace(normalizedKey) ||
+            !Directory.Exists(_paths.LinkPreviewsDirectory))
+        {
+            return null;
+        }
+
+        try
+        {
+            var key = CreateCacheKey(normalizedKey);
+            var cover = Directory.EnumerateFiles(
+                    _paths.LinkPreviewsDirectory,
+                    $"{key}-cover.*",
+                    SearchOption.TopDirectoryOnly)
+                .FirstOrDefault();
+            if (cover is not null)
+            {
+                return new CachedLinkPreviewArtwork(
+                    Path.Combine("link-previews", Path.GetFileName(cover)),
+                    false);
+            }
+
+            var icon = Directory.EnumerateFiles(
+                    _paths.LinkPreviewsDirectory,
+                    $"{key}-icon.*",
+                    SearchOption.TopDirectoryOnly)
+                .FirstOrDefault();
+            return icon is null
+                ? null
+                : new CachedLinkPreviewArtwork(
+                    Path.Combine("link-previews", Path.GetFileName(icon)),
+                    true);
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    private static string CreateCacheKey(string normalizedKey) =>
+        Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes(normalizedKey)))
+            .ToLowerInvariant();
 
     private async Task<string?> DownloadAssetAsync(
         Uri? uri,
@@ -347,3 +391,7 @@ public sealed class LinkPreviewFetcher : IDisposable
         }
     }
 }
+
+public sealed record CachedLinkPreviewArtwork(
+    string RelativePath,
+    bool IsSiteIcon);

@@ -105,6 +105,10 @@ public sealed class LinkPreviewTests : IDisposable
         Assert.NotNull(result.PreviewImagePath);
         Assert.True(File.Exists(Path.Combine(_root, result.SiteIconPath!)));
         Assert.True(File.Exists(Path.Combine(_root, result.PreviewImagePath!)));
+        var cached = fetcher.FindCachedArtwork("https://example.com/post");
+        Assert.NotNull(cached);
+        Assert.False(cached.IsSiteIcon);
+        Assert.Equal(result.PreviewImagePath, cached.RelativePath);
         Assert.Equal(3, handler.RequestCount);
     }
 
@@ -137,6 +141,11 @@ public sealed class LinkPreviewTests : IDisposable
         Assert.NotNull(result.SiteIconPath);
         Assert.Null(result.PreviewImagePath);
         Assert.True(File.Exists(Path.Combine(_root, result.SiteIconPath!)));
+        var cached = fetcher.FindCachedArtwork(
+            "https://example.com/private");
+        Assert.NotNull(cached);
+        Assert.True(cached.IsSiteIcon);
+        Assert.Equal(result.SiteIconPath, cached.RelativePath);
         Assert.Equal(2, handler.RequestCount);
     }
 

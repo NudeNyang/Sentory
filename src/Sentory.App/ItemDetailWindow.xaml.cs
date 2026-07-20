@@ -19,17 +19,25 @@ public partial class ItemDetailWindow : Window
     private readonly IReadOnlyList<GalleryImageViewModel> _detailImages;
     private readonly IReadOnlyList<DetailLinkViewModel> _detailLinks;
     private readonly Func<string?, Task<bool>> _copyImageAsync;
+    private readonly Func<DetailLinkViewModel, Task<GalleryLinkArtwork?>>
+        _loadLinkArtworkAsync;
+    private readonly Dictionary<string, GalleryLinkArtwork?> _linkArtworkCache =
+        new(StringComparer.OrdinalIgnoreCase);
     private int _collectionImageIndex;
     private int _linkIndex;
+    private int _linkArtworkGeneration;
 
     public ItemDetailWindow(
         GalleryItemViewModel item,
         bool isDarkTheme,
-        Func<string?, Task<bool>> copyImageAsync)
+        Func<string?, Task<bool>> copyImageAsync,
+        Func<DetailLinkViewModel, Task<GalleryLinkArtwork?>>
+            loadLinkArtworkAsync)
     {
         InitializeComponent();
         _isDarkTheme = isDarkTheme;
         _copyImageAsync = copyImageAsync;
+        _loadLinkArtworkAsync = loadLinkArtworkAsync;
         _detailImages = item.IsCollection
             ? item.CollectionImages
             : item.IsImage && item.Thumbnail is not null
@@ -40,10 +48,16 @@ public partial class ItemDetailWindow : Window
         _detailLinks = item.IsCollection
             ? item.Item.Members?
                 .Where(member => member.Kind == ContentKind.Url)
-                .Select(member => new DetailLinkViewModel(member.OriginalUrl))
+                .Select(member => new DetailLinkViewModel(
+                    member.OriginalUrl,
+                    member.NormalizedKey,
+                    member.Domain))
                 .ToArray() ?? []
             : !item.IsImage && !string.IsNullOrWhiteSpace(item.Item.OriginalUrl)
-                ? [new DetailLinkViewModel(item.Item.OriginalUrl)]
+                ? [new DetailLinkViewModel(
+                    item.Item.OriginalUrl,
+                    item.Item.NormalizedKey,
+                    item.Item.Domain)]
                 : [];
         SentoryTheme.Apply(Resources, isDarkTheme);
         TypeText.Text = item.TypeLabel;
@@ -71,10 +85,14 @@ public partial class ItemDetailWindow : Window
         if (_detailLinks.Count > 0)
         {
             CollectionLinksSection.Visibility = Visibility.Visible;
-            ShowLink(0);
+            SetLinkSelection(0);
             LinkNavigation.Visibility = _detailLinks.Count > 1
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+            if (_detailImages.Count == 0)
+            {
+                _ = ShowLinkAsync(0);
+            }
         }
         CaptureCountText.Text = SentoryLocalization.Format(
             "TimesFormat",
@@ -88,16 +106,6 @@ public partial class ItemDetailWindow : Window
         SavedAtText.Text = item.Item.LastCapturedAt.LocalDateTime
             .ToString("yyyy. M. d. HH:mm");
         DeliveryText.Text = item.StatusLabel;
-        var opensImage = item.IsCollection
-            ? item.Item.Members?.FirstOrDefault()?.Kind == ContentKind.Image
-            : item.IsImage;
-        OpenButton.Content = SentoryLocalization.Text(
-            opensImage ? "OpenPhoto" : "OpenLink");
-        CopyButton.Content = SentoryLocalization.Text(
-            item.IsCollection
-                ? "CopyCollection"
-                : item.IsImage ? "CopyPhoto" : "CopyUrl");
-
         if (item.Thumbnail is not null)
         {
             ArtworkImageBrush.ImageSource = item.Thumbnail;
@@ -109,21 +117,13 @@ public partial class ItemDetailWindow : Window
         if (_detailImages.Count > 0)
         {
             ShowCollectionImage(0, animate: false);
-            ArtworkImage.Margin = new Thickness(18, 18, 18, 58);
-            PhotoNavigation.Visibility = Visibility.Visible;
+            PhotoControlsSection.Visibility = Visibility.Visible;
+            PhotoNavigation.Visibility = _detailImages.Count > 1
+                ? Visibility.Visible
+                : Visibility.Collapsed;
             if (_detailImages.Count > 1)
             {
-                ArtworkImage.Margin = new Thickness(22, 20, 22, 60);
-                ArtworkImage.BorderThickness = new Thickness(2);
-                StackBackOne.Visibility = Visibility.Visible;
-                StackBackTwo.Visibility = _detailImages.Count > 2
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
-            }
-            else
-            {
-                PreviousPhotoButton.Visibility = Visibility.Collapsed;
-                NextPhotoButton.Visibility = Visibility.Collapsed;
+                ArtworkImage.Margin = new Thickness(22);
             }
         }
 
@@ -148,11 +148,15 @@ public partial class ItemDetailWindow : Window
     private void NextPhotoButton_Click(object sender, RoutedEventArgs e) =>
         ShowCollectionImage(_collectionImageIndex + 1, animate: true);
 
-    private void PreviousLinkButton_Click(object sender, RoutedEventArgs e) =>
-        ShowLink(_linkIndex - 1);
+    private async void PreviousLinkButton_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        await ShowLinkAsync(_linkIndex - 1);
 
-    private void NextLinkButton_Click(object sender, RoutedEventArgs e) =>
-        ShowLink(_linkIndex + 1);
+    private async void NextLinkButton_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        await ShowLinkAsync(_linkIndex + 1);
 
     private async void CopyCurrentPhotoButton_Click(
         object sender,
@@ -214,14 +218,27 @@ public partial class ItemDetailWindow : Window
             return;
         }
 
+        _linkArtworkGeneration++;
         _collectionImageIndex =
             (requestedIndex % _detailImages.Count + _detailImages.Count) %
             _detailImages.Count;
         ArtworkImageBrush.ImageSource =
             _detailImages[_collectionImageIndex].Thumbnail;
         ArtworkImageBrush.Stretch = Stretch.Uniform;
+        ArtworkImage.Margin = _detailImages.Count > 1
+            ? new Thickness(22)
+            : new Thickness(12);
+        ArtworkImage.BorderThickness = _detailImages.Count > 1
+            ? new Thickness(2)
+            : new Thickness(0);
         ArtworkImage.Visibility = Visibility.Visible;
         ArtworkFallback.Visibility = Visibility.Collapsed;
+        StackBackOne.Visibility = _detailImages.Count > 1
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        StackBackTwo.Visibility = _detailImages.Count > 2
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         UpdatePageDots(
             PhotoPageDots,
             _detailImages.Count,
@@ -253,7 +270,7 @@ public partial class ItemDetailWindow : Window
         }
     }
 
-    private void ShowLink(int requestedIndex)
+    private void SetLinkSelection(int requestedIndex)
     {
         if (_detailLinks.Count == 0)
         {
@@ -266,6 +283,46 @@ public partial class ItemDetailWindow : Window
         CollectionLinksList.ItemsSource =
             new[] { _detailLinks[_linkIndex] };
         UpdatePageDots(LinkPageDots, _detailLinks.Count, _linkIndex);
+    }
+
+    private async Task ShowLinkAsync(int requestedIndex)
+    {
+        SetLinkSelection(requestedIndex);
+        var link = _detailLinks[_linkIndex];
+        var generation = ++_linkArtworkGeneration;
+        ShowLinkFallback(link);
+
+        if (!_linkArtworkCache.TryGetValue(
+                link.NormalizedKey,
+                out var artwork))
+        {
+            artwork = await _loadLinkArtworkAsync(link);
+            _linkArtworkCache[link.NormalizedKey] = artwork;
+        }
+
+        if (generation != _linkArtworkGeneration || artwork is null)
+        {
+            return;
+        }
+
+        ArtworkImageBrush.ImageSource = artwork.Image;
+        ArtworkImageBrush.Stretch = artwork.Stretch;
+        ArtworkImage.Margin = artwork.Margin;
+        ArtworkImage.BorderThickness = new Thickness(0);
+        ArtworkImage.Visibility = Visibility.Visible;
+        ArtworkFallback.Visibility = Visibility.Collapsed;
+    }
+
+    private void ShowLinkFallback(DetailLinkViewModel link)
+    {
+        StackBackOne.Visibility = Visibility.Collapsed;
+        StackBackTwo.Visibility = Visibility.Collapsed;
+        ArtworkImage.Visibility = Visibility.Collapsed;
+        ArtworkFallback.Visibility = Visibility.Visible;
+        InitialText.Text = string.IsNullOrWhiteSpace(link.Domain)
+            ? "L"
+            : link.Domain[..1].ToUpperInvariant();
+        DomainText.Text = link.Domain;
     }
 
     private void UpdatePageDots(
@@ -296,4 +353,7 @@ public partial class ItemDetailWindow : Window
     }
 }
 
-public sealed record DetailLinkViewModel(string Url);
+public sealed record DetailLinkViewModel(
+    string Url,
+    string NormalizedKey,
+    string Domain);
