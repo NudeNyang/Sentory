@@ -88,6 +88,14 @@ public sealed class DiscordDropOverlayRuntime : IDisposable
 
     private void OnTick(object? sender, EventArgs e)
     {
+        if (_captureRuntime.IsPaused)
+        {
+            _passThrough.Cancel();
+            ResetDrag();
+            HideOverlay();
+            return;
+        }
+
         var leftDown = _dropWindows.IsLeftMouseButtonDown();
         var cursor = _dropWindows.GetCursorPosition();
         if (_passThrough.IsActive && _dropWindows.IsEscapeKeyDown())

@@ -5,15 +5,42 @@ namespace Sentory.Platform.Windows.Runtime;
 public sealed class CompositeCaptureRuntime :
     ICaptureRuntime,
     ICaptureRuntimeStatusSource,
-    ICaptureRuntimeRecoveryController
+    ICaptureRuntimeRecoveryController,
+    ICaptureRuntimeSourceController
 {
     private readonly IReadOnlyList<ICaptureRuntime> _runtimes;
+    private readonly IReadOnlyDictionary<SourceApp, ICaptureRuntime>
+        _runtimesBySource;
+    private readonly Dictionary<SourceApp, bool> _sourceEnabled = [];
     private bool _paused;
     private bool _started;
 
     public CompositeCaptureRuntime(params ICaptureRuntime[] runtimes)
+        : this(runtimes, new Dictionary<SourceApp, ICaptureRuntime>())
+    {
+    }
+
+    public CompositeCaptureRuntime(
+        params (SourceApp SourceApp, ICaptureRuntime Runtime)[] runtimes)
+        : this(
+            runtimes.Select(value => value.Runtime).ToArray(),
+            runtimes.ToDictionary(
+                value => value.SourceApp,
+                value => value.Runtime))
+    {
+    }
+
+    private CompositeCaptureRuntime(
+        IReadOnlyList<ICaptureRuntime> runtimes,
+        IReadOnlyDictionary<SourceApp, ICaptureRuntime> runtimesBySource)
     {
         _runtimes = runtimes;
+        _runtimesBySource = runtimesBySource;
+        foreach (var sourceApp in _runtimesBySource.Keys)
+        {
+            _sourceEnabled[sourceApp] = true;
+        }
+
         foreach (var runtime in _runtimes)
         {
             runtime.Captured += ForwardCaptured;
@@ -37,11 +64,22 @@ public sealed class CompositeCaptureRuntime :
         set
         {
             _paused = value;
-            foreach (var runtime in _runtimes)
-            {
-                runtime.IsPaused = value;
-            }
+            ApplyPauseStates();
         }
+    }
+
+    public bool IsSourceEnabled(SourceApp sourceApp) =>
+        !_sourceEnabled.TryGetValue(sourceApp, out var enabled) || enabled;
+
+    public void SetSourceEnabled(SourceApp sourceApp, bool enabled)
+    {
+        if (!_runtimesBySource.ContainsKey(sourceApp))
+        {
+            return;
+        }
+
+        _sourceEnabled[sourceApp] = enabled;
+        ApplyPauseStates();
     }
 
     public void Start()
@@ -67,6 +105,18 @@ public sealed class CompositeCaptureRuntime :
             {
                 controller.RequestRecovery(sourceApp);
             }
+        }
+    }
+
+    private void ApplyPauseStates()
+    {
+        foreach (var runtime in _runtimes)
+        {
+            var source = _runtimesBySource
+                .FirstOrDefault(pair => ReferenceEquals(pair.Value, runtime));
+            runtime.IsPaused = _paused ||
+                               (source.Value is not null &&
+                                !IsSourceEnabled(source.Key));
         }
     }
 

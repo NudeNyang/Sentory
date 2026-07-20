@@ -620,6 +620,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         Assert.Equal("Oldest", settings.SortMode);
         Assert.False(settings.IsDarkTheme);
         Assert.True(settings.DiscordSupportEnabled);
+        Assert.True(settings.KakaoTalkSupportEnabled);
         Assert.False(settings.DiscordAccessibilityPrepared);
         settings.IsDarkTheme = true;
         settings.DiscordAccessibilityPrepared = true;
@@ -633,12 +634,30 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         var restored = store.Load();
         Assert.True(restored.IsDarkTheme);
         Assert.True(restored.DiscordSupportEnabled);
+        Assert.True(restored.KakaoTalkSupportEnabled);
         Assert.True(restored.DiscordAccessibilityPrepared);
         Assert.Equal(120, restored.WindowLeft);
         Assert.Equal(80, restored.WindowTop);
         Assert.Equal(1100, restored.WindowWidth);
         Assert.Equal(720, restored.WindowHeight);
         Assert.True(restored.WindowMaximized);
+    }
+
+    [Fact]
+    public void SettingsStorePersistsIndependentMessengerDetectionStates()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var store = new SentorySettingsStore(paths);
+        store.Save(new SentorySettings
+        {
+            DiscordSupportEnabled = false,
+            KakaoTalkSupportEnabled = true
+        });
+
+        var restored = store.Load();
+
+        Assert.False(restored.DiscordSupportEnabled);
+        Assert.True(restored.KakaoTalkSupportEnabled);
     }
 
     [Fact]

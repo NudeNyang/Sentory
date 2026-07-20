@@ -22,6 +22,8 @@ public sealed class SentorySettings
 
     public bool DiscordSupportEnabled { get; set; } = true;
 
+    public bool KakaoTalkSupportEnabled { get; set; } = true;
+
     public bool DiscordAccessibilityPrepared { get; set; }
 
     public double? WindowLeft { get; set; }

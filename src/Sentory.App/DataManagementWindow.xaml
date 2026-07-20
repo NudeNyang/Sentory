@@ -307,17 +307,16 @@
                                            FontSize="13"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextBrush}" />
-                                <TextBlock Margin="0,4,0,0"
-                                           Text="{DynamicResource Loc.KakaoDescription}"
+                                <TextBlock x:Name="KakaoStatusText"
+                                           Margin="0,4,0,0"
                                            FontSize="11"
                                            Foreground="{DynamicResource MutedTextBrush}" />
                             </StackPanel>
-                            <TextBlock HorizontalAlignment="Right"
-                                       VerticalAlignment="Center"
-                                       Text="{DynamicResource Loc.DetectionReady}"
-                                       FontSize="11"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource AccentBrush}" />
+                            <Button x:Name="KakaoSupportToggleButton"
+                                    Width="92"
+                                    HorizontalAlignment="Right"
+                                    Style="{StaticResource ActionButtonStyle}"
+                                    Click="KakaoSupportToggleButton_Click" />
                         </Grid>
                     </StackPanel>
                 </Border>

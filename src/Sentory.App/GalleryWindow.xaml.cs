@@ -64,7 +64,7 @@ public partial class GalleryWindow : Window
 
     public event EventHandler? DiscordRepairRequested;
 
-    public event EventHandler? DiscordSupportChanged;
+    public event Action<SourceApp, bool>? MessengerSupportChanged;
 
     public event EventHandler? LanguageChanged;
 
@@ -157,6 +157,7 @@ public partial class GalleryWindow : Window
         DiscordConnectionBanner.Visibility = needed
             ? Visibility.Visible
             : Visibility.Collapsed;
+        UpdateDiscordDetectionVisibility();
     }
 
     public void SetDiscordDetectionState(CaptureRuntimeState state)
@@ -168,6 +169,26 @@ public partial class GalleryWindow : Window
             Resources,
             state,
             _isDarkTheme);
+        UpdateDiscordDetectionVisibility();
+    }
+
+    public void SetMessengerSupportState(
+        bool discordEnabled,
+        bool kakaoEnabled)
+    {
+        _settings.DiscordSupportEnabled = discordEnabled;
+        _settings.KakaoTalkSupportEnabled = kakaoEnabled;
+        UpdateDiscordDetectionVisibility();
+    }
+
+    private void UpdateDiscordDetectionVisibility()
+    {
+        DiscordDetectionPanel.Visibility =
+            _settings.DiscordSupportEnabled &&
+            (_discordRepairNeeded ||
+             _discordDetectionState != CaptureRuntimeState.Ready)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
     }
 
     public void SetRuntimeIssue(string? message)
@@ -497,6 +518,8 @@ public partial class GalleryWindow : Window
             Owner = this
         };
         window.ThemeSelectionChanged += ApplyThemeSelection;
+        window.MessengerSupportSelectionChanged +=
+            ApplyMessengerSupportSelection;
         try
         {
             window.ShowDialog();
@@ -504,6 +527,8 @@ public partial class GalleryWindow : Window
         finally
         {
             window.ThemeSelectionChanged -= ApplyThemeSelection;
+            window.MessengerSupportSelectionChanged -=
+                ApplyMessengerSupportSelection;
         }
         if (window.HasDataChanged)
         {
@@ -524,15 +549,27 @@ public partial class GalleryWindow : Window
             LanguageChanged?.Invoke(this, EventArgs.Empty);
         }
 
-        if (window.DiscordSupportChanged)
-        {
-            DiscordSupportChanged?.Invoke(this, EventArgs.Empty);
-        }
-
         if (window.DiscordRepairRequested)
         {
             DiscordRepairRequested?.Invoke(this, EventArgs.Empty);
         }
+    }
+
+    private void ApplyMessengerSupportSelection(
+        SourceApp sourceApp,
+        bool enabled)
+    {
+        if (sourceApp == SourceApp.Discord)
+        {
+            _settings.DiscordSupportEnabled = enabled;
+            UpdateDiscordDetectionVisibility();
+        }
+        else if (sourceApp == SourceApp.KakaoTalk)
+        {
+            _settings.KakaoTalkSupportEnabled = enabled;
+        }
+
+        MessengerSupportChanged?.Invoke(sourceApp, enabled);
     }
 
     private void ApplyThemeSelection(bool isDark)
@@ -1785,6 +1822,8 @@ public partial class GalleryWindow : Window
             _settings.LastAutoCleanupAt = current.LastAutoCleanupAt;
             _settings.DiscordSupportEnabled =
                 current.DiscordSupportEnabled;
+            _settings.KakaoTalkSupportEnabled =
+                current.KakaoTalkSupportEnabled;
             _settings.DiscordAccessibilityPrepared =
                 current.DiscordAccessibilityPrepared;
             _settingsStore.Save(_settings);

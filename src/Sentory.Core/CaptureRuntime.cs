@@ -35,6 +35,13 @@ public interface ICaptureRuntimeRecoveryController
     void RequestRecovery(SourceApp sourceApp);
 }
 
+public interface ICaptureRuntimeSourceController
+{
+    bool IsSourceEnabled(SourceApp sourceApp);
+
+    void SetSourceEnabled(SourceApp sourceApp, bool enabled);
+}
+
 public interface ICaptureRuntime : IAsyncDisposable
 {
     event EventHandler<CaptureNotification>? Captured;

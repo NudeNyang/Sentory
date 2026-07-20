@@ -41,6 +41,31 @@ public sealed class CompositeCaptureRuntimeTests
     }
 
     [Fact]
+    public void PausesOnlyTheDisabledMessengerAndPreservesGlobalPause()
+    {
+        var kakao = new FakeRuntime();
+        var discord = new FakeRuntime();
+        var composite = new CompositeCaptureRuntime(
+            (SourceApp.KakaoTalk, kakao),
+            (SourceApp.Discord, discord));
+
+        composite.SetSourceEnabled(SourceApp.Discord, false);
+
+        Assert.False(kakao.IsPaused);
+        Assert.True(discord.IsPaused);
+        Assert.True(composite.IsSourceEnabled(SourceApp.KakaoTalk));
+        Assert.False(composite.IsSourceEnabled(SourceApp.Discord));
+
+        composite.IsPaused = true;
+        Assert.True(kakao.IsPaused);
+        Assert.True(discord.IsPaused);
+
+        composite.IsPaused = false;
+        Assert.False(kakao.IsPaused);
+        Assert.True(discord.IsPaused);
+    }
+
+    [Fact]
     public async Task DisposesEveryChildRuntime()
     {
         var first = new FakeRuntime();

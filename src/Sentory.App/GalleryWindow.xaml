@@ -390,8 +390,10 @@
                                Text="{DynamicResource Loc.Tagline}"
                                FontSize="13"
                                Foreground="{DynamicResource MutedTextBrush}" />
-                    <StackPanel Margin="0,9,0,0"
+                    <StackPanel x:Name="DiscordDetectionPanel"
+                                Margin="0,9,0,0"
                                 Orientation="Horizontal"
+                                Visibility="Collapsed"
                                 AutomationProperties.Name="{DynamicResource Loc.DiscordDetection}">
                         <Ellipse Width="8" Height="8"
                                  Margin="0,0,7,0"

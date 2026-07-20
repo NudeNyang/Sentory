@@ -50,7 +50,7 @@ public partial class DataManagementWindow : Window
             "VersionFormat",
             GetVersionLabel());
         UpdateStartupControls();
-        UpdateDiscordControls(settings.DiscordSupportEnabled);
+        UpdateMessengerControls(settings);
         _initializing = false;
 
         Loaded += async (_, _) => await RefreshStatisticsAsync();
@@ -67,6 +67,10 @@ public partial class DataManagementWindow : Window
     public bool LanguageChanged { get; private set; }
 
     public bool DiscordSupportChanged { get; private set; }
+
+    public bool KakaoSupportChanged { get; private set; }
+
+    public event Action<SourceApp, bool>? MessengerSupportSelectionChanged;
 
     public bool DiscordRepairRequested { get; private set; }
 
@@ -150,7 +154,7 @@ public partial class DataManagementWindow : Window
                 "VersionFormat",
                 GetVersionLabel());
             UpdateStartupControls();
-            UpdateDiscordControls(settings.DiscordSupportEnabled);
+            UpdateMessengerControls(settings);
             _ = RefreshStatisticsAsync();
             StatusText.Text = SentoryLocalization.Text("LanguageApplied");
         }
@@ -192,6 +196,9 @@ public partial class DataManagementWindow : Window
             _settingsStore.Save(settings);
             DiscordSupportChanged = true;
             UpdateDiscordControls(settings.DiscordSupportEnabled);
+            MessengerSupportSelectionChanged?.Invoke(
+                SourceApp.Discord,
+                settings.DiscordSupportEnabled);
             StatusText.Text = settings.DiscordSupportEnabled
                 ? SentoryLocalization.Text("DiscordDetectionEnabled")
                 : SentoryLocalization.Text("DiscordDetectionDisabled");
@@ -200,6 +207,32 @@ public partial class DataManagementWindow : Window
             when (exception is IOException or UnauthorizedAccessException)
         {
             StatusText.Text = SentoryLocalization.Text("DiscordSettingFailed");
+        }
+    }
+
+    private void KakaoSupportToggleButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        try
+        {
+            var settings = _settingsStore.Load();
+            settings.KakaoTalkSupportEnabled =
+                !settings.KakaoTalkSupportEnabled;
+            _settingsStore.Save(settings);
+            KakaoSupportChanged = true;
+            UpdateKakaoControls(settings.KakaoTalkSupportEnabled);
+            MessengerSupportSelectionChanged?.Invoke(
+                SourceApp.KakaoTalk,
+                settings.KakaoTalkSupportEnabled);
+            StatusText.Text = settings.KakaoTalkSupportEnabled
+                ? SentoryLocalization.Text("KakaoDetectionEnabled")
+                : SentoryLocalization.Text("KakaoDetectionDisabled");
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException)
+        {
+            StatusText.Text = SentoryLocalization.Text("KakaoSettingFailed");
         }
     }
 
@@ -380,6 +413,22 @@ public partial class DataManagementWindow : Window
             : _discordRepairNeeded
                 ? SentoryLocalization.Text("StateReconnect")
                 : DiscordDetectionPresentation.GetLabel(_discordState);
+    }
+
+    private void UpdateKakaoControls(bool enabled)
+    {
+        KakaoSupportToggleButton.Content = enabled
+            ? SentoryLocalization.Text("InUse")
+            : SentoryLocalization.Text("NotInUse");
+        KakaoStatusText.Text = enabled
+            ? SentoryLocalization.Text("DetectionReady")
+            : SentoryLocalization.Text("KakaoNotInUse");
+    }
+
+    private void UpdateMessengerControls(SentorySettings settings)
+    {
+        UpdateDiscordControls(settings.DiscordSupportEnabled);
+        UpdateKakaoControls(settings.KakaoTalkSupportEnabled);
     }
 
     private void RefreshLocalizedOptions(SentorySettings settings)

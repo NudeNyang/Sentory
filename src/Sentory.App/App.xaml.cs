@@ -51,6 +51,7 @@ public partial class App : System.Windows.Application
     private readonly WindowsStartupManager _startupManager = new();
     private readonly DiscordAccessibilityLauncher _discordLauncher = new();
     private bool _discordSupportEnabled = true;
+    private bool _kakaoSupportEnabled = true;
     private bool _discordRepairNeeded;
     private bool _discordRepairBusy;
     private CaptureRuntimeState _discordDetectionState =
@@ -162,8 +163,8 @@ public partial class App : System.Windows.Application
                 _repository,
                 acceptInjectedInput);
             _runtime = new CompositeCaptureRuntime(
-                kakaoRuntime,
-                discordRuntime);
+                (SourceApp.KakaoTalk, kakaoRuntime),
+                (SourceApp.Discord, discordRuntime));
             _kakaoDropOverlay = new KakaoDropOverlayRuntime(
                 kakaoRuntime,
                 GetSavedDarkTheme,
@@ -202,6 +203,7 @@ public partial class App : System.Windows.Application
                 _maintenanceCancellation.Token);
             _linkPreviewTask = RunLinkPreviewLoopAsync(
                 _maintenanceCancellation.Token);
+            ApplyRuntimeSourceSettings();
             _runtime.Start();
             _kakaoDropOverlay.Start();
             _discordDropOverlay.Start();
@@ -470,6 +472,7 @@ public partial class App : System.Windows.Application
 
         var settings = _settingsStore.Load();
         _discordSupportEnabled = settings.DiscordSupportEnabled;
+        _kakaoSupportEnabled = settings.KakaoTalkSupportEnabled;
         if (!_discordSupportEnabled || !_discordLauncher.IsInstalled)
         {
             return;
@@ -526,6 +529,11 @@ public partial class App : System.Windows.Application
             _discordRepairNeeded = false;
             _galleryWindow?.SetDiscordRepairNeeded(false);
             _settingsStore.Save(settings);
+            ApplyRuntimeSourceSettings();
+            _galleryWindow?.SetMessengerSupportState(
+                _discordSupportEnabled,
+                _kakaoSupportEnabled);
+            UpdatePauseUi();
             return;
         }
 
@@ -553,7 +561,56 @@ public partial class App : System.Windows.Application
         }
 
         _settingsStore.Save(settings);
+        ApplyRuntimeSourceSettings();
         _galleryWindow?.SetDiscordRepairNeeded(_discordRepairNeeded);
+        _galleryWindow?.SetMessengerSupportState(
+            _discordSupportEnabled,
+            _kakaoSupportEnabled);
+        UpdatePauseUi();
+    }
+
+    private void ApplyMessengerSupportSetting(
+        SourceApp sourceApp,
+        bool enabled)
+    {
+        if (_settingsStore is null)
+        {
+            return;
+        }
+
+        if (sourceApp == SourceApp.Discord)
+        {
+            _discordSupportEnabled = enabled;
+            ApplyDiscordSupportSetting();
+            return;
+        }
+
+        if (sourceApp != SourceApp.KakaoTalk)
+        {
+            return;
+        }
+
+        _kakaoSupportEnabled = enabled;
+        ApplyRuntimeSourceSettings();
+        _galleryWindow?.SetMessengerSupportState(
+            _discordSupportEnabled,
+            _kakaoSupportEnabled);
+        UpdatePauseUi();
+    }
+
+    private void ApplyRuntimeSourceSettings()
+    {
+        if (_runtime is not ICaptureRuntimeSourceController controller)
+        {
+            return;
+        }
+
+        controller.SetSourceEnabled(
+            SourceApp.Discord,
+            _discordSupportEnabled);
+        controller.SetSourceEnabled(
+            SourceApp.KakaoTalk,
+            _kakaoSupportEnabled);
     }
 
     private void ApplyPauseState()
@@ -574,13 +631,27 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        if (_runtime.IsPaused)
+        {
+            SetStatus(
+                SentoryLocalization.Text("StatusPaused"),
+                SentoryLocalization.Text("TrayPaused"));
+            return;
+        }
+
+        var statusKey = (_discordSupportEnabled, _kakaoSupportEnabled) switch
+        {
+            (true, true) => "StatusDetecting",
+            (true, false) => "StatusDetectingDiscord",
+            (false, true) => "StatusDetectingKakao",
+            _ => "StatusDetectionDisabled"
+        };
         SetStatus(
-            _runtime.IsPaused
-                ? SentoryLocalization.Text("StatusPaused")
-                : SentoryLocalization.Text("StatusDetecting"),
-            _runtime.IsPaused
-                ? SentoryLocalization.Text("TrayPaused")
-                : SentoryLocalization.Text("TrayDetecting"));
+            SentoryLocalization.Text(statusKey),
+            SentoryLocalization.Text(
+                _discordSupportEnabled || _kakaoSupportEnabled
+                    ? "TrayDetecting"
+                    : "TrayDetectionDisabled"));
     }
 
     private bool GetStartupEnabled()
@@ -745,7 +816,8 @@ public partial class App : System.Windows.Application
         object? sender,
         CaptureRuntimeStatus status)
     {
-        if (status.SourceApp != SourceApp.Discord)
+        if (status.SourceApp != SourceApp.Discord ||
+            !_discordSupportEnabled)
         {
             return;
         }
@@ -913,13 +985,16 @@ public partial class App : System.Windows.Application
                 _linkPreviewFetcher);
             _galleryWindow.DiscordRepairRequested += async (_, _) =>
                 await RepairDiscordConnectionAsync();
-            _galleryWindow.DiscordSupportChanged += (_, _) =>
-                ApplyDiscordSupportSetting();
+            _galleryWindow.MessengerSupportChanged +=
+                ApplyMessengerSupportSetting;
             _galleryWindow.LanguageChanged += (_, _) => UpdatePauseUi();
             _galleryWindow.SetDiscordRepairNeeded(
                 _discordSupportEnabled && _discordRepairNeeded);
             _galleryWindow.SetDiscordDetectionState(
                 _discordDetectionState);
+            _galleryWindow.SetMessengerSupportState(
+                _discordSupportEnabled,
+                _kakaoSupportEnabled);
             _galleryWindow.SetRuntimeIssue(_lastRuntimeIssue);
             _galleryWindow.Closed += (_, _) => _galleryWindow = null;
             _galleryWindow.Show();
