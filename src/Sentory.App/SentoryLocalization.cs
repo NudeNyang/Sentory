@@ -195,7 +195,7 @@ internal static class SentoryLocalization
             L("PngImage", "PNG 이미지", "PNG image", "PNG 画像", "PNG 图片"),
             L("ImageFormatFormat", "{0} 이미지", "{0} image", "{0} 画像", "{0} 图片"),
             L("SavedOnInput", "입력 시 저장됨", "Saved on paste", "入力時に保存", "粘贴时保存"),
-            L("DiscordSent", "Discord 전송 확인됨", "Discord send confirmed", "Discord 送信確認済み", "已确认 Discord 发送"),
+            L("DiscordSent", "전송 시 저장됨", "Saved on send", "送信時に保存", "发送时保存"),
             L("SentConfirmed", "전송 확인됨", "Send confirmed", "送信確認済み", "已确认发送"),
             L("FavoriteAdd", "즐겨찾기에 추가", "Add to favorites", "お気に入りに追加", "添加到收藏"),
             L("FavoriteRemove", "즐겨찾기에서 제거", "Remove from favorites", "お気に入りから削除", "从收藏中移除"),
