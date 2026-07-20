@@ -58,8 +58,6 @@ public partial class DataManagementWindow : Window
         Closed += (_, _) => _scrollIndicator.Dispose();
     }
 
-    public bool HasDataChanged { get; private set; }
-
     public bool ThemeChanged { get; private set; }
 
     public event Action<bool>? ThemeSelectionChanged;
@@ -71,6 +69,8 @@ public partial class DataManagementWindow : Window
     public bool KakaoSupportChanged { get; private set; }
 
     public event Action<SourceApp, bool>? MessengerSupportSelectionChanged;
+
+    public event Func<Task>? DataChanged;
 
     public bool DiscordRepairRequested { get; private set; }
 
@@ -349,7 +349,10 @@ public partial class DataManagementWindow : Window
             }
 
             var result = await _repository.CleanupAsync(olderThan);
-            HasDataChanged = result.Deleted.TotalItems > 0;
+            if (result.Deleted.TotalItems > 0)
+            {
+                await NotifyDataChangedAsync();
+            }
             StatusText.Text = result.FileDeleteFailures == 0
                 ? SentoryLocalization.Format(
                     "CleanupCompleteFormat",
@@ -366,6 +369,21 @@ public partial class DataManagementWindow : Window
         finally
         {
             SetBusy(false);
+        }
+    }
+
+    private async Task NotifyDataChangedAsync()
+    {
+        if (DataChanged is null)
+        {
+            return;
+        }
+
+        foreach (var handler in DataChanged
+                     .GetInvocationList()
+                     .Cast<Func<Task>>())
+        {
+            await handler();
         }
     }
 

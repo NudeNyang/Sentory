@@ -501,7 +501,7 @@ public partial class GalleryWindow : Window
         SortPopup.IsOpen = !SortPopup.IsOpen;
     }
 
-    private async void DataManagementButton_Click(
+    private void DataManagementButton_Click(
         object sender,
         RoutedEventArgs e)
     {
@@ -520,6 +520,7 @@ public partial class GalleryWindow : Window
         window.ThemeSelectionChanged += ApplyThemeSelection;
         window.MessengerSupportSelectionChanged +=
             ApplyMessengerSupportSelection;
+        window.DataChanged += RefreshAsync;
         try
         {
             window.ShowDialog();
@@ -529,10 +530,7 @@ public partial class GalleryWindow : Window
             window.ThemeSelectionChanged -= ApplyThemeSelection;
             window.MessengerSupportSelectionChanged -=
                 ApplyMessengerSupportSelection;
-        }
-        if (window.HasDataChanged)
-        {
-            await RefreshAsync();
+            window.DataChanged -= RefreshAsync;
         }
 
         if (window.ThemeChanged)
