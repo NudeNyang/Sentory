@@ -261,15 +261,12 @@ public partial class App : System.Windows.Application
 
             await await Dispatcher.InvokeAsync(async () =>
             {
-                var notes = update.Notes.Replace('\r', ' ').Replace('\n', ' ').Trim();
-                if (notes.Length > 280) notes = notes[..280] + "…";
                 var accepted = SentoryDialogWindow.Confirm(
                     _galleryWindow,
                     SentoryLocalization.Text("UpdateAvailableHeading"),
                     SentoryLocalization.Format(
                         "UpdateAvailableMessage",
-                        update.Version,
-                        notes),
+                        update.Version),
                     SentoryLocalization.Text("InstallUpdate"),
                     GetSavedDarkTheme());
                 if (!accepted) return;

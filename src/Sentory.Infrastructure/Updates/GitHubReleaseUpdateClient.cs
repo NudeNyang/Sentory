@@ -16,7 +16,6 @@ public enum UpdatePackageKind
 public sealed record ReleaseUpdate(
     string Version,
     string Title,
-    string Notes,
     Uri ReleasePage,
     Uri DownloadUri,
     string FileName,
@@ -107,7 +106,6 @@ public sealed class GitHubReleaseUpdateClient : IDisposable
             return new ReleaseUpdate(
                 candidate.Parsed.GetValueOrDefault().ToString(),
                 string.IsNullOrWhiteSpace(release.Name) ? release.TagName : release.Name,
-                release.Body ?? string.Empty,
                 releasePage,
                 uri,
                 expectedName,
@@ -207,7 +205,6 @@ public sealed class GitHubReleaseUpdateClient : IDisposable
     private sealed record ReleaseDto(
         [property: JsonPropertyName("tag_name")] string TagName,
         [property: JsonPropertyName("name")] string? Name,
-        [property: JsonPropertyName("body")] string? Body,
         [property: JsonPropertyName("html_url")] string HtmlUrl,
         [property: JsonPropertyName("draft")] bool Draft,
         [property: JsonPropertyName("prerelease")] bool Prerelease,

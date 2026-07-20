@@ -8,6 +8,14 @@ namespace Sentory.Infrastructure.Tests;
 public sealed class GitHubReleaseUpdateClientTests
 {
     [Fact]
+    public void UpdateMetadataDoesNotExposeVerboseReleaseBody()
+    {
+        Assert.DoesNotContain(
+            typeof(ReleaseUpdate).GetProperties(),
+            property => property.Name == "Notes");
+    }
+
+    [Fact]
     public async Task SelectsArchitectureAndPackageThenVerifiesDownload()
     {
         var payload = "updated sentory"u8.ToArray();
