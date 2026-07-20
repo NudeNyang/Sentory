@@ -22,9 +22,9 @@ internal static class SentoryTheme
             ["InputBackgroundBrush"] = "#24282D",
             ["PopupBackgroundBrush"] = "#202428",
             ["PopupHoverBrush"] = "#2A2E33",
-            ["AccentBrush"] = "#7295FF",
+            ["AccentBrush"] = "#AFA08E",
             ["FavoriteBrush"] = "#D4B15A",
-            ["AccentTextBrush"] = "#10141C",
+            ["AccentTextBrush"] = "#151719",
             ["TextBrush"] = "#ECEBE7",
             ["MutedTextBrush"] = "#AAA69F",
             ["SoftTextBrush"] = "#858B93",
@@ -32,18 +32,18 @@ internal static class SentoryTheme
             ["CopyButtonBackgroundBrush"] = "#E6282C31",
             ["CopyButtonHoverBrush"] = "#363B41",
             ["CopyButtonBorderBrush"] = "#454B53",
-            ["CardHoverBorderBrush"] = "#69778E",
-            ["SelectionTintBrush"] = "#247295FF",
-            ["SelectionBorderBrush"] = "#807295FF",
+            ["CardHoverBorderBrush"] = "#756B60",
+            ["SelectionTintBrush"] = "#24AFA08E",
+            ["SelectionBorderBrush"] = "#80AFA08E",
             ["StatusBackgroundBrush"] = "#2A2E33",
             ["StatusTextBrush"] = "#BEC2C8",
-            ["NoticeBackgroundBrush"] = "#252B36",
-            ["NoticeBorderBrush"] = "#465779",
+            ["NoticeBackgroundBrush"] = "#292724",
+            ["NoticeBorderBrush"] = "#5A5147",
             ["SkeletonBrush"] = "#24282D",
-            ["EmptyIconBackgroundBrush"] = "#252C3B",
+            ["EmptyIconBackgroundBrush"] = "#292824",
             ["ToastBackgroundBrush"] = "#ECEBE7",
             ["ToastTextBrush"] = "#1A1C1F",
-            ["DangerBrush"] = "#F08A82"
+            ["DangerBrush"] = "#BD8078"
         };
 
     private static readonly IReadOnlyDictionary<string, string> WarmPalette =
@@ -77,7 +77,7 @@ internal static class SentoryTheme
             ["EmptyIconBackgroundBrush"] = "#DCE3F1",
             ["ToastBackgroundBrush"] = "#292722",
             ["ToastTextBrush"] = "#F2EEE7",
-            ["DangerBrush"] = "#B85A52"
+            ["DangerBrush"] = "#A6504A"
         };
 
     public static void Apply(ResourceDictionary resources, bool dark)

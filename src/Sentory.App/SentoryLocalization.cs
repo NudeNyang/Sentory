@@ -147,7 +147,7 @@ internal static class SentoryLocalization
             L("CopyToClipboard", "클립보드에 복사", "Copy to clipboard", "クリップボードにコピー", "复制到剪贴板"),
             L("OpenPreview", "원본 바로 열기", "Open original", "元をすぐ開く", "直接打开原文件"),
             L("SelectedCountFormat", "{0:N0}개 선택", "{0:N0} selected", "{0:N0}件選択", "已选择 {0:N0} 项"),
-            L("SelectVisible", "현재 화면 전체 선택", "Select all visible", "表示中をすべて選択", "选择当前显示的全部项目"),
+            L("SelectVisible", "전체 선택", "Select all", "すべて選択", "全选"),
             L("ClearSelection", "선택 취소", "Clear selection", "選択を解除", "取消选择"),
             L("DeleteSelected", "선택 항목 삭제", "Delete selected", "選択項目を削除", "删除所选项目"),
             L("LoadingLibrary", "보관함을 불러오는 중", "Loading library", "ライブラリを読み込み中", "正在加载收藏库"),

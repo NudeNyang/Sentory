@@ -443,7 +443,7 @@
                             <Run Text=" · " Foreground="{DynamicResource LineBrush}" />
                             <Run Text="NudeNyang"
                                  FontWeight="SemiBold"
-                                 Foreground="{DynamicResource AccentBrush}" />
+                                 Foreground="{DynamicResource TextBrush}" />
                             <Run Text=" · " Foreground="{DynamicResource LineBrush}" />
                             <Hyperlink NavigateUri="https://github.com/NudeNyang/Sentory"
                                        RequestNavigate="GitHubLink_RequestNavigate"
