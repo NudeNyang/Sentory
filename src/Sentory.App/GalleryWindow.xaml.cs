@@ -210,10 +210,29 @@ public partial class GalleryWindow : Window
             : !string.IsNullOrWhiteSpace(item.PageDescription)
                 ? item.PageDescription
             : item.OriginalUrl;
-        var collectionArtwork = members.FirstOrDefault(member =>
-            member.Kind == ContentKind.Image)?.ContentPath;
+        var collectionImages = isCollection
+            ? members
+                .Where(member => member.Kind == ContentKind.Image)
+                .Select(member => LoadThumbnail(member.ContentPath))
+                .OfType<ImageSource>()
+                .ToArray()
+            : [];
+        var collectionArtwork = collectionImages.FirstOrDefault();
+        var collectionLinkPreview = isCollection
+            ? LoadThumbnail(item.PreviewImagePath)
+            : null;
+        var collectionLinkIcon = isCollection
+            ? LoadThumbnail(item.SiteIconPath)
+            : null;
+        var collectionPreview = collectionArtwork ??
+            collectionLinkPreview ??
+            collectionLinkIcon;
+        var collectionUsesSiteIcon = isCollection &&
+            collectionArtwork is null &&
+            collectionLinkPreview is null &&
+            collectionLinkIcon is not null;
         var thumbnail = isCollection
-            ? LoadThumbnail(collectionArtwork)
+            ? collectionPreview
             : isImage
                 ? LoadThumbnail(item.ContentPath)
                 : LoadThumbnail(item.PreviewImagePath);
@@ -234,17 +253,26 @@ public partial class GalleryWindow : Window
                 : item.LastSourceApp == SourceApp.Discord
                     ? SentoryLocalization.Text("DiscordSent")
                     : SentoryLocalization.Text("SentConfirmed"),
-            GetInitial(title),
+            GetInitial(isCollection && urlCount > 0
+                ? members.First(member => member.Kind == ContentKind.Url).Domain
+                : title),
             thumbnail,
             siteIcon,
             thumbnail is not null,
             siteIcon is not null,
-            isImage || isCollection ? Stretch.Uniform : Stretch.UniformToFill,
-            isImage || isCollection ? new Thickness(8) : new Thickness(0),
+            isImage || collectionArtwork is not null || collectionUsesSiteIcon
+                ? Stretch.Uniform
+                : Stretch.UniformToFill,
+            isImage || collectionArtwork is not null
+                ? new Thickness(8)
+                : collectionUsesSiteIcon
+                    ? new Thickness(72)
+                    : new Thickness(0),
             isCollection
                 ? SentoryLocalization.Format("CollectionItemsFormat", members.Count)
                 : string.Empty,
             isCollection,
+            collectionImages,
             _selectionMode,
             _selectedItemIds.Contains(item.ItemId));
     }
@@ -2255,11 +2283,17 @@ public sealed record GalleryItemViewModel(
     Thickness ThumbnailMargin,
     string CollectionBadgeText,
     bool HasCollectionBadge,
+    IReadOnlyList<ImageSource> CollectionImages,
     bool IsSelectionMode,
     bool IsSelected)
 {
     public string Domain => IsCollection
-        ? SentoryLocalization.Format("CollectionItemsFormat", Item.Members?.Count ?? 0)
+        ? Item.Members?.FirstOrDefault(member =>
+              member.Kind == ContentKind.Url)?.Domain is { Length: > 0 } domain
+            ? domain
+            : SentoryLocalization.Format(
+                "CollectionItemsFormat",
+                Item.Members?.Count ?? 0)
         : Item.Domain;
 
     public string FavoriteIcon =>

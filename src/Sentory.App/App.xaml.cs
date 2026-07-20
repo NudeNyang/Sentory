@@ -672,7 +672,7 @@ public partial class App : System.Windows.Application
                 _ = RefreshGalleryAfterCaptureAsync(notification);
             }
 
-            if (notification.Kind == ContentKind.Url)
+            if (notification.Kind is ContentKind.Url or ContentKind.Collection)
             {
                 WakeLinkPreviewWorker();
             }

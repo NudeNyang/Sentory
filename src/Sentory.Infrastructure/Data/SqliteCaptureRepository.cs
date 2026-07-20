@@ -1207,16 +1207,41 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         await using var command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT id, original_url, normalized_key
+            SELECT items.id,
+                   CASE
+                       WHEN items.kind = $collectionKind THEN (
+                           SELECT original_url
+                           FROM collection_members
+                           WHERE collection_id = items.id AND kind = $urlKind
+                           ORDER BY position
+                           LIMIT 1)
+                       ELSE items.original_url
+                   END AS preview_url,
+                   CASE
+                       WHEN items.kind = $collectionKind THEN (
+                           SELECT normalized_key
+                           FROM collection_members
+                           WHERE collection_id = items.id AND kind = $urlKind
+                           ORDER BY position
+                           LIMIT 1)
+                       ELSE items.normalized_key
+                   END AS preview_key
             FROM items
-            WHERE kind = $kind
+            WHERE (items.kind = $urlKind OR
+                   (items.kind = $collectionKind AND EXISTS (
+                       SELECT 1
+                       FROM collection_members
+                       WHERE collection_id = items.id AND kind = $urlKind)))
               AND (preview_fetched_at IS NULL OR
                    julianday(preview_fetched_at) < julianday($retryBefore))
             ORDER BY preview_fetched_at IS NOT NULL,
                      last_captured_at DESC
             LIMIT $limit;
             """;
-        command.Parameters.AddWithValue("$kind", ContentKind.Url.ToString());
+        command.Parameters.AddWithValue("$urlKind", ContentKind.Url.ToString());
+        command.Parameters.AddWithValue(
+            "$collectionKind",
+            ContentKind.Collection.ToString());
         command.Parameters.AddWithValue(
             "$retryBefore",
             retryBefore.ToString("O"));
@@ -1252,10 +1277,16 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 """
                 SELECT site_icon_path, preview_image_path
                 FROM items
-                WHERE id = $itemId AND kind = $kind;
+                WHERE id = $itemId AND
+                      kind IN ($urlKind, $collectionKind);
                 """;
             lookup.Parameters.AddWithValue("$itemId", itemId.ToString("D"));
-            lookup.Parameters.AddWithValue("$kind", ContentKind.Url.ToString());
+            lookup.Parameters.AddWithValue(
+                "$urlKind",
+                ContentKind.Url.ToString());
+            lookup.Parameters.AddWithValue(
+                "$collectionKind",
+                ContentKind.Collection.ToString());
             await using var reader = await lookup.ExecuteReaderAsync(
                 cancellationToken);
             if (!await reader.ReadAsync(cancellationToken))
@@ -1284,7 +1315,8 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 preview_image_path = $previewImagePath,
                 preview_status = $previewStatus,
                 preview_fetched_at = $previewFetchedAt
-            WHERE id = $itemId AND kind = $kind;
+            WHERE id = $itemId AND
+                  kind IN ($urlKind, $collectionKind);
             """;
         command.Parameters.AddWithValue(
             "$pageTitle",
@@ -1305,7 +1337,10 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             "$previewFetchedAt",
             preview.FetchedAt.ToString("O"));
         command.Parameters.AddWithValue("$itemId", itemId.ToString("D"));
-        command.Parameters.AddWithValue("$kind", ContentKind.Url.ToString());
+        command.Parameters.AddWithValue("$urlKind", ContentKind.Url.ToString());
+        command.Parameters.AddWithValue(
+            "$collectionKind",
+            ContentKind.Collection.ToString());
         var updated = await command.ExecuteNonQueryAsync(cancellationToken) > 0;
         await transaction.CommitAsync(cancellationToken);
         if (updated)

@@ -109,6 +109,38 @@ public sealed class LinkPreviewTests : IDisposable
     }
 
     [Fact]
+    public async Task FetcherUsesSiteIconWhenPagePreviewIsUnavailable()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var handler = new RouteHandler(request =>
+            request.RequestUri!.AbsoluteUri switch
+            {
+                "https://example.com/private" =>
+                    new HttpResponseMessage(HttpStatusCode.Forbidden),
+                "https://example.com/favicon.ico" => ImageResponse(
+                    [7, 8, 9],
+                    "image/x-icon"),
+                _ => new HttpResponseMessage(HttpStatusCode.NotFound)
+            });
+        using var httpClient = new HttpClient(handler);
+        using var fetcher = new LinkPreviewFetcher(
+            paths,
+            httpClient,
+            new FixedResolver(IPAddress.Parse("93.184.216.34")));
+
+        var result = await fetcher.FetchAsync(new LinkPreviewCandidate(
+            Guid.NewGuid(),
+            "https://example.com/private",
+            "https://example.com/private"));
+
+        Assert.Equal(LinkPreviewStatus.Available, result.Status);
+        Assert.NotNull(result.SiteIconPath);
+        Assert.Null(result.PreviewImagePath);
+        Assert.True(File.Exists(Path.Combine(_root, result.SiteIconPath!)));
+        Assert.Equal(2, handler.RequestCount);
+    }
+
+    [Fact]
     public async Task FetcherDoesNotFollowRedirectToPrivateAddress()
     {
         var handler = new RouteHandler(_ => new HttpResponseMessage(

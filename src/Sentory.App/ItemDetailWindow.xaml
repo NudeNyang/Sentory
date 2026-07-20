@@ -109,10 +109,12 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Border Background="{DynamicResource SurfaceSecondaryBrush}"
+            <Border x:Name="ArtworkSurface"
+                    Background="{DynamicResource SurfaceSecondaryBrush}"
                     BorderBrush="{DynamicResource LineBrush}"
                     BorderThickness="1"
-                    CornerRadius="16">
+                    CornerRadius="16"
+                    ClipToBounds="True">
                 <Grid>
                     <StackPanel x:Name="ArtworkFallback"
                                 HorizontalAlignment="Center"
@@ -139,8 +141,52 @@
                                    Foreground="{DynamicResource MutedTextBrush}"
                                    TextTrimming="CharacterEllipsis" />
                     </StackPanel>
+
+                    <Border x:Name="StackBackTwo"
+                            Margin="34,28,22,66"
+                            BorderBrush="{DynamicResource LineBrush}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Opacity="0.42"
+                            RenderTransformOrigin="0.5,0.5"
+                            Visibility="Collapsed">
+                        <Border.RenderTransform>
+                            <TransformGroup>
+                                <RotateTransform Angle="-3" />
+                                <TranslateTransform X="-3" Y="2" />
+                            </TransformGroup>
+                        </Border.RenderTransform>
+                        <Border.Background>
+                            <ImageBrush x:Name="StackBackTwoBrush"
+                                        Stretch="Uniform"
+                                        AlignmentX="Center"
+                                        AlignmentY="Center" />
+                        </Border.Background>
+                    </Border>
+                    <Border x:Name="StackBackOne"
+                            Margin="24,24,32,62"
+                            BorderBrush="{DynamicResource LineBrush}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Opacity="0.68"
+                            RenderTransformOrigin="0.5,0.5"
+                            Visibility="Collapsed">
+                        <Border.RenderTransform>
+                            <TransformGroup>
+                                <RotateTransform Angle="2.4" />
+                                <TranslateTransform X="4" />
+                            </TransformGroup>
+                        </Border.RenderTransform>
+                        <Border.Background>
+                            <ImageBrush x:Name="StackBackOneBrush"
+                                        Stretch="Uniform"
+                                        AlignmentX="Center"
+                                        AlignmentY="Center" />
+                        </Border.Background>
+                    </Border>
                     <Border x:Name="ArtworkImage"
                             Margin="12"
+                            CornerRadius="10"
                             Visibility="Collapsed">
                         <Border.Background>
                             <ImageBrush x:Name="ArtworkImageBrush"
@@ -148,6 +194,44 @@
                                         AlignmentX="Center"
                                         AlignmentY="Center" />
                         </Border.Background>
+                    </Border>
+                    <Border x:Name="PhotoNavigation"
+                            Margin="0,0,0,13"
+                            Padding="5,4"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Bottom"
+                            Background="{DynamicResource SurfaceBrush}"
+                            BorderBrush="{DynamicResource LineBrush}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Width="32"
+                                    Height="30"
+                                    Padding="0"
+                                    Content="&#x2039;"
+                                    FontSize="22"
+                                    ToolTip="{DynamicResource Loc.PreviousPhoto}"
+                                    Style="{StaticResource DetailButtonStyle}"
+                                    Click="PreviousPhotoButton_Click" />
+                            <TextBlock x:Name="PhotoPositionText"
+                                       MinWidth="56"
+                                       Margin="8,0"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       TextAlignment="Center"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource MutedTextBrush}" />
+                            <Button Width="32"
+                                    Height="30"
+                                    Padding="0"
+                                    Content="&#x203A;"
+                                    FontSize="22"
+                                    ToolTip="{DynamicResource Loc.NextPhoto}"
+                                    Style="{StaticResource DetailButtonStyle}"
+                                    Click="NextPhotoButton_Click" />
+                        </StackPanel>
                     </Border>
                 </Grid>
             </Border>
@@ -171,6 +255,51 @@
                                    Foreground="{DynamicResource TextBrush}"
                                    TextWrapping="Wrap" />
                     </Border>
+
+                    <StackPanel x:Name="CollectionLinksSection"
+                                Margin="0,18,0,0"
+                                Visibility="Collapsed">
+                        <TextBlock Margin="2,0,0,8"
+                                   Text="{DynamicResource Loc.CollectionLinks}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource MutedTextBrush}" />
+                        <ItemsControl x:Name="CollectionLinksList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,0,7"
+                                            Padding="11,7,7,7"
+                                            Background="{DynamicResource InputBackgroundBrush}"
+                                            CornerRadius="9">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox Text="{Binding Url}"
+                                                     VerticalAlignment="Center"
+                                                     Background="Transparent"
+                                                     BorderThickness="0"
+                                                     FontSize="11"
+                                                     Foreground="{DynamicResource TextBrush}"
+                                                     IsReadOnly="True"
+                                                     IsReadOnlyCaretVisible="True"
+                                                     TextWrapping="Wrap" />
+                                            <Button Grid.Column="1"
+                                                    MinWidth="52"
+                                                    Height="31"
+                                                    Margin="8,0,0,0"
+                                                    Padding="10,0"
+                                                    Content="{DynamicResource Loc.Copy}"
+                                                    Style="{StaticResource DetailButtonStyle}"
+                                                    Tag="{Binding Url}"
+                                                    Click="CopyCollectionLinkButton_Click" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
 
                     <UniformGrid Margin="0,18,0,0" Columns="2">
                         <Border Margin="0,0,5,5"

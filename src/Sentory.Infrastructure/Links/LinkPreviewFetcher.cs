@@ -47,6 +47,10 @@ public sealed class LinkPreviewFetcher : IDisposable
                 return Unavailable(fetchedAt);
             }
 
+            var key = Convert.ToHexString(
+                    SHA256.HashData(Encoding.UTF8.GetBytes(candidate.NormalizedKey)))
+                .ToLowerInvariant();
+
             using var response = await SendWithRedirectsAsync(
                 pageUri,
                 "text/html,application/xhtml+xml",
@@ -55,7 +59,21 @@ public sealed class LinkPreviewFetcher : IDisposable
                 response.Content.Headers.ContentType?.MediaType is not string mediaType ||
                 !mediaType.Contains("html", StringComparison.OrdinalIgnoreCase))
             {
-                return Unavailable(fetchedAt);
+                var fallbackIcon = await DownloadAssetAsync(
+                    new Uri(pageUri, "/favicon.ico"),
+                    key,
+                    "icon",
+                    allowGenericBinary: true,
+                    cancellationToken);
+                return fallbackIcon is null
+                    ? Unavailable(fetchedAt)
+                    : new LinkPreviewUpdate(
+                        LinkPreviewStatus.Available,
+                        null,
+                        null,
+                        fallbackIcon,
+                        null,
+                        fetchedAt);
             }
 
             var htmlBytes = await ReadLimitedAsync(
@@ -65,9 +83,6 @@ public sealed class LinkPreviewFetcher : IDisposable
             var html = DecodeHtml(htmlBytes, response.Content.Headers.ContentType);
             var finalUri = response.RequestMessage?.RequestUri ?? pageUri;
             var parsed = LinkPreviewHtmlParser.Parse(html, finalUri);
-            var key = Convert.ToHexString(
-                    SHA256.HashData(Encoding.UTF8.GetBytes(candidate.NormalizedKey)))
-                .ToLowerInvariant();
             var previewPath = await DownloadAssetAsync(
                 parsed.PreviewImageUri,
                 key,

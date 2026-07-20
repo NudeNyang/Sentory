@@ -370,6 +370,44 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task CollectionUsesItsFirstLinkAsRepresentativePreview()
+    {
+        var repository = CreateRepository();
+        await repository.InitializeAsync();
+        var result = await repository.UpsertCollectionAsync(
+            CreateUrlOnlyCollectionRequest(Guid.NewGuid()));
+        var fetchedAt = DateTimeOffset.UtcNow;
+
+        var candidates = await repository.GetLinkPreviewCandidatesAsync(
+            10,
+            fetchedAt.AddDays(-30));
+        var candidate = Assert.Single(candidates);
+
+        Assert.Equal(result.ItemId, candidate.ItemId);
+        Assert.Equal("https://example.com/first", candidate.Url);
+        Assert.Equal("https://example.com/first", candidate.NormalizedKey);
+        Assert.True(await repository.UpdateLinkPreviewAsync(
+            result.ItemId,
+            new LinkPreviewUpdate(
+                LinkPreviewStatus.Available,
+                "First link",
+                "Representative collection link",
+                "link-previews/collection-icon.png",
+                "link-previews/collection-cover.jpg",
+                fetchedAt)));
+
+        var item = Assert.Single(await repository.GetRecentAsync(10));
+        Assert.Equal(ContentKind.Collection, item.Kind);
+        Assert.Equal("First link", item.PageTitle);
+        Assert.Equal(
+            "link-previews/collection-cover.jpg",
+            item.PreviewImagePath);
+        Assert.Empty(await repository.GetLinkPreviewCandidatesAsync(
+            10,
+            fetchedAt.AddDays(-30)));
+    }
+
+    [Fact]
     public async Task RepairRemovesOnlyUnreferencedAndTemporaryImageFiles()
     {
         var paths = SentoryDataPaths.ForRoot(_root);
@@ -861,6 +899,46 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
             "discord-context",
             DateTimeOffset.UtcNow,
             ["test"]);
+
+    private static CollectionCaptureRequest CreateUrlOnlyCollectionRequest(
+        Guid eventId)
+    {
+        CollectionMemberCaptureRequest[] members =
+        [
+            new(
+                ContentKind.Url,
+                "https://example.com/first",
+                "https://example.com/first",
+                "example.com",
+                ReadOnlyMemory<byte>.Empty,
+                null,
+                0,
+                0,
+                null,
+                null),
+            new(
+                ContentKind.Url,
+                "https://example.org/second",
+                "https://example.org/second",
+                "example.org",
+                ReadOnlyMemory<byte>.Empty,
+                null,
+                0,
+                0,
+                null,
+                null)
+        ];
+        return new CollectionCaptureRequest(
+            eventId,
+            CaptureCollectionIdentity.CreateSignature(members),
+            members,
+            SourceApp.KakaoTalk,
+            CaptureMethod.KakaoCtrlVUrl,
+            DeliveryStatus.NotObserved,
+            "test-context",
+            DateTimeOffset.UtcNow,
+            ["test"]);
+    }
 
     public void Dispose()
     {
