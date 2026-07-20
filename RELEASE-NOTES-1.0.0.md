@@ -1,0 +1,89 @@
+# Sentory 1.0.0
+
+Sentory의 첫 정식 버전입니다. Discord와 카카오톡에서 다룬 링크와 사진을 한곳에
+보관하고, 필요할 때 다시 찾거나 복사할 수 있습니다.
+
+## 이번 버전에서 달라진 점
+
+- Discord와 카카오톡 감지를 설정에서 각각 끄고 켤 수 있습니다.
+- Discord에서 한 번에 보낸 여러 링크가 하나의 묶음 카드로 저장됩니다.
+- Discord와 카카오톡에 드래그 앤 드롭한 로컬 사진을 더 안정적으로 감지합니다.
+- 묶음 카드의 사진과 링크를 넘겨 보며 하나씩 복사하거나 열 수 있습니다.
+- YouTube를 포함한 링크의 제목과 대표 이미지 수집을 개선했습니다.
+- 즐겨찾기 제외 항목을 삭제하면 보관함과 통계가 바로 갱신됩니다.
+- 자동 정리 기간에 7일 기준을 추가했습니다.
+- Discord 재연결 안내가 실제 상태와 다르게 자주 나타나던 문제를 고쳤습니다.
+- 테마 전환, 스크롤 표시기와 카드 정렬을 다듬었습니다.
+- GitHub Releases를 이용한 인앱 자동 업데이트를 지원합니다.
+
+전체 변경 내용은
+[CHANGELOG.md](https://github.com/NudeNyang/Sentory/blob/main/CHANGELOG.md)에서
+확인할 수 있습니다.
+
+## 어떤 파일을 받으면 되나요?
+
+| 사용 환경 | 권장 파일 |
+| --- | --- |
+| 일반적인 Intel·AMD Windows PC | `Sentory-win-x64-setup.exe` |
+| 설치하지 않고 사용할 x64 PC | `Sentory-win-x64-portable.zip` |
+| Windows on ARM PC | `Sentory-win-arm64-setup.exe` |
+| 설치하지 않고 사용할 ARM64 PC | `Sentory-win-arm64-portable.zip` |
+
+대부분의 사용자는 `Sentory-win-x64-setup.exe`를 받으면 됩니다. 포터블 버전은 ZIP을
+완전히 푼 다음 `Sentory.exe`를 실행해 주세요.
+
+## 설치 전에 확인해 주세요
+
+- Windows 10/11 64비트를 지원합니다.
+- 현재 파일에는 코드 서명이 적용되지 않아 Windows에서 알 수 없는 게시자 또는
+  SmartScreen 경고가 나타날 수 있습니다.
+- 각 파일의 `.sha256`을 함께 제공하므로 필요하면 다운로드한 파일의 SHA-256 값을
+  비교할 수 있습니다.
+- ARM64 파일은 교차 빌드와 실행 파일 구조 검증을 마쳤지만 실제 Windows on ARM
+  장치에서의 최종 검수는 남아 있습니다.
+- 사용자 데이터는 `%LOCALAPPDATA%\Sentory`에 보관되며 업데이트해도 유지됩니다.
+
+오류를 제보할 때는 비공개 대화나 원본 사진 대신 Sentory 버전, Windows 버전,
+사용한 메신저와 재현 순서를 적어 주세요.
+
+---
+
+## English
+
+Sentory 1.0.0 is the first stable release. It keeps links and images from supported
+Discord and KakaoTalk chats in a separate library where they can be searched, opened,
+or copied again.
+
+### Changes in 1.0.0
+
+- Enable or disable Discord and KakaoTalk detection separately.
+- Keep several links sent in one Discord message as a single collection.
+- Improve detection of local images dropped into Discord or KakaoTalk.
+- Browse, copy, or open individual images and links inside a collection.
+- Improve title and preview image retrieval, including YouTube links.
+- Refresh the library and statistics immediately after deleting non-favorite items.
+- Add a 7-day automatic cleanup option.
+- Fix overly frequent Discord reconnection warnings.
+- Refine theme switching, scroll indicators, and centered card layout.
+- Support in-app updates through GitHub Releases.
+
+See
+[CHANGELOG.md](https://github.com/NudeNyang/Sentory/blob/main/CHANGELOG.md)
+for the full list.
+
+### Downloads
+
+| System | Recommended file |
+| --- | --- |
+| Most Intel or AMD Windows PCs | `Sentory-win-x64-setup.exe` |
+| Portable use on an x64 PC | `Sentory-win-x64-portable.zip` |
+| Windows on ARM PC | `Sentory-win-arm64-setup.exe` |
+| Portable use on an ARM64 PC | `Sentory-win-arm64-portable.zip` |
+
+The binaries are self-contained and do not require a separate .NET installation.
+They are not currently code-signed, so Windows may show an Unknown Publisher or
+SmartScreen warning. SHA-256 checksum files are included with the release. ARM64
+packages have passed cross-build and executable architecture checks, but final testing
+on physical Windows on ARM hardware is still pending.
+
+User data remains in `%LOCALAPPDATA%\Sentory` when the app is updated.
