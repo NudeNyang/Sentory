@@ -113,6 +113,45 @@ public sealed class LinkPreviewTests : IDisposable
     }
 
     [Fact]
+    public async Task FetcherReadsMetadataBeforeLargeHtmlLimit()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var html = string.Concat(
+            "<html><head>",
+            new string('x', 700_000),
+            """
+            <meta property="og:title" content="Large video page">
+            <meta property="og:image" content="/video-cover.jpg">
+            """,
+            new string('y', 400_000),
+            "</head></html>");
+        var handler = new RouteHandler(request =>
+            request.RequestUri!.AbsoluteUri switch
+            {
+                "https://video.example/watch?v=123" => HtmlResponse(html),
+                "https://video.example/video-cover.jpg" => ImageResponse(
+                    [1, 2, 3, 4],
+                    "image/jpeg"),
+                _ => new HttpResponseMessage(HttpStatusCode.NotFound)
+            });
+        using var httpClient = new HttpClient(handler);
+        using var fetcher = new LinkPreviewFetcher(
+            paths,
+            httpClient,
+            new FixedResolver(IPAddress.Parse("93.184.216.34")));
+
+        var result = await fetcher.FetchAsync(new LinkPreviewCandidate(
+            Guid.NewGuid(),
+            "https://video.example/watch?v=123",
+            "https://video.example/watch?v=123"));
+
+        Assert.Equal(LinkPreviewStatus.Available, result.Status);
+        Assert.Equal("Large video page", result.PageTitle);
+        Assert.NotNull(result.PreviewImagePath);
+        Assert.True(File.Exists(Path.Combine(_root, result.PreviewImagePath!)));
+    }
+
+    [Fact]
     public async Task FetcherUsesSiteIconWhenPagePreviewIsUnavailable()
     {
         var paths = SentoryDataPaths.ForRoot(_root);

@@ -74,7 +74,7 @@ public sealed class LinkPreviewFetcher : IDisposable
                         fetchedAt);
             }
 
-            var htmlBytes = await ReadLimitedAsync(
+            var htmlBytes = await ReadPrefixAsync(
                 response.Content,
                 MaximumHtmlBytes,
                 cancellationToken);
@@ -317,6 +317,34 @@ public sealed class LinkPreviewFetcher : IDisposable
             if (memory.Length + read > maximumBytes)
             {
                 throw new InvalidDataException("Link preview response is too large.");
+            }
+
+            await memory.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+        }
+
+        return memory.ToArray();
+    }
+
+    private static async Task<byte[]> ReadPrefixAsync(
+        HttpContent content,
+        int maximumBytes,
+        CancellationToken cancellationToken)
+    {
+        await using var stream = await content.ReadAsStreamAsync(cancellationToken);
+        using var memory = new MemoryStream(
+            content.Headers.ContentLength is > 0 and var contentLength
+                ? (int)Math.Min(contentLength, maximumBytes)
+                : 0);
+        var buffer = new byte[16 * 1024];
+        while (memory.Length < maximumBytes)
+        {
+            var remaining = maximumBytes - (int)memory.Length;
+            var read = await stream.ReadAsync(
+                buffer.AsMemory(0, Math.Min(buffer.Length, remaining)),
+                cancellationToken);
+            if (read == 0)
+            {
+                break;
             }
 
             await memory.WriteAsync(buffer.AsMemory(0, read), cancellationToken);

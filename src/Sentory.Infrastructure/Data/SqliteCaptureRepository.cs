@@ -8,7 +8,7 @@ namespace Sentory.Infrastructure.Data;
 public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
     : ICaptureRepository
 {
-    private const int CurrentSchemaVersion = 3;
+    private const int CurrentSchemaVersion = 4;
     private static readonly HashSet<string> StoredImageExtensions = new(
         [".png", ".jpg", ".bmp", ".gif", ".tif", ".webp"],
         StringComparer.OrdinalIgnoreCase);
@@ -220,6 +220,41 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 ON items(kind, preview_fetched_at);
             """,
             cancellationToken);
+        if (schemaVersion < 4)
+        {
+            await ExecuteNonQueryAsync(
+                connection,
+                """
+                UPDATE items
+                SET preview_status = NULL,
+                    preview_fetched_at = NULL
+                WHERE preview_image_path IS NULL
+                  AND (
+                      lower(domain) IN (
+                          'youtube.com',
+                          'www.youtube.com',
+                          'm.youtube.com',
+                          'music.youtube.com',
+                          'youtu.be',
+                          'www.youtu.be',
+                          'youtube-nocookie.com',
+                          'www.youtube-nocookie.com')
+                      OR EXISTS (
+                          SELECT 1
+                          FROM collection_members
+                          WHERE collection_id = items.id
+                            AND lower(domain) IN (
+                                'youtube.com',
+                                'www.youtube.com',
+                                'm.youtube.com',
+                                'music.youtube.com',
+                                'youtu.be',
+                                'www.youtu.be',
+                                'youtube-nocookie.com',
+                                'www.youtube-nocookie.com')));
+                """,
+                cancellationToken);
+        }
         await ExecuteNonQueryAsync(
             connection,
             $"PRAGMA user_version = {CurrentSchemaVersion};",

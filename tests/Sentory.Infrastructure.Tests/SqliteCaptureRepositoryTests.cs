@@ -325,7 +325,53 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         await using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version;";
 
-        Assert.Equal(3L, (long)(await command.ExecuteScalarAsync())!);
+        Assert.Equal(4L, (long)(await command.ExecuteScalarAsync())!);
+    }
+
+    [Fact]
+    public async Task VersionFourRetriesUnavailableYouTubePreviews()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var repository = new SqliteCaptureRepository(paths);
+        await repository.InitializeAsync();
+        var youtube = await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://www.youtube.com/watch?v=gqkfH78Gm40",
+            DeliveryStatus.Confirmed));
+        var ordinary = await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/unavailable",
+            DeliveryStatus.Confirmed));
+        var fetchedAt = DateTimeOffset.UtcNow;
+        foreach (var itemId in new[] { youtube.ItemId, ordinary.ItemId })
+        {
+            Assert.True(await repository.UpdateLinkPreviewAsync(
+                itemId,
+                new LinkPreviewUpdate(
+                    LinkPreviewStatus.Unavailable,
+                    null,
+                    null,
+                    null,
+                    null,
+                    fetchedAt)));
+        }
+
+        await using (var connection = new SqliteConnection(
+                         $"Data Source={paths.DatabasePath}"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA user_version = 3;";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        await repository.InitializeAsync();
+        var candidates = await repository.GetLinkPreviewCandidatesAsync(
+            10,
+            fetchedAt.AddYears(-1));
+
+        var candidate = Assert.Single(candidates);
+        Assert.Equal(youtube.ItemId, candidate.ItemId);
     }
 
     [Fact]
