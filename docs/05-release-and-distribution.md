@@ -4,7 +4,7 @@
 
 - 제품명: Sentory
 - 제작자·게시자: NudeNyang
-- 현재 개발 버전: `0.9.1-beta`
+- 현재 배포 버전: `1.0.0`
 - 라이선스: Sentory Personal Use License 1.0
 - 사용 범위: 개인적·비상업적 용도
 - 현재 배포 운영체제: Windows 10/11 64비트
@@ -37,7 +37,7 @@ GitHub 푸시와 Release 발행은 저장소 소유자가 직접 수행한다.
 다음 명령 하나로 네 종류의 패키지와 SHA-256 확인값을 만든다.
 
 ```powershell
-.\scripts\Publish-Release.ps1 -Version 0.9.1-beta
+.\scripts\Publish-Release.ps1 -Version 1.0.0
 ```
 
 | 파일 | 대상 |
@@ -109,10 +109,9 @@ x64 설치·실행·제거 왕복 검증은 다음 명령으로 반복할 수 �
 - `SUPPORT.md`: 지원 범위와 안전한 버그 제보 방법
 - `distribution/README-KO.txt`: 최종 사용자 설치·사용 안내
 
-현재 베타 산출물은 코드 서명되지 않는다. 따라서 Windows가 알 수 없는 게시자
+현재 산출물은 코드 서명되지 않는다. 따라서 Windows가 알 수 없는 게시자
 또는 평판 기반 경고를 표시할 수 있다. 공개 Release에는 SHA-256 확인 방법을
-명시하고, 정식 1.0 배포 전에는 실행 파일과 설치 프로그램의 코드 서명을
-완료한다.
+명시한다. 코드 서명은 인증서를 준비한 뒤 후속 배포에 적용한다.
 
 ## 버전과 업데이트 정책
 

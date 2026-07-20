@@ -45,4 +45,4 @@ Discord와 카카오톡의 지원 채팅 입력 문맥을 확인한다. 지원 �
 ## 문의
 
 개인정보 또는 데이터 처리 방식에 관한 문의는 Sentory의 공식 GitHub 저장소를
-통해 접수한다. 저장소 주소는 공개 배포 시 README와 앱 정보에 추가한다.
+통해 접수한다. 저장소 주소는 `https://github.com/NudeNyang/Sentory`다.

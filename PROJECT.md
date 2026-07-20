@@ -250,7 +250,8 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
   확인한 뒤 사용자 승인 후 적용한다.
 - Sentory Personal Use License에 따라 개인적·비상업적 사용만 허용하며,
   수정·역공학·재배포·상업적 이용에는 제작자의 사전 서면 허가가 필요하다.
-- 정식 배포 전 코드 서명과 ARM64 실제 장치 검수를 완료한다.
+- 코드 서명은 인증서를 준비한 뒤 후속 배포에 적용한다. ARM64 패키지는 실제
+  Windows on ARM 장치에서 별도 검수한다.
 
 세부 구조와 이식 순서는
 [`docs/03-cross-platform-and-distribution-readiness.md`](./docs/03-cross-platform-and-distribution-readiness.md)에
