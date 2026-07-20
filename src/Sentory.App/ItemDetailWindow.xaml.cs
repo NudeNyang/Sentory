@@ -24,6 +24,7 @@ public partial class ItemDetailWindow : Window
         _loadLinkArtworkAsync;
     private readonly Action<string?> _openImage;
     private readonly Action<string> _openLink;
+    private readonly OverlayScrollIndicatorController _scrollIndicator;
     private readonly Dictionary<string, GalleryLinkArtwork?> _linkArtworkCache =
         new(StringComparer.OrdinalIgnoreCase);
     private int _collectionImageIndex;
@@ -69,6 +70,12 @@ public partial class ItemDetailWindow : Window
                     item.Item.Domain)]
                 : [];
         SentoryTheme.Apply(Resources, isDarkTheme);
+        _scrollIndicator = new OverlayScrollIndicatorController(
+            DetailScrollViewer,
+            DetailScrollSurface,
+            DetailScrollIndicator,
+            DetailScrollIndicatorThumb,
+            DetailScrollIndicatorThumbTransform);
         TypeText.Text = item.TypeLabel;
         TitleText.Text = item.Title;
         DescriptionText.Text = item.Subtitle;
@@ -122,6 +129,7 @@ public partial class ItemDetailWindow : Window
 
         SourceInitialized += (_, _) =>
             SentoryTheme.ApplyTitleBar(this, _isDarkTheme);
+        Closed += (_, _) => _scrollIndicator.Dispose();
     }
 
     public ItemDetailAction SelectedAction { get; private set; }

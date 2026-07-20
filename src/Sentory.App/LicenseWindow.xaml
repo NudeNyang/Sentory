@@ -41,16 +41,49 @@
                 BorderBrush="{DynamicResource LineBrush}"
                 BorderThickness="1"
                 CornerRadius="14">
-            <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                          VerticalScrollBarVisibility="Auto"
-                          FocusVisualStyle="{x:Null}">
-                <TextBlock x:Name="LicenseText"
-                           FontFamily="Consolas"
-                           FontSize="11.5"
-                           LineHeight="19"
-                           TextWrapping="Wrap"
-                           Foreground="{DynamicResource TextBrush}" />
-            </ScrollViewer>
+            <Grid x:Name="LicenseScrollSurface">
+                <ScrollViewer x:Name="LicenseScrollViewer"
+                              Padding="0,0,12,0"
+                              HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Hidden"
+                              FocusVisualStyle="{x:Null}">
+                    <TextBlock x:Name="LicenseText"
+                               FontFamily="Consolas"
+                               FontSize="11.5"
+                               LineHeight="19"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextBrush}" />
+                </ScrollViewer>
+
+                <Border x:Name="LicenseScrollIndicator"
+                        Panel.ZIndex="40"
+                        Width="10"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Stretch"
+                        Background="Transparent"
+                        Cursor="Arrow"
+                        IsHitTestVisible="False"
+                        Opacity="0"
+                        SnapsToDevicePixels="True"
+                        Visibility="Visible">
+                    <Grid ClipToBounds="True">
+                        <Border x:Name="LicenseScrollIndicatorThumb"
+                                Width="3"
+                                Height="32"
+                                Margin="0,0,3,0"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Top"
+                                Background="{DynamicResource AccentBrush}"
+                                CornerRadius="3"
+                                Opacity="0.46"
+                                SnapsToDevicePixels="True">
+                            <Border.RenderTransform>
+                                <TranslateTransform x:Name="LicenseScrollIndicatorThumbTransform" />
+                            </Border.RenderTransform>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
         </Border>
     </Grid>
 </Window>

@@ -204,9 +204,13 @@
                 </Grid>
             </Border>
 
-            <ScrollViewer Grid.Column="2"
-                          VerticalScrollBarVisibility="Auto">
-                <StackPanel>
+            <Grid x:Name="DetailScrollSurface" Grid.Column="2">
+                <ScrollViewer x:Name="DetailScrollViewer"
+                              Padding="0,0,12,0"
+                              HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Hidden"
+                              FocusVisualStyle="{x:Null}">
+                    <StackPanel>
                     <TextBlock x:Name="DescriptionText"
                                FontSize="13"
                                LineHeight="20"
@@ -434,8 +438,38 @@
                                Margin="0,18,0,0"
                                FontSize="11"
                                Foreground="{DynamicResource SoftTextBrush}" />
-                </StackPanel>
-            </ScrollViewer>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <Border x:Name="DetailScrollIndicator"
+                        Panel.ZIndex="40"
+                        Width="10"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Stretch"
+                        Background="Transparent"
+                        Cursor="Arrow"
+                        IsHitTestVisible="False"
+                        Opacity="0"
+                        SnapsToDevicePixels="True"
+                        Visibility="Visible">
+                    <Grid ClipToBounds="True">
+                        <Border x:Name="DetailScrollIndicatorThumb"
+                                Width="3"
+                                Height="32"
+                                Margin="0,0,3,0"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Top"
+                                Background="{DynamicResource AccentBrush}"
+                                CornerRadius="3"
+                                Opacity="0.46"
+                                SnapsToDevicePixels="True">
+                            <Border.RenderTransform>
+                                <TranslateTransform x:Name="DetailScrollIndicatorThumbTransform" />
+                            </Border.RenderTransform>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
         </Grid>
 
     </Grid>
