@@ -62,6 +62,7 @@ public partial class GalleryWindow : Window
     private bool _scrollIndicatorShown;
     private bool _scrollIndicatorThumbEmphasized;
     private bool _discordRepairNeeded;
+    private bool _allowCloseWithOwnedWindows;
     private CaptureRuntimeState _discordDetectionState =
         CaptureRuntimeState.Connecting;
 
@@ -548,6 +549,7 @@ public partial class GalleryWindow : Window
             window.Closed += (_, _) => closed.TrySetResult(true);
             window.Show();
             await closed.Task;
+            RestoreAfterOwnedWindowClosed();
         }
         finally
         {
@@ -2029,6 +2031,7 @@ public partial class GalleryWindow : Window
         window.Closed += (_, _) => closed.TrySetResult(true);
         window.Show();
         await closed.Task;
+        RestoreAfterOwnedWindowClosed();
         switch (window.SelectedAction)
         {
             case ItemDetailAction.Copy:
@@ -2431,12 +2434,46 @@ public partial class GalleryWindow : Window
 
     protected override void OnClosing(CancelEventArgs e)
     {
+        if (!_allowCloseWithOwnedWindows)
+        {
+            var visibleOwnedWindow = OwnedWindows
+                .Cast<Window>()
+                .FirstOrDefault(window => window.IsVisible);
+            if (visibleOwnedWindow is not null)
+            {
+                e.Cancel = true;
+                RestoreAfterOwnedWindowClosed();
+                visibleOwnedWindow.Activate();
+                return;
+            }
+        }
+
         SaveWindowPlacement();
         SaveSettings();
         _feedbackCancellation?.Cancel();
         _feedbackCancellation?.Dispose();
         _scrollIndicatorHideTimer.Stop();
         base.OnClosing(e);
+    }
+
+    internal void PrepareForApplicationShutdown() =>
+        _allowCloseWithOwnedWindows = true;
+
+    private void RestoreAfterOwnedWindowClosed()
+    {
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        ShowInTaskbar = true;
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
+        Show();
+        Activate();
     }
 
     private enum GalleryFilter

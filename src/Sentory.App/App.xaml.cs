@@ -1026,8 +1026,19 @@ public partial class App : System.Windows.Application
                 _discordSupportEnabled,
                 _kakaoSupportEnabled);
             _galleryWindow.SetRuntimeIssue(_lastRuntimeIssue);
-            _galleryWindow.Closed += (_, _) => _galleryWindow = null;
+            MainWindow = _galleryWindow;
+            _galleryWindow.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(MainWindow, _galleryWindow))
+                {
+                    MainWindow = null;
+                }
+
+                _galleryWindow = null;
+            };
+            _galleryWindow.ShowInTaskbar = true;
             _galleryWindow.Show();
+            _galleryWindow.Activate();
             return;
         }
 
@@ -1036,6 +1047,8 @@ public partial class App : System.Windows.Application
             _galleryWindow.WindowState = WindowState.Normal;
         }
 
+        MainWindow = _galleryWindow;
+        _galleryWindow.ShowInTaskbar = true;
         _galleryWindow.Show();
         _galleryWindow.Activate();
     }
@@ -1343,6 +1356,7 @@ public partial class App : System.Windows.Application
     {
         _trayMenuWindow?.Close();
         _trayMenuWindow = null;
+        _galleryWindow?.PrepareForApplicationShutdown();
         _galleryWindow?.Close();
         _galleryWindow = null;
         if (_trayIcon is not null)
