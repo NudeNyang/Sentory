@@ -18,7 +18,7 @@ planned.
 | Messenger | When Sentory saves | What Sentory ignores |
 | --- | --- | --- |
 | Discord | After a pasted link or image is actually sent | Paste without sending, `Shift+Enter`, canceled attachments |
-| KakaoTalk | As soon as a link or image is pasted into an individual chat input | Manually typed URLs, search input, anything outside a chat input |
+| KakaoTalk | When a link or image is pasted into an individual chat, or local photos are placed on Sentory's verified drop area | Manually typed URLs, search input, anything outside a chat input |
 
 Copying or pasting in another application does not create an item. Sentory validates
 the messenger window and its input area first, so ordinary clipboard activity does
@@ -27,6 +27,7 @@ not fill your library.
 ## Features
 
 - Browse links and images as visual cards
+- Keep multiple links and images from one paste in a single card and copy the set again
 - Search by title, URL, or domain
 - Filter by messenger, content type, and date, then choose the sort order you prefer
 - Mark favorites and keep them safe from automatic cleanup

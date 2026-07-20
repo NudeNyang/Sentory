@@ -8,7 +8,10 @@ namespace Sentory.Infrastructure.Data;
 public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
     : ICaptureRepository
 {
-    private const int CurrentSchemaVersion = 2;
+    private const int CurrentSchemaVersion = 3;
+    private static readonly HashSet<string> StoredImageExtensions = new(
+        [".png", ".jpg", ".bmp", ".gif", ".tif", ".webp"],
+        StringComparer.OrdinalIgnoreCase);
     private readonly string _connectionString =
         new SqliteConnectionStringBuilder
         {
@@ -82,10 +85,32 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 FOREIGN KEY(item_id) REFERENCES items(id)
             );
 
+            CREATE TABLE IF NOT EXISTS collection_members (
+                collection_id TEXT NOT NULL,
+                position INTEGER NOT NULL,
+                kind TEXT NOT NULL,
+                normalized_key TEXT NOT NULL,
+                original_url TEXT NOT NULL,
+                domain TEXT NOT NULL,
+                content_path TEXT NULL,
+                content_hash TEXT NULL,
+                mime_type TEXT NULL,
+                byte_size INTEGER NULL,
+                image_width INTEGER NULL,
+                image_height INTEGER NULL,
+                PRIMARY KEY(collection_id, position),
+                FOREIGN KEY(collection_id) REFERENCES items(id)
+                    ON DELETE CASCADE
+            );
+
             CREATE INDEX IF NOT EXISTS ix_items_last_captured_at
                 ON items(last_captured_at DESC);
             CREATE INDEX IF NOT EXISTS ix_capture_events_item_id
                 ON capture_events(item_id);
+            CREATE INDEX IF NOT EXISTS ix_collection_members_collection_id
+                ON collection_members(collection_id, position);
+            CREATE INDEX IF NOT EXISTS ix_collection_members_normalized_key
+                ON collection_members(normalized_key);
             """,
             cancellationToken);
         await EnsureColumnAsync(
@@ -178,6 +203,12 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             "preview_fetched_at",
             "TEXT NULL",
             cancellationToken);
+        await EnsureColumnAsync(
+            connection,
+            "collection_members",
+            "byte_size",
+            "INTEGER NULL",
+            cancellationToken);
         await ExecuteNonQueryAsync(
             connection,
             """
@@ -267,14 +298,14 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         CancellationToken cancellationToken = default)
     {
         var calculatedHash = Convert.ToHexString(
-            SHA256.HashData(request.PngBytes.Span));
+            SHA256.HashData(request.ContentBytes.Span));
         if (!string.Equals(
                 calculatedHash,
                 request.Sha256,
                 StringComparison.OrdinalIgnoreCase))
         {
             throw new ArgumentException(
-                "Image hash does not match its PNG bytes.",
+                "Image hash does not match its content bytes.",
                 nameof(request));
         }
 
@@ -317,26 +348,11 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                          (request.DeliveryStatus == DeliveryStatus.Confirmed
                              ? 1
                              : 0);
-        var relativePath = Path.Combine("images", $"{normalizedHash}.png");
-        var absolutePath = Path.Combine(paths.RootDirectory, relativePath);
-
-        if (!File.Exists(absolutePath))
-        {
-            var temporaryPath =
-                $"{absolutePath}.{Guid.NewGuid():N}.tmp";
-            await File.WriteAllBytesAsync(
-                temporaryPath,
-                request.PngBytes.ToArray(),
-                cancellationToken);
-            try
-            {
-                File.Move(temporaryPath, absolutePath, overwrite: false);
-            }
-            catch (IOException) when (File.Exists(absolutePath))
-            {
-                File.Delete(temporaryPath);
-            }
-        }
+        var relativePath = await EnsureImageStoredAsync(
+            normalizedHash,
+            request.FileExtension,
+            request.ContentBytes,
+            cancellationToken);
 
         await UpsertImageItemAsync(
             connection,
@@ -370,6 +386,141 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             shareCount);
     }
 
+    public async Task<CaptureResult> UpsertCollectionAsync(
+        CollectionCaptureRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request.Members.Count < 2)
+        {
+            throw new ArgumentException(
+                "A collection must contain at least two members.",
+                nameof(request));
+        }
+
+        var distinctKeys = request.Members
+            .Select(member => $"{member.Kind}:{member.NormalizedKey}")
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+        if (distinctKeys != request.Members.Count)
+        {
+            throw new ArgumentException(
+                "A collection cannot contain duplicate members.",
+                nameof(request));
+        }
+
+        if (!string.Equals(
+                request.Signature,
+                CaptureCollectionIdentity.CreateSignature(request.Members),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException(
+                "Collection signature does not match its members.",
+                nameof(request));
+        }
+
+        foreach (var member in request.Members.Where(member =>
+                     member.Kind == ContentKind.Image))
+        {
+            var calculatedHash = Convert.ToHexString(
+                SHA256.HashData(member.ContentBytes.Span));
+            if (!string.Equals(
+                    calculatedHash,
+                    member.Sha256,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException(
+                    "Collection image hash does not match its content bytes.",
+                    nameof(request));
+            }
+        }
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var transaction =
+            await connection.BeginTransactionAsync(cancellationToken);
+        var existingEventItemId = await GetEventItemIdAsync(
+            connection,
+            transaction,
+            request.EventId,
+            cancellationToken);
+        if (existingEventItemId is not null)
+        {
+            var existingCounts = await GetCountsAsync(
+                connection,
+                transaction,
+                existingEventItemId.Value,
+                cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return new CaptureResult(
+                existingEventItemId.Value,
+                false,
+                false,
+                existingCounts.CaptureCount,
+                existingCounts.ShareCount);
+        }
+
+        var storedPaths = new Dictionary<string, string>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var member in request.Members.Where(member =>
+                     member.Kind == ContentKind.Image))
+        {
+            storedPaths[member.NormalizedKey] = await EnsureImageStoredAsync(
+                member.Sha256!,
+                member.FileExtension!,
+                member.ContentBytes,
+                cancellationToken);
+        }
+
+        var normalizedKey = $"collection:sha256:{request.Signature}";
+        var existingItem = await GetItemAsync(
+            connection,
+            transaction,
+            normalizedKey,
+            cancellationToken);
+        var itemId = existingItem?.ItemId ?? Guid.NewGuid();
+        var itemCreated = existingItem is null;
+        var captureCount = (existingItem?.CaptureCount ?? 0) + 1;
+        var shareCount = (existingItem?.ShareCount ?? 0) +
+                         (request.DeliveryStatus == DeliveryStatus.Confirmed
+                             ? 1
+                             : 0);
+
+        await UpsertCollectionItemAsync(
+            connection,
+            transaction,
+            request,
+            itemId,
+            normalizedKey,
+            captureCount,
+            shareCount,
+            cancellationToken);
+        await ReplaceCollectionMembersAsync(
+            connection,
+            transaction,
+            request.Members,
+            storedPaths,
+            itemId,
+            cancellationToken);
+        await InsertEventAsync(
+            connection,
+            transaction,
+            request.EventId,
+            itemId,
+            request.SourceApp,
+            request.CaptureMethod,
+            request.DeliveryStatus,
+            request.ContextHash,
+            request.CapturedAt,
+            request.ConfirmationSignals,
+            cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new CaptureResult(
+            itemId,
+            itemCreated,
+            true,
+            captureCount,
+            shareCount);
+    }
+
     public async Task<IReadOnlyList<CapturedItemSummary>> GetRecentAsync(
         int limit,
         CancellationToken cancellationToken = default)
@@ -389,7 +540,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                    content_path, content_hash, is_favorite, copy_count,
                    last_copied_at, page_title, page_description,
                    site_icon_path, preview_image_path, preview_status,
-                   preview_fetched_at,
+                   preview_fetched_at, mime_type,
                    (SELECT GROUP_CONCAT(DISTINCT source_app)
                     FROM capture_events
                     WHERE item_id = items.id) AS source_apps
@@ -400,45 +551,67 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         command.Parameters.AddWithValue("$limit", limit);
 
         var results = new List<CapturedItemSummary>();
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
         {
-            results.Add(new CapturedItemSummary(
-                Guid.Parse(reader.GetString(0)),
-                Enum.Parse<ContentKind>(reader.GetString(1)),
-                reader.GetString(2),
-                reader.GetString(3),
-                reader.GetString(4),
-                Enum.Parse<SourceApp>(reader.GetString(5)),
-                Enum.Parse<CaptureMethod>(reader.GetString(6)),
-                Enum.Parse<DeliveryStatus>(reader.GetString(7)),
-                reader.GetInt32(8),
-                reader.GetInt32(9),
-                DateTimeOffset.Parse(reader.GetString(10)),
-                DateTimeOffset.Parse(reader.GetString(11)),
-                reader.IsDBNull(12) ? null : reader.GetString(12),
-                reader.IsDBNull(13) ? null : reader.GetString(13),
-                reader.GetInt32(14) != 0,
-                reader.GetInt32(15),
-                reader.IsDBNull(16)
-                    ? null
-                    : DateTimeOffset.Parse(reader.GetString(16)),
-                reader.IsDBNull(17) ? null : reader.GetString(17),
-                reader.IsDBNull(18) ? null : reader.GetString(18),
-                reader.IsDBNull(19) ? null : reader.GetString(19),
-                reader.IsDBNull(20) ? null : reader.GetString(20),
-                reader.IsDBNull(21)
-                    ? null
-                    : Enum.Parse<LinkPreviewStatus>(reader.GetString(21)),
-                reader.IsDBNull(22)
-                    ? null
-                    : DateTimeOffset.Parse(reader.GetString(22)),
-                ParseSourceApps(
-                    reader.IsDBNull(23) ? null : reader.GetString(23),
-                    Enum.Parse<SourceApp>(reader.GetString(5)))));
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                results.Add(new CapturedItemSummary(
+                    Guid.Parse(reader.GetString(0)),
+                    Enum.Parse<ContentKind>(reader.GetString(1)),
+                    reader.GetString(2),
+                    reader.GetString(3),
+                    reader.GetString(4),
+                    Enum.Parse<SourceApp>(reader.GetString(5)),
+                    Enum.Parse<CaptureMethod>(reader.GetString(6)),
+                    Enum.Parse<DeliveryStatus>(reader.GetString(7)),
+                    reader.GetInt32(8),
+                    reader.GetInt32(9),
+                    DateTimeOffset.Parse(reader.GetString(10)),
+                    DateTimeOffset.Parse(reader.GetString(11)),
+                    reader.IsDBNull(12) ? null : reader.GetString(12),
+                    reader.IsDBNull(13) ? null : reader.GetString(13),
+                    reader.GetInt32(14) != 0,
+                    reader.GetInt32(15),
+                    reader.IsDBNull(16)
+                        ? null
+                        : DateTimeOffset.Parse(reader.GetString(16)),
+                    reader.IsDBNull(17) ? null : reader.GetString(17),
+                    reader.IsDBNull(18) ? null : reader.GetString(18),
+                    reader.IsDBNull(19) ? null : reader.GetString(19),
+                    reader.IsDBNull(20) ? null : reader.GetString(20),
+                    reader.IsDBNull(21)
+                        ? null
+                        : Enum.Parse<LinkPreviewStatus>(reader.GetString(21)),
+                    reader.IsDBNull(22)
+                        ? null
+                        : DateTimeOffset.Parse(reader.GetString(22)),
+                    ParseSourceApps(
+                        reader.IsDBNull(24) ? null : reader.GetString(24),
+                        Enum.Parse<SourceApp>(reader.GetString(5))),
+                    reader.IsDBNull(23) ? null : reader.GetString(23)));
+            }
         }
 
-        return results;
+        var collections = results
+            .Where(item => item.Kind == ContentKind.Collection)
+            .Select(item => item.ItemId)
+            .ToArray();
+        if (collections.Length == 0)
+        {
+            return results;
+        }
+
+        var memberLookup = await ReadCollectionMembersAsync(
+            connection,
+            collections,
+            cancellationToken);
+        return results.Select(item => item.Kind == ContentKind.Collection
+                ? item with
+                {
+                    Members = memberLookup.GetValueOrDefault(item.ItemId, [])
+                }
+                : item)
+            .ToArray();
     }
 
     private static IReadOnlyList<SourceApp> ParseSourceApps(
@@ -517,23 +690,32 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 """
                 SELECT content_path, site_icon_path, preview_image_path
                 FROM items
-                WHERE id = $itemId;
+                WHERE id = $itemId
+                UNION ALL
+                SELECT content_path, NULL, NULL
+                FROM collection_members
+                WHERE collection_id = $itemId AND content_path IS NOT NULL;
                 """;
             lookup.Parameters.AddWithValue("$itemId", itemId.ToString("D"));
             await using var reader = await lookup.ExecuteReaderAsync(
                 cancellationToken);
-            if (!await reader.ReadAsync(cancellationToken))
+            var found = false;
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                found = true;
+                for (var index = 0; index < 3; index++)
+                {
+                    if (!reader.IsDBNull(index))
+                    {
+                        storedPaths.Add(reader.GetString(index));
+                    }
+                }
+            }
+
+            if (!found)
             {
                 await transaction.CommitAsync(cancellationToken);
                 return false;
-            }
-
-            for (var index = 0; index < 3; index++)
-            {
-                if (!reader.IsDBNull(index))
-                {
-                    storedPaths.Add(reader.GetString(index));
-                }
             }
         }
 
@@ -566,7 +748,9 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             foreach (var storedPath in storedPaths.Distinct(
                          StringComparer.OrdinalIgnoreCase))
             {
-                DeleteStoredFile(storedPath);
+                await DeleteStoredFileIfUnreferencedAsync(
+                    storedPath,
+                    cancellationToken);
             }
         }
 
@@ -613,9 +797,12 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 """
                 SELECT content_path
                 FROM items
-                WHERE kind = $kind AND content_path IS NOT NULL;
+                WHERE content_path IS NOT NULL
+                UNION
+                SELECT content_path
+                FROM collection_members
+                WHERE content_path IS NOT NULL;
                 """;
-            command.Parameters.AddWithValue("$kind", ContentKind.Image.ToString());
             await using var reader = await command.ExecuteReaderAsync(
                 cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
@@ -675,12 +862,10 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             var isTemporary = file.EndsWith(
                 ".tmp",
                 StringComparison.OrdinalIgnoreCase);
-            var isOrphanPng = string.Equals(
-                                  Path.GetExtension(file),
-                                  ".png",
-                                  StringComparison.OrdinalIgnoreCase) &&
-                              !referencedFiles.Contains(Path.GetFullPath(file));
-            if (!isTemporary && !isOrphanPng)
+            var isOrphanImage = StoredImageExtensions.Contains(
+                                    Path.GetExtension(file)) &&
+                                !referencedFiles.Contains(Path.GetFullPath(file));
+            if (!isTemporary && !isOrphanImage)
             {
                 continue;
             }
@@ -753,10 +938,24 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             """
             SELECT COUNT(*),
                    COALESCE(SUM(CASE WHEN is_favorite = 1 THEN 1 ELSE 0 END), 0),
-                   COALESCE(SUM(CASE WHEN kind = $urlKind THEN 1 ELSE 0 END), 0),
-                   COALESCE(SUM(CASE WHEN kind = $imageKind THEN 1 ELSE 0 END), 0),
-                   COALESCE(SUM(CASE WHEN kind = $imageKind
-                                     THEN COALESCE(byte_size, 0) ELSE 0 END), 0)
+                   COALESCE(SUM(CASE WHEN kind = $urlKind THEN 1 ELSE 0 END), 0) +
+                       (SELECT COUNT(*) FROM collection_members WHERE kind = $urlKind),
+                   COALESCE(SUM(CASE WHEN kind = $imageKind THEN 1 ELSE 0 END), 0) +
+                       (SELECT COUNT(*) FROM collection_members WHERE kind = $imageKind),
+                   (SELECT COALESCE(SUM(stored_size), 0)
+                    FROM (
+                        SELECT content_hash, MAX(byte_size) AS stored_size
+                        FROM (
+                            SELECT content_hash, byte_size
+                            FROM items
+                            WHERE kind = $imageKind AND content_hash IS NOT NULL
+                            UNION ALL
+                            SELECT content_hash, byte_size
+                            FROM collection_members
+                            WHERE kind = $imageKind AND content_hash IS NOT NULL
+                        )
+                        GROUP BY content_hash
+                    ))
             FROM items;
             """;
         command.Parameters.AddWithValue("$urlKind", ContentKind.Url.ToString());
@@ -830,6 +1029,26 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             }
         }
 
+        await using (var selectMembers = connection.CreateCommand())
+        {
+            selectMembers.Transaction = transaction;
+            selectMembers.CommandText =
+                $"""
+                SELECT content_path
+                FROM collection_members
+                WHERE content_path IS NOT NULL AND collection_id IN (
+                    SELECT id FROM items WHERE {CleanupPredicate}
+                );
+                """;
+            AddCleanupParameters(selectMembers, olderThan);
+            await using var reader = await selectMembers.ExecuteReaderAsync(
+                cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                imagePaths.Add(reader.GetString(0));
+            }
+        }
+
         await using (var deleteEvents = connection.CreateCommand())
         {
             deleteEvents.Transaction = transaction;
@@ -871,8 +1090,13 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
 
                 if (File.Exists(target))
                 {
-                    File.Delete(target);
-                    deletedImageFiles++;
+                    await DeleteStoredFileIfUnreferencedAsync(
+                        relativePath,
+                        cancellationToken);
+                    if (!File.Exists(target))
+                    {
+                        deletedImageFiles++;
+                    }
                 }
             }
             catch (Exception exception)
@@ -1107,6 +1331,35 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         }
 
         return updated;
+    }
+
+    private async Task DeleteStoredFileIfUnreferencedAsync(
+        string relativePath,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT CASE WHEN
+                EXISTS (
+                    SELECT 1 FROM items
+                    WHERE content_path = $path OR
+                          site_icon_path = $path OR
+                          preview_image_path = $path
+                ) OR EXISTS (
+                    SELECT 1 FROM collection_members
+                    WHERE content_path = $path
+                )
+            THEN 1 ELSE 0 END;
+            """;
+        command.Parameters.AddWithValue("$path", relativePath);
+        var referenced = Convert.ToInt32(
+            await command.ExecuteScalarAsync(cancellationToken)) != 0;
+        if (!referenced)
+        {
+            DeleteStoredFile(relativePath);
+        }
     }
 
     private void DeleteStoredFile(string relativePath)
@@ -1429,7 +1682,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 $createdAt, $lastCapturedAt, $lastSourceApp,
                 $lastCaptureMethod, $deliveryStatus,
                 $captureCount, $shareCount, $contentPath, $contentHash,
-                'image/png', $byteSize, $imageWidth, $imageHeight
+                $mimeType, $byteSize, $imageWidth, $imageHeight
             )
             ON CONFLICT(normalized_key) DO UPDATE SET
                 last_captured_at = excluded.last_captured_at,
@@ -1471,9 +1724,218 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             request.Sha256.ToLowerInvariant());
         command.Parameters.AddWithValue(
             "$byteSize",
-            request.PngBytes.Length);
+            request.ContentBytes.Length);
+        command.Parameters.AddWithValue("$mimeType", request.MimeType);
         command.Parameters.AddWithValue("$imageWidth", request.PixelWidth);
         command.Parameters.AddWithValue("$imageHeight", request.PixelHeight);
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private async Task<string> EnsureImageStoredAsync(
+        string sha256,
+        string fileExtension,
+        ReadOnlyMemory<byte> contentBytes,
+        CancellationToken cancellationToken)
+    {
+        var extension = NormalizeImageExtension(fileExtension);
+        var relativePath = Path.Combine("images", $"{sha256.ToLowerInvariant()}{extension}");
+        var absolutePath = Path.Combine(paths.RootDirectory, relativePath);
+        if (File.Exists(absolutePath))
+        {
+            return relativePath;
+        }
+
+        var temporaryPath = $"{absolutePath}.{Guid.NewGuid():N}.tmp";
+        await File.WriteAllBytesAsync(
+            temporaryPath,
+            contentBytes.ToArray(),
+            cancellationToken);
+        try
+        {
+            File.Move(temporaryPath, absolutePath, overwrite: false);
+        }
+        catch (IOException) when (File.Exists(absolutePath))
+        {
+            File.Delete(temporaryPath);
+        }
+
+        return relativePath;
+    }
+
+    private static string NormalizeImageExtension(string extension)
+    {
+        if (string.IsNullOrWhiteSpace(extension))
+        {
+            return ".png";
+        }
+
+        var normalized = extension.StartsWith('.')
+            ? extension.ToLowerInvariant()
+            : $".{extension.ToLowerInvariant()}";
+        return normalized is ".png" or ".jpg" or ".bmp" or ".gif" or
+            ".tif" or ".webp"
+            ? normalized
+            : ".png";
+    }
+
+    private static async Task UpsertCollectionItemAsync(
+        SqliteConnection connection,
+        System.Data.Common.DbTransaction transaction,
+        CollectionCaptureRequest request,
+        Guid itemId,
+        string normalizedKey,
+        int captureCount,
+        int shareCount,
+        CancellationToken cancellationToken)
+    {
+        var urls = request.Members
+            .Where(member => member.Kind == ContentKind.Url)
+            .Select(member => member.OriginalUrl);
+        await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction)transaction;
+        command.CommandText =
+            """
+            INSERT INTO items (
+                id, kind, normalized_key, original_url, domain,
+                created_at, last_captured_at, last_source_app,
+                last_capture_method, delivery_status,
+                capture_count, share_count
+            )
+            VALUES (
+                $id, $kind, $normalizedKey, $originalUrl, '',
+                $createdAt, $lastCapturedAt, $lastSourceApp,
+                $lastCaptureMethod, $deliveryStatus,
+                $captureCount, $shareCount
+            )
+            ON CONFLICT(normalized_key) DO UPDATE SET
+                original_url = excluded.original_url,
+                last_captured_at = excluded.last_captured_at,
+                last_source_app = excluded.last_source_app,
+                last_capture_method = excluded.last_capture_method,
+                delivery_status = excluded.delivery_status,
+                capture_count = excluded.capture_count,
+                share_count = excluded.share_count;
+            """;
+        command.Parameters.AddWithValue("$id", itemId.ToString("D"));
+        command.Parameters.AddWithValue("$kind", ContentKind.Collection.ToString());
+        command.Parameters.AddWithValue("$normalizedKey", normalizedKey);
+        command.Parameters.AddWithValue("$originalUrl", string.Join('\n', urls));
+        command.Parameters.AddWithValue("$createdAt", request.CapturedAt.ToString("O"));
+        command.Parameters.AddWithValue("$lastCapturedAt", request.CapturedAt.ToString("O"));
+        command.Parameters.AddWithValue("$lastSourceApp", request.SourceApp.ToString());
+        command.Parameters.AddWithValue("$lastCaptureMethod", request.CaptureMethod.ToString());
+        command.Parameters.AddWithValue("$deliveryStatus", request.DeliveryStatus.ToString());
+        command.Parameters.AddWithValue("$captureCount", captureCount);
+        command.Parameters.AddWithValue("$shareCount", shareCount);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task ReplaceCollectionMembersAsync(
+        SqliteConnection connection,
+        System.Data.Common.DbTransaction transaction,
+        IReadOnlyList<CollectionMemberCaptureRequest> members,
+        IReadOnlyDictionary<string, string> storedPaths,
+        Guid collectionId,
+        CancellationToken cancellationToken)
+    {
+        await using (var delete = connection.CreateCommand())
+        {
+            delete.Transaction = (SqliteTransaction)transaction;
+            delete.CommandText =
+                "DELETE FROM collection_members WHERE collection_id = $collectionId;";
+            delete.Parameters.AddWithValue("$collectionId", collectionId.ToString("D"));
+            await delete.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        for (var index = 0; index < members.Count; index++)
+        {
+            var member = members[index];
+            await using var insert = connection.CreateCommand();
+            insert.Transaction = (SqliteTransaction)transaction;
+            insert.CommandText =
+                """
+                INSERT INTO collection_members (
+                    collection_id, position, kind, normalized_key,
+                    original_url, domain, content_path, content_hash,
+                    mime_type, byte_size, image_width, image_height
+                ) VALUES (
+                    $collectionId, $position, $kind, $normalizedKey,
+                    $originalUrl, $domain, $contentPath, $contentHash,
+                    $mimeType, $byteSize, $imageWidth, $imageHeight
+                );
+                """;
+            insert.Parameters.AddWithValue("$collectionId", collectionId.ToString("D"));
+            insert.Parameters.AddWithValue("$position", index);
+            insert.Parameters.AddWithValue("$kind", member.Kind.ToString());
+            insert.Parameters.AddWithValue("$normalizedKey", member.NormalizedKey);
+            insert.Parameters.AddWithValue("$originalUrl", member.OriginalUrl);
+            insert.Parameters.AddWithValue("$domain", member.Domain);
+            insert.Parameters.AddWithValue(
+                "$contentPath",
+                member.Kind == ContentKind.Image
+                    ? storedPaths[member.NormalizedKey]
+                    : DBNull.Value);
+            insert.Parameters.AddWithValue("$contentHash", (object?)member.Sha256 ?? DBNull.Value);
+            insert.Parameters.AddWithValue("$mimeType", (object?)member.MimeType ?? DBNull.Value);
+            insert.Parameters.AddWithValue(
+                "$byteSize",
+                member.Kind == ContentKind.Image
+                    ? member.ContentBytes.Length
+                    : DBNull.Value);
+            insert.Parameters.AddWithValue("$imageWidth", member.PixelWidth > 0 ? member.PixelWidth : DBNull.Value);
+            insert.Parameters.AddWithValue("$imageHeight", member.PixelHeight > 0 ? member.PixelHeight : DBNull.Value);
+            await insert.ExecuteNonQueryAsync(cancellationToken);
+        }
+    }
+
+    private static async Task<Dictionary<Guid, IReadOnlyList<CapturedCollectionMember>>>
+        ReadCollectionMembersAsync(
+            SqliteConnection connection,
+            IReadOnlyList<Guid> collectionIds,
+            CancellationToken cancellationToken)
+    {
+        var lookup = collectionIds.ToDictionary(
+            id => id,
+            _ => new List<CapturedCollectionMember>());
+        await using var command = connection.CreateCommand();
+        var parameterNames = new List<string>(collectionIds.Count);
+        for (var index = 0; index < collectionIds.Count; index++)
+        {
+            var parameterName = $"$id{index}";
+            parameterNames.Add(parameterName);
+            command.Parameters.AddWithValue(
+                parameterName,
+                collectionIds[index].ToString("D"));
+        }
+
+        command.CommandText =
+            $"""
+            SELECT collection_id, position, kind, original_url,
+                   normalized_key, domain, content_path, content_hash,
+                   mime_type, image_width, image_height
+            FROM collection_members
+            WHERE collection_id IN ({string.Join(',', parameterNames)})
+            ORDER BY collection_id, position;
+            """;
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var collectionId = Guid.Parse(reader.GetString(0));
+            lookup[collectionId].Add(new CapturedCollectionMember(
+                reader.GetInt32(1),
+                Enum.Parse<ContentKind>(reader.GetString(2)),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.GetString(5),
+                reader.IsDBNull(6) ? null : reader.GetString(6),
+                reader.IsDBNull(7) ? null : reader.GetString(7),
+                reader.IsDBNull(8) ? null : reader.GetString(8),
+                reader.IsDBNull(9) ? 0 : reader.GetInt32(9),
+                reader.IsDBNull(10) ? 0 : reader.GetInt32(10)));
+        }
+
+        return lookup.ToDictionary(
+            pair => pair.Key,
+            pair => (IReadOnlyList<CapturedCollectionMember>)pair.Value);
     }
 }

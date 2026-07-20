@@ -185,7 +185,10 @@ internal sealed class OverlayScrollIndicatorController : IDisposable
     private void Update()
     {
         var metrics = Metrics();
-        _track.Visibility = metrics.IsScrollable ? Visibility.Visible : Visibility.Collapsed;
+        // Keep the transparent track measured even while hidden. Collapsing it
+        // makes ActualHeight zero, so it can never discover that the viewer is
+        // scrollable again.
+        _track.Visibility = Visibility.Visible;
         _track.IsHitTestVisible = metrics.IsScrollable;
         if (!metrics.IsScrollable)
         {

@@ -38,7 +38,7 @@ public static class GalleryQuery
 
         var search = options.SearchText.Trim();
         var filtered = items.Where(item =>
-            (options.Kind is null || item.Kind == options.Kind) &&
+            MatchesKind(item, options.Kind) &&
             (!options.FavoritesOnly || item.IsFavorite) &&
             MatchesSource(item, options.SourceApps) &&
             IsInDateRange(item.LastCapturedAt, options.DateRange, now) &&
@@ -102,8 +102,20 @@ public static class GalleryQuery
                     StringComparison.OrdinalIgnoreCase) ?? false) ||
                (item.PageDescription?.Contains(
                     search,
-                    StringComparison.OrdinalIgnoreCase) ?? false);
+                    StringComparison.OrdinalIgnoreCase) ?? false) ||
+               (item.Members?.Any(member =>
+                    member.OriginalUrl.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    member.NormalizedKey.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    member.Domain.Contains(search, StringComparison.OrdinalIgnoreCase)) ?? false);
     }
+
+    private static bool MatchesKind(
+        CapturedItemSummary item,
+        ContentKind? kind) =>
+        kind is null ||
+        item.Kind == kind ||
+        item.Kind == ContentKind.Collection &&
+        (item.Members?.Any(member => member.Kind == kind) ?? false);
 
     private static bool MatchesSource(
         CapturedItemSummary item,
@@ -149,6 +161,9 @@ public static class GalleryQuery
             ContentKind.Url when !string.IsNullOrWhiteSpace(item.Domain) =>
                 item.Domain,
             ContentKind.Image => "클립보드 이미지",
+            ContentKind.Collection => item.Members is { Count: > 0 }
+                ? $"묶음 {item.Members.Count}개"
+                : "묶음",
             _ => item.NormalizedKey
         };
 }

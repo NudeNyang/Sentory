@@ -39,6 +39,7 @@ public partial class App : System.Windows.Application
     private SentorySettingsStore? _settingsStore;
     private SentoryDiagnosticsLog? _diagnosticsLog;
     private ICaptureRuntime? _runtime;
+    private KakaoDropOverlayRuntime? _kakaoDropOverlay;
     private GalleryWindow? _galleryWindow;
     private readonly CancellationTokenSource _maintenanceCancellation = new();
     private Task? _maintenanceTask;
@@ -153,13 +154,21 @@ public partial class App : System.Windows.Application
                     "SENTORY_ACCEPT_INJECTED_INPUT"),
                 "1",
                 StringComparison.Ordinal);
+            var kakaoRuntime = new KakaoCaptureRuntime(
+                _repository,
+                acceptInjectedInput);
             _runtime = new CompositeCaptureRuntime(
-                new KakaoCaptureRuntime(
-                    _repository,
-                    acceptInjectedInput),
+                kakaoRuntime,
                 new DiscordCaptureRuntime(
                     _repository,
                     acceptInjectedInput));
+            _kakaoDropOverlay = new KakaoDropOverlayRuntime(
+                kakaoRuntime,
+                GetSavedDarkTheme,
+                () => SentoryLocalization.Text("KakaoDropHeading"),
+                () => SentoryLocalization.Text("KakaoDropDescription"),
+                (category, message) =>
+                    _diagnosticsLog?.Write(category, message));
             _runtime.Captured += OnCaptured;
             _runtime.IssueDetected += OnCaptureIssueDetected;
             if (_runtime is ICaptureRuntimeStatusSource statusSource)
@@ -188,6 +197,7 @@ public partial class App : System.Windows.Application
             _linkPreviewTask = RunLinkPreviewLoopAsync(
                 _maintenanceCancellation.Token);
             _runtime.Start();
+            _kakaoDropOverlay.Start();
             UpdatePauseUi();
             OpenGallery();
             _ = CheckForUpdatesAsync(_maintenanceCancellation.Token);
@@ -637,13 +647,17 @@ public partial class App : System.Windows.Application
                 "Sentory",
                 notification.SourceApp == SourceApp.Discord &&
                 notification.DeliveryStatus == DeliveryStatus.Confirmed
-                    ? notification.Kind == ContentKind.Image
+                    ? notification.Kind == ContentKind.Collection
+                        ? SentoryLocalization.Text("DiscordCollectionSaved")
+                    : notification.Kind == ContentKind.Image
                         ? SentoryLocalization.Text("DiscordPhotoSaved")
                         : notification.Count == 1
                             ? SentoryLocalization.Text("DiscordUrlSaved")
                             : SentoryLocalization.Format(
                                 "DiscordUrlsSavedFormat",
                                 notification.Count)
+                    : notification.Kind == ContentKind.Collection
+                    ? SentoryLocalization.Text("InputCollectionSaved")
                     : notification.Kind == Sentory.Core.ContentKind.Image
                     ? SentoryLocalization.Text("InputPhotoSaved")
                     : notification.Count == 1
@@ -655,7 +669,7 @@ public partial class App : System.Windows.Application
 
             if (_galleryWindow is { IsLoaded: true })
             {
-                _ = _galleryWindow.RefreshAsync();
+                _ = RefreshGalleryAfterCaptureAsync(notification);
             }
 
             if (notification.Kind == ContentKind.Url)
@@ -663,6 +677,23 @@ public partial class App : System.Windows.Application
                 WakeLinkPreviewWorker();
             }
         });
+    }
+
+    private async Task RefreshGalleryAfterCaptureAsync(
+        CaptureNotification notification)
+    {
+        if (_galleryWindow is not { IsLoaded: true } gallery)
+        {
+            return;
+        }
+
+        _diagnosticsLog?.Write(
+            "gallery-refresh-started",
+            $"source={notification.SourceApp}, kind={notification.Kind}");
+        await gallery.RefreshAfterCaptureAsync();
+        _diagnosticsLog?.Write(
+            "gallery-refresh-completed",
+            $"source={notification.SourceApp}, kind={notification.Kind}");
     }
 
     private void OnCaptureIssueDetected(
@@ -1082,6 +1113,8 @@ public partial class App : System.Windows.Application
         _linkPreviewFetcher?.Dispose();
         _linkPreviewFetcher = null;
         _linkPreviewService = null;
+        _kakaoDropOverlay?.Dispose();
+        _kakaoDropOverlay = null;
         if (_runtime is not null)
         {
             _runtime.Captured -= OnCaptured;

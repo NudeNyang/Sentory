@@ -932,6 +932,23 @@
                                                                 AlignmentY="Center" />
                                                 </Border.Background>
                                             </Border>
+
+                                            <Border x:Name="CollectionBadge"
+                                                    Margin="12"
+                                                    Padding="9,5"
+                                                    HorizontalAlignment="Left"
+                                                    VerticalAlignment="Bottom"
+                                                    Background="{DynamicResource SurfaceBrush}"
+                                                    BorderBrush="{DynamicResource LineBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="8"
+                                                    IsHitTestVisible="False"
+                                                    Visibility="Collapsed">
+                                                <TextBlock Text="{Binding CollectionBadgeText}"
+                                                           FontSize="10.5"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource AccentBrush}" />
+                                            </Border>
                                         </Grid>
                                     </Border>
 
@@ -1117,6 +1134,12 @@
                                             Property="Visibility"
                                             Value="Visible" />
                                     <Setter TargetName="CardSiteIcon"
+                                            Property="Visibility"
+                                            Value="Visible" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding HasCollectionBadge}"
+                                             Value="True">
+                                    <Setter TargetName="CollectionBadge"
                                             Property="Visibility"
                                             Value="Visible" />
                                 </DataTrigger>

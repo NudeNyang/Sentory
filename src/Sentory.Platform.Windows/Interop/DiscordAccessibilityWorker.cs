@@ -235,6 +235,19 @@ public static class DiscordAccessibilityWorker
         var baselineMessageCount = baselineMessages.Count;
         var baselineFingerprints = CreateMessageFingerprintSet(
             baselineMessages);
+        if (request.ContentKind ==
+            DiscordConfirmationContentKind.AttachmentDiscovery)
+        {
+            return await DiscoverAttachmentsAsync(
+                request,
+                accessibleRoot,
+                messageList,
+                baselineMessageCount,
+                baselineFingerprints,
+                resolved.CacheHit,
+                cancellationToken);
+        }
+
         if (request.ContentKind == DiscordConfirmationContentKind.Image)
         {
             if (request.ExplicitSendObserved &&
@@ -426,6 +439,68 @@ public static class DiscordAccessibilityWorker
                 matchingOwnedImageFound));
     }
 
+    private static async Task<DiscordConfirmationResponse> DiscoverAttachmentsAsync(
+        DiscordConfirmationRequest request,
+        IAccessible accessibleRoot,
+        AccessibleTarget messageList,
+        int baselineMessageCount,
+        IReadOnlySet<string> baselineFingerprints,
+        bool cacheHit,
+        CancellationToken cancellationToken)
+    {
+        var timeout = TimeSpan.FromMilliseconds(
+            Math.Clamp(request.TimeoutMilliseconds, 1_000, 30_000));
+        var startedAt = DateTimeOffset.UtcNow;
+        var ownedImageSeen = false;
+        while (DateTimeOffset.UtcNow - startedAt < timeout)
+        {
+            await Task.Delay(120, cancellationToken);
+            if (!IsContextValid(request))
+            {
+                return new DiscordConfirmationResponse(
+                    DiscordConfirmationOutcome.Cancelled,
+                    null,
+                    ["discord-context-changed"]);
+            }
+
+            var messages = GetMessagesWithRefresh(
+                accessibleRoot,
+                ref messageList);
+            var newMessages = GetNewMessages(
+                messages,
+                baselineMessageCount,
+                baselineFingerprints);
+            var ownedImages = newMessages
+                .Where(IsVisibleOwnedImageMessage)
+                .ToList();
+            ownedImageSeen |= ownedImages.Count > 0;
+            var attachmentUrls = ownedImages
+                .SelectMany(ExtractAttachmentUrls)
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            if (attachmentUrls.Count > 0)
+            {
+                return new DiscordConfirmationResponse(
+                    DiscordConfirmationOutcome.Confirmed,
+                    DateTimeOffset.UtcNow,
+                    [
+                        "discord-process-and-window",
+                        cacheHit ? "target-cache-hit" : "target-cache-miss",
+                        "new-owned-attachment-url-match"
+                    ],
+                    attachmentUrls);
+            }
+        }
+
+        return new DiscordConfirmationResponse(
+            DiscordConfirmationOutcome.Expired,
+            null,
+            [
+                $"owned-image-seen:{ownedImageSeen}",
+                "attachment-url-not-observed"
+            ]);
+    }
+
     private static IReadOnlyList<string> BuildImageDiagnosticSignals(
         int baselineMessageCount,
         int latestMessageCount,
@@ -485,6 +560,40 @@ public static class DiscordAccessibilityWorker
             VisibleListItemState &&
         SubtreeContainsImageAttachment(message) &&
         SubtreeContainsOwnedAttachmentControl(message);
+
+    private static IReadOnlyList<string> ExtractAttachmentUrls(
+        AccessibleTarget root)
+    {
+        var visited = new HashSet<long>();
+        var nodeCount = 0;
+        var values = new List<string?>();
+
+        void Inspect(AccessibleTarget target, int depth)
+        {
+            if (depth > MaximumTraversalDepth ||
+                nodeCount++ >= MaximumTraversalNodes)
+            {
+                return;
+            }
+
+            values.Add(SafeName(target.Accessible, target.ChildId));
+            values.Add(SafeValue(target.Accessible, target.ChildId));
+            values.Add(SafeDescription(target.Accessible, target.ChildId));
+            var nested = ToAccessible(target);
+            if (nested is null || !MarkVisited(nested, visited))
+            {
+                return;
+            }
+
+            foreach (var child in GetChildren(nested))
+            {
+                Inspect(child, depth + 1);
+            }
+        }
+
+        Inspect(root, 0);
+        return DiscordAttachmentUrlExtractor.Extract(values);
+    }
 
     private static List<AccessibleTarget> GetNewMessages(
         IReadOnlyList<AccessibleTarget> messages,

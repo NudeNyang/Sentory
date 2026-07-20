@@ -95,6 +95,52 @@ public sealed class KakaoContextValidator(INativeWindowApi native)
         return true;
     }
 
+    public bool TryValidateTarget(
+        KakaoDropTarget target,
+        uint clipboardSequenceNumber,
+        DateTimeOffset occurredAt,
+        out ValidatedKakaoContext context)
+    {
+        context = null!;
+        if (target.ChatRootWindow == nint.Zero ||
+            target.InputWindow == nint.Zero ||
+            target.ProcessId == 0 ||
+            native.GetRootWindow(target.ChatRootWindow) !=
+            target.ChatRootWindow ||
+            native.GetRootWindow(target.InputWindow) !=
+            target.ChatRootWindow ||
+            native.GetProcessId(target.ChatRootWindow) != target.ProcessId ||
+            native.GetProcessId(target.InputWindow) != target.ProcessId ||
+            !string.Equals(
+                native.GetProcessName(target.ProcessId),
+                KakaoProcessName,
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(
+                native.GetClassName(target.InputWindow),
+                InputClassName,
+                StringComparison.Ordinal) ||
+            native.GetControlId(target.InputWindow) != InputControlId ||
+            !native.HasDescendant(
+                target.ChatRootWindow,
+                MessageListClassName,
+                MessageListControlId))
+        {
+            return false;
+        }
+
+        context = new ValidatedKakaoContext(
+            Guid.NewGuid(),
+            target.ChatRootWindow,
+            target.InputWindow,
+            target.ProcessId,
+            clipboardSequenceNumber,
+            occurredAt,
+            CreateContextHash(
+                target.ProcessId,
+                target.ChatRootWindow));
+        return true;
+    }
+
     private static string CreateContextHash(uint processId, nint root)
     {
         var bytes = SHA256.HashData(

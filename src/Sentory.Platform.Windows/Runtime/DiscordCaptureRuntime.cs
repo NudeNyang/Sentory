@@ -17,6 +17,7 @@ public sealed class DiscordCaptureRuntime :
     private readonly DiscordContextValidator _validator;
     private readonly LowLevelPasteHook _hook;
     private readonly StaClipboardReader _clipboardReader;
+    private readonly DiscordAttachmentDownloader _attachmentDownloader;
     private readonly IDiscordConfirmationClient _confirmationClient;
     private readonly IDiscordWorkerLifecycle? _workerLifecycle;
     private readonly DiscordDetectionStatusTracker _statusTracker = new();
@@ -33,6 +34,8 @@ public sealed class DiscordCaptureRuntime :
     private readonly object _candidateGate = new();
     private readonly object _warmupGate = new();
     private readonly List<CandidateRegistration> _candidates = [];
+    private readonly List<AttachmentDiscoveryRegistration>
+        _attachmentDiscoveries = [];
     private readonly HashSet<string> _activeUrls =
         new(StringComparer.Ordinal);
     private readonly HashSet<string> _activeImageHashes =
@@ -54,6 +57,7 @@ public sealed class DiscordCaptureRuntime :
         _validator = new DiscordContextValidator(native, native);
         _hook = new LowLevelPasteHook(native, acceptInjectedInput);
         _clipboardReader = new StaClipboardReader(native);
+        _attachmentDownloader = new DiscordAttachmentDownloader();
         _confirmationClient = new DiscordWorkerClient();
         _workerLifecycle = _confirmationClient as IDiscordWorkerLifecycle;
         if (_workerLifecycle is not null)
@@ -123,6 +127,7 @@ public sealed class DiscordCaptureRuntime :
             return;
         }
 
+        var hasClipboardImageCandidate = false;
         lock (_candidateGate)
         {
             _recentSendSignals[context.ContextHash] = context.OccurredAt;
@@ -134,10 +139,141 @@ public sealed class DiscordCaptureRuntime :
                          candidate.Context.OccurredAt <= context.OccurredAt))
             {
                 candidate.SendObserved.TrySetResult(context.OccurredAt);
+                hasClipboardImageCandidate |= candidate.HasImages;
             }
         }
 
         DiscordCaptureTrace.Write("discord-send-key-observed");
+        if (!hasClipboardImageCandidate)
+        {
+            StartAttachmentDiscovery(context);
+        }
+    }
+
+    private void StartAttachmentDiscovery(ValidatedDiscordContext context)
+    {
+        AttachmentDiscoveryRegistration registration;
+        lock (_candidateGate)
+        {
+            _attachmentDiscoveries.RemoveAll(discovery =>
+                discovery.Task.IsCompleted);
+            if (_attachmentDiscoveries.Any(discovery =>
+                    string.Equals(
+                        discovery.Context.ContextHash,
+                        context.ContextHash,
+                        StringComparison.Ordinal)) ||
+                _attachmentDiscoveries.Count >= 2)
+            {
+                return;
+            }
+
+            var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
+                _cancellation.Token);
+            registration = new AttachmentDiscoveryRegistration(
+                context,
+                context.EventId,
+                cancellation);
+            _attachmentDiscoveries.Add(registration);
+            registration.Task = RunAttachmentDiscoveryAsync(registration);
+        }
+    }
+
+    private async Task RunAttachmentDiscoveryAsync(
+        AttachmentDiscoveryRegistration registration)
+    {
+        try
+        {
+            var context = registration.Context;
+            var response = await _confirmationClient.ConfirmAsync(
+                new DiscordConfirmationRequest(
+                    context.MainWindow.ToInt64(),
+                    context.RendererWindow.ToInt64(),
+                    context.ProcessId,
+                    DiscordConfirmationContentKind.AttachmentDiscovery,
+                    [],
+                    15_000,
+                    ExplicitSendObserved: true),
+                registration.Cancellation.Token);
+            var attachmentUrls = response.AttachmentUrls ?? [];
+            DiscordCaptureTrace.Write(
+                "attachment-discovery-response",
+                $"outcome={response.Outcome} urls={attachmentUrls.Count} signals={string.Join(',', response.ConfirmationSignals)}");
+            if (response.Outcome != DiscordConfirmationOutcome.Confirmed ||
+                attachmentUrls.Count == 0 ||
+                _paused)
+            {
+                return;
+            }
+
+            var images = await _attachmentDownloader.DownloadAsync(
+                attachmentUrls,
+                registration.Cancellation.Token);
+            DiscordCaptureTrace.Write(
+                "attachment-download-result",
+                $"requested={attachmentUrls.Count} images={images.Count} bytes={images.Sum(image => image.ContentBytes.LongLength)}");
+            if (images.Count == 0)
+            {
+                return;
+            }
+
+            var capturedAt = response.ConfirmedAt ?? DateTimeOffset.UtcNow;
+            var signals = new List<string>(response.ConfirmationSignals)
+            {
+                "discord-send-key",
+                "discord-sent-attachment-url",
+                "discord-attachment-downloaded"
+            };
+            var result = await _coordinator.CaptureBatchAsync(
+                registration.EventId,
+                null,
+                images.Select(image => new ImageCapturePayload(
+                    image.ContentBytes,
+                    image.Sha256,
+                    image.PixelWidth,
+                    image.PixelHeight,
+                    image.MimeType,
+                    image.FileExtension)).ToList(),
+                SourceApp.Discord,
+                CaptureMethod.DiscordConfirmedAttachment,
+                DeliveryStatus.Confirmed,
+                context.ContextHash,
+                capturedAt,
+                signals,
+                registration.Cancellation.Token);
+            if (result?.EventApplied == true)
+            {
+                Captured?.Invoke(
+                    this,
+                    new CaptureNotification(
+                        images.Count > 1
+                            ? ContentKind.Collection
+                            : ContentKind.Image,
+                        1,
+                        capturedAt,
+                        SourceApp.Discord,
+                        DeliveryStatus.Confirmed));
+            }
+        }
+        catch (OperationCanceledException)
+            when (registration.Cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            DiscordCaptureTrace.Write(
+                "attachment-discovery-failed",
+                $"type={exception.GetType().Name}");
+            ReportIssue(exception);
+        }
+        finally
+        {
+            lock (_candidateGate)
+            {
+                _attachmentDiscoveries.Remove(registration);
+            }
+
+            registration.Cancellation.Dispose();
+        }
     }
 
     private async Task ProcessTriggersAsync(CancellationToken cancellationToken)
@@ -180,41 +316,29 @@ public sealed class DiscordCaptureRuntime :
             return;
         }
 
-        if (clipboard.Images.Count > 0)
-        {
-            DiscordCaptureTrace.Write(
-                "clipboard-image-read",
-                $"count={clipboard.Images.Count} bytes={clipboard.Images.Sum(image => image.PngBytes.LongLength)} elapsedMs={Stopwatch.GetElapsedTime(readStartedAt).TotalMilliseconds:F0}");
-            foreach (var image in clipboard.Images)
-            {
-                StartImageCandidate(context, image);
-            }
-            return;
-        }
-
-        if (clipboard.Text is null)
-        {
-            return;
-        }
-
-        var urls = UrlExtractor.Extract(clipboard.Text)
+        var urls = UrlExtractor.Extract(clipboard.Text ?? string.Empty)
             .GroupBy(url => url.Value, StringComparer.Ordinal)
             .Select(group => group.First())
             .ToList();
-        if (urls.Count == 0)
+        var images = clipboard.Images
+            .GroupBy(image => image.Sha256, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .ToList();
+        if (urls.Count == 0 && images.Count == 0)
         {
             return;
         }
 
         DiscordCaptureTrace.Write(
-            "clipboard-url-read",
-            $"count={urls.Count}");
-        StartCandidate(context, urls);
+            "clipboard-batch-read",
+            $"urls={urls.Count} images={images.Count} bytes={images.Sum(image => image.ContentBytes.LongLength)} elapsedMs={Stopwatch.GetElapsedTime(readStartedAt).TotalMilliseconds:F0}");
+        StartCandidate(context, urls, images);
     }
 
     private void StartCandidate(
         ValidatedDiscordContext context,
-        IReadOnlyList<NormalizedUrl> urls)
+        IReadOnlyList<NormalizedUrl> urls,
+        IReadOnlyList<ClipboardImageSnapshot> images)
     {
         CandidateRegistration registration;
         lock (_candidateGate)
@@ -223,7 +347,10 @@ public sealed class DiscordCaptureRuntime :
             var candidateUrls = urls
                 .Where(url => !_activeUrls.Contains(url.Value))
                 .ToList();
-            if (candidateUrls.Count == 0 ||
+            var candidateImages = images
+                .Where(image => !_activeImageHashes.Contains(image.Sha256))
+                .ToList();
+            if ((candidateUrls.Count == 0 && candidateImages.Count == 0) ||
                 _candidates.Count >= MaximumActiveCandidates)
             {
                 return;
@@ -234,55 +361,25 @@ public sealed class DiscordCaptureRuntime :
                 _activeUrls.Add(url.Value);
             }
 
+            foreach (var image in candidateImages)
+            {
+                _activeImageHashes.Add(image.Sha256);
+            }
+
             var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
                 _cancellation.Token);
             registration = new CandidateRegistration(
                 context,
                 context.EventId,
                 candidateUrls,
-                null,
+                candidateImages,
                 cancellation);
             registration.Task = Task.Run(() => RunCandidateAsync(registration));
             _candidates.Add(registration);
             ApplyRecentSendSignal(registration);
             DiscordCaptureTrace.Write(
-                "url-candidate-started",
-                $"count={candidateUrls.Count} active={_candidates.Count}");
-        }
-    }
-
-    private void StartImageCandidate(
-        ValidatedDiscordContext context,
-        ClipboardImageSnapshot image)
-    {
-        CandidateRegistration registration;
-        lock (_candidateGate)
-        {
-            _candidates.RemoveAll(candidate => candidate.Task.IsCompleted);
-            if (_activeImageHashes.Contains(image.Sha256) ||
-                _candidates.Count >= MaximumActiveCandidates)
-            {
-                DiscordCaptureTrace.Write(
-                    "image-candidate-skipped",
-                    $"duplicate={_activeImageHashes.Contains(image.Sha256)} active={_candidates.Count}");
-                return;
-            }
-
-            _activeImageHashes.Add(image.Sha256);
-            var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
-                _cancellation.Token);
-            registration = new CandidateRegistration(
-                context,
-                CaptureBatchIdentity.ForImage(context.EventId, image.Sha256),
-                [],
-                image,
-                cancellation);
-            registration.Task = Task.Run(() => RunCandidateAsync(registration));
-            _candidates.Add(registration);
-            ApplyRecentSendSignal(registration);
-            DiscordCaptureTrace.Write(
-                "image-candidate-started",
-                $"active={_candidates.Count}");
+                "batch-candidate-started",
+                $"urls={candidateUrls.Count} images={candidateImages.Count} active={_candidates.Count}");
         }
     }
 
@@ -290,9 +387,9 @@ public sealed class DiscordCaptureRuntime :
     {
         try
         {
-            var sendTimeout = registration.Image is null
-                ? TimeSpan.FromMinutes(5)
-                : TimeSpan.FromMinutes(2);
+            var sendTimeout = registration.HasImages
+                ? TimeSpan.FromMinutes(2)
+                : TimeSpan.FromMinutes(5);
             _ = await registration.SendObserved.Task.WaitAsync(
                 sendTimeout,
                 registration.Cancellation.Token);
@@ -303,7 +400,7 @@ public sealed class DiscordCaptureRuntime :
                 registration.Cancellation.Token);
 
             DiscordCaptureTrace.Write(
-                registration.Image is null
+                !registration.HasImages
                     ? "url-confirmation-response"
                     : "image-confirmation-response",
                 $"outcome={response.Outcome} signals={string.Join(',', response.ConfirmationSignals)}");
@@ -345,21 +442,10 @@ public sealed class DiscordCaptureRuntime :
                 "clipboard-sequence-stable"
             };
             signals.AddRange(response.ConfirmationSignals);
-            if (registration.Image is { } image)
-            {
-                await CaptureConfirmedImageAsync(
-                    registration,
-                    image,
-                    response,
-                    signals);
-            }
-            else
-            {
-                await CaptureConfirmedUrlsAsync(
-                    registration,
-                    response,
-                    signals);
-            }
+            await CaptureConfirmedBatchAsync(
+                registration,
+                response,
+                signals);
         }
         catch (OperationCanceledException)
             when (registration.Cancellation.IsCancellationRequested)
@@ -370,7 +456,7 @@ public sealed class DiscordCaptureRuntime :
         }
         catch (Exception exception)
         {
-            if (registration.Image is not null)
+            if (registration.HasImages)
             {
                 DiscordCaptureTrace.Write(
                     "image-candidate-failed",
@@ -388,9 +474,9 @@ public sealed class DiscordCaptureRuntime :
                     _activeUrls.Remove(url.Value);
                 }
 
-                if (registration.Image is not null)
+                foreach (var image in registration.Images)
                 {
-                    _activeImageHashes.Remove(registration.Image.Sha256);
+                    _activeImageHashes.Remove(image.Sha256);
                 }
 
                 _candidates.Remove(registration);
@@ -576,11 +662,11 @@ public sealed class DiscordCaptureRuntime :
                 context.MainWindow.ToInt64(),
                 context.RendererWindow.ToInt64(),
                 context.ProcessId,
-                registration.Image is null
+                !registration.HasImages
                     ? DiscordConfirmationContentKind.Url
                     : DiscordConfirmationContentKind.Image,
                 registration.Urls.Select(url => url.Value).ToList(),
-                registration.Image is null ? 300_000 : 120_000,
+                registration.HasImages ? 120_000 : 300_000,
                 explicitSendObserved),
             cancellationToken);
     }
@@ -595,7 +681,7 @@ public sealed class DiscordCaptureRuntime :
                 registration.Context.OccurredAt,
                 sentAt,
                 now,
-                registration.Image is not null))
+                registration.HasImages))
         {
             registration.SendObserved.TrySetResult(sentAt);
         }
@@ -610,72 +696,51 @@ public sealed class DiscordCaptureRuntime :
         }
     }
 
-    private async Task CaptureConfirmedUrlsAsync(
+    private async Task CaptureConfirmedBatchAsync(
         CandidateRegistration registration,
         DiscordConfirmationResponse response,
         IReadOnlyList<string> signals)
     {
         var context = registration.Context;
         var capturedAt = response.ConfirmedAt ?? DateTimeOffset.UtcNow;
-        var results = await _coordinator.CaptureUrlsAsync(
+        var result = await _coordinator.CaptureBatchAsync(
             registration.EventId,
             string.Join('\n', registration.Urls.Select(url => url.Original)),
+            registration.Images.Select(image => new ImageCapturePayload(
+                image.ContentBytes,
+                image.Sha256,
+                image.PixelWidth,
+                image.PixelHeight,
+                image.MimeType,
+                image.FileExtension)).ToList(),
             SourceApp.Discord,
-            CaptureMethod.DiscordConfirmedSend,
+            registration.HasImages
+                ? CaptureMethod.DiscordConfirmedImage
+                : CaptureMethod.DiscordConfirmedSend,
             DeliveryStatus.Confirmed,
             context.ContextHash,
             capturedAt,
             signals,
             registration.Cancellation.Token);
-        var applied = results.Count(result => result.EventApplied);
-        if (applied > 0)
+        if (result?.EventApplied == true)
         {
+            var memberCount = registration.Urls.Count + registration.Images.Count;
             Captured?.Invoke(
                 this,
                 new CaptureNotification(
-                    ContentKind.Url,
-                    applied,
-                    capturedAt,
-                    SourceApp.Discord,
-                    DeliveryStatus.Confirmed));
-        }
-    }
-
-    private async Task CaptureConfirmedImageAsync(
-        CandidateRegistration registration,
-        ClipboardImageSnapshot image,
-        DiscordConfirmationResponse response,
-        IReadOnlyList<string> signals)
-    {
-        var context = registration.Context;
-        var capturedAt = response.ConfirmedAt ?? DateTimeOffset.UtcNow;
-        var result = await _coordinator.CaptureImageAsync(
-            registration.EventId,
-            image.PngBytes,
-            image.Sha256,
-            image.PixelWidth,
-            image.PixelHeight,
-            SourceApp.Discord,
-            CaptureMethod.DiscordConfirmedImage,
-            DeliveryStatus.Confirmed,
-            context.ContextHash,
-            capturedAt,
-            signals,
-            registration.Cancellation.Token);
-        DiscordCaptureTrace.Write(
-            "image-capture-result",
-            $"eventApplied={result.EventApplied}");
-        if (result.EventApplied)
-        {
-            Captured?.Invoke(
-                this,
-                new CaptureNotification(
-                    ContentKind.Image,
+                    memberCount > 1
+                        ? ContentKind.Collection
+                        : registration.HasImages
+                            ? ContentKind.Image
+                            : ContentKind.Url,
                     1,
                     capturedAt,
                     SourceApp.Discord,
                     DeliveryStatus.Confirmed));
         }
+        DiscordCaptureTrace.Write(
+            "batch-capture-result",
+            $"eventApplied={result?.EventApplied == true} urls={registration.Urls.Count} images={registration.Images.Count}");
     }
 
     private void CancelActiveCandidates()
@@ -685,6 +750,11 @@ public sealed class DiscordCaptureRuntime :
             foreach (var candidate in _candidates)
             {
                 candidate.Cancellation.Cancel();
+            }
+
+            foreach (var discovery in _attachmentDiscoveries)
+            {
+                discovery.Cancellation.Cancel();
             }
         }
     }
@@ -763,9 +833,13 @@ public sealed class DiscordCaptureRuntime :
         }
 
         Task[] candidates;
+        Task[] discoveries;
         lock (_candidateGate)
         {
             candidates = _candidates.Select(candidate => candidate.Task).ToArray();
+            discoveries = _attachmentDiscoveries
+                .Select(discovery => discovery.Task)
+                .ToArray();
         }
 
         try
@@ -776,7 +850,16 @@ public sealed class DiscordCaptureRuntime :
         {
         }
 
+        try
+        {
+            await Task.WhenAll(discoveries);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
         _clipboardReader.Dispose();
+        _attachmentDownloader.Dispose();
         _cancellation.Dispose();
         GC.SuppressFinalize(this);
     }
@@ -785,7 +868,7 @@ public sealed class DiscordCaptureRuntime :
         ValidatedDiscordContext context,
         Guid eventId,
         IReadOnlyList<NormalizedUrl> urls,
-        ClipboardImageSnapshot? image,
+        IReadOnlyList<ClipboardImageSnapshot> images,
         CancellationTokenSource cancellation)
     {
         public ValidatedDiscordContext Context { get; } = context;
@@ -794,7 +877,9 @@ public sealed class DiscordCaptureRuntime :
 
         public IReadOnlyList<NormalizedUrl> Urls { get; } = urls;
 
-        public ClipboardImageSnapshot? Image { get; } = image;
+        public IReadOnlyList<ClipboardImageSnapshot> Images { get; } = images;
+
+        public bool HasImages => Images.Count > 0;
 
         public CancellationTokenSource Cancellation { get; } = cancellation;
 
@@ -803,5 +888,20 @@ public sealed class DiscordCaptureRuntime :
 
         public TaskCompletionSource<DateTimeOffset> SendObserved { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private sealed class AttachmentDiscoveryRegistration(
+        ValidatedDiscordContext context,
+        Guid eventId,
+        CancellationTokenSource cancellation)
+    {
+        public ValidatedDiscordContext Context { get; } = context;
+
+        public Guid EventId { get; } = eventId;
+
+        public CancellationTokenSource Cancellation { get; } = cancellation;
+
+        public Task Task { get; set; } =
+            System.Threading.Tasks.Task.CompletedTask;
     }
 }

@@ -229,6 +229,62 @@ public sealed class GalleryQueryTests
             Assert.Single(descriptionResults).ItemId);
     }
 
+    [Fact]
+    public void CollectionMatchesMemberKindAndSearchText()
+    {
+        var collection = Create(
+            string.Empty,
+            Now,
+            kind: ContentKind.Collection) with
+        {
+            Members =
+            [
+                new CapturedCollectionMember(
+                    0,
+                    ContentKind.Url,
+                    "https://example.com/wanted",
+                    "https://example.com/wanted",
+                    "example.com",
+                    null,
+                    null,
+                    null,
+                    0,
+                    0),
+                new CapturedCollectionMember(
+                    1,
+                    ContentKind.Image,
+                    string.Empty,
+                    "sha256:image",
+                    string.Empty,
+                    "images/image.png",
+                    "HASH",
+                    "image/png",
+                    32,
+                    32)
+            ]
+        };
+
+        var linkResults = GalleryQuery.Apply(
+            [collection],
+            new GalleryQueryOptions(
+                ContentKind.Url,
+                "wanted",
+                GalleryDateRange.All,
+                GallerySortMode.Newest),
+            Now);
+        var imageResults = GalleryQuery.Apply(
+            [collection],
+            new GalleryQueryOptions(
+                ContentKind.Image,
+                string.Empty,
+                GalleryDateRange.All,
+                GallerySortMode.Newest),
+            Now);
+
+        Assert.Equal(collection.ItemId, Assert.Single(linkResults).ItemId);
+        Assert.Equal(collection.ItemId, Assert.Single(imageResults).ItemId);
+    }
+
     private static IReadOnlyList<CapturedItemSummary> Apply(
         IEnumerable<CapturedItemSummary> items,
         GallerySortMode sortMode) =>

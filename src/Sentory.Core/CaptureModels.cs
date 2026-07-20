@@ -10,7 +10,8 @@ public enum ContentKind
 {
     Url,
     Image,
-    File
+    File,
+    Collection
 }
 
 public enum DeliveryStatus
@@ -23,6 +24,7 @@ public enum CaptureMethod
 {
     DiscordConfirmedSend,
     DiscordConfirmedImage,
+    DiscordConfirmedAttachment,
     KakaoCtrlVUrl,
     KakaoCtrlVImage,
     KakaoTypedUrl,
@@ -49,10 +51,43 @@ public sealed record UrlCaptureRequest(
 
 public sealed record ImageCaptureRequest(
     Guid EventId,
-    ReadOnlyMemory<byte> PngBytes,
+    ReadOnlyMemory<byte> ContentBytes,
     string Sha256,
     int PixelWidth,
     int PixelHeight,
+    string MimeType,
+    string FileExtension,
+    SourceApp SourceApp,
+    CaptureMethod CaptureMethod,
+    DeliveryStatus DeliveryStatus,
+    string ContextHash,
+    DateTimeOffset CapturedAt,
+    IReadOnlyList<string> ConfirmationSignals);
+
+public sealed record ImageCapturePayload(
+    ReadOnlyMemory<byte> ContentBytes,
+    string Sha256,
+    int PixelWidth,
+    int PixelHeight,
+    string MimeType,
+    string FileExtension);
+
+public sealed record CollectionMemberCaptureRequest(
+    ContentKind Kind,
+    string OriginalUrl,
+    string NormalizedKey,
+    string Domain,
+    ReadOnlyMemory<byte> ContentBytes,
+    string? Sha256,
+    int PixelWidth,
+    int PixelHeight,
+    string? MimeType,
+    string? FileExtension);
+
+public sealed record CollectionCaptureRequest(
+    Guid EventId,
+    string Signature,
+    IReadOnlyList<CollectionMemberCaptureRequest> Members,
     SourceApp SourceApp,
     CaptureMethod CaptureMethod,
     DeliveryStatus DeliveryStatus,
@@ -91,7 +126,21 @@ public sealed record CapturedItemSummary(
     string? PreviewImagePath = null,
     LinkPreviewStatus? PreviewStatus = null,
     DateTimeOffset? PreviewFetchedAt = null,
-    IReadOnlyList<SourceApp>? SourceApps = null);
+    IReadOnlyList<SourceApp>? SourceApps = null,
+    string? MimeType = null,
+    IReadOnlyList<CapturedCollectionMember>? Members = null);
+
+public sealed record CapturedCollectionMember(
+    int Position,
+    ContentKind Kind,
+    string OriginalUrl,
+    string NormalizedKey,
+    string Domain,
+    string? ContentPath,
+    string? Sha256,
+    string? MimeType,
+    int PixelWidth,
+    int PixelHeight);
 
 public sealed record LinkPreviewCandidate(
     Guid ItemId,
@@ -145,6 +194,10 @@ public interface ICaptureRepository
 
     Task<CaptureResult> UpsertImageAsync(
         ImageCaptureRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<CaptureResult> UpsertCollectionAsync(
+        CollectionCaptureRequest request,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<CapturedItemSummary>> GetRecentAsync(

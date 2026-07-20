@@ -68,6 +68,30 @@ public sealed class KakaoContextValidatorTests
             out _));
     }
 
+    [Fact]
+    public void AcceptsVerifiedDropTargetWithoutForegroundFocus()
+    {
+        var native = FakeNative.ValidKakaoChat();
+        var validator = new KakaoContextValidator(native);
+        var target = new KakaoDropTarget(
+            native.Root,
+            native.Input,
+            native.ProcessId,
+            new WindowBounds(0, 0, 680, 800),
+            new WindowBounds(0, 600, 680, 800));
+
+        var success = validator.TryValidateTarget(
+            target,
+            12,
+            DateTimeOffset.UtcNow,
+            out var context);
+
+        Assert.True(success);
+        Assert.Equal(native.Root, context.ChatRootWindow);
+        Assert.Equal(native.Input, context.InputWindow);
+        Assert.Equal((uint)12, context.ClipboardSequenceNumber);
+    }
+
     private static PasteTrigger CreateTrigger(FakeNative native) =>
         new(
             Guid.NewGuid(),

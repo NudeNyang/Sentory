@@ -9,10 +9,12 @@ using WpfClipboard = System.Windows.Clipboard;
 namespace Sentory.Platform.Windows.Interop;
 
 public sealed record ClipboardImageSnapshot(
-    byte[] PngBytes,
+    byte[] ContentBytes,
     string Sha256,
     int PixelWidth,
-    int PixelHeight);
+    int PixelHeight,
+    string MimeType,
+    string FileExtension);
 
 public sealed record ClipboardSnapshot(
     uint SequenceNumber,
@@ -90,7 +92,19 @@ public sealed class StaClipboardReader : IDisposable
 
             try
             {
-                var images = ReadImages();
+                var imagePaths = WpfClipboard.ContainsFileDropList()
+                    ? WpfClipboard.GetFileDropList()
+                        .Cast<string>()
+                        .Where(ClipboardImageCodec.IsSupportedImagePath)
+                        .ToArray()
+                    : [];
+                BitmapSource? bitmap = null;
+                if (imagePaths.Length == 0 && WpfClipboard.ContainsImage())
+                {
+                    bitmap = WpfClipboard.GetImage();
+                    bitmap?.Freeze();
+                }
+
                 var text = WpfClipboard.ContainsText(
                     WpfTextDataFormat.UnicodeText)
                     ? WpfClipboard.GetText(WpfTextDataFormat.UnicodeText)
@@ -101,6 +115,19 @@ public sealed class StaClipboardReader : IDisposable
                     return null;
                 }
 
+                // The clipboard-owned data is detached now. File reads and PNG
+                // encoding can be slow for large images, so do them only after
+                // the sequence-stability check instead of turning that work into
+                // a race against the messenger.
+                IReadOnlyList<ClipboardImageSnapshot> images = imagePaths.Length > 0
+                    ? imagePaths
+                        .Select(ClipboardImageCodec.TryReadFile)
+                        .Where(image => image is not null)
+                        .Cast<ClipboardImageSnapshot>()
+                        .ToList()
+                    : bitmap is { PixelWidth: > 0, PixelHeight: > 0 }
+                        ? [ClipboardImageCodec.Encode(bitmap)]
+                        : [];
                 if (images.Count == 0 && string.IsNullOrWhiteSpace(text))
                 {
                     return null;
@@ -122,39 +149,6 @@ public sealed class StaClipboardReader : IDisposable
         }
 
         return null;
-    }
-
-    private static IReadOnlyList<ClipboardImageSnapshot> ReadImages()
-    {
-        if (WpfClipboard.ContainsFileDropList())
-        {
-            var images = WpfClipboard.GetFileDropList()
-                .Cast<string>()
-                .Where(ClipboardImageCodec.IsSupportedImagePath)
-                .Select(ClipboardImageCodec.TryReadFile)
-                .Where(image => image is not null)
-                .Cast<ClipboardImageSnapshot>()
-                .ToList();
-            if (images.Count > 0)
-            {
-                return images;
-            }
-        }
-
-        if (!WpfClipboard.ContainsImage())
-        {
-            return [];
-        }
-
-        var bitmap = WpfClipboard.GetImage();
-        if (bitmap is null ||
-            bitmap.PixelWidth <= 0 ||
-            bitmap.PixelHeight <= 0)
-        {
-            return [];
-        }
-
-        return [ClipboardImageCodec.Encode(bitmap)];
     }
 
     public void Dispose()
@@ -190,18 +184,24 @@ internal static class ClipboardImageCodec
     {
         try
         {
+            byte[] bytes;
             using var stream = new FileStream(
                 path,
                 FileMode.Open,
                 FileAccess.Read,
                 FileShare.ReadWrite | FileShare.Delete);
-            var decoder = BitmapDecoder.Create(
-                stream,
-                BitmapCreateOptions.PreservePixelFormat,
-                BitmapCacheOption.OnLoad);
-            return decoder.Frames.Count == 0
-                ? null
-                : Encode(decoder.Frames[0]);
+            using (var content = new MemoryStream(
+                       stream.Length > int.MaxValue ? 0 : (int)stream.Length))
+            {
+                stream.CopyTo(content);
+                bytes = content.ToArray();
+            }
+
+            var extension = NormalizeExtension(Path.GetExtension(path));
+            return TryDecode(
+                bytes,
+                extension,
+                MimeTypeFor(extension));
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException or
@@ -222,6 +222,86 @@ internal static class ClipboardImageCodec
             bytes,
             Convert.ToHexString(SHA256.HashData(bytes)),
             bitmap.PixelWidth,
-            bitmap.PixelHeight);
+            bitmap.PixelHeight,
+            "image/png",
+            ".png");
     }
+
+    public static ClipboardImageSnapshot? TryDecode(
+        byte[] bytes,
+        string? fileExtension,
+        string? mimeType)
+    {
+        try
+        {
+            using var stream = new MemoryStream(bytes, writable: false);
+            var decoder = BitmapDecoder.Create(
+                stream,
+                BitmapCreateOptions.PreservePixelFormat,
+                BitmapCacheOption.OnLoad);
+            if (decoder.Frames.Count == 0)
+            {
+                return null;
+            }
+
+            var extension = NormalizeExtension(
+                ResolveExtension(fileExtension, mimeType));
+            if (!SupportedExtensions.Contains(extension))
+            {
+                return null;
+            }
+
+            return new ClipboardImageSnapshot(
+                bytes,
+                Convert.ToHexString(SHA256.HashData(bytes)),
+                decoder.Frames[0].PixelWidth,
+                decoder.Frames[0].PixelHeight,
+                MimeTypeFor(extension),
+                extension);
+        }
+        catch (Exception exception)
+            when (exception is NotSupportedException or FileFormatException or
+                  ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    private static string ResolveExtension(
+        string? extension,
+        string? mimeType)
+    {
+        if (!string.IsNullOrWhiteSpace(extension))
+        {
+            return extension.StartsWith('.') ? extension : $".{extension}";
+        }
+
+        return mimeType?.Split(';', 2)[0].Trim().ToLowerInvariant() switch
+        {
+            "image/jpeg" => ".jpg",
+            "image/bmp" => ".bmp",
+            "image/gif" => ".gif",
+            "image/tiff" => ".tif",
+            "image/webp" => ".webp",
+            _ => ".png"
+        };
+    }
+
+    private static string NormalizeExtension(string extension) =>
+        extension.ToLowerInvariant() switch
+        {
+            ".jpeg" => ".jpg",
+            ".tiff" => ".tif",
+            var value => value
+        };
+
+    private static string MimeTypeFor(string extension) => extension switch
+    {
+        ".jpg" => "image/jpeg",
+        ".bmp" => "image/bmp",
+        ".gif" => "image/gif",
+        ".tif" => "image/tiff",
+        ".webp" => "image/webp",
+        _ => "image/png"
+    };
 }

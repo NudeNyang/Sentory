@@ -123,6 +123,8 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
                 hash,
                 48,
                 32,
+                "image/png",
+                ".png",
                 SourceApp.Discord,
                 CaptureMethod.DiscordConfirmedImage,
                 DeliveryStatus.Confirmed,
@@ -323,7 +325,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         await using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version;";
 
-        Assert.Equal(2L, (long)(await command.ExecuteScalarAsync())!);
+        Assert.Equal(3L, (long)(await command.ExecuteScalarAsync())!);
     }
 
     [Fact]
@@ -661,6 +663,81 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
                 "*.png").Length);
     }
 
+    [Fact]
+    public async Task CollectionIsOneCardDeduplicatedBySignatureAndCopiesItsMembers()
+    {
+        var repository = CreateRepository();
+        await repository.InitializeAsync();
+        byte[] imageBytes = [9, 8, 7, 6];
+        var hash = Convert.ToHexString(SHA256.HashData(imageBytes));
+        var first = CreateCollectionRequest(Guid.NewGuid(), imageBytes, hash);
+        var second = first with { EventId = Guid.NewGuid() };
+
+        var firstResult = await repository.UpsertCollectionAsync(first);
+        var secondResult = await repository.UpsertCollectionAsync(second);
+        var item = Assert.Single(await repository.GetRecentAsync(10));
+
+        Assert.True(firstResult.ItemCreated);
+        Assert.False(secondResult.ItemCreated);
+        Assert.Equal(ContentKind.Collection, item.Kind);
+        Assert.Equal(2, item.CaptureCount);
+        Assert.Equal(2, item.ShareCount);
+        Assert.Equal(2, item.Members?.Count);
+        Assert.Single(item.Members!, member => member.Kind == ContentKind.Url);
+        var image = Assert.Single(
+            item.Members!,
+            member => member.Kind == ContentKind.Image);
+        Assert.NotNull(image.ContentPath);
+        Assert.True(File.Exists(Path.Combine(_root, image.ContentPath)));
+    }
+
+    [Fact]
+    public async Task DeletingCollectionRemovesItsUnreferencedImage()
+    {
+        var repository = CreateRepository();
+        await repository.InitializeAsync();
+        byte[] imageBytes = [4, 5, 6, 7];
+        var hash = Convert.ToHexString(SHA256.HashData(imageBytes));
+        await repository.UpsertCollectionAsync(
+            CreateCollectionRequest(Guid.NewGuid(), imageBytes, hash));
+        var item = Assert.Single(await repository.GetRecentAsync(10));
+        var imagePath = Path.Combine(
+            _root,
+            Assert.Single(item.Members!, member => member.Kind == ContentKind.Image)
+                .ContentPath!);
+
+        Assert.True(await repository.DeleteItemAsync(item.ItemId));
+
+        Assert.False(File.Exists(imagePath));
+    }
+
+    [Fact]
+    public async Task DeletingCollectionKeepsImageReferencedByAnotherCard()
+    {
+        var repository = CreateRepository();
+        await repository.InitializeAsync();
+        byte[] imageBytes = [1, 3, 5, 7, 9];
+        var hash = Convert.ToHexString(SHA256.HashData(imageBytes));
+        await repository.UpsertImageAsync(
+            CreateImageRequest(Guid.NewGuid(), imageBytes, hash));
+        await repository.UpsertCollectionAsync(
+            CreateCollectionRequest(Guid.NewGuid(), imageBytes, hash));
+        var items = await repository.GetRecentAsync(10);
+        var collection = Assert.Single(
+            items,
+            item => item.Kind == ContentKind.Collection);
+        var image = Assert.Single(
+            items,
+            item => item.Kind == ContentKind.Image);
+        var imagePath = Path.Combine(_root, image.ContentPath!);
+
+        Assert.True(await repository.DeleteItemAsync(collection.ItemId));
+        Assert.True(File.Exists(imagePath));
+
+        Assert.True(await repository.DeleteItemAsync(image.ItemId));
+        Assert.False(File.Exists(imagePath));
+    }
+
     [Theory]
     [InlineData(0, 0)]
     [InlineData(30, 30)]
@@ -714,10 +791,74 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
             hash,
             48,
             32,
+            "image/png",
+            ".png",
             SourceApp.KakaoTalk,
             CaptureMethod.KakaoCtrlVImage,
             DeliveryStatus.NotObserved,
             "test-context",
+            DateTimeOffset.UtcNow,
+            ["test"]);
+
+    private static CollectionCaptureRequest CreateCollectionRequest(
+        Guid eventId,
+        byte[] imageBytes,
+        string hash) =>
+        new(
+            eventId,
+            CaptureCollectionIdentity.CreateSignature(
+            [
+                new CollectionMemberCaptureRequest(
+                    ContentKind.Url,
+                    "https://example.com/path",
+                    "https://example.com/path",
+                    "example.com",
+                    ReadOnlyMemory<byte>.Empty,
+                    null,
+                    0,
+                    0,
+                    null,
+                    null),
+                new CollectionMemberCaptureRequest(
+                    ContentKind.Image,
+                    string.Empty,
+                    $"sha256:{hash.ToLowerInvariant()}",
+                    string.Empty,
+                    imageBytes,
+                    hash,
+                    2,
+                    2,
+                    "image/png",
+                    ".png")
+            ]),
+            [
+                new CollectionMemberCaptureRequest(
+                    ContentKind.Url,
+                    "https://example.com/path",
+                    "https://example.com/path",
+                    "example.com",
+                    ReadOnlyMemory<byte>.Empty,
+                    null,
+                    0,
+                    0,
+                    null,
+                    null),
+                new CollectionMemberCaptureRequest(
+                    ContentKind.Image,
+                    string.Empty,
+                    $"sha256:{hash.ToLowerInvariant()}",
+                    string.Empty,
+                    imageBytes,
+                    hash,
+                    2,
+                    2,
+                    "image/png",
+                    ".png")
+            ],
+            SourceApp.Discord,
+            CaptureMethod.DiscordConfirmedImage,
+            DeliveryStatus.Confirmed,
+            "discord-context",
             DateTimeOffset.UtcNow,
             ["test"]);
 

@@ -4,6 +4,17 @@ using Sentory.Platform.Windows.Interop;
 
 namespace Sentory.Platform.Windows.Runtime;
 
+public enum KakaoNativeDropCaptureResult
+{
+    Captured,
+    Paused,
+    UnsupportedFiles,
+    TargetInvalid,
+    ImageReadFailed,
+    StorageNotApplied,
+    Failed
+}
+
 public sealed class KakaoCaptureRuntime : ICaptureRuntime
 {
     private readonly INativeWindowApi _native;
@@ -66,6 +77,109 @@ public sealed class KakaoCaptureRuntime : ICaptureRuntime
         _triggers.Writer.TryWrite(trigger);
     }
 
+    public async Task<KakaoNativeDropCaptureResult> CaptureNativeDroppedFilesAsync(
+        KakaoDropTarget target,
+        IReadOnlyList<string> filePaths,
+        CancellationToken cancellationToken = default)
+    {
+        if (_paused)
+        {
+            return KakaoNativeDropCaptureResult.Paused;
+        }
+
+        var supportedPaths = filePaths
+            .Where(ClipboardImageCodec.IsSupportedImagePath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (supportedPaths.Length == 0)
+        {
+            return KakaoNativeDropCaptureResult.UnsupportedFiles;
+        }
+
+        try
+        {
+            var clipboardSequence = _native.GetClipboardSequenceNumber();
+            var occurredAt = DateTimeOffset.UtcNow;
+            if (!_validator.TryValidateTarget(
+                    target,
+                    clipboardSequence,
+                    occurredAt,
+                    out var context))
+            {
+                return KakaoNativeDropCaptureResult.TargetInvalid;
+            }
+
+            var images = await Task.Run(
+                () => supportedPaths
+                    .Select(ClipboardImageCodec.TryReadFile)
+                    .Where(image => image is not null)
+                    .Cast<ClipboardImageSnapshot>()
+                    .DistinctBy(
+                        image => image.Sha256,
+                        StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
+                cancellationToken);
+            if (images.Count == 0)
+            {
+                return KakaoNativeDropCaptureResult.ImageReadFailed;
+            }
+
+            var result = await _coordinator.CaptureBatchAsync(
+                context.EventId,
+                null,
+                images.Select(image => new ImageCapturePayload(
+                    image.ContentBytes,
+                    image.Sha256,
+                    image.PixelWidth,
+                    image.PixelHeight,
+                    image.MimeType,
+                    image.FileExtension)).ToList(),
+                SourceApp.KakaoTalk,
+                CaptureMethod.KakaoDragDrop,
+                DeliveryStatus.NotObserved,
+                context.ContextHash,
+                context.OccurredAt,
+                [
+                    "sentory-pass-through-drop-target",
+                    "native-explorer-file-drop",
+                    "kakao-process",
+                    "individual-chat-root",
+                    "input-class-and-id",
+                    "message-list-class-and-id",
+                    "release-over-same-chat-root",
+                    "escape-not-observed",
+                    "exact-file-paths"
+                ],
+                cancellationToken);
+            if (result?.EventApplied != true)
+            {
+                return KakaoNativeDropCaptureResult.StorageNotApplied;
+            }
+
+            Captured?.Invoke(
+                this,
+                new CaptureNotification(
+                    images.Count > 1
+                        ? ContentKind.Collection
+                        : ContentKind.Image,
+                    1,
+                    context.OccurredAt,
+                    SourceApp.KakaoTalk,
+                    DeliveryStatus.NotObserved));
+            return KakaoNativeDropCaptureResult.Captured;
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            ReportIssue(exception);
+            return KakaoNativeDropCaptureResult.Failed;
+        }
+    }
+
     private async Task ProcessTriggersAsync(CancellationToken cancellationToken)
     {
         try
@@ -104,6 +218,7 @@ public sealed class KakaoCaptureRuntime : ICaptureRuntime
         {
             await CaptureImagesIfConfirmedAsync(
                 context,
+                clipboard.Text,
                 clipboard.Images,
                 cancellationToken);
             return;
@@ -132,9 +247,10 @@ public sealed class KakaoCaptureRuntime : ICaptureRuntime
             return;
         }
 
-        var results = await _coordinator.CaptureUrlsAsync(
+        var result = await _coordinator.CaptureBatchAsync(
             context.EventId,
             clipboard.Text,
+            [],
             SourceApp.KakaoTalk,
             CaptureMethod.KakaoCtrlVUrl,
             DeliveryStatus.NotObserved,
@@ -150,14 +266,15 @@ public sealed class KakaoCaptureRuntime : ICaptureRuntime
                 "input-value-url-match"
             ],
             cancellationToken);
-        var applied = results.Count(result => result.EventApplied);
-        if (applied > 0)
+        if (result?.EventApplied == true)
         {
             Captured?.Invoke(
                 this,
                 new CaptureNotification(
-                    ContentKind.Url,
-                    applied,
+                    UrlExtractor.Extract(clipboard.Text).DistinctBy(url => url.Value).Count() > 1
+                        ? ContentKind.Collection
+                        : ContentKind.Url,
+                    1,
                     context.OccurredAt,
                     SourceApp.KakaoTalk,
                     DeliveryStatus.NotObserved));
@@ -184,6 +301,7 @@ public sealed class KakaoCaptureRuntime : ICaptureRuntime
 
     private async Task CaptureImagesIfConfirmedAsync(
         ValidatedKakaoContext context,
+        string? clipboardText,
         IReadOnlyList<ClipboardImageSnapshot> images,
         CancellationToken cancellationToken)
     {
@@ -203,44 +321,47 @@ public sealed class KakaoCaptureRuntime : ICaptureRuntime
             return;
         }
 
-        var applied = 0;
-        foreach (var image in images)
-        {
-            var result = await _coordinator.CaptureImageAsync(
-                CaptureBatchIdentity.ForImage(context.EventId, image.Sha256),
-                image.PngBytes,
+        var result = await _coordinator.CaptureBatchAsync(
+            context.EventId,
+            clipboardText,
+            images.Select(image => new ImageCapturePayload(
+                image.ContentBytes,
                 image.Sha256,
                 image.PixelWidth,
                 image.PixelHeight,
-                SourceApp.KakaoTalk,
-                CaptureMethod.KakaoCtrlVImage,
-                DeliveryStatus.NotObserved,
-                context.ContextHash,
-                context.OccurredAt,
-                [
-                    "ctrl-v",
-                    "kakao-process",
-                    "individual-chat-root",
-                    "input-class-and-id",
-                    "message-list-class-and-id",
-                    "clipboard-image-sequence-stable",
-                    "owned-image-confirmation-window",
-                    "caption-edit-class-and-id"
-                ],
-                cancellationToken);
-            if (result.EventApplied)
-            {
-                applied++;
-            }
-        }
+                image.MimeType,
+                image.FileExtension)).ToList(),
+            SourceApp.KakaoTalk,
+            CaptureMethod.KakaoCtrlVImage,
+            DeliveryStatus.NotObserved,
+            context.ContextHash,
+            context.OccurredAt,
+            [
+                "ctrl-v",
+                "kakao-process",
+                "individual-chat-root",
+                "input-class-and-id",
+                "message-list-class-and-id",
+                "clipboard-image-sequence-stable",
+                "owned-image-confirmation-window",
+                "caption-edit-class-and-id"
+            ],
+            cancellationToken);
 
-        if (applied > 0)
+        if (result?.EventApplied == true)
         {
+            var memberCount = images
+                .DistinctBy(image => image.Sha256, StringComparer.OrdinalIgnoreCase)
+                .Count() + UrlExtractor.Extract(clipboardText ?? string.Empty)
+                .DistinctBy(url => url.Value)
+                .Count();
             Captured?.Invoke(
                 this,
                 new CaptureNotification(
-                    ContentKind.Image,
-                    applied,
+                    memberCount > 1
+                        ? ContentKind.Collection
+                        : ContentKind.Image,
+                    1,
                     context.OccurredAt,
                     SourceApp.KakaoTalk,
                     DeliveryStatus.NotObserved));

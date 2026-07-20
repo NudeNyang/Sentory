@@ -24,9 +24,38 @@ public sealed class CaptureCoordinatorTests
         Assert.Empty(repository.Requests);
     }
 
+    [Fact]
+    public async Task MultipleUniqueMembersBecomeOneCollectionAndDuplicatesAreRemoved()
+    {
+        var repository = new RecordingRepository();
+        var coordinator = new CaptureCoordinator(repository);
+        byte[] imageBytes = [1, 2, 3];
+        var hash = Convert.ToHexString(
+            System.Security.Cryptography.SHA256.HashData(imageBytes));
+
+        var result = await coordinator.CaptureBatchAsync(
+            Guid.NewGuid(),
+            "https://example.com\nhttps://example.com/",
+            [new ImageCapturePayload(imageBytes, hash, 1, 1, "image/png", ".png")],
+            SourceApp.Discord,
+            CaptureMethod.DiscordConfirmedImage,
+            DeliveryStatus.Confirmed,
+            "context",
+            DateTimeOffset.UtcNow,
+            ["test"]);
+
+        Assert.NotNull(result);
+        var request = Assert.Single(repository.Collections);
+        Assert.Equal(2, request.Members.Count);
+        Assert.Single(request.Members.Where(member => member.Kind == ContentKind.Url));
+        Assert.Single(request.Members.Where(member => member.Kind == ContentKind.Image));
+    }
+
     private sealed class RecordingRepository : ICaptureRepository
     {
         public List<UrlCaptureRequest> Requests { get; } = [];
+
+        public List<CollectionCaptureRequest> Collections { get; } = [];
 
         public Task InitializeAsync(
             CancellationToken cancellationToken = default) =>
@@ -54,6 +83,19 @@ public sealed class CaptureCoordinatorTests
                 true,
                 1,
                 0));
+
+        public Task<CaptureResult> UpsertCollectionAsync(
+            CollectionCaptureRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            Collections.Add(request);
+            return Task.FromResult(new CaptureResult(
+                Guid.NewGuid(),
+                true,
+                true,
+                1,
+                1));
+        }
 
         public Task<IReadOnlyList<CapturedItemSummary>> GetRecentAsync(
             int limit,

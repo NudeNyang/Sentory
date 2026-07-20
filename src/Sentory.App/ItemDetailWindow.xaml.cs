@@ -30,10 +30,21 @@ public partial class ItemDetailWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
         InitialText.Text = item.Initial;
-        DomainText.Text = item.IsImage
+        DomainText.Text = item.IsCollection
+            ? SentoryLocalization.Format(
+                "CollectionItemsFormat",
+                item.Item.Members?.Count ?? 0)
+            : item.IsImage
             ? SentoryLocalization.Text("StoredPhoto")
             : item.Domain;
-        OriginalText.Text = item.IsImage
+        OriginalText.Text = item.IsCollection
+            ? string.Join(
+                Environment.NewLine,
+                item.Item.Members?.Select(member =>
+                    member.Kind == ContentKind.Url
+                        ? member.OriginalUrl
+                        : member.ContentPath) ?? [])
+            : item.IsImage
             ? item.Item.ContentPath ??
               SentoryLocalization.Text("MissingPhotoPath")
             : item.Item.OriginalUrl;
@@ -49,15 +60,20 @@ public partial class ItemDetailWindow : Window
         SavedAtText.Text = item.Item.LastCapturedAt.LocalDateTime
             .ToString("yyyy. M. d. HH:mm");
         DeliveryText.Text = item.StatusLabel;
+        var opensImage = item.IsCollection
+            ? item.Item.Members?.FirstOrDefault()?.Kind == ContentKind.Image
+            : item.IsImage;
         OpenButton.Content = SentoryLocalization.Text(
-            item.IsImage ? "OpenPhoto" : "OpenLink");
+            opensImage ? "OpenPhoto" : "OpenLink");
         CopyButton.Content = SentoryLocalization.Text(
-            item.IsImage ? "CopyPhoto" : "CopyUrl");
+            item.IsCollection
+                ? "CopyCollection"
+                : item.IsImage ? "CopyPhoto" : "CopyUrl");
 
         if (item.Thumbnail is not null)
         {
             ArtworkImageBrush.ImageSource = item.Thumbnail;
-            ArtworkImageBrush.Stretch = item.IsImage
+            ArtworkImageBrush.Stretch = item.IsImage || item.IsCollection
                 ? Stretch.Uniform
                 : Stretch.UniformToFill;
             ArtworkImage.Visibility = Visibility.Visible;

@@ -11,6 +11,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
+using Sentory.Platform.Windows.Interop;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using Point = System.Windows.Point;
 using WpfClipboard = System.Windows.Clipboard;
@@ -140,6 +141,12 @@ public partial class GalleryWindow : Window
         }
     }
 
+    public async Task RefreshAfterCaptureAsync()
+    {
+        await RefreshAsync();
+        GalleryScrollViewer.ScrollToTop();
+    }
+
     public void SetDiscordRepairNeeded(bool needed)
     {
         _discordRepairNeeded = needed;
@@ -175,30 +182,51 @@ public partial class GalleryWindow : Window
     private GalleryItemViewModel CreateViewModel(CapturedItemSummary item)
     {
         var isImage = item.Kind == ContentKind.Image;
-        var title = isImage
+        var isCollection = item.Kind == ContentKind.Collection;
+        var members = item.Members ?? [];
+        var imageCount = members.Count(member => member.Kind == ContentKind.Image);
+        var urlCount = members.Count(member => member.Kind == ContentKind.Url);
+        var title = isCollection
+            ? SentoryLocalization.Format("CollectionTitleFormat", imageCount, urlCount)
+            : isImage
             ? SentoryLocalization.Text("ClipboardImage")
             : !string.IsNullOrWhiteSpace(item.PageTitle)
                 ? item.PageTitle
             : string.IsNullOrWhiteSpace(item.Domain)
                 ? SentoryLocalization.Text("SavedLink")
                 : item.Domain;
-        var subtitle = isImage
-            ? SentoryLocalization.Text("PngImage")
+        var subtitle = isCollection
+            ? string.Join(" · ", members
+                .Where(member => member.Kind == ContentKind.Url)
+                .Select(member => member.Domain)
+                .Where(domain => !string.IsNullOrWhiteSpace(domain))
+                .Take(2)) is { Length: > 0 } domains
+                    ? domains
+                    : SentoryLocalization.Format("CollectionItemsFormat", members.Count)
+            : isImage
+            ? SentoryLocalization.Format(
+                "ImageFormatFormat",
+                GetImageFormatLabel(item))
             : !string.IsNullOrWhiteSpace(item.PageDescription)
                 ? item.PageDescription
             : item.OriginalUrl;
-        var thumbnail = isImage
-            ? LoadThumbnail(item.ContentPath)
-            : LoadThumbnail(item.PreviewImagePath);
-        var siteIcon = isImage
+        var collectionArtwork = members.FirstOrDefault(member =>
+            member.Kind == ContentKind.Image)?.ContentPath;
+        var thumbnail = isCollection
+            ? LoadThumbnail(collectionArtwork)
+            : isImage
+                ? LoadThumbnail(item.ContentPath)
+                : LoadThumbnail(item.PreviewImagePath);
+        var siteIcon = isImage || isCollection
             ? null
             : LoadThumbnail(item.SiteIconPath);
         return new GalleryItemViewModel(
             item,
             isImage,
+            isCollection,
             title,
             subtitle,
-            $"{SentoryLocalization.Text(isImage ? "Image" : "Link")} · " +
+            $"{SentoryLocalization.Text(isCollection ? "Collection" : isImage ? "Image" : "Link")} · " +
             GetSourceLabel(item.LastSourceApp),
             SentoryLocalization.FormatDate(item.LastCapturedAt.LocalDateTime),
             item.DeliveryStatus == DeliveryStatus.NotObserved
@@ -211,8 +239,12 @@ public partial class GalleryWindow : Window
             siteIcon,
             thumbnail is not null,
             siteIcon is not null,
-            isImage ? Stretch.Uniform : Stretch.UniformToFill,
-            isImage ? new Thickness(8) : new Thickness(0),
+            isImage || isCollection ? Stretch.Uniform : Stretch.UniformToFill,
+            isImage || isCollection ? new Thickness(8) : new Thickness(0),
+            isCollection
+                ? SentoryLocalization.Format("CollectionItemsFormat", members.Count)
+                : string.Empty,
+            isCollection,
             _selectionMode,
             _selectedItemIds.Contains(item.ItemId));
     }
@@ -270,6 +302,18 @@ public partial class GalleryWindow : Window
         }
 
         return "S";
+    }
+
+    private static string GetImageFormatLabel(CapturedItemSummary item)
+    {
+        var extension = Path.GetExtension(item.ContentPath);
+        if (!string.IsNullOrWhiteSpace(extension))
+        {
+            return extension.TrimStart('.').ToUpperInvariant();
+        }
+
+        return item.MimeType?.Split('/').LastOrDefault()?.ToUpperInvariant()
+            ?? "PNG";
     }
 
     private void ApplyFilter()
@@ -1898,7 +1942,20 @@ public partial class GalleryWindow : Window
         string successMessage;
         try
         {
-            if (item.IsImage)
+            if (item.IsCollection)
+            {
+                var data = CreateCollectionClipboardData(item.Item);
+                if (data is null)
+                {
+                    ShowFeedback(SentoryLocalization.Text("OriginalNotFound"));
+                    return;
+                }
+
+                await SetClipboardWithRetryAsync(
+                    () => WpfClipboard.SetDataObject(data, true));
+                successMessage = SentoryLocalization.Text("CollectionCopied");
+            }
+            else if (item.IsImage)
             {
                 var path = ResolveContentPath(item.Item.ContentPath);
                 if (path is null || !File.Exists(path))
@@ -1973,6 +2030,31 @@ public partial class GalleryWindow : Window
         return image;
     }
 
+    private System.Windows.DataObject? CreateCollectionClipboardData(
+        CapturedItemSummary item)
+    {
+        var members = item.Members ?? [];
+        var urls = members
+            .Where(member => member.Kind == ContentKind.Url)
+            .Select(member => member.OriginalUrl)
+            .Where(url => !string.IsNullOrWhiteSpace(url))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var imagePaths = members
+            .Where(member => member.Kind == ContentKind.Image)
+            .Select(member => ResolveContentPath(member.ContentPath))
+            .Where(path => path is not null && File.Exists(path))
+            .Cast<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (urls.Length == 0 && imagePaths.Length == 0)
+        {
+            return null;
+        }
+
+        return CollectionClipboardComposer.Create(urls, imagePaths);
+    }
+
     private static async Task SetClipboardWithRetryAsync(Action action)
     {
         for (var attempt = 0; attempt < 5; attempt++)
@@ -1997,9 +2079,14 @@ public partial class GalleryWindow : Window
 
     private void OpenItem(GalleryItemViewModel item)
     {
-        var target = item.IsImage
-            ? ResolveContentPath(item.Item.ContentPath)
-            : item.Item.OriginalUrl;
+        var firstMember = item.Item.Members?.FirstOrDefault();
+        var target = item.IsCollection
+            ? firstMember?.Kind == ContentKind.Image
+                ? ResolveContentPath(firstMember.ContentPath)
+                : firstMember?.OriginalUrl
+            : item.IsImage
+                ? ResolveContentPath(item.Item.ContentPath)
+                : item.Item.OriginalUrl;
         if (string.IsNullOrWhiteSpace(target))
         {
             ShowFeedback(SentoryLocalization.Text("OriginalNotFound"));
@@ -2153,6 +2240,7 @@ public partial class GalleryWindow : Window
 public sealed record GalleryItemViewModel(
     CapturedItemSummary Item,
     bool IsImage,
+    bool IsCollection,
     string Title,
     string Subtitle,
     string TypeLabel,
@@ -2165,10 +2253,14 @@ public sealed record GalleryItemViewModel(
     bool HasSiteIcon,
     Stretch ThumbnailStretch,
     Thickness ThumbnailMargin,
+    string CollectionBadgeText,
+    bool HasCollectionBadge,
     bool IsSelectionMode,
     bool IsSelected)
 {
-    public string Domain => Item.Domain;
+    public string Domain => IsCollection
+        ? SentoryLocalization.Format("CollectionItemsFormat", Item.Members?.Count ?? 0)
+        : Item.Domain;
 
     public string FavoriteIcon =>
         Item.IsFavorite ? "\uE735" : "\uE734";

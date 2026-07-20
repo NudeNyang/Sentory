@@ -34,7 +34,24 @@ public interface IDiscordWindowApi
     nint FindDescendant(nint root, string className);
 }
 
-public sealed class NativeWindowApi : INativeWindowApi, IDiscordWindowApi
+public interface IKakaoDropWindowApi
+{
+    IReadOnlyList<nint> EnumerateTopLevelWindows();
+    nint FindDescendant(nint root, string className, int controlId);
+    bool IsWindowVisible(nint window);
+    bool IsWindowMinimized(nint window);
+    (int X, int Y) GetCursorPosition();
+    nint GetWindowAtPoint(int x, int y);
+    bool IsLeftMouseButtonDown();
+    bool IsEscapeKeyDown();
+    bool PositionTopmostWindow(nint window, WindowBounds bounds);
+    bool FocusWindowAndSendPaste(nint root, nint input);
+}
+
+public sealed class NativeWindowApi :
+    INativeWindowApi,
+    IDiscordWindowApi,
+    IKakaoDropWindowApi
 {
     public nint GetForegroundWindow() =>
         NativeMethods.GetForegroundWindow();
@@ -157,6 +174,134 @@ public sealed class NativeWindowApi : INativeWindowApi, IDiscordWindowApi
         return found;
     }
 
+    public IReadOnlyList<nint> EnumerateTopLevelWindows()
+    {
+        var windows = new List<nint>();
+        NativeMethods.EnumWindows(
+            (window, _) =>
+            {
+                windows.Add(window);
+                return true;
+            },
+            nint.Zero);
+        return windows;
+    }
+
+    public nint FindDescendant(
+        nint root,
+        string className,
+        int controlId)
+    {
+        var found = nint.Zero;
+        NativeMethods.EnumChildWindows(
+            root,
+            (window, _) =>
+            {
+                if (!string.Equals(
+                        GetClassName(window),
+                        className,
+                        StringComparison.Ordinal) ||
+                    GetControlId(window) != controlId)
+                {
+                    return true;
+                }
+
+                found = window;
+                return false;
+            },
+            nint.Zero);
+        return found;
+    }
+
+    public bool IsWindowVisible(nint window) =>
+        NativeMethods.IsWindowVisible(window);
+
+    public bool IsWindowMinimized(nint window) =>
+        NativeMethods.IsIconic(window);
+
+    public (int X, int Y) GetCursorPosition() =>
+        NativeMethods.GetCursorPos(out var point)
+            ? (point.X, point.Y)
+            : default;
+
+    public nint GetWindowAtPoint(int x, int y) =>
+        NativeMethods.WindowFromPoint(new NativeMethods.Point
+        {
+            X = x,
+            Y = y
+        });
+
+    public bool IsLeftMouseButtonDown() =>
+        (NativeMethods.GetAsyncKeyState(NativeMethods.VkLButton) & 0x8000) != 0;
+
+    public bool IsEscapeKeyDown() =>
+        (NativeMethods.GetAsyncKeyState(NativeMethods.VkEscape) & 0x8000) != 0;
+
+    public bool PositionTopmostWindow(
+        nint window,
+        WindowBounds bounds) =>
+        NativeMethods.SetWindowPos(
+            window,
+            NativeMethods.HwndTopmost,
+            bounds.Left,
+            bounds.Top,
+            bounds.Width,
+            bounds.Height,
+            NativeMethods.SwpNoActivate | NativeMethods.SwpShowWindow);
+
+    public bool FocusWindowAndSendPaste(nint root, nint input)
+    {
+        var currentThread = NativeMethods.GetCurrentThreadId();
+        var targetThread = NativeMethods.GetWindowThreadProcessId(
+            input,
+            out _);
+        var attached = targetThread != 0 &&
+                       targetThread != currentThread &&
+                       NativeMethods.AttachThreadInput(
+                           currentThread,
+                           targetThread,
+                           true);
+        try
+        {
+            if (!NativeMethods.SetForegroundWindow(root))
+            {
+                return false;
+            }
+
+            NativeMethods.SetFocus(input);
+        }
+        finally
+        {
+            if (attached)
+            {
+                NativeMethods.AttachThreadInput(
+                    currentThread,
+                    targetThread,
+                    false);
+            }
+        }
+
+        var inputs = new[]
+        {
+            NativeMethods.Input.Keyboard(
+                NativeMethods.VkControl,
+                keyUp: false),
+            NativeMethods.Input.Keyboard(
+                NativeMethods.VkV,
+                keyUp: false),
+            NativeMethods.Input.Keyboard(
+                NativeMethods.VkV,
+                keyUp: true),
+            NativeMethods.Input.Keyboard(
+                NativeMethods.VkControl,
+                keyUp: true)
+        };
+        return NativeMethods.SendInput(
+                   (uint)inputs.Length,
+                   inputs,
+                   Marshal.SizeOf<NativeMethods.Input>()) == inputs.Length;
+    }
+
     public uint GetClipboardSequenceNumber() =>
         NativeMethods.GetClipboardSequenceNumber();
 }
@@ -169,10 +314,17 @@ internal static class NativeMethods
     internal const int WmKeyDown = 0x0100;
     internal const int WmSysKeyDown = 0x0104;
     internal const int VkControl = 0x11;
+    internal const int VkLButton = 0x01;
+    internal const int VkEscape = 0x1B;
     internal const int VkShift = 0x10;
     internal const int VkReturn = 0x0D;
     internal const int VkV = 0x56;
     internal const uint LlkhfInjected = 0x10;
+    internal const uint KeyEventFKeyUp = 0x0002;
+    internal const uint InputKeyboard = 1;
+    internal static readonly nint HwndTopmost = new(-1);
+    internal const uint SwpNoActivate = 0x0010;
+    internal const uint SwpShowWindow = 0x0040;
 
     internal delegate bool EnumWindowsProc(nint window, nint parameter);
     internal delegate nint LowLevelKeyboardProc(
@@ -213,8 +365,78 @@ internal static class NativeMethods
         public nuint ExtraInfo;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct Point
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct Input
+    {
+        public uint Type;
+        public InputUnion Data;
+
+        public static Input Keyboard(int virtualKey, bool keyUp) => new()
+        {
+            Type = InputKeyboard,
+            Data = new InputUnion
+            {
+                Keyboard = new KeyboardInput
+                {
+                    VirtualKeyCode = (ushort)virtualKey,
+                    Flags = keyUp ? KeyEventFKeyUp : 0
+                }
+            }
+        };
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    internal struct InputUnion
+    {
+        [FieldOffset(0)] public KeyboardInput Keyboard;
+        [FieldOffset(0)] public MouseInput Mouse;
+        [FieldOffset(0)] public HardwareInput Hardware;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct KeyboardInput
+    {
+        public ushort VirtualKeyCode;
+        public ushort ScanCode;
+        public uint Flags;
+        public uint Time;
+        public nuint ExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct MouseInput
+    {
+        public int X;
+        public int Y;
+        public uint MouseData;
+        public uint Flags;
+        public uint Time;
+        public nuint ExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct HardwareInput
+    {
+        public uint Message;
+        public ushort ParameterLow;
+        public ushort ParameterHigh;
+    }
+
     [DllImport("user32.dll")]
     internal static extern nint GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EnumWindows(
+        EnumWindowsProc callback,
+        nint parameter);
 
     [DllImport("user32.dll")]
     internal static extern uint GetWindowThreadProcessId(
@@ -254,6 +476,55 @@ internal static class NativeMethods
         nint parent,
         EnumWindowsProc callback,
         nint parameter);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool IsWindowVisible(nint window);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool IsIconic(nint window);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool GetCursorPos(out Point point);
+
+    [DllImport("user32.dll")]
+    internal static extern nint WindowFromPoint(Point point);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool SetForegroundWindow(nint window);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool SetWindowPos(
+        nint window,
+        nint insertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
+        uint flags);
+
+    [DllImport("user32.dll")]
+    internal static extern nint SetFocus(nint window);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool AttachThreadInput(
+        uint sourceThread,
+        uint targetThread,
+        [MarshalAs(UnmanagedType.Bool)] bool attach);
+
+    [DllImport("kernel32.dll")]
+    internal static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern uint SendInput(
+        uint inputCount,
+        [In] Input[] inputs,
+        int inputSize);
 
     [DllImport("user32.dll")]
     internal static extern uint GetClipboardSequenceNumber();

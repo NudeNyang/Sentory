@@ -4,10 +4,12 @@ public sealed class CaptureCoordinator(ICaptureRepository repository)
 {
     public Task<CaptureResult> CaptureImageAsync(
         Guid eventId,
-        ReadOnlyMemory<byte> pngBytes,
+        ReadOnlyMemory<byte> contentBytes,
         string sha256,
         int pixelWidth,
         int pixelHeight,
+        string mimeType,
+        string fileExtension,
         SourceApp sourceApp,
         CaptureMethod captureMethod,
         DeliveryStatus deliveryStatus,
@@ -18,10 +20,12 @@ public sealed class CaptureCoordinator(ICaptureRepository repository)
         repository.UpsertImageAsync(
             new ImageCaptureRequest(
                 eventId,
-                pngBytes,
+                contentBytes,
                 sha256,
                 pixelWidth,
                 pixelHeight,
+                mimeType,
+                fileExtension,
                 sourceApp,
                 captureMethod,
                 deliveryStatus,
@@ -29,6 +33,117 @@ public sealed class CaptureCoordinator(ICaptureRepository repository)
                 capturedAt,
                 confirmationSignals),
             cancellationToken);
+
+    public async Task<CaptureResult?> CaptureBatchAsync(
+        Guid eventId,
+        string? clipboardText,
+        IReadOnlyList<ImageCapturePayload> images,
+        SourceApp sourceApp,
+        CaptureMethod captureMethod,
+        DeliveryStatus deliveryStatus,
+        string contextHash,
+        DateTimeOffset capturedAt,
+        IReadOnlyList<string> confirmationSignals,
+        CancellationToken cancellationToken = default)
+    {
+        var members = new List<CollectionMemberCaptureRequest>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var url in UrlExtractor.Extract(clipboardText ?? string.Empty))
+        {
+            var key = $"url:{url.Value}";
+            if (!seen.Add(key))
+            {
+                continue;
+            }
+
+            members.Add(new CollectionMemberCaptureRequest(
+                ContentKind.Url,
+                url.Original,
+                url.Value,
+                url.Domain,
+                ReadOnlyMemory<byte>.Empty,
+                null,
+                0,
+                0,
+                null,
+                null));
+        }
+
+        foreach (var image in images)
+        {
+            var normalizedHash = image.Sha256.ToLowerInvariant();
+            var key = $"image:{normalizedHash}";
+            if (!seen.Add(key))
+            {
+                continue;
+            }
+
+            members.Add(new CollectionMemberCaptureRequest(
+                ContentKind.Image,
+                string.Empty,
+                $"sha256:{normalizedHash}",
+                string.Empty,
+                image.ContentBytes,
+                normalizedHash,
+                image.PixelWidth,
+                image.PixelHeight,
+                image.MimeType,
+                image.FileExtension));
+        }
+
+        if (members.Count == 0)
+        {
+            return null;
+        }
+
+        if (members.Count == 1)
+        {
+            var member = members[0];
+            if (member.Kind == ContentKind.Url)
+            {
+                return (await CaptureUrlsAsync(
+                    eventId,
+                    member.OriginalUrl,
+                    sourceApp,
+                    captureMethod,
+                    deliveryStatus,
+                    contextHash,
+                    capturedAt,
+                    confirmationSignals,
+                    cancellationToken)).Single();
+            }
+
+            return await CaptureImageAsync(
+                eventId,
+                member.ContentBytes,
+                member.Sha256!,
+                member.PixelWidth,
+                member.PixelHeight,
+                member.MimeType!,
+                member.FileExtension!,
+                sourceApp,
+                captureMethod,
+                deliveryStatus,
+                contextHash,
+                capturedAt,
+                confirmationSignals,
+                cancellationToken);
+        }
+
+        var signature = CaptureCollectionIdentity.CreateSignature(members);
+        return await repository.UpsertCollectionAsync(
+            new CollectionCaptureRequest(
+                eventId,
+                signature,
+                members,
+                sourceApp,
+                captureMethod,
+                deliveryStatus,
+                contextHash,
+                capturedAt,
+                confirmationSignals),
+            cancellationToken);
+    }
 
     public async Task<IReadOnlyList<CaptureResult>> CaptureUrlsAsync(
         Guid eventId,
