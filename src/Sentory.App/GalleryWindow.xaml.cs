@@ -39,6 +39,8 @@ public partial class GalleryWindow : Window
         _sourceOptionButtons = [];
     private readonly Dictionary<string, System.Windows.Controls.TextBlock>
         _sourceOptionChecks = [];
+    private readonly FileBackedWeakLruCache<ImageSource> _thumbnailCache =
+        new(1024);
     private GalleryFilter _filter = GalleryFilter.All;
     private GalleryDateRange _dateRange = GalleryDateRange.All;
     private GallerySortMode _sortMode = GallerySortMode.Newest;
@@ -313,6 +315,13 @@ public partial class GalleryWindow : Window
             return null;
         }
 
+        return _thumbnailCache.GetOrAdd(
+            absolutePath,
+            LoadThumbnailFromFile);
+    }
+
+    private static ImageSource? LoadThumbnailFromFile(string absolutePath)
+    {
         try
         {
             var image = new BitmapImage();

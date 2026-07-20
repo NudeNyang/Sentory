@@ -14,6 +14,7 @@ Sentory의 첫 정식 버전입니다. Discord와 카카오톡에서 다룬 링�
 - 자동 정리 기간에 7일 기준을 추가했습니다.
 - Discord 재연결 안내가 실제 상태와 다르게 자주 나타나던 문제를 고쳤습니다.
 - 테마 전환, 스크롤 표시기와 카드 정렬을 다듬었습니다.
+- 보관함을 갱신할 때 바뀌지 않은 썸네일을 재사용해 반복 작업을 줄였습니다.
 - GitHub Releases를 이용한 인앱 자동 업데이트를 지원합니다.
 
 전체 변경 내용은
@@ -65,6 +66,7 @@ or copied again.
 - Add a 7-day automatic cleanup option.
 - Fix overly frequent Discord reconnection warnings.
 - Refine theme switching, scroll indicators, and centered card layout.
+- Reuse unchanged thumbnails to reduce repeated work during library refreshes.
 - Support in-app updates through GitHub Releases.
 
 See
