@@ -5,6 +5,17 @@ using Sentory.Platform.Windows.Interop;
 
 namespace Sentory.Platform.Windows.Runtime;
 
+public enum DiscordNativeDropRegistrationResult
+{
+    Registered,
+    Paused,
+    TargetInvalid,
+    UnsupportedFiles,
+    ImageReadFailed,
+    Duplicate,
+    Failed
+}
+
 public sealed class DiscordCaptureRuntime :
     ICaptureRuntime,
     ICaptureRuntimeStatusSource,
@@ -119,6 +130,76 @@ public sealed class DiscordCaptureRuntime :
 
     private void OnPasteDetected(object? sender, PasteTrigger trigger) =>
         _triggers.Writer.TryWrite(trigger);
+
+    public async Task<DiscordNativeDropRegistrationResult>
+        RegisterNativeDroppedFilesAsync(
+            DiscordDropTarget target,
+            IReadOnlyList<string> paths)
+    {
+        if (_paused)
+        {
+            return DiscordNativeDropRegistrationResult.Paused;
+        }
+
+        var occurredAt = DateTimeOffset.UtcNow;
+        var trigger = new PasteTrigger(
+            Guid.NewGuid(),
+            target.MainWindow,
+            target.RendererWindow,
+            target.ProcessId,
+            _native.GetClipboardSequenceNumber(),
+            occurredAt,
+            false);
+        if (!_validator.TryValidate(trigger, out var context))
+        {
+            return DiscordNativeDropRegistrationResult.TargetInvalid;
+        }
+
+        var imagePaths = paths
+            .Where(ClipboardImageCodec.IsSupportedImagePath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (imagePaths.Length == 0)
+        {
+            return DiscordNativeDropRegistrationResult.UnsupportedFiles;
+        }
+
+        try
+        {
+            var images = await Task.Run(() => imagePaths
+                .Select(ClipboardImageCodec.TryReadFile)
+                .Where(image => image is not null)
+                .Cast<ClipboardImageSnapshot>()
+                .ToList());
+            if (images.Count == 0)
+            {
+                return DiscordNativeDropRegistrationResult.ImageReadFailed;
+            }
+
+            if (_paused)
+            {
+                return DiscordNativeDropRegistrationResult.Paused;
+            }
+
+            var registered = StartCandidate(context, [], images);
+            DiscordCaptureTrace.Write(
+                "native-drop-candidate",
+                $"registered={registered} files={imagePaths.Length} images={images.Count} bytes={images.Sum(image => image.ContentBytes.LongLength)}");
+            return registered
+                ? DiscordNativeDropRegistrationResult.Registered
+                : DiscordNativeDropRegistrationResult.Duplicate;
+        }
+        catch (Exception exception)
+            when (exception is System.IO.IOException or
+                  UnauthorizedAccessException or
+                  NotSupportedException)
+        {
+            DiscordCaptureTrace.Write(
+                "native-drop-candidate-failed",
+                $"type={exception.GetType().Name}");
+            return DiscordNativeDropRegistrationResult.Failed;
+        }
+    }
 
     private void OnSendDetected(object? sender, PasteTrigger trigger)
     {
@@ -335,7 +416,7 @@ public sealed class DiscordCaptureRuntime :
         StartCandidate(context, urls, images);
     }
 
-    private void StartCandidate(
+    private bool StartCandidate(
         ValidatedDiscordContext context,
         IReadOnlyList<NormalizedUrl> urls,
         IReadOnlyList<ClipboardImageSnapshot> images)
@@ -353,7 +434,7 @@ public sealed class DiscordCaptureRuntime :
             if ((candidateUrls.Count == 0 && candidateImages.Count == 0) ||
                 _candidates.Count >= MaximumActiveCandidates)
             {
-                return;
+                return false;
             }
 
             foreach (var url in candidateUrls)
@@ -380,6 +461,7 @@ public sealed class DiscordCaptureRuntime :
             DiscordCaptureTrace.Write(
                 "batch-candidate-started",
                 $"urls={candidateUrls.Count} images={candidateImages.Count} active={_candidates.Count}");
+            return true;
         }
     }
 

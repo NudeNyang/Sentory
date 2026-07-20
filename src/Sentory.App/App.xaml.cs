@@ -40,6 +40,7 @@ public partial class App : System.Windows.Application
     private SentoryDiagnosticsLog? _diagnosticsLog;
     private ICaptureRuntime? _runtime;
     private KakaoDropOverlayRuntime? _kakaoDropOverlay;
+    private DiscordDropOverlayRuntime? _discordDropOverlay;
     private GalleryWindow? _galleryWindow;
     private readonly CancellationTokenSource _maintenanceCancellation = new();
     private Task? _maintenanceTask;
@@ -157,16 +158,21 @@ public partial class App : System.Windows.Application
             var kakaoRuntime = new KakaoCaptureRuntime(
                 _repository,
                 acceptInjectedInput);
+            var discordRuntime = new DiscordCaptureRuntime(
+                _repository,
+                acceptInjectedInput);
             _runtime = new CompositeCaptureRuntime(
                 kakaoRuntime,
-                new DiscordCaptureRuntime(
-                    _repository,
-                    acceptInjectedInput));
+                discordRuntime);
             _kakaoDropOverlay = new KakaoDropOverlayRuntime(
                 kakaoRuntime,
                 GetSavedDarkTheme,
                 () => SentoryLocalization.Text("KakaoDropHeading"),
                 () => SentoryLocalization.Text("KakaoDropDescription"),
+                (category, message) =>
+                    _diagnosticsLog?.Write(category, message));
+            _discordDropOverlay = new DiscordDropOverlayRuntime(
+                discordRuntime,
                 (category, message) =>
                     _diagnosticsLog?.Write(category, message));
             _runtime.Captured += OnCaptured;
@@ -198,6 +204,7 @@ public partial class App : System.Windows.Application
                 _maintenanceCancellation.Token);
             _runtime.Start();
             _kakaoDropOverlay.Start();
+            _discordDropOverlay.Start();
             UpdatePauseUi();
             OpenGallery();
             _ = CheckForUpdatesAsync(_maintenanceCancellation.Token);
@@ -1118,6 +1125,8 @@ public partial class App : System.Windows.Application
         _linkPreviewService = null;
         _kakaoDropOverlay?.Dispose();
         _kakaoDropOverlay = null;
+        _discordDropOverlay?.Dispose();
+        _discordDropOverlay = null;
         if (_runtime is not null)
         {
             _runtime.Captured -= OnCaptured;
