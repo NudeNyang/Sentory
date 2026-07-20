@@ -16,16 +16,35 @@ public enum ItemDetailAction
 public partial class ItemDetailWindow : Window
 {
     private readonly bool _isDarkTheme;
-    private readonly IReadOnlyList<ImageSource> _collectionImages;
+    private readonly IReadOnlyList<GalleryImageViewModel> _detailImages;
+    private readonly IReadOnlyList<DetailLinkViewModel> _detailLinks;
+    private readonly Func<string?, Task<bool>> _copyImageAsync;
     private int _collectionImageIndex;
+    private int _linkIndex;
 
     public ItemDetailWindow(
         GalleryItemViewModel item,
-        bool isDarkTheme)
+        bool isDarkTheme,
+        Func<string?, Task<bool>> copyImageAsync)
     {
         InitializeComponent();
         _isDarkTheme = isDarkTheme;
-        _collectionImages = item.CollectionImages;
+        _copyImageAsync = copyImageAsync;
+        _detailImages = item.IsCollection
+            ? item.CollectionImages
+            : item.IsImage && item.Thumbnail is not null
+                ? [new GalleryImageViewModel(
+                    item.Item.ContentPath,
+                    item.Thumbnail)]
+                : [];
+        _detailLinks = item.IsCollection
+            ? item.Item.Members?
+                .Where(member => member.Kind == ContentKind.Url)
+                .Select(member => new DetailLinkViewModel(member.OriginalUrl))
+                .ToArray() ?? []
+            : !item.IsImage && !string.IsNullOrWhiteSpace(item.Item.OriginalUrl)
+                ? [new DetailLinkViewModel(item.Item.OriginalUrl)]
+                : [];
         SentoryTheme.Apply(Resources, isDarkTheme);
         TypeText.Text = item.TypeLabel;
         TitleText.Text = item.Title;
@@ -44,22 +63,18 @@ public partial class ItemDetailWindow : Window
         if (item.IsCollection)
         {
             OriginalBorder.Visibility = Visibility.Collapsed;
-            var links = item.Item.Members?
-                .Where(member => member.Kind == ContentKind.Url)
-                .Select(member => new DetailLinkViewModel(member.OriginalUrl))
-                .ToArray() ?? [];
-            if (links.Length > 0)
-            {
-                CollectionLinksList.ItemsSource = links;
-                CollectionLinksSection.Visibility = Visibility.Visible;
-            }
         }
         else if (!item.IsImage && !string.IsNullOrWhiteSpace(item.Item.OriginalUrl))
         {
             OriginalBorder.Visibility = Visibility.Collapsed;
-            CollectionLinksList.ItemsSource =
-                new[] { new DetailLinkViewModel(item.Item.OriginalUrl) };
+        }
+        if (_detailLinks.Count > 0)
+        {
             CollectionLinksSection.Visibility = Visibility.Visible;
+            ShowLink(0);
+            LinkNavigation.Visibility = _detailLinks.Count > 1
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
         CaptureCountText.Text = SentoryLocalization.Format(
             "TimesFormat",
@@ -91,17 +106,24 @@ public partial class ItemDetailWindow : Window
             ArtworkFallback.Visibility = Visibility.Collapsed;
         }
 
-        if (_collectionImages.Count > 0)
+        if (_detailImages.Count > 0)
         {
             ShowCollectionImage(0, animate: false);
-            if (_collectionImages.Count > 1)
+            ArtworkImage.Margin = new Thickness(18, 18, 18, 58);
+            PhotoNavigation.Visibility = Visibility.Visible;
+            if (_detailImages.Count > 1)
             {
                 ArtworkImage.Margin = new Thickness(22, 20, 22, 60);
-                PhotoNavigation.Visibility = Visibility.Visible;
+                ArtworkImage.BorderThickness = new Thickness(2);
                 StackBackOne.Visibility = Visibility.Visible;
-                StackBackTwo.Visibility = _collectionImages.Count > 2
+                StackBackTwo.Visibility = _detailImages.Count > 2
                     ? Visibility.Visible
                     : Visibility.Collapsed;
+            }
+            else
+            {
+                PreviousPhotoButton.Visibility = Visibility.Collapsed;
+                NextPhotoButton.Visibility = Visibility.Collapsed;
             }
         }
 
@@ -125,6 +147,37 @@ public partial class ItemDetailWindow : Window
 
     private void NextPhotoButton_Click(object sender, RoutedEventArgs e) =>
         ShowCollectionImage(_collectionImageIndex + 1, animate: true);
+
+    private void PreviousLinkButton_Click(object sender, RoutedEventArgs e) =>
+        ShowLink(_linkIndex - 1);
+
+    private void NextLinkButton_Click(object sender, RoutedEventArgs e) =>
+        ShowLink(_linkIndex + 1);
+
+    private async void CopyCurrentPhotoButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_detailImages.Count == 0)
+        {
+            return;
+        }
+
+        var selectedImage = _detailImages[_collectionImageIndex];
+        CurrentPhotoCopyButton.IsEnabled = false;
+        var copied = await _copyImageAsync(selectedImage.ContentPath);
+        CurrentPhotoCopyIcon.Text = copied ? "\uE73E" : "\uE783";
+        CurrentPhotoCopyButton.ToolTip = SentoryLocalization.Text(
+            copied ? "Copied" : "CopyFailedShort");
+        await Task.Delay(1000);
+        if (CurrentPhotoCopyButton.IsLoaded)
+        {
+            CurrentPhotoCopyIcon.Text = "\uE8C8";
+            CurrentPhotoCopyButton.ToolTip = SentoryLocalization.Text(
+                "CopyCurrentPhoto");
+            CurrentPhotoCopyButton.IsEnabled = true;
+        }
+    }
 
     private async void CopyCollectionLinkButton_Click(
         object sender,
@@ -156,33 +209,34 @@ public partial class ItemDetailWindow : Window
 
     private void ShowCollectionImage(int requestedIndex, bool animate)
     {
-        if (_collectionImages.Count == 0)
+        if (_detailImages.Count == 0)
         {
             return;
         }
 
         _collectionImageIndex =
-            (requestedIndex % _collectionImages.Count + _collectionImages.Count) %
-            _collectionImages.Count;
-        ArtworkImageBrush.ImageSource = _collectionImages[_collectionImageIndex];
+            (requestedIndex % _detailImages.Count + _detailImages.Count) %
+            _detailImages.Count;
+        ArtworkImageBrush.ImageSource =
+            _detailImages[_collectionImageIndex].Thumbnail;
         ArtworkImageBrush.Stretch = Stretch.Uniform;
         ArtworkImage.Visibility = Visibility.Visible;
         ArtworkFallback.Visibility = Visibility.Collapsed;
-        PhotoPositionText.Text = SentoryLocalization.Format(
-            "PhotoPositionFormat",
-            _collectionImageIndex + 1,
-            _collectionImages.Count);
+        UpdatePageDots(
+            PhotoPageDots,
+            _detailImages.Count,
+            _collectionImageIndex);
 
-        if (_collectionImages.Count > 1)
+        if (_detailImages.Count > 1)
         {
-            StackBackOneBrush.ImageSource = _collectionImages[
-                (_collectionImageIndex + 1) % _collectionImages.Count];
+            StackBackOneBrush.ImageSource = _detailImages[
+                (_collectionImageIndex + 1) % _detailImages.Count].Thumbnail;
         }
 
-        if (_collectionImages.Count > 2)
+        if (_detailImages.Count > 2)
         {
-            StackBackTwoBrush.ImageSource = _collectionImages[
-                (_collectionImageIndex + 2) % _collectionImages.Count];
+            StackBackTwoBrush.ImageSource = _detailImages[
+                (_collectionImageIndex + 2) % _detailImages.Count].Thumbnail;
         }
 
         if (animate)
@@ -196,6 +250,42 @@ public partial class ItemDetailWindow : Window
                         EasingMode = EasingMode.EaseOut
                     }
                 });
+        }
+    }
+
+    private void ShowLink(int requestedIndex)
+    {
+        if (_detailLinks.Count == 0)
+        {
+            return;
+        }
+
+        _linkIndex =
+            (requestedIndex % _detailLinks.Count + _detailLinks.Count) %
+            _detailLinks.Count;
+        CollectionLinksList.ItemsSource =
+            new[] { _detailLinks[_linkIndex] };
+        UpdatePageDots(LinkPageDots, _detailLinks.Count, _linkIndex);
+    }
+
+    private void UpdatePageDots(
+        System.Windows.Controls.StackPanel panel,
+        int count,
+        int selectedIndex)
+    {
+        panel.Children.Clear();
+        var accent = (System.Windows.Media.Brush)FindResource("AccentBrush");
+        var muted = (System.Windows.Media.Brush)FindResource("LineBrush");
+        for (var index = 0; index < count; index++)
+        {
+            panel.Children.Add(new System.Windows.Shapes.Ellipse
+            {
+                Width = index == selectedIndex ? 9 : 5,
+                Height = 5,
+                Margin = new Thickness(2, 0, 2, 0),
+                Fill = index == selectedIndex ? accent : muted,
+                Opacity = index == selectedIndex ? 0.9 : 0.72
+            });
         }
     }
 

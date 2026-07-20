@@ -147,7 +147,7 @@
                             BorderBrush="{DynamicResource LineBrush}"
                             BorderThickness="1"
                             CornerRadius="12"
-                            Opacity="0.42"
+                            Opacity="0.28"
                             RenderTransformOrigin="0.5,0.5"
                             Visibility="Collapsed">
                         <Border.RenderTransform>
@@ -168,7 +168,7 @@
                             BorderBrush="{DynamicResource LineBrush}"
                             BorderThickness="1"
                             CornerRadius="12"
-                            Opacity="0.68"
+                            Opacity="0.5"
                             RenderTransformOrigin="0.5,0.5"
                             Visibility="Collapsed">
                         <Border.RenderTransform>
@@ -186,6 +186,8 @@
                     </Border>
                     <Border x:Name="ArtworkImage"
                             Margin="12"
+                            BorderBrush="{DynamicResource AccentBrush}"
+                            BorderThickness="0"
                             CornerRadius="10"
                             Visibility="Collapsed">
                         <Border.Background>
@@ -196,41 +198,56 @@
                         </Border.Background>
                     </Border>
                     <Border x:Name="PhotoNavigation"
-                            Margin="0,0,0,13"
-                            Padding="5,4"
+                            Margin="0,0,0,12"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Bottom"
-                            Background="{DynamicResource SurfaceBrush}"
-                            BorderBrush="{DynamicResource LineBrush}"
-                            BorderThickness="1"
-                            CornerRadius="12"
+                            Background="Transparent"
+                            BorderThickness="0"
                             Visibility="Collapsed">
                         <StackPanel Orientation="Horizontal">
-                            <Button Width="32"
-                                    Height="30"
+                            <Button x:Name="PreviousPhotoButton"
+                                    Width="28"
+                                    Height="28"
                                     Padding="0"
                                     Content="&#x2039;"
-                                    FontSize="22"
+                                    FontSize="19"
+                                    Opacity="0.72"
                                     ToolTip="{DynamicResource Loc.PreviousPhoto}"
                                     Style="{StaticResource DetailButtonStyle}"
                                     Click="PreviousPhotoButton_Click" />
-                            <TextBlock x:Name="PhotoPositionText"
-                                       MinWidth="56"
-                                       Margin="8,0"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       TextAlignment="Center"
-                                       FontSize="11"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource MutedTextBrush}" />
-                            <Button Width="32"
-                                    Height="30"
+                            <StackPanel x:Name="PhotoPageDots"
+                                        MinWidth="38"
+                                        Margin="7,0"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Orientation="Horizontal" />
+                            <Button x:Name="NextPhotoButton"
+                                    Width="28"
+                                    Height="28"
                                     Padding="0"
                                     Content="&#x203A;"
-                                    FontSize="22"
+                                    FontSize="19"
+                                    Opacity="0.72"
                                     ToolTip="{DynamicResource Loc.NextPhoto}"
                                     Style="{StaticResource DetailButtonStyle}"
                                     Click="NextPhotoButton_Click" />
+                            <Border Width="1"
+                                    Height="15"
+                                    Margin="7,0"
+                                    VerticalAlignment="Center"
+                                    Background="{DynamicResource LineBrush}" />
+                            <Button x:Name="CurrentPhotoCopyButton"
+                                    Width="30"
+                                    Height="28"
+                                    Padding="0"
+                                    ToolTip="{DynamicResource Loc.CopyCurrentPhoto}"
+                                    Style="{StaticResource DetailButtonStyle}"
+                                    Click="CopyCurrentPhotoButton_Click">
+                                <TextBlock x:Name="CurrentPhotoCopyIcon"
+                                           Text="&#xE8C8;"
+                                           FontFamily="Segoe Fluent Icons"
+                                           FontSize="13" />
+                            </Button>
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -299,6 +316,38 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                        <StackPanel x:Name="LinkNavigation"
+                                    Margin="0,2,0,0"
+                                    HorizontalAlignment="Center"
+                                    Orientation="Horizontal"
+                                    Visibility="Collapsed">
+                            <Button x:Name="PreviousLinkButton"
+                                    Width="28"
+                                    Height="28"
+                                    Padding="0"
+                                    Content="&#x2039;"
+                                    FontSize="19"
+                                    Opacity="0.72"
+                                    ToolTip="{DynamicResource Loc.PreviousLink}"
+                                    Style="{StaticResource DetailButtonStyle}"
+                                    Click="PreviousLinkButton_Click" />
+                            <StackPanel x:Name="LinkPageDots"
+                                        MinWidth="38"
+                                        Margin="7,0"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Orientation="Horizontal" />
+                            <Button x:Name="NextLinkButton"
+                                    Width="28"
+                                    Height="28"
+                                    Padding="0"
+                                    Content="&#x203A;"
+                                    FontSize="19"
+                                    Opacity="0.72"
+                                    ToolTip="{DynamicResource Loc.NextLink}"
+                                    Style="{StaticResource DetailButtonStyle}"
+                                    Click="NextLinkButton_Click" />
+                        </StackPanel>
                     </StackPanel>
 
                     <UniformGrid Margin="0,18,0,0" Columns="2">

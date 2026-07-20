@@ -213,11 +213,13 @@ public partial class GalleryWindow : Window
         var collectionImages = isCollection
             ? members
                 .Where(member => member.Kind == ContentKind.Image)
-                .Select(member => LoadThumbnail(member.ContentPath))
-                .OfType<ImageSource>()
+                .Select(member => new GalleryImageViewModel(
+                    member.ContentPath,
+                    LoadThumbnail(member.ContentPath)))
+                .Where(image => image.Thumbnail is not null)
                 .ToArray()
             : [];
-        var collectionArtwork = collectionImages.FirstOrDefault();
+        var collectionArtwork = collectionImages.FirstOrDefault()?.Thumbnail;
         var collectionLinkPreview = isCollection
             ? LoadThumbnail(item.PreviewImagePath)
             : null;
@@ -1946,7 +1948,10 @@ public partial class GalleryWindow : Window
 
     private async Task ShowItemDetailsAsync(GalleryItemViewModel item)
     {
-        var window = new ItemDetailWindow(item, _isDarkTheme)
+        var window = new ItemDetailWindow(
+            item,
+            _isDarkTheme,
+            CopyDetailImageAsync)
         {
             Owner = this
         };
@@ -2056,6 +2061,29 @@ public partial class GalleryWindow : Window
         image.EndInit();
         image.Freeze();
         return image;
+    }
+
+    private async Task<bool> CopyDetailImageAsync(string? contentPath)
+    {
+        var path = ResolveContentPath(contentPath);
+        if (path is null || !File.Exists(path))
+        {
+            return false;
+        }
+
+        try
+        {
+            var image = LoadClipboardImage(path);
+            await SetClipboardWithRetryAsync(() => WpfClipboard.SetImage(image));
+            return true;
+        }
+        catch (Exception exception)
+            when (exception is COMException or ExternalException or
+                  IOException or UnauthorizedAccessException or
+                  NotSupportedException)
+        {
+            return false;
+        }
     }
 
     private System.Windows.DataObject? CreateCollectionClipboardData(
@@ -2283,7 +2311,7 @@ public sealed record GalleryItemViewModel(
     Thickness ThumbnailMargin,
     string CollectionBadgeText,
     bool HasCollectionBadge,
-    IReadOnlyList<ImageSource> CollectionImages,
+    IReadOnlyList<GalleryImageViewModel> CollectionImages,
     bool IsSelectionMode,
     bool IsSelected)
 {
@@ -2326,3 +2354,7 @@ public sealed record GalleryItemViewModel(
             Item.CaptureCount,
             Item.CopyCount);
 }
+
+public sealed record GalleryImageViewModel(
+    string? ContentPath,
+    ImageSource? Thumbnail);
