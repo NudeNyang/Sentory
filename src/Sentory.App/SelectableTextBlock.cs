@@ -190,6 +190,17 @@ public sealed class SelectableTextBlock : WpfControl
             new WpfPoint(Padding.Left, Padding.Top));
     }
 
+    protected override HitTestResult? HitTestCore(
+        PointHitTestParameters hitTestParameters)
+    {
+        if (!IsWithinExtendedTextHitArea(hitTestParameters.HitPoint))
+        {
+            return null;
+        }
+
+        return new PointHitTestResult(this, hitTestParameters.HitPoint);
+    }
+
     protected override void OnPreviewMouseDown(MouseButtonEventArgs e)
     {
         if (e.ChangedButton != MouseButton.Left)
