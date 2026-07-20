@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using Sentory.Core;
@@ -21,29 +22,37 @@ public partial class ItemDetailWindow : Window
     private readonly Func<string?, Task<bool>> _copyImageAsync;
     private readonly Func<DetailLinkViewModel, Task<GalleryLinkArtwork?>>
         _loadLinkArtworkAsync;
+    private readonly Action<string?> _openImage;
+    private readonly Action<string> _openLink;
     private readonly Dictionary<string, GalleryLinkArtwork?> _linkArtworkCache =
         new(StringComparer.OrdinalIgnoreCase);
     private int _collectionImageIndex;
     private int _linkIndex;
     private int _linkArtworkGeneration;
+    private bool _artworkDisplaysLink;
 
     public ItemDetailWindow(
         GalleryItemViewModel item,
         bool isDarkTheme,
         Func<string?, Task<bool>> copyImageAsync,
         Func<DetailLinkViewModel, Task<GalleryLinkArtwork?>>
-            loadLinkArtworkAsync)
+            loadLinkArtworkAsync,
+        Action<string?> openImage,
+        Action<string> openLink)
     {
         InitializeComponent();
         _isDarkTheme = isDarkTheme;
         _copyImageAsync = copyImageAsync;
         _loadLinkArtworkAsync = loadLinkArtworkAsync;
+        _openImage = openImage;
+        _openLink = openLink;
         _detailImages = item.IsCollection
             ? item.CollectionImages
             : item.IsImage && item.Thumbnail is not null
                 ? [new GalleryImageViewModel(
                     item.Item.ContentPath,
-                    item.Thumbnail)]
+                    item.Thumbnail,
+                    GetPhotoName(item.Item.ContentPath))]
                 : [];
         _detailLinks = item.IsCollection
             ? item.Item.Members?
@@ -121,10 +130,6 @@ public partial class ItemDetailWindow : Window
             PhotoNavigation.Visibility = _detailImages.Count > 1
                 ? Visibility.Visible
                 : Visibility.Collapsed;
-            if (_detailImages.Count > 1)
-            {
-                ArtworkImage.Margin = new Thickness(22);
-            }
         }
 
         SourceInitialized += (_, _) =>
@@ -183,6 +188,41 @@ public partial class ItemDetailWindow : Window
         }
     }
 
+    private void ArtworkSurface_MouseLeftButtonUp(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        OpenCurrentArtwork();
+        e.Handled = true;
+    }
+
+    private void ArtworkSurface_KeyDown(
+        object sender,
+        System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key is not (Key.Enter or Key.Space))
+        {
+            return;
+        }
+
+        OpenCurrentArtwork();
+        e.Handled = true;
+    }
+
+    private void OpenCurrentArtwork()
+    {
+        if (_artworkDisplaysLink && _detailLinks.Count > 0)
+        {
+            _openLink(_detailLinks[_linkIndex].Url);
+            return;
+        }
+
+        if (_detailImages.Count > 0)
+        {
+            _openImage(_detailImages[_collectionImageIndex].ContentPath);
+        }
+    }
+
     private async void CopyCollectionLinkButton_Click(
         object sender,
         RoutedEventArgs e)
@@ -222,17 +262,18 @@ public partial class ItemDetailWindow : Window
         _collectionImageIndex =
             (requestedIndex % _detailImages.Count + _detailImages.Count) %
             _detailImages.Count;
+        _artworkDisplaysLink = false;
+        var selectedImage = _detailImages[_collectionImageIndex];
         ArtworkImageBrush.ImageSource =
-            _detailImages[_collectionImageIndex].Thumbnail;
+            selectedImage.Thumbnail;
         ArtworkImageBrush.Stretch = Stretch.Uniform;
-        ArtworkImage.Margin = _detailImages.Count > 1
-            ? new Thickness(22)
-            : new Thickness(12);
-        ArtworkImage.BorderThickness = _detailImages.Count > 1
-            ? new Thickness(2)
-            : new Thickness(0);
+        ArtworkImage.Margin = new Thickness(12);
+        ArtworkImage.BorderThickness = new Thickness(0);
         ArtworkImage.Visibility = Visibility.Visible;
         ArtworkFallback.Visibility = Visibility.Collapsed;
+        CurrentPhotoNameText.Text = selectedImage.DisplayName;
+        CurrentPhotoNameText.ToolTip = selectedImage.DisplayName;
+        ArtworkSurface.ToolTip = SentoryLocalization.Text("OpenPhoto");
         StackBackOne.Visibility = _detailImages.Count > 1
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -289,6 +330,8 @@ public partial class ItemDetailWindow : Window
     {
         SetLinkSelection(requestedIndex);
         var link = _detailLinks[_linkIndex];
+        _artworkDisplaysLink = true;
+        ArtworkSurface.ToolTip = SentoryLocalization.Text("OpenLink");
         var generation = ++_linkArtworkGeneration;
         ShowLinkFallback(link);
 
@@ -323,6 +366,14 @@ public partial class ItemDetailWindow : Window
             ? "L"
             : link.Domain[..1].ToUpperInvariant();
         DomainText.Text = link.Domain;
+    }
+
+    private static string GetPhotoName(string? contentPath)
+    {
+        var fileName = System.IO.Path.GetFileName(contentPath);
+        return string.IsNullOrWhiteSpace(fileName)
+            ? SentoryLocalization.Text("Image")
+            : fileName;
     }
 
     private void UpdatePageDots(

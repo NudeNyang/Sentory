@@ -113,7 +113,12 @@
                     BorderBrush="{DynamicResource LineBrush}"
                     BorderThickness="1"
                     CornerRadius="16"
-                    ClipToBounds="True">
+                    ClipToBounds="True"
+                    Cursor="Hand"
+                    Focusable="True"
+                    FocusVisualStyle="{x:Null}"
+                    MouseLeftButtonUp="ArtworkSurface_MouseLeftButtonUp"
+                    KeyDown="ArtworkSurface_KeyDown">
                 <Grid>
                     <StackPanel x:Name="ArtworkFallback"
                                 HorizontalAlignment="Center"
@@ -224,8 +229,9 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock VerticalAlignment="Center"
-                                           Text="{DynamicResource Loc.CurrentPhoto}"
+                                <TextBlock x:Name="CurrentPhotoNameText"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
                                            FontSize="11"
                                            Foreground="{DynamicResource TextBrush}" />
                                 <Button x:Name="CurrentPhotoCopyButton"

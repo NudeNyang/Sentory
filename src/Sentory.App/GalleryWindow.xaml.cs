@@ -219,7 +219,8 @@ public partial class GalleryWindow : Window
                 .Where(member => member.Kind == ContentKind.Image)
                 .Select(member => new GalleryImageViewModel(
                     member.ContentPath,
-                    LoadThumbnail(member.ContentPath)))
+                    LoadThumbnail(member.ContentPath),
+                    GetPhotoName(member.ContentPath)))
                 .Where(image => image.Thumbnail is not null)
                 .ToArray()
             : [];
@@ -1956,7 +1957,9 @@ public partial class GalleryWindow : Window
             item,
             _isDarkTheme,
             CopyDetailImageAsync,
-            LoadDetailLinkArtworkAsync)
+            LoadDetailLinkArtworkAsync,
+            OpenDetailImage,
+            OpenDetailLink)
         {
             Owner = this
         };
@@ -2089,6 +2092,41 @@ public partial class GalleryWindow : Window
         {
             return false;
         }
+    }
+
+    private void OpenDetailImage(string? contentPath) =>
+        OpenTarget(ResolveContentPath(contentPath));
+
+    private void OpenDetailLink(string url) => OpenTarget(url);
+
+    private void OpenTarget(string? target)
+    {
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            ShowFeedback(SentoryLocalization.Text("OriginalNotFound"));
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = target,
+                UseShellExecute = true
+            });
+        }
+        catch (Win32Exception)
+        {
+            ShowFeedback(SentoryLocalization.Text("OpenOriginalFailed"));
+        }
+    }
+
+    private static string GetPhotoName(string? contentPath)
+    {
+        var fileName = Path.GetFileName(contentPath);
+        return string.IsNullOrWhiteSpace(fileName)
+            ? SentoryLocalization.Text("Image")
+            : fileName;
     }
 
     private async Task<GalleryLinkArtwork?> LoadDetailLinkArtworkAsync(
@@ -2393,7 +2431,8 @@ public sealed record GalleryItemViewModel(
 
 public sealed record GalleryImageViewModel(
     string? ContentPath,
-    ImageSource? Thumbnail);
+    ImageSource? Thumbnail,
+    string DisplayName);
 
 public sealed record GalleryLinkArtwork(
     ImageSource Image,
