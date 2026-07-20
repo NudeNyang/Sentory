@@ -121,7 +121,8 @@
                                     Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="8">
+                                    CornerRadius="8"
+                                    SnapsToDevicePixels="True">
                                 <Grid>
                                     <ContentPresenter Margin="12,0,38,0"
                                                       HorizontalAlignment="Left"
@@ -153,20 +154,27 @@
                                    Focusable="False"
                                    IsOpen="{TemplateBinding IsDropDownOpen}"
                                    Placement="Bottom"
-                                   PopupAnimation="Fade">
-                                <Border Margin="0,4,0,0"
-                                        MinWidth="{Binding ActualWidth, ElementName=Root}"
+                                   PopupAnimation="None"
+                                   SnapsToDevicePixels="True"
+                                   VerticalOffset="-1">
+                                <Border MinWidth="{Binding ActualWidth, ElementName=Root}"
                                         MaxHeight="{TemplateBinding MaxDropDownHeight}"
                                         Background="{DynamicResource PopupBackgroundBrush}"
                                         BorderBrush="{DynamicResource LineBrush}"
                                         BorderThickness="1"
-                                        CornerRadius="8">
+                                        CornerRadius="0,0,8,8"
+                                        SnapsToDevicePixels="True">
                                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                                         <StackPanel IsItemsHost="True" />
                                     </ScrollViewer>
                                 </Border>
                             </Popup>
                         </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsDropDownOpen" Value="True">
+                                <Setter TargetName="ClosedBorder" Property="CornerRadius" Value="8,8,0,0" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>

@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 using Sentory.Core;
+using MediaColor = System.Windows.Media.Color;
 
 namespace Sentory.App;
 
@@ -80,15 +81,17 @@ internal static class SentoryTheme
             ["DangerBrush"] = "#A6504A"
         };
 
+    private static readonly IReadOnlyDictionary<string, MediaColor> DarkColors =
+        ParsePalette(DarkPalette);
+
+    private static readonly IReadOnlyDictionary<string, MediaColor> WarmColors =
+        ParsePalette(WarmPalette);
+
     public static void Apply(ResourceDictionary resources, bool dark)
     {
-        foreach (var (key, color) in dark ? DarkPalette : WarmPalette)
+        foreach (var (key, color) in dark ? DarkColors : WarmColors)
         {
-            var brush = new SolidColorBrush(
-                (System.Windows.Media.Color)
-                System.Windows.Media.ColorConverter.ConvertFromString(color));
-            brush.Freeze();
-            resources[key] = brush;
+            SetBrushColor(resources, key, color);
         }
     }
 
@@ -108,11 +111,38 @@ internal static class SentoryTheme
             (_, false) => "#6F5C42",
             _ => "#C0A77D"
         };
-        var brush = new SolidColorBrush(
-            (System.Windows.Media.Color)
-            System.Windows.Media.ColorConverter.ConvertFromString(color));
-        brush.Freeze();
-        resources["DiscordDetectionBrush"] = brush;
+        SetBrushColor(
+            resources,
+            "DiscordDetectionBrush",
+            ParseColor(color));
+    }
+
+    private static IReadOnlyDictionary<string, MediaColor> ParsePalette(
+        IReadOnlyDictionary<string, string> palette) =>
+        palette.ToDictionary(
+            pair => pair.Key,
+            pair => ParseColor(pair.Value));
+
+    private static MediaColor ParseColor(string color) =>
+        (MediaColor)System.Windows.Media.ColorConverter.ConvertFromString(color);
+
+    private static void SetBrushColor(
+        ResourceDictionary resources,
+        string key,
+        MediaColor color)
+    {
+        if (resources.Contains(key) &&
+            resources[key] is SolidColorBrush { IsFrozen: false } brush)
+        {
+            if (brush.Color != color)
+            {
+                brush.Color = color;
+            }
+
+            return;
+        }
+
+        resources[key] = new SolidColorBrush(color);
     }
 
     public static void ApplyTitleBar(Window window, bool dark)
@@ -145,8 +175,7 @@ internal static class SentoryTheme
 
     private static int ToColorRef(string hexColor)
     {
-        var color = (System.Windows.Media.Color)
-            System.Windows.Media.ColorConverter.ConvertFromString(hexColor);
+        var color = ParseColor(hexColor);
         return color.R | color.G << 8 | color.B << 16;
     }
 

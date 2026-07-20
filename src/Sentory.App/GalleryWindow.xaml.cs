@@ -1745,11 +1745,12 @@ public partial class GalleryWindow : Window
             _ => sourceApp.ToString()
         };
 
-    private void ThemeButton_Click(object sender, RoutedEventArgs e)
+    private async void ThemeButton_Click(object sender, RoutedEventArgs e)
     {
         _isDarkTheme = !_isDarkTheme;
         ApplyTheme(_isDarkTheme);
         _settings.IsDarkTheme = _isDarkTheme;
+        await Dispatcher.Yield(DispatcherPriority.Background);
         SaveSettings(SentoryLocalization.Text("ThemeSaveFailed"));
     }
 

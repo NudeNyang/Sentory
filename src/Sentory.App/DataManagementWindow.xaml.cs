@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Navigation;
+using System.Windows.Threading;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
 
@@ -103,7 +104,7 @@ public partial class DataManagementWindow : Window
         }
     }
 
-    private void ThemeComboBox_SelectionChanged(
+    private async void ThemeComboBox_SelectionChanged(
         object sender,
         SelectionChangedEventArgs e)
     {
@@ -113,19 +114,22 @@ public partial class DataManagementWindow : Window
             return;
         }
 
+        _isDarkTheme = option.IsDark;
+        ThemeChanged = true;
+        ApplyPalette();
+        ApplyTitleBarTheme();
+        ThemeSelectionChanged?.Invoke(option.IsDark);
+        StatusText.Text = option.IsDark
+            ? SentoryLocalization.Text("DarkModeApplied")
+            : SentoryLocalization.Text("LightModeApplied");
+
+        await Dispatcher.Yield(DispatcherPriority.Background);
+
         try
         {
             var settings = _settingsStore.Load();
             settings.IsDarkTheme = option.IsDark;
             _settingsStore.Save(settings);
-            _isDarkTheme = option.IsDark;
-            ThemeChanged = true;
-            ApplyPalette();
-            ApplyTitleBarTheme();
-            ThemeSelectionChanged?.Invoke(option.IsDark);
-            StatusText.Text = option.IsDark
-                ? SentoryLocalization.Text("DarkModeApplied")
-                : SentoryLocalization.Text("LightModeApplied");
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException)
