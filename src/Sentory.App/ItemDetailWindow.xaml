@@ -70,21 +70,14 @@
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
         </Style>
         <Style x:Key="SelectableDetailTextStyle"
-               TargetType="{x:Type local:SelectableTextBox}">
+               TargetType="{x:Type local:SelectableTextBlock}">
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Margin" Value="-8,-6" />
-            <Setter Property="Padding" Value="8,6" />
-            <Setter Property="IsReadOnly" Value="True" />
-            <Setter Property="IsReadOnlyCaretVisible" Value="True" />
-            <Setter Property="IsInactiveSelectionHighlightEnabled" Value="True" />
-            <Setter Property="IsTabStop" Value="False" />
-            <Setter Property="AcceptsReturn" Value="False" />
-            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
-            <Setter Property="VerticalScrollBarVisibility" Value="Disabled" />
-            <Setter Property="ScrollViewer.PanningMode" Value="None" />
+            <Setter Property="Padding" Value="0,4" />
+            <Setter Property="Focusable" Value="True" />
+            <Setter Property="KeyboardNavigation.IsTabStop" Value="False" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="ClipToBounds" Value="True" />
             <Setter Property="Cursor" Value="IBeam" />
-            <Setter Property="SpellCheck.IsEnabled" Value="False" />
         </Style>
     </Window.Resources>
 
@@ -101,7 +94,7 @@
         <Grid>
             <StackPanel>
                 <StackPanel Orientation="Horizontal">
-                    <local:SelectableTextBox x:Name="TypeText"
+                    <local:SelectableTextBlock x:Name="TypeText"
                              FontSize="11"
                              FontWeight="SemiBold"
                              Foreground="{DynamicResource AccentBrush}"
@@ -114,10 +107,10 @@
                                Foreground="{DynamicResource FavoriteBrush}"
                                Visibility="Collapsed" />
                 </StackPanel>
-                <local:SelectableTextBox x:Name="TitleText"
-                         Margin="-8,1,-8,-6"
-                         MaxWidth="750"
-                         MaxHeight="70"
+                <local:SelectableTextBlock x:Name="TitleText"
+                         Margin="0,7,0,0"
+                         MaxWidth="734"
+                         MaxHeight="66"
                          FontSize="23"
                          FontWeight="SemiBold"
                          Foreground="{DynamicResource TextBrush}"
@@ -129,7 +122,7 @@
         <Grid Grid.Row="1" Margin="0,22,0,22">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="360" />
-                <ColumnDefinition Width="22" />
+                <ColumnDefinition Width="12" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
@@ -162,9 +155,9 @@
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource AccentBrush}" />
                         </Border>
-                        <local:SelectableTextBox x:Name="DomainText"
-                                 Margin="-8,8,-8,-6"
-                                 MaxWidth="276"
+                        <local:SelectableTextBlock x:Name="DomainText"
+                                 Margin="0,14,0,0"
+                                 MaxWidth="260"
                                  HorizontalAlignment="Center"
                                  FontSize="13"
                                  Foreground="{DynamicResource MutedTextBrush}"
@@ -236,15 +229,16 @@
                               VerticalScrollBarVisibility="Hidden"
                               FocusVisualStyle="{x:Null}">
                     <StackPanel>
-                    <local:SelectableTextBox x:Name="DescriptionText"
+                    <local:SelectableTextBlock x:Name="DescriptionText"
+                             Padding="10,4,0,4"
                              FontSize="13"
-                             TextBlock.LineHeight="20"
+                             LineHeight="20"
                              Foreground="{DynamicResource MutedTextBrush}"
                              TextWrapping="Wrap"
                              Style="{StaticResource SelectableDetailTextStyle}" />
 
                     <StackPanel x:Name="PhotoControlsSection"
-                                Margin="0,18,0,0"
+                                Margin="10,18,0,0"
                                 Visibility="Collapsed">
                         <TextBlock Margin="2,0,0,8"
                                    Text="{DynamicResource Loc.Photos}"
@@ -259,7 +253,7 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <local:SelectableTextBox x:Name="CurrentPhotoNameText"
+                                <local:SelectableTextBlock x:Name="CurrentPhotoNameText"
                                          VerticalAlignment="Center"
                                          FontSize="11"
                                          Foreground="{DynamicResource TextBrush}"
@@ -313,7 +307,7 @@
                     </StackPanel>
 
                     <StackPanel x:Name="CollectionLinksSection"
-                                Margin="0,18,0,0"
+                                Margin="10,18,0,0"
                                 Visibility="Collapsed">
                         <TextBlock Margin="2,0,0,8"
                                    Text="{DynamicResource Loc.CollectionLinks}"
@@ -332,10 +326,8 @@
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
-                                            <local:SelectableTextBox Text="{Binding Url}"
+                                            <local:SelectableTextBlock Text="{Binding Url}"
                                                      VerticalAlignment="Center"
-                                                     Margin="-8,-6,0,-6"
-                                                     Padding="8,6,0,6"
                                                      FontSize="11"
                                                      Foreground="{DynamicResource TextBrush}"
                                                      TextWrapping="Wrap"
@@ -388,7 +380,7 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <UniformGrid Margin="0,18,0,0" Columns="2">
+                    <UniformGrid Margin="10,18,0,0" Columns="2">
                         <Border Margin="0,0,5,5"
                                 Padding="12"
                                 Background="{DynamicResource SurfaceBrush}"
@@ -399,8 +391,8 @@
                                 <TextBlock Text="{DynamicResource Loc.CaptureCount}"
                                            FontSize="10.5"
                                            Foreground="{DynamicResource SoftTextBrush}" />
-                                <local:SelectableTextBox x:Name="CaptureCountText"
-                                         Margin="-8,-2,-8,-6"
+                                <local:SelectableTextBlock x:Name="CaptureCountText"
+                                         Margin="0,4,0,0"
                                          FontSize="14"
                                          FontWeight="SemiBold"
                                          Foreground="{DynamicResource TextBrush}"
@@ -417,8 +409,8 @@
                                 <TextBlock Text="{DynamicResource Loc.CopyCount}"
                                            FontSize="10.5"
                                            Foreground="{DynamicResource SoftTextBrush}" />
-                                <local:SelectableTextBox x:Name="CopyCountText"
-                                         Margin="-8,-2,-8,-6"
+                                <local:SelectableTextBlock x:Name="CopyCountText"
+                                         Margin="0,4,0,0"
                                          FontSize="14"
                                          FontWeight="SemiBold"
                                          Foreground="{DynamicResource TextBrush}"
@@ -435,8 +427,8 @@
                                 <TextBlock Text="{DynamicResource Loc.LastSource}"
                                            FontSize="10.5"
                                            Foreground="{DynamicResource SoftTextBrush}" />
-                                <local:SelectableTextBox x:Name="SourceText"
-                                         Margin="-8,-2,-8,-6"
+                                <local:SelectableTextBlock x:Name="SourceText"
+                                         Margin="0,4,0,0"
                                          FontSize="13"
                                          FontWeight="SemiBold"
                                          Foreground="{DynamicResource TextBrush}"
@@ -453,8 +445,8 @@
                                 <TextBlock Text="{DynamicResource Loc.LastSaved}"
                                            FontSize="10.5"
                                            Foreground="{DynamicResource SoftTextBrush}" />
-                                <local:SelectableTextBox x:Name="SavedAtText"
-                                         Margin="-8,-2,-8,-6"
+                                <local:SelectableTextBlock x:Name="SavedAtText"
+                                         Margin="0,4,0,0"
                                          FontSize="12"
                                          FontWeight="SemiBold"
                                          Foreground="{DynamicResource TextBrush}"
@@ -463,8 +455,8 @@
                         </Border>
                     </UniformGrid>
 
-                    <local:SelectableTextBox x:Name="DeliveryText"
-                             Margin="-8,12,-8,-6"
+                    <local:SelectableTextBlock x:Name="DeliveryText"
+                             Margin="10,18,0,0"
                              FontSize="11"
                              Foreground="{DynamicResource SoftTextBrush}"
                              Style="{StaticResource SelectableDetailTextStyle}" />
