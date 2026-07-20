@@ -282,17 +282,6 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <Border x:Name="OriginalBorder"
-                            Margin="0,18,0,0"
-                            Padding="13,11"
-                            Background="{DynamicResource InputBackgroundBrush}"
-                            CornerRadius="10">
-                        <TextBlock x:Name="OriginalText"
-                                   FontSize="11.5"
-                                   Foreground="{DynamicResource TextBrush}"
-                                   TextWrapping="Wrap" />
-                    </Border>
-
                     <StackPanel x:Name="CollectionLinksSection"
                                 Margin="0,18,0,0"
                                 Visibility="Collapsed">

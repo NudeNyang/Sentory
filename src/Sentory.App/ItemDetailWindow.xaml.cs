@@ -79,18 +79,6 @@ public partial class ItemDetailWindow : Window
         DomainText.Text = item.IsImage
             ? SentoryLocalization.Text("StoredPhoto")
             : item.Domain;
-        OriginalText.Text = item.IsImage
-            ? item.Item.ContentPath ??
-              SentoryLocalization.Text("MissingPhotoPath")
-            : item.Item.OriginalUrl;
-        if (item.IsCollection)
-        {
-            OriginalBorder.Visibility = Visibility.Collapsed;
-        }
-        else if (!item.IsImage && !string.IsNullOrWhiteSpace(item.Item.OriginalUrl))
-        {
-            OriginalBorder.Visibility = Visibility.Collapsed;
-        }
         if (_detailLinks.Count > 0)
         {
             CollectionLinksSection.Visibility = Visibility.Visible;
