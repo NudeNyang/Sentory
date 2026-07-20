@@ -280,7 +280,8 @@ public partial class GalleryWindow : Window
                     GetPhotoName(
                         member.ContentPath,
                         member.OcrDisplayName,
-                        member.OriginalUrl)))
+                        member.OriginalUrl),
+                    member.Sha256))
                 .Where(image => image.Thumbnail is not null)
                 .ToArray()
             : [];
@@ -2198,8 +2199,11 @@ public partial class GalleryWindow : Window
         }
     }
 
-    private void OpenDetailImage(string? contentPath) =>
-        OpenTarget(ResolveContentPath(contentPath));
+    private void OpenDetailImage(GalleryImageViewModel image) =>
+        OpenImageTarget(
+            image.ContentPath,
+            image.DisplayName,
+            image.Sha256);
 
     private void OpenDetailLink(string url) => OpenTarget(url);
 
@@ -2339,31 +2343,64 @@ public partial class GalleryWindow : Window
     private void OpenItem(GalleryItemViewModel item)
     {
         var firstMember = item.Item.Members?.FirstOrDefault();
-        var target = item.IsCollection
-            ? firstMember?.Kind == ContentKind.Image
-                ? ResolveContentPath(firstMember.ContentPath)
-                : firstMember?.OriginalUrl
-            : item.IsImage
-                ? ResolveContentPath(item.Item.ContentPath)
-                : item.Item.OriginalUrl;
-        if (string.IsNullOrWhiteSpace(target))
+        if (item.IsCollection && firstMember?.Kind == ContentKind.Image)
+        {
+            var firstImage = item.CollectionImages.FirstOrDefault(image =>
+                string.Equals(
+                    image.ContentPath,
+                    firstMember.ContentPath,
+                    StringComparison.OrdinalIgnoreCase));
+            OpenImageTarget(
+                firstMember.ContentPath,
+                firstImage?.DisplayName ?? GetPhotoName(
+                    firstMember.ContentPath,
+                    firstMember.OcrDisplayName,
+                    firstMember.OriginalUrl),
+                firstMember.Sha256);
+            return;
+        }
+
+        if (item.IsImage)
+        {
+            OpenImageTarget(
+                item.Item.ContentPath,
+                item.Title,
+                item.Item.Sha256);
+            return;
+        }
+
+        OpenTarget(item.IsCollection
+            ? firstMember?.OriginalUrl
+            : item.Item.OriginalUrl);
+    }
+
+    private void OpenImageTarget(
+        string? contentPath,
+        string displayName,
+        string? contentIdentity)
+    {
+        var sourcePath = ResolveContentPath(contentPath);
+        if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
         {
             ShowFeedback(SentoryLocalization.Text("OriginalNotFound"));
             return;
         }
 
+        var targetPath = sourcePath;
         try
         {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = target,
-                UseShellExecute = true
-            });
+            targetPath = DisplayNamedImageFile.Prepare(
+                sourcePath,
+                displayName,
+                contentIdentity);
         }
-        catch (Win32Exception)
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException or
+                  NotSupportedException or ArgumentException)
         {
-            ShowFeedback(SentoryLocalization.Text("OpenOriginalFailed"));
         }
+
+        OpenTarget(targetPath);
     }
 
     private async Task DeleteAsync(GalleryItemViewModel item)
@@ -2651,7 +2688,8 @@ public sealed class GalleryItemSelectionState : INotifyPropertyChanged
 public sealed record GalleryImageViewModel(
     string? ContentPath,
     ImageSource? Thumbnail,
-    string DisplayName);
+    string DisplayName,
+    string? Sha256);
 
 public sealed record GalleryLinkArtwork(
     ImageSource Image,

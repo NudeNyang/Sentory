@@ -153,7 +153,7 @@ internal static class SentoryLocalization
             L("DeleteSelected", "선택 항목 삭제", "Delete selected", "選択項目を削除", "删除所选项目"),
             L("LoadingLibrary", "보관함을 불러오는 중", "Loading library", "ライブラリを読み込み中", "正在加载收藏库"),
             L("NoItems", "아직 보관된 항목이 없습니다", "Nothing saved yet", "まだ保存された項目はありません", "尚未保存任何项目"),
-            L("NoItemsDescription", "Discord에서 URL이나 사진을 전송하거나 카카오톡에 URL이나 사진을 붙여넣어 보세요.", "Send a URL or photo in Discord, or paste one into KakaoTalk.", "Discord で URL や写真を送信するか、カカオトークに貼り付けてみてください。", "请在 Discord 中发送链接或图片，或将其粘贴到 KakaoTalk。"),
+            L("NoItemsDescription", "메신저에 URL이나 사진을 붙여넣어 보세요.", "Paste a URL or photo into a messenger.", "メッセンジャーに URL や写真を貼り付けてみてください。", "请在聊天应用中粘贴链接或图片。"),
             L("NoSearchResults", "검색 결과가 없습니다", "No results found", "検索結果がありません", "没有搜索结果"),
             L("NoSearchResultsDescription", "다른 검색어나 필터로 다시 찾아보세요.", "Try another search term or filter.", "別の検索語やフィルターをお試しください。", "请尝试其他关键词或筛选条件。"),
             L("LoadFailed", "보관함을 불러오지 못했습니다", "Could not load the library", "ライブラリを読み込めませんでした", "无法加载收藏库"),

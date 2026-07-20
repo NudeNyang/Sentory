@@ -138,6 +138,8 @@ public partial class App : System.Windows.Application
             RegisterGalleryOpenSignal();
         }
 
+        DisplayNamedImageFile.CleanupOldCopies(TimeSpan.FromDays(7));
+
         try
         {
             if (!isInstallationVerification)

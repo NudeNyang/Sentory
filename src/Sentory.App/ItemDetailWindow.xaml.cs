@@ -23,7 +23,7 @@ public partial class ItemDetailWindow : Window
     private readonly Func<string?, Task<bool>> _copyImageAsync;
     private readonly Func<DetailLinkViewModel, Task<GalleryLinkArtwork?>>
         _loadLinkArtworkAsync;
-    private readonly Action<string?> _openImage;
+    private readonly Action<GalleryImageViewModel> _openImage;
     private readonly Action<string> _openLink;
     private readonly OverlayScrollIndicatorController _scrollIndicator;
     private readonly Dictionary<string, GalleryLinkArtwork?> _linkArtworkCache =
@@ -41,7 +41,7 @@ public partial class ItemDetailWindow : Window
         Func<string?, Task<bool>> copyImageAsync,
         Func<DetailLinkViewModel, Task<GalleryLinkArtwork?>>
             loadLinkArtworkAsync,
-        Action<string?> openImage,
+        Action<GalleryImageViewModel> openImage,
         Action<string> openLink)
     {
         InitializeComponent();
@@ -56,10 +56,8 @@ public partial class ItemDetailWindow : Window
                 ? [new GalleryImageViewModel(
                     item.Item.ContentPath,
                     item.Thumbnail,
-                    GetPhotoName(
-                        item.Item.ContentPath,
-                        item.Item.OcrDisplayName,
-                        item.Item.OriginalUrl))]
+                    item.Title,
+                    item.Item.Sha256)]
                 : [];
         _detailLinks = item.IsCollection
             ? item.Item.Members?
@@ -276,7 +274,7 @@ public partial class ItemDetailWindow : Window
 
         if (_detailImages.Count > 0)
         {
-            _openImage(_detailImages[_collectionImageIndex].ContentPath);
+            _openImage(_detailImages[_collectionImageIndex]);
         }
     }
 
