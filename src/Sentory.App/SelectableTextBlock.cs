@@ -123,16 +123,26 @@ public sealed class SelectableTextBlock : WpfControl
         MouseButtonEventHandler previewMouseDown = (_, e) =>
         {
             if (e.ChangedButton != MouseButton.Left ||
-                e.OriginalSource is not WpfDependencyObject source ||
-                FindAncestor<SelectableTextBlock>(source) is not null ||
-                IsInteractiveSource(source))
+                e.OriginalSource is not WpfDependencyObject source)
             {
+                return;
+            }
+
+            if (FindAncestor<SelectableTextBlock>(source) is not null)
+            {
+                return;
+            }
+
+            if (IsInteractiveSource(source))
+            {
+                ClearActiveSelection();
                 return;
             }
 
             var target = FindExtendedHitTarget(window, e);
             if (target is null)
             {
+                ClearActiveSelection();
                 return;
             }
 
@@ -358,6 +368,16 @@ public sealed class SelectableTextBlock : WpfControl
         }
 
         _activeSelection = new WeakReference<SelectableTextBlock>(this);
+    }
+
+    private static void ClearActiveSelection()
+    {
+        if (_activeSelection?.TryGetTarget(out var active) == true)
+        {
+            active.ClearSelection();
+        }
+
+        _activeSelection = null;
     }
 
     private void ClearSelection()
