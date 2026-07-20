@@ -122,7 +122,7 @@
         <Grid Grid.Row="1" Margin="0,22,0,22">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="360" />
-                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="0" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
@@ -230,7 +230,7 @@
                               FocusVisualStyle="{x:Null}">
                     <StackPanel>
                     <local:SelectableTextBlock x:Name="DescriptionText"
-                             Padding="10,4,0,4"
+                             Padding="22,4,0,4"
                              FontSize="13"
                              LineHeight="20"
                              Foreground="{DynamicResource MutedTextBrush}"
@@ -238,7 +238,7 @@
                              Style="{StaticResource SelectableDetailTextStyle}" />
 
                     <StackPanel x:Name="PhotoControlsSection"
-                                Margin="10,18,0,0"
+                                Margin="22,18,0,0"
                                 Visibility="Collapsed">
                         <TextBlock Margin="2,0,0,8"
                                    Text="{DynamicResource Loc.Photos}"
@@ -307,7 +307,7 @@
                     </StackPanel>
 
                     <StackPanel x:Name="CollectionLinksSection"
-                                Margin="10,18,0,0"
+                                Margin="22,18,0,0"
                                 Visibility="Collapsed">
                         <TextBlock Margin="2,0,0,8"
                                    Text="{DynamicResource Loc.CollectionLinks}"
@@ -380,7 +380,7 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <UniformGrid Margin="10,18,0,0" Columns="2">
+                    <UniformGrid Margin="22,18,0,0" Columns="2">
                         <Border Margin="0,0,5,5"
                                 Padding="12"
                                 Background="{DynamicResource SurfaceBrush}"
@@ -456,7 +456,7 @@
                     </UniformGrid>
 
                     <local:SelectableTextBlock x:Name="DeliveryText"
-                             Margin="10,18,0,0"
+                             Margin="22,18,0,0"
                              FontSize="11"
                              Foreground="{DynamicResource SoftTextBrush}"
                              Style="{StaticResource SelectableDetailTextStyle}" />

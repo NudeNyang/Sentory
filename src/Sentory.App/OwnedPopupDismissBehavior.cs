@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Threading;
 
 namespace Sentory.App;
@@ -10,32 +11,62 @@ internal static class OwnedPopupDismissBehavior
         Func<bool>? canDismiss = null)
     {
         var closeRequested = false;
-        window.Closing += (_, _) => closeRequested = true;
-        window.Deactivated += (_, _) =>
+        Window? owner = null;
+        MouseButtonEventHandler? ownerMouseDown = null;
+
+        void DetachOwnerHandler()
         {
-            if (!window.IsLoaded || closeRequested ||
-                canDismiss?.Invoke() == false)
+            if (owner is not null && ownerMouseDown is not null)
+            {
+                owner.RemoveHandler(
+                    Mouse.PreviewMouseDownEvent,
+                    ownerMouseDown);
+            }
+
+            owner = null;
+            ownerMouseDown = null;
+        }
+
+        void AttachOwnerHandler()
+        {
+            DetachOwnerHandler();
+            owner = window.Owner;
+            if (owner is null)
             {
                 return;
             }
 
-            closeRequested = true;
-            var owner = window.Owner;
-            _ = window.Dispatcher.BeginInvoke(
-                () =>
+            ownerMouseDown = (_, _) =>
+            {
+                if (!window.IsLoaded || closeRequested ||
+                    canDismiss?.Invoke() == false)
                 {
-                    var returnFocusToOwner = owner?.IsActive == true;
-                    if (window.IsLoaded)
-                    {
-                        window.Close();
-                    }
+                    return;
+                }
 
-                    if (returnFocusToOwner && owner?.IsVisible == true)
+                closeRequested = true;
+                _ = window.Dispatcher.BeginInvoke(
+                    () =>
                     {
-                        owner.Activate();
-                    }
-                },
-                DispatcherPriority.Background);
-        };
+                        if (window.IsLoaded)
+                        {
+                            window.Close();
+                        }
+                    },
+                    DispatcherPriority.Background);
+            };
+            owner.AddHandler(
+                Mouse.PreviewMouseDownEvent,
+                ownerMouseDown,
+                handledEventsToo: true);
+        }
+
+        window.Loaded += (_, _) => AttachOwnerHandler();
+        window.Closing += (_, _) => closeRequested = true;
+        window.Closed += (_, _) => DetachOwnerHandler();
+        if (window.IsLoaded)
+        {
+            AttachOwnerHandler();
+        }
     }
 }
