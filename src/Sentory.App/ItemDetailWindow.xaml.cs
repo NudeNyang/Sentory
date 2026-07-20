@@ -32,6 +32,8 @@ public partial class ItemDetailWindow : Window
     private int _linkIndex;
     private int _linkArtworkGeneration;
     private bool _artworkDisplaysLink;
+    private System.Windows.Point? _artworkPointerDown;
+    private bool _artworkPointerDragged;
 
     public ItemDetailWindow(
         GalleryItemViewModel item,
@@ -190,12 +192,65 @@ public partial class ItemDetailWindow : Window
         }
     }
 
+    private void ArtworkSurface_MouseLeftButtonDown(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        _artworkPointerDown = e.GetPosition(ArtworkSurface);
+        _artworkPointerDragged = false;
+        Mouse.Capture(ArtworkSurface, CaptureMode.Element);
+        e.Handled = true;
+    }
+
+    private void ArtworkSurface_MouseMove(
+        object sender,
+        System.Windows.Input.MouseEventArgs e)
+    {
+        if (_artworkPointerDown is not { } origin ||
+            e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        var current = e.GetPosition(ArtworkSurface);
+        if (Math.Abs(current.X - origin.X) >=
+                SystemParameters.MinimumHorizontalDragDistance ||
+            Math.Abs(current.Y - origin.Y) >=
+                SystemParameters.MinimumVerticalDragDistance)
+        {
+            _artworkPointerDragged = true;
+        }
+    }
+
     private void ArtworkSurface_MouseLeftButtonUp(
         object sender,
         MouseButtonEventArgs e)
     {
-        OpenCurrentArtwork();
+        var shouldOpen = _artworkPointerDown is not null &&
+            !_artworkPointerDragged;
+        ResetArtworkPointerGesture();
+        if (Mouse.Captured == ArtworkSurface)
+        {
+            Mouse.Capture(null);
+        }
+
+        if (shouldOpen)
+        {
+            OpenCurrentArtwork();
+        }
+
         e.Handled = true;
+    }
+
+    private void ArtworkSurface_LostMouseCapture(
+        object sender,
+        System.Windows.Input.MouseEventArgs e) =>
+        ResetArtworkPointerGesture();
+
+    private void ResetArtworkPointerGesture()
+    {
+        _artworkPointerDown = null;
+        _artworkPointerDragged = false;
     }
 
     private void ArtworkSurface_KeyDown(

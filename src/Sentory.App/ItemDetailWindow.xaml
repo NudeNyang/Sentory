@@ -135,7 +135,10 @@
                     Cursor="Hand"
                     Focusable="True"
                     FocusVisualStyle="{x:Null}"
+                    MouseLeftButtonDown="ArtworkSurface_MouseLeftButtonDown"
+                    MouseMove="ArtworkSurface_MouseMove"
                     MouseLeftButtonUp="ArtworkSurface_MouseLeftButtonUp"
+                    LostMouseCapture="ArtworkSurface_LostMouseCapture"
                     KeyDown="ArtworkSurface_KeyDown">
                 <Grid>
                     <StackPanel x:Name="ArtworkFallback"
