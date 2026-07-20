@@ -37,3 +37,13 @@ internal sealed class WindowsStartupManager
             RegistryValueKind.String);
     }
 }
+
+internal static class StartupPreferencePolicy
+{
+    public static bool Resolve(
+        bool settingsFileExisted,
+        bool? savedPreference,
+        bool registrationEnabled) =>
+        savedPreference ??
+        (settingsFileExisted ? registrationEnabled : true);
+}

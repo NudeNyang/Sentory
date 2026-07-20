@@ -676,8 +676,10 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         Assert.True(settings.DiscordSupportEnabled);
         Assert.True(settings.KakaoTalkSupportEnabled);
         Assert.False(settings.DiscordAccessibilityPrepared);
+        Assert.Null(settings.StartWithWindows);
         settings.IsDarkTheme = true;
         settings.DiscordAccessibilityPrepared = true;
+        settings.StartWithWindows = false;
         settings.WindowLeft = 120;
         settings.WindowTop = 80;
         settings.WindowWidth = 1100;
@@ -690,6 +692,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         Assert.True(restored.DiscordSupportEnabled);
         Assert.True(restored.KakaoTalkSupportEnabled);
         Assert.True(restored.DiscordAccessibilityPrepared);
+        Assert.False(restored.StartWithWindows);
         Assert.Equal(120, restored.WindowLeft);
         Assert.Equal(80, restored.WindowTop);
         Assert.Equal(1100, restored.WindowWidth);

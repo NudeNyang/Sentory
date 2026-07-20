@@ -180,9 +180,13 @@ public partial class DataManagementWindow : Window
     {
         try
         {
-            _startupManager.SetEnabled(!_startupManager.IsEnabled());
+            var enabled = !_startupManager.IsEnabled();
+            _startupManager.SetEnabled(enabled);
+            var settings = _settingsStore.Load();
+            settings.StartWithWindows = enabled;
+            _settingsStore.Save(settings);
             UpdateStartupControls();
-            StatusText.Text = _startupManager.IsEnabled()
+            StatusText.Text = enabled
                 ? SentoryLocalization.Text("StartupEnabled")
                 : SentoryLocalization.Text("StartupDisabled");
         }

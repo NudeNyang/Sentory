@@ -76,10 +76,12 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        var settingsFileExisted = File.Exists(_paths.SettingsPath);
         _settingsStore = new SentorySettingsStore(_paths);
+        var initialSettings = _settingsStore.Load();
         SentoryLocalization.Apply(
             Resources,
-            _settingsStore.Load().Language);
+            initialSettings.Language);
         _statusText = SentoryLocalization.Text("Starting");
         _diagnosticsLog = new SentoryDiagnosticsLog(_paths);
         var isInstallationVerification = e.Args.Contains(
@@ -136,6 +138,13 @@ public partial class App : System.Windows.Application
 
         try
         {
+            if (!isInstallationVerification)
+            {
+                ApplyInitialStartupPreference(
+                    settingsFileExisted,
+                    initialSettings);
+            }
+
             PrepareDiscordDefault();
             _repository = new SqliteCaptureRepository(_paths);
             await _repository.InitializeAsync();
@@ -695,6 +704,36 @@ public partial class App : System.Windows.Application
         }
     }
 
+    private void ApplyInitialStartupPreference(
+        bool settingsFileExisted,
+        SentorySettings settings)
+    {
+        try
+        {
+            var enabled = StartupPreferencePolicy.Resolve(
+                settingsFileExisted,
+                settings.StartWithWindows,
+                _startupManager.IsEnabled());
+            _startupManager.SetEnabled(enabled);
+            if (settings.StartWithWindows != enabled)
+            {
+                settings.StartWithWindows = enabled;
+                _settingsStore!.Save(settings);
+            }
+        }
+        catch (Exception exception)
+            when (exception is UnauthorizedAccessException or
+                  System.Security.SecurityException or
+                  IOException or
+                  InvalidOperationException)
+        {
+            _diagnosticsLog?.Write(
+                "startup-registration-failed",
+                "Windows startup preference could not be applied",
+                exception);
+        }
+    }
+
     private bool GetSavedDarkTheme()
     {
         try
@@ -716,6 +755,12 @@ public partial class App : System.Windows.Application
         try
         {
             _startupManager.SetEnabled(enabled);
+            if (_settingsStore is not null)
+            {
+                var settings = _settingsStore.Load();
+                settings.StartWithWindows = enabled;
+                _settingsStore.Save(settings);
+            }
             _trayIcon?.ShowBalloonTip(
                 1800,
                 "Sentory",
