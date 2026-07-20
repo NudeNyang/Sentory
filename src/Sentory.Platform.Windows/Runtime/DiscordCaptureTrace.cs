@@ -7,13 +7,23 @@ internal static class DiscordCaptureTrace
 {
     private const long MaximumLogBytes = 256 * 1024;
     private static readonly object Gate = new();
-    private static readonly string LogDirectory = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Sentory",
-        "diagnostics");
+    private static readonly string LogDirectory = ResolveLogDirectory(
+        Environment.GetEnvironmentVariable("SENTORY_DATA_DIR"),
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
     private static readonly string LogPath = Path.Combine(
         LogDirectory,
         "discord-capture.log");
+
+    internal static string ResolveLogDirectory(
+        string? dataDirectoryOverride,
+        string localAppDataDirectory)
+    {
+        var dataDirectory = string.IsNullOrWhiteSpace(dataDirectoryOverride)
+            ? Path.Combine(localAppDataDirectory, "Sentory")
+            : Path.GetFullPath(dataDirectoryOverride);
+
+        return Path.Combine(dataDirectory, "diagnostics");
+    }
 
     public static void Write(string stage, string? detail = null)
     {

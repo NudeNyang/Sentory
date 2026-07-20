@@ -24,6 +24,7 @@ public static class DiscordAccessibilityWorker
     private const int VisibleListItemState = 64;
     private const int MaximumTraversalDepth = 60;
     private const int MaximumTraversalNodes = 5_000;
+    private const int MaximumTargetResolutionAttempts = 3;
     private static readonly Guid AccessibleInterfaceId =
         new("618736e0-3c3d-11cf-810c-00aa00389b71");
 
@@ -161,7 +162,7 @@ public static class DiscordAccessibilityWorker
         catch (Exception exception)
         {
             response = DiscordConfirmationResponse.Unavailable(
-                $"worker-exception:{exception.GetType().Name}");
+                CreateExceptionSignal(exception));
         }
         finally
         {
@@ -177,6 +178,16 @@ public static class DiscordAccessibilityWorker
                 new DiscordWorkerResponse(message.RequestId, response),
                 workerCancellation);
         }
+    }
+
+    internal static string CreateExceptionSignal(Exception exception)
+    {
+        var targetSite = exception.TargetSite;
+        var declaringType = targetSite?.DeclaringType?.Name ?? "unknown";
+        var methodName = targetSite?.Name ?? "unknown";
+
+        return $"worker-exception:{exception.GetType().Name}:" +
+            $"{declaringType}.{methodName}:0x{exception.HResult:X8}";
     }
 
     private static async Task WriteResponseAsync(
@@ -209,16 +220,26 @@ public static class DiscordAccessibilityWorker
         }
 
         var requireMatchingUrlInput = RequiresMatchingUrlInput(request);
-        if (!TryResolveTargets(
-                request,
-                expectedUrls,
-                requireMatchingUrlInput,
-                targetCache,
-                out var resolved,
-                out var unavailableSignal))
+        TargetResolution resolved;
+        string unavailableSignal;
+        var resolutionAttempt = 0;
+        while (!TryResolveTargets(
+                   request,
+                   expectedUrls,
+                   requireMatchingUrlInput,
+                   targetCache,
+                   out resolved,
+                   out unavailableSignal))
         {
-            return DiscordConfirmationResponse.Unavailable(
-                unavailableSignal);
+            resolutionAttempt++;
+            if (resolutionAttempt >= MaximumTargetResolutionAttempts ||
+                !ShouldRetryTargetResolution(request, unavailableSignal))
+            {
+                return DiscordConfirmationResponse.Unavailable(
+                    unavailableSignal);
+            }
+
+            await Task.Delay(180, cancellationToken);
         }
 
         if (request.ContentKind == DiscordConfirmationContentKind.Warmup)
@@ -897,6 +918,20 @@ public static class DiscordAccessibilityWorker
         DiscordConfirmationRequest request) =>
         request.ContentKind == DiscordConfirmationContentKind.Url &&
         !request.ExplicitSendObserved;
+
+    internal static bool ShouldRetryTargetResolution(
+        DiscordConfirmationRequest request,
+        string unavailableSignal) =>
+        request.ExplicitSendObserved &&
+        request.ContentKind != DiscordConfirmationContentKind.Warmup &&
+        (string.Equals(
+             unavailableSignal,
+             "message-list-unavailable",
+             StringComparison.Ordinal) ||
+         string.Equals(
+             unavailableSignal,
+             "renderer-accessibility-root-unavailable",
+             StringComparison.Ordinal));
 
     internal static bool IsCacheContextMatch(
         DiscordConfirmationRequest request,

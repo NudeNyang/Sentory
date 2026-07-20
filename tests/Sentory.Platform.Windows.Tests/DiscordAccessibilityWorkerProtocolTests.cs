@@ -6,6 +6,27 @@ namespace Sentory.Platform.Windows.Tests;
 public sealed class DiscordAccessibilityWorkerProtocolTests
 {
     [Fact]
+    public void WorkerExceptionSignalIncludesFailureLocationAndHResult()
+    {
+        Exception captured;
+        try
+        {
+            ThrowDiagnosticArgumentException();
+            throw new InvalidOperationException("Expected helper to throw.");
+        }
+        catch (ArgumentException exception)
+        {
+            captured = exception;
+        }
+
+        var signal = DiscordAccessibilityWorker.CreateExceptionSignal(captured);
+
+        Assert.StartsWith("worker-exception:ArgumentException:", signal);
+        Assert.Contains(nameof(ThrowDiagnosticArgumentException), signal);
+        Assert.Contains("0x80070057", signal);
+    }
+
+    [Fact]
     public async Task ProcessesMultipleRequestsUntilInputCloses()
     {
         var firstId = Guid.NewGuid();
@@ -60,5 +81,10 @@ public sealed class DiscordAccessibilityWorkerProtocolTests
         return document.RootElement
             .GetProperty("RequestId")
             .GetGuid();
+    }
+
+    private static void ThrowDiagnosticArgumentException()
+    {
+        throw new ArgumentException("diagnostic test");
     }
 }

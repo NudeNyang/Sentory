@@ -35,6 +35,34 @@ public sealed class DiscordConfirmationEvaluatorTests
     }
 
     [Theory]
+    [InlineData(DiscordConfirmationContentKind.Image, true, "message-list-unavailable", true)]
+    [InlineData(DiscordConfirmationContentKind.Url, true, "renderer-accessibility-root-unavailable", true)]
+    [InlineData(DiscordConfirmationContentKind.AttachmentDiscovery, true, "message-list-unavailable", true)]
+    [InlineData(DiscordConfirmationContentKind.Warmup, false, "message-list-unavailable", false)]
+    [InlineData(DiscordConfirmationContentKind.Image, false, "message-list-unavailable", false)]
+    [InlineData(DiscordConfirmationContentKind.Image, true, "url-input-candidate-count:0", false)]
+    public void RetriesOnlyTransientTargetFailuresAfterExplicitSend(
+        DiscordConfirmationContentKind contentKind,
+        bool explicitSendObserved,
+        string unavailableSignal,
+        bool expected)
+    {
+        var request = new DiscordConfirmationRequest(
+            1,
+            2,
+            3,
+            contentKind,
+            [],
+            ExplicitSendObserved: explicitSendObserved);
+
+        Assert.Equal(
+            expected,
+            DiscordAccessibilityWorker.ShouldRetryTargetResolution(
+                request,
+                unavailableSignal));
+    }
+
+    [Theory]
     [InlineData(false, 1, 0, true)]
     [InlineData(true, 1, 0, false)]
     [InlineData(true, 1, 1, true)]
