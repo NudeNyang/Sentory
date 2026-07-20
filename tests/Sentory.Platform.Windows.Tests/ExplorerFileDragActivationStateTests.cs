@@ -10,7 +10,7 @@ public sealed class ExplorerFileDragActivationStateTests
         var state = new ExplorerFileDragActivationState();
 
         Assert.False(state.Observe(false, (20, 30), () => true));
-        Assert.True(state.Observe(true, (120, 130), () => true));
+        Assert.True(state.Observe(true, (120, 130), () => false));
     }
 
     [Fact]
@@ -28,7 +28,7 @@ public sealed class ExplorerFileDragActivationStateTests
     {
         var state = new ExplorerFileDragActivationState();
 
-        Assert.False(state.Observe(false, (20, 30), () => true));
+        Assert.False(state.Observe(false, (20, 30), () => false));
         Assert.False(state.Observe(true, (120, 130), () => false));
         Assert.False(state.Observe(true, (220, 230), () => true));
     }

@@ -127,7 +127,7 @@ public sealed class DiscordDropOverlayRuntime : IDisposable
         var shouldInspectTarget = _dragActivation.Observe(
             leftDown,
             cursor,
-            IsExplorerForeground);
+            () => IsExplorerAt(cursor));
 
         if (!leftDown)
         {
@@ -157,11 +157,13 @@ public sealed class DiscordDropOverlayRuntime : IDisposable
         ShowOverlay(target);
     }
 
-    private bool IsExplorerForeground()
+    private bool IsExplorerAt((int X, int Y) cursor)
     {
-        var foreground = _native.GetForegroundWindow();
+        var window = _dropWindows.GetWindowAtPoint(
+            cursor.X,
+            cursor.Y);
         return string.Equals(
-            _native.GetProcessName(_native.GetProcessId(foreground)),
+            _native.GetProcessName(_native.GetProcessId(window)),
             "explorer",
             StringComparison.OrdinalIgnoreCase);
     }

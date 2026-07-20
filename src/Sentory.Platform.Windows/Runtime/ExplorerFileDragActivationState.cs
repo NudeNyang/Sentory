@@ -6,18 +6,25 @@ public sealed class ExplorerFileDragActivationState(
     private bool _leftWasDown;
     private bool _explorerDragCandidate;
     private bool _hasPointerUpSample;
+    private bool _lastPointerUpWasExplorer;
     private (int X, int Y) _lastPointerUpPosition;
     private (int X, int Y) _dragStart;
 
     public bool Observe(
         bool leftDown,
         (int X, int Y) cursor,
-        Func<bool> isExplorerForeground)
+        Func<bool> isExplorerAtPointer)
     {
         if (!leftDown)
         {
             _leftWasDown = false;
             _explorerDragCandidate = false;
+            if (!_hasPointerUpSample ||
+                _lastPointerUpPosition != cursor)
+            {
+                _lastPointerUpWasExplorer = isExplorerAtPointer();
+            }
+
             _hasPointerUpSample = true;
             _lastPointerUpPosition = cursor;
             return false;
@@ -26,7 +33,9 @@ public sealed class ExplorerFileDragActivationState(
         if (!_leftWasDown)
         {
             _leftWasDown = true;
-            _explorerDragCandidate = isExplorerForeground();
+            _explorerDragCandidate = isExplorerAtPointer() ||
+                                     (_hasPointerUpSample &&
+                                      _lastPointerUpWasExplorer);
             _dragStart = _hasPointerUpSample
                 ? _lastPointerUpPosition
                 : cursor;
