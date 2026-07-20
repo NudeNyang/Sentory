@@ -2,8 +2,8 @@ Sentory Third-Party Notices
 ===========================
 
 Sentory includes or depends on the following third-party software. These
-components remain governed by their own licenses and are not subject to the
-Sentory Personal Use License.
+components remain governed by their own licenses. Sentory's original source
+code is distributed under GNU GPL v3 only (GPL-3.0-only).
 
 1. .NET Runtime and Windows Desktop Runtime
    Copyright © .NET Foundation and Contributors

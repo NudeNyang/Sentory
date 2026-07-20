@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <Authors>NudeNyang</Authors>
+    <Copyright>Copyright © 2026 NudeNyang</Copyright>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/NudeNyang/Sentory</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/NudeNyang/Sentory</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+</Project>

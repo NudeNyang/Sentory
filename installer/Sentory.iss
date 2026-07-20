@@ -1,8 +1,8 @@
 #ifndef MyVersion
-  #define MyVersion "1.0.0"
+  #define MyVersion "1.0.1"
 #endif
 #ifndef MyNumericVersion
-  #define MyNumericVersion "1.0.0.0"
+  #define MyNumericVersion "1.0.1.0"
 #endif
 #ifndef MyArch
   #define MyArch "x64"
@@ -36,11 +36,11 @@ AppName=Sentory
 AppVersion={#MyVersion}
 AppVerName=Sentory {#MyVersion} ({#ArchitectureName})
 AppPublisher=NudeNyang
-AppCopyright=Copyright © 2026 NudeNyang. All rights reserved.
+AppCopyright=Copyright © 2026 NudeNyang
 VersionInfoVersion={#MyNumericVersion}
 VersionInfoCompany=NudeNyang
 VersionInfoDescription=Sentory {#ArchitectureName} Installer
-VersionInfoCopyright=Copyright © 2026 NudeNyang. All rights reserved.
+VersionInfoCopyright=Copyright © 2026 NudeNyang
 DefaultDirName={localappdata}\Programs\Sentory
 DefaultGroupName=Sentory
 DisableProgramGroupPage=yes

@@ -50,7 +50,7 @@ Sentory가 운영하는 서버로 보관 데이터를 보내지 않으며 분석
 
 ## 다운로드
 
-현재 정식 버전은 **1.0.0**입니다. Windows 10/11 64비트에서 사용할 수 있으며,
+현재 정식 버전은 **1.0.1**입니다. Windows 10/11 64비트에서 사용할 수 있으며,
 [Releases](https://github.com/NudeNyang/Sentory/releases)에서 PC에 맞는 파일을
 내려받으면 됩니다. macOS와 Linux 버전도 계획하고 있지만 아직 배포 일정은
 정해지지 않았습니다.
@@ -90,27 +90,38 @@ Windows on ARM용 파일은 빌드와 실행 파일 구조 검증을 마쳤지�
 버전, 사용한 메신저와 재현 순서를 적어 주세요. 자세한 내용은
 [지원 정책](./SUPPORT.md)에 정리해 두었습니다.
 
-## 개발 및 빌드
+## 소스 코드와 빌드
+
+Sentory의 소스 코드는 이 저장소에서 공개합니다. 배포 파일과 정확히 대응하는
+소스는 각 Release의 `Sentory-<버전>-source.zip` 또는 같은 버전의 Git 태그에서
+받을 수 있습니다.
 
 ```powershell
+git clone https://github.com/NudeNyang/Sentory.git
+cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 1.0.0
+.\scripts\Publish-Release.ps1 -Version 1.0.1
 ```
 
 배포 스크립트는 Windows x64·ARM64 설치형과 포터블 패키지, SHA-256 확인값,
-`release-manifest.json`을 `artifacts` 폴더에 만듭니다. 구현과 배포 절차는
+해당 버전의 소스 ZIP, `release-manifest.json`을 `artifacts` 폴더에 만듭니다.
+구현과 배포 절차는
 [PROJECT.md](./PROJECT.md)와
 [공개 배포 문서](./docs/05-release-and-distribution.md)에서 확인할 수 있습니다.
 
 ## 라이선스
 
-Sentory는 개인적이고 비상업적인 용도로만 사용할 수 있습니다. NudeNyang의 사전
-서면 허가 없이 수정, 역공학, 재배포 또는 상업적으로 이용할 수 없습니다.
+Sentory는 **GNU General Public License v3.0 only**로 배포합니다. 라이선스 조건을
+지키는 범위에서 사용, 연구, 수정, 재배포할 수 있으며 상업적 이용도 가능합니다.
+수정한 버전이나 실행 파일을 배포할 때는 GPL이 요구하는 방식으로 해당 소스 코드와
+라이선스 고지를 함께 제공해야 합니다. 제3자 구성 요소는 각 구성 요소의 라이선스를
+따릅니다.
 
-Copyright © 2026 NudeNyang. All rights reserved.
+Copyright © 2026 NudeNyang
 
-- [전체 사용 조건](./LICENSE.txt)
+- [GNU GPL v3 전체 내용](./LICENSE.txt)
+- [소스 코드 안내](./SOURCE.md)
 - [개인정보 및 로컬 데이터](./PRIVACY.md)
 - [제3자 구성 요소](./THIRD-PARTY-NOTICES.txt)
 - [변경 기록](./CHANGELOG.md)

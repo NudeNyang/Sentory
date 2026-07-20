@@ -1,4 +1,4 @@
-Sentory 1.0.0 사용 방법
+Sentory 1.0.1 사용 방법
 ========================
 
 Sentory는 붙여넣기한 사진과 링크를 한 곳에서 확인하는 Windows 프로그램입니다.
@@ -70,11 +70,15 @@ Sentory는 실행 후 GitHub Releases에서 새 버전을 자동으로 확인합
 라이선스와 개인정보
 ------------------
 
-Sentory는 개인적이고 비상업적인 용도로만 사용할 수 있습니다. NudeNyang의
-사전 서면 허가 없이 수정, 역공학, 재배포 또는 상업적으로 이용할 수 없습니다.
-전체 조건은 LICENSE.txt를 확인해 주세요.
+Sentory는 GNU General Public License v3.0 only로 배포합니다. 라이선스 조건을
+지키는 범위에서 사용, 수정, 재배포와 상업적 이용이 가능합니다. 실행 파일이나
+수정본을 다른 사람에게 배포할 때는 GPL이 요구하는 소스 코드와 라이선스 고지도
+함께 제공해야 합니다. 전체 내용은 LICENSE.txt 또는 COPYING을 확인해 주세요.
+
+이 버전에 대응하는 소스 코드는 공식 GitHub Release의
+Sentory-1.0.1-source.zip과 같은 버전의 Git 태그에서 받을 수 있습니다.
 
 개인정보 및 로컬 데이터 처리 방식은 PRIVACY.md, 제3자 구성 요소의 라이선스는
 THIRD-PARTY-NOTICES.txt를 확인해 주세요.
 
-Copyright © 2026 NudeNyang. All rights reserved.
+Copyright © 2026 NudeNyang

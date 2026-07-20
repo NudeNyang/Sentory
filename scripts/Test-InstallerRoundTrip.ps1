@@ -100,6 +100,7 @@ try {
     foreach ($requiredFile in @(
             $installedExecutable,
             (Join-Path $testDirectory "LICENSE.txt"),
+            (Join-Path $testDirectory "COPYING"),
             (Join-Path $testDirectory "PRIVACY.md"),
             (Join-Path $testDirectory "THIRD-PARTY-NOTICES.txt"),
             (Join-Path $testDirectory "licenses\Apache-2.0.txt"))) {

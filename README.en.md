@@ -51,7 +51,7 @@ request to the website behind that link. See the
 
 ## Download
 
-The current stable version is **1.0.0**. It runs on 64-bit Windows 10 and 11. Download
+The current stable version is **1.0.1**. It runs on 64-bit Windows 10 and 11. Download
 the package for your PC from
 [Releases](https://github.com/NudeNyang/Sentory/releases). macOS and Linux versions
 are planned, but there is no release schedule yet.
@@ -90,28 +90,38 @@ When reporting a problem, do not attach private conversations or original images
 The Sentory version, Windows version, messenger name, and reproduction steps are
 usually enough. See the [support policy](./SUPPORT.md) for details.
 
-## Development and builds
+## Source code and builds
+
+Sentory's source code is published in this repository. The exact source corresponding
+to each binary release is available as `Sentory-<version>-source.zip` on the Release
+page and from the matching Git tag.
 
 ```powershell
+git clone https://github.com/NudeNyang/Sentory.git
+cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 1.0.0
+.\scripts\Publish-Release.ps1 -Version 1.0.1
 ```
 
 The release script creates Windows x64 and ARM64 installers, portable packages,
-SHA-256 checksum files, and `release-manifest.json` in the `artifacts` directory.
+SHA-256 checksum files, the corresponding source archive, and
+`release-manifest.json` in the `artifacts` directory.
 Implementation and release details are documented in [PROJECT.md](./PROJECT.md) and
 the [release guide](./docs/05-release-and-distribution.md).
 
 ## License
 
-Sentory may be used only for personal, non-commercial purposes. Modification, reverse
-engineering, redistribution, or commercial use requires prior written permission
-from NudeNyang.
+Sentory is licensed under the **GNU General Public License v3.0 only**. You may use,
+study, modify, and redistribute it, including for commercial purposes, provided that
+you follow the license terms. If you distribute a modified version or binaries, you
+must also provide the corresponding source code and license notices as required by
+the GPL. Third-party components remain under their respective licenses.
 
-Copyright © 2026 NudeNyang. All rights reserved.
+Copyright © 2026 NudeNyang
 
-- [Full license terms](./LICENSE.txt)
+- [GNU GPL v3 license text](./LICENSE.txt)
+- [Source code notice](./SOURCE.md)
 - [Privacy and local data](./PRIVACY.md)
 - [Third-party notices](./THIRD-PARTY-NOTICES.txt)
 - [Changelog](./CHANGELOG.md)
