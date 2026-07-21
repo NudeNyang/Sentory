@@ -69,7 +69,6 @@ WizardImageStretch=yes
 ShowLanguageDialog=no
 CloseApplications=force
 RestartApplications=no
-AppMutex=Local\Sentory.Desktop.Singleton
 ChangesAssociations=no
 ChangesEnvironment=no
 
@@ -111,6 +110,7 @@ const
   SentoryText = $00222729;
   SentoryMutedText = $0061686D;
   SentoryLine = $00BCC7CE;
+  SentoryMutexName = 'Local\Sentory.Desktop.Singleton';
 
 function IsSentoryUpdate: Boolean;
 begin
@@ -127,6 +127,27 @@ end;
 function IsRegularSentoryUpdate: Boolean;
 begin
   Result := IsSentoryUpdate and not IsSentoryUpdateTest;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Attempt: Integer;
+begin
+  Result := '';
+  if not IsSentoryUpdate then
+    exit;
+
+  for Attempt := 0 to 119 do
+  begin
+    if not CheckForMutexes(SentoryMutexName) then
+    begin
+      Log('Sentory has exited; continuing the update.');
+      exit;
+    end;
+    Sleep(250);
+  end;
+
+  Result := 'Sentory is still running. Please open Sentory and try the update again.';
 end;
 
 procedure ApplySentoryWizardStyle;

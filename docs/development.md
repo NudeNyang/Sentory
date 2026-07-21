@@ -327,9 +327,14 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
   다시 내려받지 않는다.
 - 준비한 업데이트는 앱이 실행되는 동안 경로와 함께 보관한다. 자동 안내를
   취소해도 버튼은 유지하며, 설치 중에는 중복 실행을 막는다.
-- 설치형 업데이트는 `/SILENT /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS /NORESTART
-  /SENTORYUPDATE=1`로 실행한다. 설치 마법사를 표시하지 않고 파일을 교체한 뒤
-  Sentory를 다시 연다. 최초 설치에는 Sentory 전용 색상과 고해상도 그림을 쓴다.
+- 설치형 업데이트는 현재 실행 파일을 임시 헬퍼로 복사한 뒤 앱을 종료한다.
+  헬퍼는 기존 PID가 완전히 끝난 것을 확인하고 `/SILENT /SUPPRESSMSGBOXES
+  /CLOSEAPPLICATIONS /NORESTART /SENTORYUPDATE=1`로 설치 파일을 실행한다.
+  설치 마법사 전체 대신 진행창만 표시하고, 설치가 끝나면 Sentory를 다시 연다.
+- 설치 프로그램은 초기 `AppMutex` 검사로 업데이트를 즉시 취소하지 않는다.
+  업데이트 모드에서는 같은 mutex가 풀릴 때까지 기다려 헬퍼가 없던 구버전 앱도
+  다음 설치 파일로 갱신할 수 있게 한다. 최초 설치에는 Sentory 전용 색상과
+  고해상도 그림을 쓴다.
 - Sentory의 원본 소스는 GNU GPL v3 전용(`GPL-3.0-only`)으로 공개한다.
   바이너리 또는 수정본을 배포할 때는 해당 소스와 라이선스 고지를 GPL 조건에
   맞게 함께 제공한다.

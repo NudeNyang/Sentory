@@ -72,6 +72,13 @@ public partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (InstallerUpdateApplier.IsLaunchCommand(e.Args))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Shutdown(await InstallerUpdateApplier.RunAsync(e.Args));
+            return;
+        }
+
         if (PortableUpdateApplier.IsApplyCommand(e.Args))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -419,18 +426,11 @@ public partial class App : System.Windows.Application
 
             if (update.PackageKind == UpdatePackageKind.Installer)
             {
-                var startInfo = new ProcessStartInfo
-                {
-                    FileName = package,
-                    UseShellExecute = true,
-                    WorkingDirectory = Path.GetDirectoryName(package)
-                };
-                startInfo.ArgumentList.Add("/SILENT");
-                startInfo.ArgumentList.Add("/SUPPRESSMSGBOXES");
-                startInfo.ArgumentList.Add("/CLOSEAPPLICATIONS");
-                startInfo.ArgumentList.Add("/NORESTART");
-                startInfo.ArgumentList.Add("/SENTORYUPDATE=1");
-                Process.Start(startInfo);
+                InstallerUpdateApplier.PrepareAndLaunch(
+                    package,
+                    _diagnosticsLog?.CurrentLogPath ?? Path.Combine(
+                        _paths.LogsDirectory,
+                        "sentory.log"));
             }
             else
             {
