@@ -86,7 +86,7 @@ function New-SentoryBitmap {
                         ($Width - 40) * $Scale,
                         34 * $Scale))
                 $graphics.DrawString(
-                    "1.1.33",
+                    "1.3.33",
                     $captionFont,
                     $mutedBrush,
                     [single](24 * $Scale),
