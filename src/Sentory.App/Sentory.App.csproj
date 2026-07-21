@@ -12,12 +12,12 @@
     <AssemblyName>Sentory</AssemblyName>
     <RootNamespace>Sentory.App</RootNamespace>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
-    <Version>1.1.31</Version>
-    <AssemblyVersion>1.1.31.0</AssemblyVersion>
-    <FileVersion>1.1.31.0</FileVersion>
+    <Version>1.1.32</Version>
+    <AssemblyVersion>1.1.32.0</AssemblyVersion>
+    <FileVersion>1.1.32.0</FileVersion>
     <SentoryBuildFlavor Condition="'$(SentoryBuildFlavor)' == ''">Developer</SentoryBuildFlavor>
-    <InformationalVersion Condition="'$(SentoryBuildFlavor)' == 'Public'">1.1.31</InformationalVersion>
-    <InformationalVersion Condition="'$(SentoryBuildFlavor)' == 'Developer'">1.1.31+developers</InformationalVersion>
+    <InformationalVersion Condition="'$(SentoryBuildFlavor)' == 'Public'">1.1.32</InformationalVersion>
+    <InformationalVersion Condition="'$(SentoryBuildFlavor)' == 'Developer'">1.1.32+developers</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Authors>NudeNyang</Authors>
     <Company>NudeNyang</Company>

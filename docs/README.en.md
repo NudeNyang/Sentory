@@ -55,7 +55,7 @@ recognized text is stored in the Sentory database for search. See the
 
 ## Download
 
-The current stable version is **1.1.31**. It runs on 64-bit Windows 10 and 11. Download
+The current stable version is **1.1.32**. It runs on 64-bit Windows 10 and 11. Download
 the package for your PC from
 [Releases](https://github.com/NudeNyang/Sentory/releases). macOS and Linux versions
 are planned, but there is no release schedule yet.
@@ -113,7 +113,7 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 1.1.31
+.\scripts\Publish-Release.ps1 -Version 1.1.32
 ```
 
 The release script creates Windows x64 and ARM64 installers, portable packages,

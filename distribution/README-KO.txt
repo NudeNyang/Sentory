@@ -1,4 +1,4 @@
-Sentory 1.1.31 사용 방법
+Sentory 1.1.32 사용 방법
 ========================
 
 Sentory는 붙여넣기한 사진과 링크를 한 곳에서 확인하는 Windows 프로그램입니다.
@@ -91,7 +91,7 @@ Sentory는 GNU General Public License v3.0 only로 배포합니다. 라이선스
 함께 제공해야 합니다. 전체 내용은 LICENSE.txt를 확인해 주세요.
 
 이 버전에 대응하는 소스 코드는 공식 GitHub Release의
-Sentory-1.1.31-source.zip과 같은 버전의 Git 태그에서 받을 수 있습니다.
+Sentory-1.1.32-source.zip과 같은 버전의 Git 태그에서 받을 수 있습니다.
 
 개인정보 및 로컬 데이터 처리 방식은 PRIVACY.md, 제3자 구성 요소의 라이선스는
 THIRD-PARTY-NOTICES.txt를 확인해 주세요.
