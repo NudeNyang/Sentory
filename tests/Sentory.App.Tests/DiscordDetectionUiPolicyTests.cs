@@ -5,7 +5,7 @@ namespace Sentory.App.Tests;
 public sealed class DiscordDetectionUiPolicyTests
 {
     [Theory]
-    [InlineData(CaptureRuntimeState.Connecting, false, false, false)]
+    [InlineData(CaptureRuntimeState.Connecting, true, true, false)]
     [InlineData(CaptureRuntimeState.Ready, false, false, false)]
     [InlineData(CaptureRuntimeState.Recovering, true, true, false)]
     [InlineData(CaptureRuntimeState.ReconnectRequired, false, true, true)]

@@ -67,4 +67,23 @@ public sealed class DiscordDetectionStatusTrackerTests
             expected,
             DiscordCaptureRuntime.ClassifyUnavailableState(response));
     }
+
+    [Theory]
+    [InlineData(
+        CaptureRuntimeState.Connecting,
+        CaptureRuntimeState.ReconnectRequired)]
+    [InlineData(
+        CaptureRuntimeState.Recovering,
+        CaptureRuntimeState.Recovering)]
+    [InlineData(
+        CaptureRuntimeState.ReconnectRequired,
+        CaptureRuntimeState.ReconnectRequired)]
+    public void LongWarmupFailureBecomesActionable(
+        CaptureRuntimeState lastState,
+        CaptureRuntimeState expected)
+    {
+        Assert.Equal(
+            expected,
+            DiscordCaptureRuntime.ResolveWarmupExhaustedState(lastState));
+    }
 }

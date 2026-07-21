@@ -5,7 +5,25 @@ namespace Sentory.App;
 
 public partial class TrayMenuWindow : Window
 {
-    public TrayMenuWindow(
+    private bool _allowClose;
+
+    public TrayMenuWindow()
+    {
+        InitializeComponent();
+        Deactivated += (_, _) => Hide();
+        Closing += (_, eventArgs) =>
+        {
+            if (_allowClose)
+            {
+                return;
+            }
+
+            eventArgs.Cancel = true;
+            Hide();
+        };
+    }
+
+    public void UpdateState(
         string status,
         bool paused,
         bool startupEnabled,
@@ -14,7 +32,6 @@ public partial class TrayMenuWindow : Window
         bool discordRepairNeeded,
         bool isDarkTheme)
     {
-        InitializeComponent();
         SentoryTheme.Apply(Resources, isDarkTheme);
         SentoryTheme.ApplyDetectionStatus(
             Resources,
@@ -45,7 +62,12 @@ public partial class TrayMenuWindow : Window
             discordPresentation.ShowRepairAction
                 ? Visibility.Visible
                 : Visibility.Collapsed;
-        Deactivated += (_, _) => Close();
+    }
+
+    public void CloseForShutdown()
+    {
+        _allowClose = true;
+        Close();
     }
 
     public event EventHandler? OpenGalleryRequested;
@@ -57,29 +79,29 @@ public partial class TrayMenuWindow : Window
     public event EventHandler? ExitRequested;
 
     private void OpenGalleryButton_Click(object sender, RoutedEventArgs e) =>
-        RaiseAndClose(OpenGalleryRequested);
+        RaiseAndHide(OpenGalleryRequested);
 
     private void PauseButton_Click(object sender, RoutedEventArgs e) =>
-        RaiseAndClose(PauseToggleRequested);
+        RaiseAndHide(PauseToggleRequested);
 
     private void StartupButton_Click(object sender, RoutedEventArgs e) =>
-        RaiseAndClose(StartupToggleRequested);
+        RaiseAndHide(StartupToggleRequested);
 
     private void DiscordSupportButton_Click(object sender, RoutedEventArgs e) =>
-        RaiseAndClose(DiscordSupportToggleRequested);
+        RaiseAndHide(DiscordSupportToggleRequested);
 
     private void DiscordRepairButton_Click(object sender, RoutedEventArgs e) =>
-        RaiseAndClose(DiscordRepairRequested);
+        RaiseAndHide(DiscordRepairRequested);
 
     private void OpenDataButton_Click(object sender, RoutedEventArgs e) =>
-        RaiseAndClose(OpenDataRequested);
+        RaiseAndHide(OpenDataRequested);
 
     private void ExitButton_Click(object sender, RoutedEventArgs e) =>
-        RaiseAndClose(ExitRequested);
+        RaiseAndHide(ExitRequested);
 
-    private void RaiseAndClose(EventHandler? handler)
+    private void RaiseAndHide(EventHandler? handler)
     {
         handler?.Invoke(this, EventArgs.Empty);
-        Close();
+        Hide();
     }
 }

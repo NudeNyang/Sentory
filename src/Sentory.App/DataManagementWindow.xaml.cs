@@ -17,8 +17,8 @@ public partial class DataManagementWindow : Window
     private readonly SentorySettingsStore _settingsStore;
     private readonly SentoryDataPaths _paths;
     private readonly WindowsStartupManager _startupManager = new();
-    private readonly CaptureRuntimeState _discordState;
-    private readonly bool _discordRepairNeeded;
+    private CaptureRuntimeState _discordState;
+    private bool _discordRepairNeeded;
     private SentoryThemeMode _themeMode;
     private bool _isDarkTheme;
     private bool _busy;
@@ -99,6 +99,20 @@ public partial class DataManagementWindow : Window
     public event Func<Task>? DataChanged;
 
     public bool DiscordRepairRequested { get; private set; }
+
+    public void SetDiscordDetectionState(CaptureRuntimeState state)
+    {
+        _discordState = state;
+        var settings = _settingsStore.Load();
+        UpdateDiscordControls(settings.DiscordSupportEnabled);
+    }
+
+    public void SetDiscordRepairNeeded(bool needed)
+    {
+        _discordRepairNeeded = needed;
+        var settings = _settingsStore.Load();
+        UpdateDiscordControls(settings.DiscordSupportEnabled);
+    }
 
     private async Task RefreshStatisticsAsync()
     {
@@ -598,9 +612,7 @@ public partial class DataManagementWindow : Window
             ? SentoryLocalization.Text("DiscordNotInUse")
             : presentation.ShowRepairAction
                 ? SentoryLocalization.Text("StateReconnect")
-                : presentation.ShowPassiveStatus
-                    ? DiscordDetectionPresentation.GetLabel(_discordState)
-                    : SentoryLocalization.Text("DiscordDetectionOn");
+                : DiscordDetectionPresentation.GetLabel(_discordState);
     }
 
     private void UpdateKakaoControls(bool enabled)

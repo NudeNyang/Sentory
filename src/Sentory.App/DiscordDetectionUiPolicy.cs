@@ -22,7 +22,9 @@ internal static class DiscordDetectionUiPolicy
         var showRepairAction =
             repairNeeded || state == CaptureRuntimeState.ReconnectRequired;
         var showPassiveStatus =
-            !showRepairAction && state == CaptureRuntimeState.Recovering;
+            !showRepairAction &&
+            state is CaptureRuntimeState.Connecting or
+                CaptureRuntimeState.Recovering;
 
         return new DiscordDetectionUiPresentation(
             showPassiveStatus,

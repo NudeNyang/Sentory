@@ -64,6 +64,7 @@ public partial class GalleryWindow : Window
     private bool _scrollIndicatorShown;
     private bool _scrollIndicatorThumbEmphasized;
     private bool _discordRepairNeeded;
+    private DataManagementWindow? _dataManagementWindow;
     private bool _allowCloseWithOwnedWindows;
     private string? _availableUpdateVersion;
     private bool _updateInstallationInProgress;
@@ -176,6 +177,7 @@ public partial class GalleryWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
         UpdateDiscordDetectionVisibility();
+        _dataManagementWindow?.SetDiscordRepairNeeded(needed);
     }
 
     public void SetDiscordDetectionState(CaptureRuntimeState state)
@@ -188,6 +190,7 @@ public partial class GalleryWindow : Window
             state,
             _isDarkTheme);
         UpdateDiscordDetectionVisibility();
+        _dataManagementWindow?.SetDiscordDetectionState(state);
     }
 
     public void SetMessengerSupportState(
@@ -231,6 +234,7 @@ public partial class GalleryWindow : Window
         _updateInstallationInProgress = installationInProgress;
         var presentation = UpdateAvailabilityUiPolicy.Resolve(
             version,
+            SentoryBuildIdentity.CurrentVersion,
             installationInProgress);
         UpdateAvailableButton.Visibility = presentation.ShowInstallAction
             ? Visibility.Visible
@@ -589,6 +593,7 @@ public partial class GalleryWindow : Window
         {
             Owner = this
         };
+        _dataManagementWindow = window;
         window.ThemeSelectionChanged += ApplyThemeSelection;
         window.LanguageSelectionChanged += ApplyLanguageSelection;
         window.MessengerSupportSelectionChanged +=
@@ -605,6 +610,11 @@ public partial class GalleryWindow : Window
         }
         finally
         {
+            if (ReferenceEquals(_dataManagementWindow, window))
+            {
+                _dataManagementWindow = null;
+            }
+
             window.ThemeSelectionChanged -= ApplyThemeSelection;
             window.LanguageSelectionChanged -= ApplyLanguageSelection;
             window.MessengerSupportSelectionChanged -=
@@ -1706,9 +1716,9 @@ public partial class GalleryWindow : Window
 
     private void UpdateIntegratedFilterControls()
     {
-        var activeFilterCount =
-            (_sourceApps.Count > 0 ? 1 : 0) +
-            (_dateRange != GalleryDateRange.All ? 1 : 0);
+        var activeFilterCount = IntegratedFilterCountPolicy.Count(
+            _sourceApps.Count,
+            _dateRange != GalleryDateRange.All);
         FilterCountText.Text = activeFilterCount.ToString();
         FilterCountBadge.Visibility = activeFilterCount > 0
             ? Visibility.Visible

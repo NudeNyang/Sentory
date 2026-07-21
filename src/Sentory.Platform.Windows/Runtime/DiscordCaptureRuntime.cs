@@ -660,8 +660,10 @@ public sealed class DiscordCaptureRuntime :
             await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
         }
 
-        _statusTracker.Publish(lastUnavailableState);
-        if (lastUnavailableState == CaptureRuntimeState.ReconnectRequired)
+        var exhaustedState = ResolveWarmupExhaustedState(
+            lastUnavailableState);
+        _statusTracker.Publish(exhaustedState);
+        if (exhaustedState == CaptureRuntimeState.ReconnectRequired)
         {
             ReportDetectionUnavailable();
         }
@@ -669,7 +671,7 @@ public sealed class DiscordCaptureRuntime :
         {
             DiscordCaptureTrace.Write(
                 "worker-warmup-deferred",
-                $"state={lastUnavailableState}");
+                $"state={exhaustedState}");
         }
     }
 
@@ -707,6 +709,12 @@ public sealed class DiscordCaptureRuntime :
             ? CaptureRuntimeState.ReconnectRequired
             : CaptureRuntimeState.Connecting;
     }
+
+    internal static CaptureRuntimeState ResolveWarmupExhaustedState(
+        CaptureRuntimeState lastState) =>
+        lastState == CaptureRuntimeState.Connecting
+            ? CaptureRuntimeState.ReconnectRequired
+            : lastState;
 
     private bool TryCreateWarmupRequest(
         out DiscordConfirmationRequest request)

@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows;
@@ -300,7 +299,7 @@ public partial class App : System.Windows.Application
                 AppContext.BaseDirectory, "unins000.exe"))
                 ? UpdatePackageKind.Installer
                 : UpdatePackageKind.Portable;
-            var currentVersion = GetApplicationVersion();
+            var currentVersion = SentoryBuildIdentity.CurrentVersion;
             var update = await _updateClient.CheckAsync(
                 currentVersion,
                 RuntimeInformation.ProcessArchitecture,
@@ -373,6 +372,22 @@ public partial class App : System.Windows.Application
     {
         if (_updateInstallationInProgress || cancellationToken.IsCancellationRequested)
         {
+            return;
+        }
+
+        var presentation = UpdateAvailabilityUiPolicy.Resolve(
+            update.Version,
+            SentoryBuildIdentity.CurrentVersion,
+            installationInProgress: false);
+        if (!presentation.ShowInstallAction)
+        {
+            _availableUpdate = null;
+            _downloadedUpdatePackage = null;
+            _galleryWindow?.SetAvailableUpdate(null);
+            _diagnosticsLog?.Write(
+                "update-stale-candidate-ignored",
+                $"Ignored Sentory {update.Version} because the current version is " +
+                SentoryBuildIdentity.CurrentVersion);
             return;
         }
 
@@ -455,14 +470,6 @@ public partial class App : System.Windows.Application
         }
     }
 
-    private static string GetApplicationVersion()
-    {
-        var value = Assembly.GetExecutingAssembly()
-            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
-            .InformationalVersion ?? "0.0.0";
-        return value.Split('+', 2)[0];
-    }
-
     private void CreateTrayIcon()
     {
         _trayIconImage = Icon.ExtractAssociatedIcon(Environment.ProcessPath!);
@@ -531,43 +538,24 @@ public partial class App : System.Windows.Application
 
     private void ShowTrayMenu()
     {
-        _trayMenuWindow?.Close();
-        var isDarkTheme = GetSavedDarkTheme();
-        var menu = new TrayMenuWindow(
+        var menu = EnsureTrayMenu();
+        menu.UpdateState(
             _statusText,
             _runtime?.IsPaused == true,
             GetStartupEnabled(),
             _discordSupportEnabled,
             _discordDetectionState,
             _discordRepairNeeded,
-            isDarkTheme);
-        _trayMenuWindow = menu;
-        menu.Closed += (_, _) =>
-        {
-            if (ReferenceEquals(_trayMenuWindow, menu))
-            {
-                _trayMenuWindow = null;
-            }
-        };
-        menu.OpenGalleryRequested += (_, _) => OpenGallery();
-        menu.PauseToggleRequested += (_, _) => ApplyPauseState();
-        menu.StartupToggleRequested += (_, _) => ApplyStartupState();
-        menu.DiscordSupportToggleRequested += (_, _) =>
-            ApplyDiscordSupportState();
-        menu.DiscordRepairRequested += async (_, _) =>
-            await RepairDiscordConnectionAsync();
-        menu.OpenDataRequested += (_, _) => OpenDataFolder();
-        menu.ExitRequested += async (_, _) =>
-        {
-            await ShutdownRuntimeAsync();
-            Shutdown();
-        };
+            GetSavedDarkTheme());
 
         var cursor = Forms.Cursor.Position;
         menu.WindowStartupLocation = WindowStartupLocation.Manual;
         menu.Left = cursor.X;
         menu.Top = cursor.Y;
-        menu.Show();
+        if (!menu.IsVisible)
+        {
+            menu.Show();
+        }
 
         var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(menu);
         var screen = Forms.Screen.FromPoint(cursor).WorkingArea;
@@ -584,6 +572,31 @@ public partial class App : System.Windows.Application
         menu.Left = leftInPixels / dpi.DpiScaleX;
         menu.Top = topInPixels / dpi.DpiScaleY;
         menu.Activate();
+    }
+
+    private TrayMenuWindow EnsureTrayMenu()
+    {
+        _trayMenuWindow = TrayMenuReusePolicy.GetOrCreate(
+            _trayMenuWindow,
+            () =>
+            {
+                var menu = new TrayMenuWindow();
+                menu.OpenGalleryRequested += (_, _) => OpenGallery();
+                menu.PauseToggleRequested += (_, _) => ApplyPauseState();
+                menu.StartupToggleRequested += (_, _) => ApplyStartupState();
+                menu.DiscordSupportToggleRequested += (_, _) =>
+                    ApplyDiscordSupportState();
+                menu.DiscordRepairRequested += async (_, _) =>
+                    await RepairDiscordConnectionAsync();
+                menu.OpenDataRequested += (_, _) => OpenDataFolder();
+                menu.ExitRequested += async (_, _) =>
+                {
+                    await ShutdownRuntimeAsync();
+                    Shutdown();
+                };
+                return menu;
+            });
+        return _trayMenuWindow;
     }
 
     private void PrepareDiscordDefault()
@@ -1191,6 +1204,9 @@ public partial class App : System.Windows.Application
             _galleryWindow.ShowInTaskbar = true;
             _galleryWindow.Show();
             _galleryWindow.Activate();
+            Dispatcher.BeginInvoke(
+                EnsureTrayMenu,
+                System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             return;
         }
 
@@ -1506,7 +1522,7 @@ public partial class App : System.Windows.Application
 
     private void HideUserInterfaceForShutdown()
     {
-        _trayMenuWindow?.Close();
+        _trayMenuWindow?.CloseForShutdown();
         _trayMenuWindow = null;
         _galleryWindow?.PrepareForApplicationShutdown();
         _galleryWindow?.Close();

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$')]
-    [string]$Version = "1.1.32",
+    [string]$Version = "1.3.33",
     [string]$ExecutablePath = (
         Join-Path $env:LOCALAPPDATA "Programs\Sentory\Sentory.exe"),
     [string]$DataDirectory = (
