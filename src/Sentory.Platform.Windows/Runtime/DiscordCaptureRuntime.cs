@@ -541,7 +541,10 @@ public sealed class DiscordCaptureRuntime :
                     BeginWorkerWarmup(
                         recovering:
                             recoveryPlan.State ==
-                            CaptureRuntimeState.Recovering);
+                            CaptureRuntimeState.Recovering,
+                        reconnectWhenExhausted:
+                            recoveryPlan.State ==
+                            CaptureRuntimeState.Connecting);
                 }
                 else if (recoveryPlan.ReportIssue)
                 {
@@ -616,7 +619,9 @@ public sealed class DiscordCaptureRuntime :
         }
     }
 
-    private void BeginWorkerWarmup(bool recovering)
+    private void BeginWorkerWarmup(
+        bool recovering,
+        bool reconnectWhenExhausted = false)
     {
         lock (_warmupGate)
         {
@@ -627,12 +632,14 @@ public sealed class DiscordCaptureRuntime :
 
             _warmupTask = WarmWorkerWithRetryAsync(
                 recovering,
+                reconnectWhenExhausted,
                 _cancellation.Token);
         }
     }
 
     private async Task WarmWorkerWithRetryAsync(
         bool recovering,
+        bool reconnectWhenExhausted,
         CancellationToken cancellationToken)
     {
         _statusTracker.Publish(
@@ -670,7 +677,8 @@ public sealed class DiscordCaptureRuntime :
         }
 
         var exhaustedState = ResolveWarmupExhaustedState(
-            lastUnavailableState);
+            lastUnavailableState,
+            reconnectWhenExhausted);
         _statusTracker.Publish(exhaustedState);
         if (exhaustedState == CaptureRuntimeState.ReconnectRequired)
         {
@@ -736,8 +744,10 @@ public sealed class DiscordCaptureRuntime :
     }
 
     internal static CaptureRuntimeState ResolveWarmupExhaustedState(
-        CaptureRuntimeState lastState) =>
-        lastState == CaptureRuntimeState.Connecting
+        CaptureRuntimeState lastState,
+        bool reconnectWhenExhausted) =>
+        lastState == CaptureRuntimeState.Connecting &&
+        reconnectWhenExhausted
             ? CaptureRuntimeState.ReconnectRequired
             : lastState;
 

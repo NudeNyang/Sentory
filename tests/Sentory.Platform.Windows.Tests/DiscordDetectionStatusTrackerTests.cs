@@ -102,19 +102,29 @@ public sealed class DiscordDetectionStatusTrackerTests
     [Theory]
     [InlineData(
         CaptureRuntimeState.Connecting,
+        false,
+        CaptureRuntimeState.Connecting)]
+    [InlineData(
+        CaptureRuntimeState.Connecting,
+        true,
         CaptureRuntimeState.ReconnectRequired)]
     [InlineData(
         CaptureRuntimeState.Recovering,
+        true,
         CaptureRuntimeState.Recovering)]
     [InlineData(
         CaptureRuntimeState.ReconnectRequired,
+        false,
         CaptureRuntimeState.ReconnectRequired)]
-    public void LongWarmupFailureBecomesActionable(
+    public void WarmupFailureOnlyBecomesActionableAfterSendFailure(
         CaptureRuntimeState lastState,
+        bool reconnectWhenExhausted,
         CaptureRuntimeState expected)
     {
         Assert.Equal(
             expected,
-            DiscordCaptureRuntime.ResolveWarmupExhaustedState(lastState));
+            DiscordCaptureRuntime.ResolveWarmupExhaustedState(
+                lastState,
+                reconnectWhenExhausted));
     }
 }
