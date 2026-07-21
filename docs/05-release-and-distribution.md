@@ -4,7 +4,7 @@
 
 - 제품명: Sentory
 - 제작자·게시자: NudeNyang
-- 현재 배포 버전: `1.3.33`
+- 현재 배포 버전: `1.4.0`
 - 라이선스: GNU General Public License v3.0 only (`GPL-3.0-only`)
 - 현재 배포 운영체제: Windows 10/11 64비트
 - 지원 아키텍처: x64, ARM64
@@ -28,7 +28,7 @@ Sentory의 원본 소스 코드는 GPL-3.0-only로 공개합니다. 사용, 연�
 
 ```powershell
 git status --short
-.\scripts\Publish-Release.ps1 -Version 1.3.33
+.\scripts\Publish-Release.ps1 -Version 1.4.0
 ```
 
 `Publish-Release.ps1`은 내부적으로 `SentoryBuildFlavor=Public`을 명시한다. 공개
@@ -54,7 +54,7 @@ git status --short
 | `Sentory-win-x64-portable.zip` | Intel·AMD Windows 포터블 |
 | `Sentory-win-arm64-setup.exe` | Windows on ARM 설치형 |
 | `Sentory-win-arm64-portable.zip` | Windows on ARM 포터블 |
-| `Sentory-1.3.33-source.zip` | 해당 바이너리에 대응하는 전체 소스 |
+| `Sentory-1.4.0-source.zip` | 해당 바이너리에 대응하는 전체 소스 |
 
 각 배포 파일의 `.sha256` 확인값과 `release-manifest.json`도 함께
 생성됩니다. 인앱 업데이트는 GitHub Releases API에서 현재 아키텍처와 설치
@@ -84,7 +84,7 @@ winget install --id JRSoftware.InnoSetup -e
 
 공개 저장소에는 최소한 다음 항목을 같은 버전으로 올립니다.
 
-- 전체 소스 코드와 `v1.3.33` 태그
+- 전체 소스 코드와 `v1.4.0` 태그
 - `LICENSE.txt`의 GNU GPL v3 전문
 - `README.md`, `docs/README.en.md`
 - `docs/privacy.md`, `distribution/THIRD-PARTY-NOTICES.txt`, `CHANGELOG.md`,
@@ -106,7 +106,7 @@ GitHub가 자동으로 제공하는 “Source code” 파일만 이용해도 소
 6. 다른 앱에서 다룬 내용이 저장되지 않는지 확인합니다.
 7. x64 설치형과 포터블을 별도 데이터 폴더에서 실행합니다.
 8. ARM64 패키지는 가능하면 실제 Windows on ARM 장치에서 확인합니다.
-9. `v1.3.33` 태그가 배포 파일을 만든 커밋을 가리키는지 확인합니다.
+9. `v1.4.0` 태그가 배포 파일을 만든 커밋을 가리키는지 확인합니다.
 10. Release 자산의 SHA-256 값과 `release-manifest.json`을 대조합니다.
 
 기존 설치본이 없는 환경에서는 아래 명령으로 x64 설치·실행·제거 과정을
@@ -147,6 +147,15 @@ Sentory는 의미적 버전 형식을 사용합니다. 앱은 시작 후 GitHub 
 확인은 6시간에 한 번으로 제한합니다. 파일 다운로드와 SHA-256 검증이 끝나면
 짧은 안내창과 보관함의 수동 설치 버튼을 표시합니다. 이미 검증된 파일이 있으면
 다시 내려받지 않습니다.
+
+버전 선택과 동기화는 Codex가 맡습니다. 변경 범위에 따라 의미적 버전의 다음
+번호를 정하고 프로젝트, 설치 프로그램, 배포 스크립트, 테스트와 문서의 버전을
+같이 바꿉니다. 사용자가 버전을 직접 지정한 경우에는 그 값을 우선합니다.
+
+정식 릴리즈 문서의 한국어 문장은 게시 전에 `humanize-korean` 스킬로 윤문합니다.
+윤문할 때 사실, 날짜, 버전과 고유명사는 바꾸지 않으며 결과 요약은 Git에 넣지
+않는 `_workspace`에 보관합니다. 이 절차를 마친 문서만 GitHub Release 본문으로
+사용합니다.
 
 설치형은 업데이트 전용 헬퍼를 먼저 준비한 뒤 Sentory를 종료합니다. 헬퍼는 기존
 프로세스가 완전히 끝난 것을 확인하고 `/SILENT` 모드로 설치 파일을 실행합니다.
