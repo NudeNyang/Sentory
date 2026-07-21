@@ -55,7 +55,7 @@ Sentory가 운영하는 서버로 보관 데이터를 보내지 않으며 분석
 
 ## 다운로드
 
-현재 정식 버전은 **1.4.0**입니다. Windows 10/11 64비트에서 사용할 수 있으며,
+현재 정식 버전은 **1.4.1**입니다. Windows 10/11 64비트에서 사용할 수 있으며,
 [Releases](https://github.com/NudeNyang/Sentory/releases)에서 PC에 맞는 파일을
 내려받으면 됩니다. macOS와 Linux 버전도 계획하고 있지만 아직 배포 일정은
 정해지지 않았습니다.
@@ -92,7 +92,9 @@ SmartScreen 경고가 나타날 수 있습니다. 이 저장소의 공식 Releas
 
 Discord를 처음 연결할 때 접근성 모드 적용을 위해 Discord가 다시 시작될 수
 있습니다. 연결 상태와 메신저별 감지 설정은 Sentory 설정 화면에서 확인할 수
-있습니다.
+있습니다. Windows 자동 실행과 Discord 감지를 함께 켜면 다음 로그인부터
+Discord가 접근성 모드로 시작되므로, 일반적인 재부팅에는 다시 연결할 필요가
+없습니다.
 
 ## 알아둘 점
 
@@ -115,7 +117,7 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 1.4.0
+.\scripts\Publish-Release.ps1 -Version 1.4.1
 ```
 
 배포 스크립트는 Windows x64·ARM64 설치형과 포터블 패키지, SHA-256 확인값,

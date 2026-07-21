@@ -90,6 +90,8 @@ public partial class DataManagementWindow : Window
 
     public event Func<string, Task>? LanguageSelectionChanged;
 
+    public event Func<bool, Task>? StartupSelectionChanged;
+
     public bool DiscordSupportChanged { get; private set; }
 
     public bool KakaoSupportChanged { get; private set; }
@@ -296,6 +298,7 @@ public partial class DataManagementWindow : Window
             var settings = _settingsStore.Load();
             settings.StartWithWindows = enabled;
             _settingsStore.Save(settings);
+            await NotifyStartupSelectionChangedAsync(enabled);
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException or
@@ -307,6 +310,20 @@ public partial class DataManagementWindow : Window
         finally
         {
             StartupToggleButton.IsEnabled = true;
+        }
+    }
+
+    private async Task NotifyStartupSelectionChangedAsync(bool enabled)
+    {
+        if (StartupSelectionChanged is null)
+        {
+            return;
+        }
+
+        foreach (Func<bool, Task> handler in
+                 StartupSelectionChanged.GetInvocationList())
+        {
+            await handler(enabled);
         }
     }
 

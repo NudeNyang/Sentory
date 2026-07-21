@@ -1,8 +1,8 @@
 #ifndef MyVersion
-  #define MyVersion "1.4.0"
+  #define MyVersion "1.4.1"
 #endif
 #ifndef MyNumericVersion
-  #define MyNumericVersion "1.4.0.0"
+  #define MyNumericVersion "1.4.1.0"
 #endif
 #ifndef MyArch
   #define MyArch "x64"
@@ -178,7 +178,22 @@ begin
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  ResultCode: Integer;
 begin
   if CurUninstallStep = usUninstall then
+  begin
+    if FileExists(ExpandConstant('{app}\Sentory.exe')) then
+    begin
+      if not Exec(
+          ExpandConstant('{app}\Sentory.exe'),
+          '--restore-discord-startup',
+          '',
+          SW_HIDE,
+          ewWaitUntilTerminated,
+          ResultCode) then
+        Log('Could not launch Sentory Discord startup restoration.');
+    end;
     RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'Sentory');
+  end;
 end;

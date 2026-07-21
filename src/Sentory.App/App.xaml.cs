@@ -55,6 +55,8 @@ public partial class App : System.Windows.Application
     private Task? _ocrTask;
     private readonly WindowsStartupManager _startupManager = new();
     private readonly DiscordAccessibilityLauncher _discordLauncher = new();
+    private readonly DiscordStartupRegistrationManager
+        _discordStartupRegistration = new();
     private bool _discordSupportEnabled = true;
     private bool _kakaoSupportEnabled = true;
     private bool _discordRepairNeeded;
@@ -83,6 +85,27 @@ public partial class App : System.Windows.Application
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             Shutdown(await PortableUpdateApplier.RunAsync(e.Args));
+            return;
+        }
+
+        if (e.Args.Contains(
+                DiscordStartupRegistrationManager.RestoreArgument,
+                StringComparer.OrdinalIgnoreCase))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            try
+            {
+                _discordStartupRegistration.Restore();
+                Shutdown(0);
+            }
+            catch (Exception exception)
+                when (exception is IOException or
+                      UnauthorizedAccessException or
+                      System.Security.SecurityException)
+            {
+                Shutdown(1);
+            }
+
             return;
         }
 
@@ -155,6 +178,9 @@ public partial class App : System.Windows.Application
                 ApplyInitialStartupPreference(
                     settingsFileExisted,
                     initialSettings);
+                SynchronizeDiscordStartupRegistration(
+                    initialSettings.DiscordSupportEnabled,
+                    GetStartupEnabled());
             }
 
             PrepareDiscordDefault();
@@ -676,6 +702,9 @@ public partial class App : System.Windows.Application
             _galleryWindow?.SetMessengerSupportState(
                 _discordSupportEnabled,
                 _kakaoSupportEnabled);
+            QueueDiscordStartupRegistrationSync(
+                discordSupportEnabled: false,
+                GetStartupEnabled());
             UpdatePauseUi();
             return;
         }
@@ -715,6 +744,9 @@ public partial class App : System.Windows.Application
         _galleryWindow?.SetMessengerSupportState(
             _discordSupportEnabled,
             _kakaoSupportEnabled);
+        QueueDiscordStartupRegistrationSync(
+            _discordSupportEnabled,
+            GetStartupEnabled());
         UpdatePauseUi();
     }
 
@@ -818,6 +850,41 @@ public partial class App : System.Windows.Application
         }
     }
 
+    private void SynchronizeDiscordStartupRegistration(
+        bool discordSupportEnabled,
+        bool startupEnabled)
+    {
+        try
+        {
+            _discordStartupRegistration.Synchronize(
+                discordSupportEnabled && startupEnabled);
+        }
+        catch (Exception exception)
+            when (exception is IOException or
+                  UnauthorizedAccessException or
+                  System.Security.SecurityException)
+        {
+            _diagnosticsLog?.Write(
+                "discord-startup-registration-failed",
+                "Discord startup registration could not be synchronized",
+                exception);
+        }
+    }
+
+    private void QueueDiscordStartupRegistrationSync(
+        bool discordSupportEnabled,
+        bool startupEnabled) =>
+        _ = Task.Run(() => SynchronizeDiscordStartupRegistration(
+            discordSupportEnabled,
+            startupEnabled));
+
+    private Task SynchronizeDiscordStartupRegistrationAsync(
+        bool discordSupportEnabled,
+        bool startupEnabled) =>
+        Task.Run(() => SynchronizeDiscordStartupRegistration(
+            discordSupportEnabled,
+            startupEnabled));
+
     private void ApplyInitialStartupPreference(
         bool settingsFileExisted,
         SentorySettings settings)
@@ -876,6 +943,9 @@ public partial class App : System.Windows.Application
                 var settings = _settingsStore.Load();
                 settings.StartWithWindows = enabled;
                 _settingsStore.Save(settings);
+                QueueDiscordStartupRegistrationSync(
+                    settings.DiscordSupportEnabled,
+                    enabled);
             }
             _trayIcon?.ShowBalloonTip(
                 1800,
@@ -1191,6 +1261,8 @@ public partial class App : System.Windows.Application
             _galleryWindow.UpdateInstallRequested += UpdateInstallRequested;
             _galleryWindow.MessengerSupportChanged +=
                 ApplyMessengerSupportSetting;
+            _galleryWindow.StartupChanged +=
+                SynchronizeDiscordStartupRegistrationAsync;
             _galleryWindow.LanguageChanged += (_, _) => UpdatePauseUi();
             _galleryWindow.SetDiscordRepairNeeded(
                 _discordSupportEnabled && _discordRepairNeeded);
@@ -1241,6 +1313,13 @@ public partial class App : System.Windows.Application
             while (true)
             {
                 await Task.Delay(TimeSpan.FromHours(6), cancellationToken);
+                if (_settingsStore is not null)
+                {
+                    var settings = _settingsStore.Load();
+                    SynchronizeDiscordStartupRegistration(
+                        settings.DiscordSupportEnabled,
+                        GetStartupEnabled());
+                }
                 await ApplyAutomaticCleanupAsync(cancellationToken);
             }
         }

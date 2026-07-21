@@ -363,6 +363,9 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
   없으면 현재 Windows 시작 프로그램 등록 상태를 가져오고, 이후 사용자가
   바꾼 값은 설정 파일과 레지스트리에 함께 기록한다. 설치 검증 프로세스와
   Discord 접근성 워커에서는 이 초기화를 실행하지 않는다.
+- Windows 자동 실행과 Discord 감지를 모두 켠 경우에만 Discord 로그인 시작
+  명령을 관리한다. 원래 값과 값 형식을 먼저 백업하고, 두 기능 중 하나를 끄거나
+  앱을 제거하면 복원한다. 관리 중 사용자가 직접 바꾼 값은 덮어쓰지 않는다.
 - 인앱 업데이트 안내에는 `새 버전 {0}을 설치할 수 있습니다.`처럼 버전과
   설치 가능 여부를 담은 한 문장만 표시한다. GitHub Release 본문, 변경 기록,
   Markdown 원문은 안내창에 붙이지 않고 공개 Release 페이지에만 둔다.
@@ -385,11 +388,11 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
 모두 종료한 뒤 저장소 루트에서 다음 명령을 실행한다.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\Start-InstalledDiagnostics.ps1 -Version 1.4.0
+powershell -ExecutionPolicy Bypass -File .\scripts\Start-InstalledDiagnostics.ps1 -Version 1.4.1
 ```
 
 설치판의 데이터베이스, 설정, 캐시와 Discord 추적 로그는
-`%LOCALAPPDATA%\Sentory-Diagnostics\1.4.0` 아래에 생성된다. 환경 변수는 실행한
+`%LOCALAPPDATA%\Sentory-Diagnostics\1.4.1` 아래에 생성된다. 환경 변수는 실행한
 프로세스와 그 접근성 작업자에만 전달되므로 기본 데이터 폴더와 시스템 환경
 변수는 바뀌지 않는다. Windows 자동 실행이나 일반 바로가기로 연 Sentory는 이
 진단 폴더를 사용하지 않으므로 재현할 때마다 위 스크립트로 실행한다.

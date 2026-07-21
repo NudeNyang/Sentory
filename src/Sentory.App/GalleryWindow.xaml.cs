@@ -77,6 +77,8 @@ public partial class GalleryWindow : Window
 
     public event Action<SourceApp, bool>? MessengerSupportChanged;
 
+    public event Func<bool, bool, Task>? StartupChanged;
+
     public event EventHandler? LanguageChanged;
 
     public bool IsDarkTheme => _isDarkTheme;
@@ -598,6 +600,7 @@ public partial class GalleryWindow : Window
         window.LanguageSelectionChanged += ApplyLanguageSelection;
         window.MessengerSupportSelectionChanged +=
             ApplyMessengerSupportSelection;
+        window.StartupSelectionChanged += ApplyStartupSelection;
         window.DataChanged += RefreshAsync;
         try
         {
@@ -619,6 +622,7 @@ public partial class GalleryWindow : Window
             window.LanguageSelectionChanged -= ApplyLanguageSelection;
             window.MessengerSupportSelectionChanged -=
                 ApplyMessengerSupportSelection;
+            window.StartupSelectionChanged -= ApplyStartupSelection;
             window.DataChanged -= RefreshAsync;
         }
 
@@ -720,6 +724,22 @@ public partial class GalleryWindow : Window
         }
 
         MessengerSupportChanged?.Invoke(sourceApp, enabled);
+    }
+
+    private async Task ApplyStartupSelection(bool enabled)
+    {
+        if (StartupChanged is null)
+        {
+            return;
+        }
+
+        foreach (Func<bool, bool, Task> handler in
+                 StartupChanged.GetInvocationList())
+        {
+            await handler(
+                _settings.DiscordSupportEnabled,
+                enabled);
+        }
     }
 
     private void ApplyThemeSelection(

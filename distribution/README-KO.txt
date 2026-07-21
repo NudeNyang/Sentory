@@ -1,4 +1,4 @@
-Sentory 1.4.0 사용 방법
+Sentory 1.4.1 사용 방법
 ========================
 
 Sentory는 붙여넣기한 사진과 링크를 한 곳에서 확인하는 Windows 프로그램입니다.
@@ -77,6 +77,8 @@ Sentory는 실행 후 GitHub Releases에서 새 버전을 자동으로 확인합
 ---------------------
 
 - Discord는 실제 전송이 확인된 링크와 사진만 저장합니다.
+- Windows 자동 실행과 Discord 감지를 함께 켜면 다음 로그인부터 Discord가
+  접근성 모드로 시작되어 일반적인 재부팅에는 다시 연결할 필요가 없습니다.
 - 카카오톡은 지원 채팅 입력창에 붙여넣은 링크와 사진을 전송 전에도 저장합니다.
 - 다른 앱이나 카카오톡 검색창의 붙여넣기는 저장하지 않습니다.
 - Discord와 카카오톡의 화면 구조가 바뀌면 감지가 일시적으로 동작하지 않을 수 있습니다.
@@ -91,7 +93,7 @@ Sentory는 GNU General Public License v3.0 only로 배포합니다. 라이선스
 함께 제공해야 합니다. 전체 내용은 LICENSE.txt를 확인해 주세요.
 
 이 버전에 대응하는 소스 코드는 공식 GitHub Release의
-Sentory-1.4.0-source.zip과 같은 버전의 Git 태그에서 받을 수 있습니다.
+Sentory-1.4.1-source.zip과 같은 버전의 Git 태그에서 받을 수 있습니다.
 
 개인정보 및 로컬 데이터 처리 방식은 PRIVACY.md, 제3자 구성 요소의 라이선스는
 THIRD-PARTY-NOTICES.txt를 확인해 주세요.
