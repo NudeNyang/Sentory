@@ -5,6 +5,7 @@ public sealed class ExplorerFileDragActivationState(
 {
     private bool _leftWasDown;
     private bool _explorerDragCandidate;
+    private bool _rejectedUntilRelease;
     private bool _hasPointerUpSample;
     private bool _lastPointerUpWasExplorer;
     private (int X, int Y) _lastPointerUpPosition;
@@ -19,6 +20,7 @@ public sealed class ExplorerFileDragActivationState(
         {
             _leftWasDown = false;
             _explorerDragCandidate = false;
+            _rejectedUntilRelease = false;
             if (!_hasPointerUpSample ||
                 _lastPointerUpPosition != cursor)
             {
@@ -27,6 +29,11 @@ public sealed class ExplorerFileDragActivationState(
 
             _hasPointerUpSample = true;
             _lastPointerUpPosition = cursor;
+            return false;
+        }
+
+        if (_rejectedUntilRelease)
+        {
             return false;
         }
 
@@ -49,6 +56,13 @@ public sealed class ExplorerFileDragActivationState(
     {
         _leftWasDown = false;
         _explorerDragCandidate = false;
+        _rejectedUntilRelease = false;
+    }
+
+    public void RejectActiveDragUntilRelease()
+    {
+        _explorerDragCandidate = false;
+        _rejectedUntilRelease = true;
     }
 
     private double DistanceFromStart((int X, int Y) cursor)

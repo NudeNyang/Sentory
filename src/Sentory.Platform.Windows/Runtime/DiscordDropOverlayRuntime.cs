@@ -202,7 +202,16 @@ public sealed class DiscordDropOverlayRuntime : IDisposable
     {
         var inspection = FileDropCapturePolicy.Inspect(e.Data);
         var target = _currentTarget;
-        if (target is null || !inspection.ShouldObserve)
+        if (!inspection.ShouldObserve)
+        {
+            _dragActivation.RejectActiveDragUntilRelease();
+            _oleDragOver = false;
+            HideOverlay();
+            e.Handled = false;
+            return;
+        }
+
+        if (target is null)
         {
             _oleDragOver = false;
             HideOverlay();

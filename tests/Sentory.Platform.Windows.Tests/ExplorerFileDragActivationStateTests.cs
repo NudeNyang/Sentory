@@ -45,4 +45,21 @@ public sealed class ExplorerFileDragActivationStateTests
 
         Assert.True(state.Observe(true, (220, 230), () => true));
     }
+
+    [Fact]
+    public void RejectedDragStaysInactiveUntilMouseButtonIsReleased()
+    {
+        var state = new ExplorerFileDragActivationState();
+
+        Assert.False(state.Observe(false, (20, 30), () => true));
+        Assert.True(state.Observe(true, (120, 130), () => false));
+
+        state.RejectActiveDragUntilRelease();
+
+        Assert.False(state.Observe(true, (220, 230), () => false));
+        Assert.False(state.Observe(true, (320, 330), () => false));
+        Assert.False(state.Observe(false, (320, 330), () => false));
+        Assert.False(state.Observe(true, (321, 331), () => true));
+        Assert.True(state.Observe(true, (340, 350), () => false));
+    }
 }

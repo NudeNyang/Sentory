@@ -603,16 +603,21 @@ public partial class App : System.Windows.Application
 
         try
         {
-            if (!_discordLauncher.IsRunning())
+            var preparation = DiscordStartupPreparationPolicy.Resolve(
+                _discordSupportEnabled,
+                _discordLauncher.IsInstalled,
+                _discordLauncher.IsRunning(),
+                settings.DiscordAccessibilityPrepared);
+            if (preparation ==
+                DiscordStartupPreparationAction.StartDiscord)
             {
                 _discordLauncher.Start();
                 settings.DiscordAccessibilityPrepared = true;
                 _settingsStore.Save(settings);
             }
-            else
-            {
-                _discordRepairNeeded = false;
-            }
+
+            _discordRepairNeeded = preparation ==
+                DiscordStartupPreparationAction.RequireRestart;
         }
         catch (Exception exception)
             when (exception is IOException or
@@ -662,16 +667,22 @@ public partial class App : System.Windows.Application
 
         try
         {
-            if (_discordLauncher.IsInstalled &&
-                !_discordLauncher.IsRunning())
+            var preparation = DiscordStartupPreparationPolicy.Resolve(
+                _discordSupportEnabled,
+                _discordLauncher.IsInstalled,
+                _discordLauncher.IsRunning(),
+                settings.DiscordAccessibilityPrepared);
+            if (preparation ==
+                DiscordStartupPreparationAction.StartDiscord)
             {
                 _discordLauncher.Start();
                 settings.DiscordAccessibilityPrepared = true;
                 _discordRepairNeeded = false;
             }
-            else if (_discordLauncher.IsInstalled)
+            else
             {
-                _discordRepairNeeded = false;
+                _discordRepairNeeded = preparation ==
+                    DiscordStartupPreparationAction.RequireRestart;
             }
         }
         catch (Exception exception)
@@ -992,18 +1003,19 @@ public partial class App : System.Windows.Application
             _galleryWindow?.SetDiscordDetectionState(status.State);
             if (_discordSupportEnabled)
             {
-                if (status.State == CaptureRuntimeState.ReconnectRequired)
+                var repairNeeded =
+                    DiscordStartupPreparationPolicy.ResolveRepairNeeded(
+                        _discordRepairNeeded,
+                        status.State);
+                var persistPrepared = status.State switch
                 {
-                    SetDiscordRepairNeeded(true, persistPrepared: false);
-                }
-                else
-                {
-                    SetDiscordRepairNeeded(
-                        false,
-                        status.State == CaptureRuntimeState.Ready
-                            ? true
-                            : null);
-                }
+                    CaptureRuntimeState.Ready => true,
+                    CaptureRuntimeState.ReconnectRequired => false,
+                    _ => (bool?)null
+                };
+                SetDiscordRepairNeeded(
+                    repairNeeded,
+                    persistPrepared);
             }
 
             if (_runtime?.IsPaused != true)
