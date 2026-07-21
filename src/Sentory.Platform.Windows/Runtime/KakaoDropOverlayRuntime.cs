@@ -4,13 +4,11 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using System.Windows.Interop;
 using Sentory.Platform.Windows.Interop;
-using WpfDataObject = System.Windows.IDataObject;
 using WpfDragEventArgs = System.Windows.DragEventArgs;
 using WpfDragDropEffects = System.Windows.DragDropEffects;
 using WpfHorizontalAlignment = System.Windows.HorizontalAlignment;
 using WpfBrushes = System.Windows.Media.Brushes;
 using WpfColor = System.Windows.Media.Color;
-using WpfDataFormats = System.Windows.DataFormats;
 
 namespace Sentory.Platform.Windows.Runtime;
 
@@ -257,21 +255,22 @@ public sealed class KakaoDropOverlayRuntime : IDisposable
 
     private void ObserveAndPassThrough(WpfDragEventArgs e)
     {
-        var paths = GetImagePaths(e.Data);
+        var inspection = FileDropCapturePolicy.Inspect(e.Data);
         var target = _currentTarget;
-        e.Effects = target is not null && paths.Length > 0
-            ? WpfDragDropEffects.Copy
-            : WpfDragDropEffects.None;
-        e.Handled = true;
-        if (target is null || paths.Length == 0)
+        if (target is null || !inspection.ShouldObserve)
         {
+            _oleDragOver = false;
+            HideOverlay();
+            e.Handled = false;
             return;
         }
 
-        _passThrough.Observe(target, paths);
+        e.Effects = WpfDragDropEffects.Copy;
+        e.Handled = true;
+        _passThrough.Observe(target, inspection.ImagePaths);
         _diagnostic?.Invoke(
             "kakao-drop-observed",
-            $"files={paths.Length}, chat=0x{target.ChatRootWindow.ToInt64():X}");
+            $"files={inspection.ImagePaths.Count}, chat=0x{target.ChatRootWindow.ToInt64():X}");
         _oleDragOver = false;
         _currentTarget = null;
         _window.Hide();
@@ -302,20 +301,6 @@ public sealed class KakaoDropOverlayRuntime : IDisposable
         _diagnostic?.Invoke(
             "kakao-drop-result",
             $"result={result}, files={paths.Count}");
-    }
-
-    private static string[] GetImagePaths(WpfDataObject data)
-    {
-        if (!data.GetDataPresent(WpfDataFormats.FileDrop) ||
-            data.GetData(WpfDataFormats.FileDrop) is not string[] paths)
-        {
-            return [];
-        }
-
-        return paths
-            .Where(ClipboardImageCodec.IsSupportedImagePath)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
     }
 
     private void HideOverlay()

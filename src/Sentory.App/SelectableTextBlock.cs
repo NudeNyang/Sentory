@@ -72,6 +72,9 @@ public sealed class SelectableTextBlock : WpfControl
     private int _selectionStart;
     private int _selectionLength;
     private bool _isSelecting;
+    private FormattedText? _cachedFormattedText;
+    private CharacterBox[]? _cachedCharacterBoxes;
+    private double _cachedLayoutWidth = double.NaN;
 
     public SelectableTextBlock()
     {
@@ -113,6 +116,8 @@ public sealed class SelectableTextBlock : WpfControl
     public int SelectionStart => _selectionStart;
 
     public int SelectionLength => _selectionLength;
+
+    internal int CharacterLayoutBuildCount { get; private set; }
 
     public string SelectedText => _selectionLength == 0
         ? string.Empty
@@ -171,7 +176,7 @@ public sealed class SelectableTextBlock : WpfControl
         var availableWidth = double.IsInfinity(constraint.Width)
             ? 100000
             : Math.Max(1, constraint.Width - Padding.Left - Padding.Right);
-        var formatted = CreateFormattedText(availableWidth);
+        var formatted = GetFormattedText(availableWidth);
         var desiredWidth = TextWrapping == WpfTextWrapping.NoWrap
             ? formatted.WidthIncludingTrailingWhitespace
             : Math.Min(availableWidth, formatted.WidthIncludingTrailingWhitespace);
@@ -193,7 +198,7 @@ public sealed class SelectableTextBlock : WpfControl
         var contentWidth = Math.Max(
             1,
             RenderSize.Width - Padding.Left - Padding.Right);
-        var formatted = CreateFormattedText(contentWidth);
+        var formatted = GetFormattedText(contentWidth);
         DrawSelection(drawingContext, formatted);
         drawingContext.DrawText(
             formatted,
@@ -302,7 +307,10 @@ public sealed class SelectableTextBlock : WpfControl
             return;
         }
 
-        var characterBoxes = GetCharacterBoxes(formatted)
+        var contentWidth = Math.Max(
+            1,
+            RenderSize.Width - Padding.Left - Padding.Right);
+        var characterBoxes = GetCharacterBoxes(contentWidth)
             .Where(box =>
                 box.Index >= _selectionStart &&
                 box.Index < _selectionStart + _selectionLength)
@@ -386,7 +394,7 @@ public sealed class SelectableTextBlock : WpfControl
         SetSelection(0, 0);
     }
 
-    private int GetTextInsertionIndex(WpfPoint pointer)
+    internal int GetTextInsertionIndex(WpfPoint pointer)
     {
         if (string.IsNullOrEmpty(Text))
         {
@@ -396,9 +404,8 @@ public sealed class SelectableTextBlock : WpfControl
         var contentWidth = Math.Max(
             1,
             ActualWidth - Padding.Left - Padding.Right);
-        var boxes = GetCharacterBoxes(CreateFormattedText(contentWidth))
-            .ToArray();
-        if (boxes.Length == 0)
+        var boxes = GetCharacterBoxes(contentWidth);
+        if (boxes.Count == 0)
         {
             return pointer.X <= ActualWidth / 2 ? 0 : Text.Length;
         }
@@ -461,7 +468,34 @@ public sealed class SelectableTextBlock : WpfControl
         return formatted;
     }
 
-    private IEnumerable<CharacterBox> GetCharacterBoxes(
+    private FormattedText GetFormattedText(double availableWidth)
+    {
+        if (_cachedFormattedText is not null &&
+            Math.Abs(_cachedLayoutWidth - availableWidth) < 0.01)
+        {
+            return _cachedFormattedText;
+        }
+
+        _cachedLayoutWidth = availableWidth;
+        _cachedFormattedText = CreateFormattedText(availableWidth);
+        _cachedCharacterBoxes = null;
+        return _cachedFormattedText;
+    }
+
+    private IReadOnlyList<CharacterBox> GetCharacterBoxes(
+        double availableWidth)
+    {
+        var formatted = GetFormattedText(availableWidth);
+        if (_cachedCharacterBoxes is null)
+        {
+            _cachedCharacterBoxes = BuildCharacterBoxes(formatted).ToArray();
+            CharacterLayoutBuildCount++;
+        }
+
+        return _cachedCharacterBoxes;
+    }
+
+    private IEnumerable<CharacterBox> BuildCharacterBoxes(
         FormattedText formatted)
     {
         var origin = new WpfPoint(Padding.Left, Padding.Top);
@@ -557,7 +591,36 @@ public sealed class SelectableTextBlock : WpfControl
         System.Windows.DependencyPropertyChangedEventArgs e)
     {
         var control = (SelectableTextBlock)dependencyObject;
+        control.InvalidateTextLayout();
         control.SetSelection(0, 0);
+    }
+
+    protected override void OnPropertyChanged(
+        System.Windows.DependencyPropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (e.Property == FontFamilyProperty ||
+            e.Property == FontStyleProperty ||
+            e.Property == FontWeightProperty ||
+            e.Property == FontStretchProperty ||
+            e.Property == FontSizeProperty ||
+            e.Property == ForegroundProperty ||
+            e.Property == PaddingProperty ||
+            e.Property == FlowDirectionProperty ||
+            e.Property == TextWrappingProperty ||
+            e.Property == TextTrimmingProperty ||
+            e.Property == TextAlignmentProperty ||
+            e.Property == LineHeightProperty)
+        {
+            InvalidateTextLayout();
+        }
+    }
+
+    private void InvalidateTextLayout()
+    {
+        _cachedFormattedText = null;
+        _cachedCharacterBoxes = null;
+        _cachedLayoutWidth = double.NaN;
     }
 
     private static SelectableTextBlock? FindExtendedHitTarget(
@@ -626,7 +689,7 @@ public sealed class SelectableTextBlock : WpfControl
         var contentWidth = Math.Max(
             1,
             ActualWidth - Padding.Left - Padding.Right);
-        var boxes = GetCharacterBoxes(CreateFormattedText(contentWidth))
+        var boxes = GetCharacterBoxes(contentWidth)
             .Select(box => box.Bounds)
             .ToArray();
         if (boxes.Length == 0)

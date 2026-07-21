@@ -21,7 +21,16 @@ internal static class SentoryLocalization
 
     public static void Apply(ResourceDictionary resources, string? language)
     {
+        SetLanguage(language);
+        ApplyCurrent(resources);
+    }
+
+    public static void SetLanguage(string? language) =>
         CurrentLanguage = NormalizeLanguage(language);
+
+    public static void ApplyCurrent(ResourceDictionary resources)
+    {
+        ArgumentNullException.ThrowIfNull(resources);
         foreach (var (key, value) in Texts)
         {
             resources[$"Loc.{key}"] = value.Get(CurrentLanguage);

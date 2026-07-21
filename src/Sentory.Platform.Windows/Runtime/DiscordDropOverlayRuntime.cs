@@ -6,8 +6,6 @@ using System.Windows.Threading;
 using Sentory.Platform.Windows.Interop;
 using WpfBrushes = System.Windows.Media.Brushes;
 using WpfColor = System.Windows.Media.Color;
-using WpfDataFormats = System.Windows.DataFormats;
-using WpfDataObject = System.Windows.IDataObject;
 using WpfDragDropEffects = System.Windows.DragDropEffects;
 using WpfDragEventArgs = System.Windows.DragEventArgs;
 
@@ -202,21 +200,22 @@ public sealed class DiscordDropOverlayRuntime : IDisposable
 
     private void ObserveAndPassThrough(WpfDragEventArgs e)
     {
-        var paths = GetImagePaths(e.Data);
+        var inspection = FileDropCapturePolicy.Inspect(e.Data);
         var target = _currentTarget;
-        e.Effects = target is not null && paths.Length > 0
-            ? WpfDragDropEffects.Copy
-            : WpfDragDropEffects.None;
-        e.Handled = true;
-        if (target is null || paths.Length == 0)
+        if (target is null || !inspection.ShouldObserve)
         {
+            _oleDragOver = false;
+            HideOverlay();
+            e.Handled = false;
             return;
         }
 
-        _passThrough.Observe(target, paths);
+        e.Effects = WpfDragDropEffects.Copy;
+        e.Handled = true;
+        _passThrough.Observe(target, inspection.ImagePaths);
         _diagnostic?.Invoke(
             "discord-drop-observed",
-            $"files={paths.Length}, window=0x{target.MainWindow.ToInt64():X}");
+            $"files={inspection.ImagePaths.Count}, window=0x{target.MainWindow.ToInt64():X}");
         _oleDragOver = false;
         _currentTarget = null;
         _window.Hide();
@@ -243,20 +242,6 @@ public sealed class DiscordDropOverlayRuntime : IDisposable
         _diagnostic?.Invoke(
             "discord-drop-result",
             $"result={result}, files={paths.Count}");
-    }
-
-    private static string[] GetImagePaths(WpfDataObject data)
-    {
-        if (!data.GetDataPresent(WpfDataFormats.FileDrop) ||
-            data.GetData(WpfDataFormats.FileDrop) is not string[] paths)
-        {
-            return [];
-        }
-
-        return paths
-            .Where(ClipboardImageCodec.IsSupportedImagePath)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
     }
 
     private void ResetDrag()

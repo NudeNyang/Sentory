@@ -22,6 +22,9 @@ public partial class DataManagementWindow : Window
     private bool _busy;
     private bool _suppressBackgroundDismiss;
     private bool _initializing = true;
+    private bool? _startupEnabled;
+    private DataStatistics? _statistics;
+    private int _languageChangeVersion;
     private readonly OverlayScrollIndicatorController _scrollIndicator;
 
     public DataManagementWindow(
@@ -70,6 +73,8 @@ public partial class DataManagementWindow : Window
 
     public bool LanguageChanged { get; private set; }
 
+    public event Func<string, Task>? LanguageSelectionChanged;
+
     public bool DiscordSupportChanged { get; private set; }
 
     public bool KakaoSupportChanged { get; private set; }
@@ -84,19 +89,8 @@ public partial class DataManagementWindow : Window
     {
         try
         {
-            var statistics = await _repository.GetDataStatisticsAsync();
-            TotalItemsText.Text = SentoryLocalization.Format(
-                "ItemsCountFormat",
-                statistics.TotalItems);
-            KindsText.Text = SentoryLocalization.Format(
-                "KindsCountFormat",
-                statistics.UrlItems,
-                statistics.ImageItems);
-            ImageBytesText.Text = FormatBytes(statistics.ImageBytes);
-            FavoriteItemsText.Text =
-                SentoryLocalization.Format(
-                    "FavoritesPreservedFormat",
-                    statistics.FavoriteItems);
+            _statistics = await _repository.GetDataStatisticsAsync();
+            UpdateStatisticsText(_statistics);
         }
         catch (Exception)
         {
@@ -138,7 +132,7 @@ public partial class DataManagementWindow : Window
         }
     }
 
-    private void LanguageComboBox_SelectionChanged(
+    private async void LanguageComboBox_SelectionChanged(
         object sender,
         SelectionChangedEventArgs e)
     {
@@ -149,23 +143,45 @@ public partial class DataManagementWindow : Window
             return;
         }
 
+        var languageChangeVersion = ++_languageChangeVersion;
         try
         {
             var settings = _settingsStore.Load();
             settings.Language = option.Code;
-            _settingsStore.Save(settings);
-            SentoryLocalization.Apply(
-                System.Windows.Application.Current.Resources,
-                settings.Language);
+            SentoryLocalization.SetLanguage(settings.Language);
+            SentoryLocalization.ApplyCurrent(Resources);
             LanguageChanged = true;
             RefreshLocalizedOptions(settings);
             VersionText.Text = SentoryLocalization.Format(
                 "VersionFormat",
                 GetVersionLabel());
-            UpdateStartupControls();
+            if (_startupEnabled is { } startupEnabled)
+            {
+                UpdateStartupControls(startupEnabled);
+            }
             UpdateMessengerControls(settings);
-            _ = RefreshStatisticsAsync();
+            if (_statistics is not null)
+            {
+                UpdateStatisticsText(_statistics);
+            }
             StatusText.Text = SentoryLocalization.Text("LanguageApplied");
+            await Dispatcher.Yield(DispatcherPriority.Render);
+            if (languageChangeVersion != _languageChangeVersion)
+            {
+                return;
+            }
+
+            await NotifyLanguageSelectionChangedAsync(settings.Language);
+            if (languageChangeVersion != _languageChangeVersion)
+            {
+                return;
+            }
+
+            await Dispatcher.InvokeAsync(
+                () => SentoryLocalization.ApplyCurrent(
+                    System.Windows.Application.Current.Resources),
+                DispatcherPriority.Background);
+            await Task.Run(() => _settingsStore.Save(settings));
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException)
@@ -174,27 +190,66 @@ public partial class DataManagementWindow : Window
         }
     }
 
-    private void StartupToggleButton_Click(
+    private async Task NotifyLanguageSelectionChangedAsync(string language)
+    {
+        if (LanguageSelectionChanged is null)
+        {
+            return;
+        }
+
+        foreach (Func<string, Task> handler in
+                 LanguageSelectionChanged.GetInvocationList())
+        {
+            await handler(language);
+        }
+    }
+
+    private async void StartupToggleButton_Click(
         object sender,
         RoutedEventArgs e)
     {
+        if (!StartupToggleButton.IsEnabled)
+        {
+            return;
+        }
+
+        bool enabled;
         try
         {
-            var enabled = !_startupManager.IsEnabled();
-            _startupManager.SetEnabled(enabled);
+            enabled = !_startupManager.IsEnabled();
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException or
+                  System.Security.SecurityException)
+        {
+            StatusText.Text = SentoryLocalization.Text("StartupChangeFailed");
+            return;
+        }
+
+        StartupToggleButton.IsEnabled = false;
+        UpdateStartupControls(enabled);
+        StatusText.Text = enabled
+            ? SentoryLocalization.Text("StartupEnabled")
+            : SentoryLocalization.Text("StartupDisabled");
+        await Dispatcher.Yield(DispatcherPriority.Render);
+
+        try
+        {
+            await Task.Run(() => _startupManager.SetEnabled(enabled));
             var settings = _settingsStore.Load();
             settings.StartWithWindows = enabled;
             _settingsStore.Save(settings);
-            UpdateStartupControls();
-            StatusText.Text = enabled
-                ? SentoryLocalization.Text("StartupEnabled")
-                : SentoryLocalization.Text("StartupDisabled");
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException or
                   System.Security.SecurityException or InvalidOperationException)
         {
+            UpdateStartupControls();
             StatusText.Text = SentoryLocalization.Text("StartupChangeFailed");
+        }
+        finally
+        {
+            StartupToggleButton.IsEnabled = true;
         }
     }
 
@@ -446,20 +501,42 @@ public partial class DataManagementWindow : Window
     {
         try
         {
-            var enabled = _startupManager.IsEnabled();
-            StartupDescriptionText.Text = enabled
-                ? SentoryLocalization.Text("StartupCurrentlyEnabled")
-                : SentoryLocalization.Text("StartupCurrentlyDisabled");
-            StartupToggleButton.Content = enabled
-                ? SentoryLocalization.Text("TurnOff")
-                : SentoryLocalization.Text("TurnOn");
+            _startupEnabled = _startupManager.IsEnabled();
+            UpdateStartupControls(_startupEnabled.Value);
         }
         catch (Exception)
         {
+            _startupEnabled = null;
             StartupDescriptionText.Text =
                 SentoryLocalization.Text("StartupStatusFailed");
             StartupToggleButton.Content = SentoryLocalization.Text("Retry");
         }
+    }
+
+    private void UpdateStartupControls(bool enabled)
+    {
+        _startupEnabled = enabled;
+        StartupDescriptionText.Text = enabled
+            ? SentoryLocalization.Text("StartupCurrentlyEnabled")
+            : SentoryLocalization.Text("StartupCurrentlyDisabled");
+        StartupToggleButton.Content = enabled
+            ? SentoryLocalization.Text("TurnOff")
+            : SentoryLocalization.Text("TurnOn");
+    }
+
+    private void UpdateStatisticsText(DataStatistics statistics)
+    {
+        TotalItemsText.Text = SentoryLocalization.Format(
+            "ItemsCountFormat",
+            statistics.TotalItems);
+        KindsText.Text = SentoryLocalization.Format(
+            "KindsCountFormat",
+            statistics.UrlItems,
+            statistics.ImageItems);
+        ImageBytesText.Text = FormatBytes(statistics.ImageBytes);
+        FavoriteItemsText.Text = SentoryLocalization.Format(
+            "FavoritesPreservedFormat",
+            statistics.FavoriteItems);
     }
 
     private void UpdateDiscordControls(bool enabled)

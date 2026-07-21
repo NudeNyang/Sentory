@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using WpfTextDataFormat = System.Windows.TextDataFormat;
 using WpfClipboard = System.Windows.Clipboard;
@@ -217,6 +218,7 @@ internal static class ClipboardImageCodec
 
     public static ClipboardImageSnapshot Encode(BitmapSource bitmap)
     {
+        bitmap = RepairMissingClipboardAlpha(bitmap);
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var stream = new MemoryStream();
@@ -229,6 +231,54 @@ internal static class ClipboardImageCodec
             bitmap.PixelHeight,
             "image/png",
             ".png");
+    }
+
+    private static BitmapSource RepairMissingClipboardAlpha(BitmapSource bitmap)
+    {
+        if (bitmap.Format != PixelFormats.Bgra32 &&
+            bitmap.Format != PixelFormats.Pbgra32)
+        {
+            return bitmap;
+        }
+
+        var stride = checked(bitmap.PixelWidth * 4);
+        var pixels = new byte[checked(stride * bitmap.PixelHeight)];
+        bitmap.CopyPixels(pixels, stride, 0);
+
+        var hasVisibleColor = false;
+        for (var offset = 0; offset < pixels.Length; offset += 4)
+        {
+            if (pixels[offset + 3] != 0)
+            {
+                return bitmap;
+            }
+
+            hasVisibleColor |= pixels[offset] != 0 ||
+                               pixels[offset + 1] != 0 ||
+                               pixels[offset + 2] != 0;
+        }
+
+        if (!hasVisibleColor)
+        {
+            return bitmap;
+        }
+
+        for (var offset = 3; offset < pixels.Length; offset += 4)
+        {
+            pixels[offset] = byte.MaxValue;
+        }
+
+        var repaired = BitmapSource.Create(
+            bitmap.PixelWidth,
+            bitmap.PixelHeight,
+            bitmap.DpiX,
+            bitmap.DpiY,
+            PixelFormats.Bgra32,
+            null,
+            pixels,
+            stride);
+        repaired.Freeze();
+        return repaired;
     }
 
     public static ClipboardImageSnapshot? TryDecode(

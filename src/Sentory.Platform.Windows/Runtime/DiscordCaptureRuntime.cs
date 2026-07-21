@@ -93,10 +93,18 @@ public sealed class DiscordCaptureRuntime :
         get => _paused;
         set
         {
+            if (_paused == value)
+            {
+                return;
+            }
+
             _paused = value;
             if (value)
             {
-                CancelActiveCandidates();
+                // Cancellation can synchronously invoke callbacks owned by the
+                // accessibility worker. Keep that work off the WPF input thread
+                // so the tray pause action always responds immediately.
+                CancelActiveCandidatesInBackground();
             }
         }
     }
@@ -994,6 +1002,21 @@ public sealed class DiscordCaptureRuntime :
                 discovery.Cancellation.Cancel();
             }
         }
+    }
+
+    private void CancelActiveCandidatesInBackground()
+    {
+        CancellationTokenSource[] cancellations;
+        lock (_candidateGate)
+        {
+            cancellations = _candidates
+                .Select(candidate => candidate.Cancellation)
+                .Concat(_attachmentDiscoveries.Select(
+                    discovery => discovery.Cancellation))
+                .ToArray();
+        }
+
+        _ = BackgroundCancellation.Request(cancellations);
     }
 
     private void ReportDetectionUnavailable()

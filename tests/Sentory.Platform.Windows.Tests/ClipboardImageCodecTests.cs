@@ -37,6 +37,59 @@ public sealed class ClipboardImageCodecTests
     }
 
     [Fact]
+    public void RepairsClipboardBitmapWhoseUnusedAlphaByteIsZero()
+    {
+        var bitmap = BitmapSource.Create(
+            2,
+            1,
+            96,
+            96,
+            PixelFormats.Bgra32,
+            null,
+            new byte[]
+            {
+                255, 0, 0, 0,
+                0, 255, 0, 0
+            },
+            8);
+
+        var snapshot = ClipboardImageCodec.Encode(bitmap);
+        var pixels = DecodeBgra32(snapshot.ContentBytes, 2, 1);
+
+        Assert.Equal(
+            new byte[]
+            {
+                255, 0, 0, 255,
+                0, 255, 0, 255
+            },
+            pixels);
+    }
+
+    [Fact]
+    public void PreservesClipboardBitmapWithRealTransparency()
+    {
+        var sourcePixels = new byte[]
+        {
+            20, 10, 5, 0,
+            60, 40, 20, 128
+        };
+        var bitmap = BitmapSource.Create(
+            2,
+            1,
+            96,
+            96,
+            PixelFormats.Bgra32,
+            null,
+            sourcePixels,
+            8);
+
+        var snapshot = ClipboardImageCodec.Encode(bitmap);
+        var pixels = DecodeBgra32(snapshot.ContentBytes, 2, 1);
+
+        Assert.Equal(sourcePixels, pixels);
+    }
+
+    [Fact]
     public void ReadsLargeJpegWithoutExpandingOrChangingItsBytes()
     {
         const int width = 3072;
@@ -79,5 +132,22 @@ public sealed class ClipboardImageCodecTests
         {
             File.Delete(path);
         }
+    }
+
+    private static byte[] DecodeBgra32(byte[] bytes, int width, int height)
+    {
+        using var stream = new MemoryStream(bytes, writable: false);
+        var decoder = BitmapDecoder.Create(
+            stream,
+            BitmapCreateOptions.PreservePixelFormat,
+            BitmapCacheOption.OnLoad);
+        var frame = decoder.Frames[0];
+        BitmapSource converted = frame.Format == PixelFormats.Bgra32
+            ? frame
+            : new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
+        var stride = width * 4;
+        var pixels = new byte[stride * height];
+        converted.CopyPixels(pixels, stride, 0);
+        return pixels;
     }
 }

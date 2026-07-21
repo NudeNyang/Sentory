@@ -45,6 +45,7 @@ public partial class GalleryWindow : Window
     private GalleryDateRange _dateRange = GalleryDateRange.All;
     private GallerySortMode _sortMode = GallerySortMode.Newest;
     private CancellationTokenSource? _feedbackCancellation;
+    private CancellationTokenSource? _languageRefreshCancellation;
     private bool _loaded;
     private bool _isDarkTheme;
     private bool _selectionMode;
@@ -238,39 +239,7 @@ public partial class GalleryWindow : Window
         var isImage = item.Kind == ContentKind.Image;
         var isCollection = item.Kind == ContentKind.Collection;
         var members = item.Members ?? [];
-        var imageCount = members.Count(member => member.Kind == ContentKind.Image);
-        var urlCount = members.Count(member => member.Kind == ContentKind.Url);
-        var imageTitle = isImage
-            ? OcrTitleGenerator.CreateBestDisplayTitle(
-                item.OriginalUrl,
-                item.OcrDisplayName)
-            : null;
-        var title = isCollection
-            ? SentoryLocalization.Format("CollectionTitleFormat", imageCount, urlCount)
-            : isImage
-            ? imageTitle ?? SentoryLocalization.Text("ClipboardImage")
-            : !string.IsNullOrWhiteSpace(item.PageTitle)
-                ? item.PageTitle
-            : string.IsNullOrWhiteSpace(item.Domain)
-                ? SentoryLocalization.Text("SavedLink")
-                : item.Domain;
-        var subtitle = isCollection
-            ? string.Join(" · ", members
-                .Where(member => member.Kind == ContentKind.Url)
-                .Select(member => member.Domain)
-                .Where(domain => !string.IsNullOrWhiteSpace(domain))
-                .Take(2)) is { Length: > 0 } domains
-                    ? domains
-                    : SentoryLocalization.Format("CollectionItemsFormat", members.Count)
-            : isImage
-            ? !string.IsNullOrWhiteSpace(item.OcrText)
-                ? CreateOcrSnippet(item.OcrText)
-                : SentoryLocalization.Format(
-                    "ImageFormatFormat",
-                    GetImageFormatLabel(item))
-            : !string.IsNullOrWhiteSpace(item.PageDescription)
-                ? item.PageDescription
-            : item.OriginalUrl;
+        var localizedText = CreateLocalizedText(item);
         var collectionImages = isCollection
             ? members
                 .Where(member => member.Kind == ContentKind.Image)
@@ -311,6 +280,72 @@ public partial class GalleryWindow : Window
             item,
             isImage,
             isCollection,
+            localizedText.Title,
+            localizedText.Subtitle,
+            localizedText.TypeLabel,
+            localizedText.DateLabel,
+            localizedText.StatusLabel,
+            localizedText.Initial,
+            thumbnail,
+            siteIcon,
+            thumbnail is not null,
+            siteIcon is not null,
+            isImage || collectionArtwork is not null || collectionUsesSiteIcon
+                ? Stretch.Uniform
+                : Stretch.UniformToFill,
+            isImage || collectionArtwork is not null
+                ? new Thickness(8)
+                : collectionUsesSiteIcon
+                    ? new Thickness(72)
+                    : new Thickness(0),
+            localizedText.CollectionBadgeText,
+            isCollection,
+            collectionImages,
+            new GalleryItemSelectionState(
+                _selectionMode,
+                _selectedItemIds.Contains(item.ItemId)));
+    }
+
+    private static GalleryItemLocalizedText CreateLocalizedText(
+        CapturedItemSummary item)
+    {
+        var isImage = item.Kind == ContentKind.Image;
+        var isCollection = item.Kind == ContentKind.Collection;
+        var members = item.Members ?? [];
+        var imageCount = members.Count(member => member.Kind == ContentKind.Image);
+        var urlCount = members.Count(member => member.Kind == ContentKind.Url);
+        var imageTitle = isImage
+            ? OcrTitleGenerator.CreateBestDisplayTitle(
+                item.OriginalUrl,
+                item.OcrDisplayName)
+            : null;
+        var title = isCollection
+            ? SentoryLocalization.Format("CollectionTitleFormat", imageCount, urlCount)
+            : isImage
+            ? imageTitle ?? SentoryLocalization.Text("ClipboardImage")
+            : !string.IsNullOrWhiteSpace(item.PageTitle)
+                ? item.PageTitle
+            : string.IsNullOrWhiteSpace(item.Domain)
+                ? SentoryLocalization.Text("SavedLink")
+                : item.Domain;
+        var subtitle = isCollection
+            ? string.Join(" · ", members
+                .Where(member => member.Kind == ContentKind.Url)
+                .Select(member => member.Domain)
+                .Where(domain => !string.IsNullOrWhiteSpace(domain))
+                .Take(2)) is { Length: > 0 } domains
+                    ? domains
+                    : SentoryLocalization.Format("CollectionItemsFormat", members.Count)
+            : isImage
+            ? !string.IsNullOrWhiteSpace(item.OcrText)
+                ? CreateOcrSnippet(item.OcrText)
+                : SentoryLocalization.Format(
+                    "ImageFormatFormat",
+                    GetImageFormatLabel(item))
+            : !string.IsNullOrWhiteSpace(item.PageDescription)
+                ? item.PageDescription
+            : item.OriginalUrl;
+        return new GalleryItemLocalizedText(
             title,
             subtitle,
             $"{SentoryLocalization.Text(isCollection ? "Collection" : isImage ? "Image" : "Link")} · " +
@@ -324,26 +359,9 @@ public partial class GalleryWindow : Window
             GetInitial(isCollection && urlCount > 0
                 ? members.First(member => member.Kind == ContentKind.Url).Domain
                 : title),
-            thumbnail,
-            siteIcon,
-            thumbnail is not null,
-            siteIcon is not null,
-            isImage || collectionArtwork is not null || collectionUsesSiteIcon
-                ? Stretch.Uniform
-                : Stretch.UniformToFill,
-            isImage || collectionArtwork is not null
-                ? new Thickness(8)
-                : collectionUsesSiteIcon
-                    ? new Thickness(72)
-                    : new Thickness(0),
             isCollection
                 ? SentoryLocalization.Format("CollectionItemsFormat", members.Count)
-                : string.Empty,
-            isCollection,
-            collectionImages,
-            new GalleryItemSelectionState(
-                _selectionMode,
-                _selectedItemIds.Contains(item.ItemId)));
+                : string.Empty);
     }
 
     private ImageSource? LoadThumbnail(string? relativePath)
@@ -447,23 +465,27 @@ public partial class GalleryWindow : Window
 
         UpdateSelectionControls();
 
-        if (_allItems.Count > 0 && _visibleItems.Count == 0)
-        {
-            EmptyTitleText.Text = SentoryLocalization.Text("NoSearchResults");
-            EmptyDescriptionText.Text = SentoryLocalization.Text(
-                "NoSearchResultsDescription");
-        }
-        else
-        {
-            EmptyTitleText.Text = SentoryLocalization.Text("NoItems");
-            EmptyDescriptionText.Text =
-                SentoryLocalization.Text("NoItemsDescription");
-        }
+        UpdateEmptyStateText();
 
         SetViewState(
             _visibleItems.Count == 0
                 ? ViewState.Empty
                 : ViewState.Content);
+    }
+
+    private void UpdateEmptyStateText()
+    {
+        if (_allItems.Count > 0 && _visibleItems.Count == 0)
+        {
+            EmptyTitleText.Text = SentoryLocalization.Text("NoSearchResults");
+            EmptyDescriptionText.Text = SentoryLocalization.Text(
+                "NoSearchResultsDescription");
+            return;
+        }
+
+        EmptyTitleText.Text = SentoryLocalization.Text("NoItems");
+        EmptyDescriptionText.Text =
+            SentoryLocalization.Text("NoItemsDescription");
     }
 
     private void SearchBox_TextChanged(
@@ -559,6 +581,7 @@ public partial class GalleryWindow : Window
             Owner = this
         };
         window.ThemeSelectionChanged += ApplyThemeSelection;
+        window.LanguageSelectionChanged += ApplyLanguageSelection;
         window.MessengerSupportSelectionChanged +=
             ApplyMessengerSupportSelection;
         window.DataChanged += RefreshAsync;
@@ -574,6 +597,7 @@ public partial class GalleryWindow : Window
         finally
         {
             window.ThemeSelectionChanged -= ApplyThemeSelection;
+            window.LanguageSelectionChanged -= ApplyLanguageSelection;
             window.MessengerSupportSelectionChanged -=
                 ApplyMessengerSupportSelection;
             window.DataChanged -= RefreshAsync;
@@ -586,16 +610,74 @@ public partial class GalleryWindow : Window
             ApplyTheme(_isDarkTheme);
         }
 
-        if (window.LanguageChanged)
-        {
-            _settings.Language = _settingsStore.Load().Language;
-            RebuildLocalizedControls();
-            LanguageChanged?.Invoke(this, EventArgs.Empty);
-        }
-
         if (window.DiscordRepairRequested)
         {
             DiscordRepairRequested?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private async Task ApplyLanguageSelection(string language)
+    {
+        _languageRefreshCancellation?.Cancel();
+        _languageRefreshCancellation?.Dispose();
+        _languageRefreshCancellation = new CancellationTokenSource();
+        var cancellationToken = _languageRefreshCancellation.Token;
+        try
+        {
+            _settings.Language = language;
+            SentoryLocalization.SetLanguage(language);
+            SentoryLocalization.ApplyCurrent(Resources);
+            RebuildLocalizedShellControls();
+
+            var virtualizingPanel = FindVisualDescendant<
+                VirtualizingCenteredWrapPanel>(GalleryItems);
+            IReadOnlyList<GalleryItemViewModel> visibleItems =
+                virtualizingPanel is null
+                    ? []
+                    : virtualizingPanel
+                        .GetVisibleDataItems()
+                        .OfType<GalleryItemViewModel>()
+                        .ToArray();
+            var batches = LanguageRefreshPlan.Create<GalleryItemViewModel>(
+                _allItems,
+                visibleItems,
+                backgroundBatchSize: 24,
+                ReferenceEqualityComparer.Instance);
+            if (batches.Count == 0)
+            {
+                UpdateSelectionControls();
+                UpdateEmptyStateText();
+                await Dispatcher.Yield(DispatcherPriority.Render);
+            }
+
+            for (var batchIndex = 0;
+                 batchIndex < batches.Count;
+                 batchIndex++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (var item in batches[batchIndex])
+                {
+                    item.ApplyLocalizedText(CreateLocalizedText(item.Item));
+                }
+
+                if (batchIndex == 0)
+                {
+                    UpdateSelectionControls();
+                    UpdateEmptyStateText();
+                    await Dispatcher.Yield(DispatcherPriority.Render);
+                }
+                else
+                {
+                    await Dispatcher.Yield(DispatcherPriority.Background);
+                }
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            LanguageChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
         }
     }
 
@@ -1424,6 +1506,28 @@ public partial class GalleryWindow : Window
         return null;
     }
 
+    private static T? FindVisualDescendant<T>(DependencyObject current)
+        where T : DependencyObject
+    {
+        if (current is T match)
+        {
+            return match;
+        }
+
+        var childCount = VisualTreeHelper.GetChildrenCount(current);
+        for (var index = 0; index < childCount; index++)
+        {
+            var descendant = FindVisualDescendant<T>(
+                VisualTreeHelper.GetChild(current, index));
+            if (descendant is not null)
+            {
+                return descendant;
+            }
+        }
+
+        return null;
+    }
+
     private static DependencyObject? GetVisualOrLogicalParent(
         DependencyObject current) =>
         current is Visual
@@ -1450,16 +1554,6 @@ public partial class GalleryWindow : Window
         }
 
         UpdateSelectionControls();
-    }
-
-    private void RebuildItemViewModels()
-    {
-        for (var index = 0; index < _allItems.Count; index++)
-        {
-            _allItems[index] = CreateViewModel(_allItems[index].Item);
-        }
-
-        ApplyFilter();
     }
 
     private void UpdateSelectionControls()
@@ -1625,17 +1719,17 @@ public partial class GalleryWindow : Window
         }
     }
 
-    private void RebuildLocalizedControls()
+    private void RebuildLocalizedShellControls()
     {
         BuildSourceOptions();
         UpdateSortControls();
         UpdateIntegratedFilterControls();
-        SetDiscordDetectionState(_discordDetectionState);
+        DiscordDetectionStatusText.Text =
+            DiscordDetectionPresentation.GetLabel(_discordDetectionState);
         SetAvailableUpdate(
             _availableUpdateVersion,
             _updateInstallationInProgress);
-        ApplyTheme(_isDarkTheme);
-        RebuildItemViewModels();
+        UpdateThemeButtonLabel();
     }
 
     private void AddSourceOption(string value, string label)
@@ -1793,14 +1887,19 @@ public partial class GalleryWindow : Window
             dark);
 
         ThemeIcon.Text = dark ? "\uE706" : "\uE708";
-        var label = dark
+        UpdateThemeButtonLabel();
+        ApplyTitleBarTheme();
+    }
+
+    private void UpdateThemeButtonLabel()
+    {
+        var label = _isDarkTheme
             ? SentoryLocalization.Text("SwitchToLight")
             : SentoryLocalization.Text("SwitchToDark");
         ThemeButton.ToolTip = label;
         System.Windows.Automation.AutomationProperties.SetName(
             ThemeButton,
             label);
-        ApplyTitleBarTheme();
     }
 
     private void ApplyTitleBarTheme()
@@ -2598,8 +2697,32 @@ public sealed record GalleryItemViewModel(
     string CollectionBadgeText,
     bool HasCollectionBadge,
     IReadOnlyList<GalleryImageViewModel> CollectionImages,
-    GalleryItemSelectionState SelectionState)
+    GalleryItemSelectionState SelectionState) : INotifyPropertyChanged
 {
+    private string _title = Title;
+    private string _subtitle = Subtitle;
+    private string _typeLabel = TypeLabel;
+    private string _dateLabel = DateLabel;
+    private string _statusLabel = StatusLabel;
+    private string _initial = Initial;
+    private string _collectionBadgeText = CollectionBadgeText;
+
+    public string Title => _title;
+
+    public string Subtitle => _subtitle;
+
+    public string TypeLabel => _typeLabel;
+
+    public string DateLabel => _dateLabel;
+
+    public string StatusLabel => _statusLabel;
+
+    public string Initial => _initial;
+
+    public string CollectionBadgeText => _collectionBadgeText;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
     public string Domain => IsCollection
         ? Item.Members?.FirstOrDefault(member =>
               member.Kind == ContentKind.Url)?.Domain is { Length: > 0 } domain
@@ -2633,7 +2756,66 @@ public sealed record GalleryItemViewModel(
             DateLabel,
             Item.CaptureCount,
             Item.CopyCount);
+
+    internal void ApplyLocalizedText(GalleryItemLocalizedText text)
+    {
+        SetLocalizedProperty(ref _title, text.Title, nameof(Title));
+        SetLocalizedProperty(
+            ref _subtitle,
+            text.Subtitle,
+            nameof(Subtitle));
+        SetLocalizedProperty(
+            ref _typeLabel,
+            text.TypeLabel,
+            nameof(TypeLabel));
+        SetLocalizedProperty(
+            ref _dateLabel,
+            text.DateLabel,
+            nameof(DateLabel));
+        SetLocalizedProperty(
+            ref _statusLabel,
+            text.StatusLabel,
+            nameof(StatusLabel));
+        SetLocalizedProperty(ref _initial, text.Initial, nameof(Initial));
+        SetLocalizedProperty(
+            ref _collectionBadgeText,
+            text.CollectionBadgeText,
+            nameof(CollectionBadgeText));
+        OnPropertyChanged(nameof(Domain));
+        OnPropertyChanged(nameof(FavoriteToolTip));
+        OnPropertyChanged(nameof(FavoriteMenuLabel));
+        OnPropertyChanged(nameof(CopyUsageLabel));
+        OnPropertyChanged(nameof(AutomationName));
+    }
+
+    private void SetLocalizedProperty(
+        ref string property,
+        string value,
+        string propertyName)
+    {
+        if (string.Equals(property, value, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        property = value;
+        OnPropertyChanged(propertyName);
+    }
+
+    private void OnPropertyChanged(string propertyName) =>
+        PropertyChanged?.Invoke(
+            this,
+            new PropertyChangedEventArgs(propertyName));
 }
+
+internal sealed record GalleryItemLocalizedText(
+    string Title,
+    string Subtitle,
+    string TypeLabel,
+    string DateLabel,
+    string StatusLabel,
+    string Initial,
+    string CollectionBadgeText);
 
 public sealed class GalleryItemSelectionState : INotifyPropertyChanged
 {

@@ -291,19 +291,32 @@ public partial class ItemDetailWindow : Window
         try
         {
             System.Windows.Clipboard.SetText(url);
-            button.Content = SentoryLocalization.Text("Copied");
+            SetCopyButtonFeedback(button, "\uE73E", "Copied");
             await Task.Delay(1000);
             if (button.IsLoaded)
             {
-                button.Content = SentoryLocalization.Text("Copy");
+                SetCopyButtonFeedback(button, "\uE8C8", "CopyUrl");
             }
         }
         catch (Exception exception)
             when (exception is System.Runtime.InteropServices.ExternalException or
                   InvalidOperationException)
         {
-            button.Content = SentoryLocalization.Text("CopyFailedShort");
+            SetCopyButtonFeedback(button, "\uE783", "CopyFailedShort");
         }
+    }
+
+    private static void SetCopyButtonFeedback(
+        System.Windows.Controls.Button button,
+        string glyph,
+        string tooltipKey)
+    {
+        if (button.Content is System.Windows.Controls.TextBlock icon)
+        {
+            icon.Text = glyph;
+        }
+
+        button.ToolTip = SentoryLocalization.Text(tooltipKey);
     }
 
     private void ShowCollectionImage(int requestedIndex, bool animate)

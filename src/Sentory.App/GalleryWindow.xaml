@@ -853,10 +853,15 @@
                           HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Hidden"
                           ScrollChanged="GalleryScrollViewer_ScrollChanged">
-                <ItemsControl x:Name="GalleryItems">
+                <ItemsControl x:Name="GalleryItems"
+                              VirtualizingPanel.IsVirtualizing="True"
+                              VirtualizingPanel.VirtualizationMode="Recycling">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <local:CenteredWrapPanel Orientation="Horizontal" />
+                            <local:VirtualizingCenteredWrapPanel
+                                ItemWidth="268"
+                                ItemHeight="336"
+                                CacheRows="2" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
@@ -877,12 +882,10 @@
                                     <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
                                         <MenuItem Header="{Binding FavoriteMenuLabel}"
                                                   Click="FavoriteMenuItem_Click" />
-                                        <Separator />
                                         <MenuItem Header="{DynamicResource Loc.Copy}"
                                                   Click="CopyMenuItem_Click" />
                                         <MenuItem Header="{DynamicResource Loc.OpenOriginal}"
                                                   Click="OpenMenuItem_Click" />
-                                        <Separator />
                                         <MenuItem Header="{DynamicResource Loc.Delete}"
                                                   Foreground="{DynamicResource DangerBrush}"
                                                   Click="DeleteMenuItem_Click" />
