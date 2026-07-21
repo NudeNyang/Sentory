@@ -2,7 +2,7 @@
 
 [한국어](./README.md) | [English](./docs/README.en.md)
 
-<img width="2166" height="1548" alt="image" src="https://github.com/user-attachments/assets/2ad95018-640c-4a45-a09d-17c3628db773" />
+<img width="2166" height="1547" alt="image" src="https://github.com/user-attachments/assets/989ecb23-eb72-43cf-8165-c43b2e2ba9dc" />
 
 > 붙여넣기한 사진과 링크를 한 곳에서
 
