@@ -58,7 +58,7 @@ macOS와 Linux에서 바로 실행되는 앱이 완성된 것은 아니다. 이�
 설치 프로그램과 압축을 풀고 실행하는 포터블 폴더를 함께 제공한다.
 
 ```powershell
-.\scripts\Publish-Release.ps1 -Version 1.1.2
+.\scripts\Publish-Release.ps1 -Version 1.1.3
 ```
 
 결과 위치:
@@ -76,8 +76,9 @@ artifacts\release-manifest.json
 확인한다. 자체 점검 데이터는 끝난 뒤 삭제하며 실제 사용자 데이터에는
 접근하지 않는다.
 
-받는 사람은 ZIP을 완전히 푼 뒤 `Sentory.exe`를 실행한다. 업데이트할
-때는 Sentory를 종료하고 실행 폴더의 파일을 새 버전으로 교체한다.
+받는 사람은 ZIP을 완전히 푼 뒤 `Sentory.exe`를 실행한다. 포터블 업데이트는
+Sentory가 종료된 뒤 전용 프로세스가 실행 폴더의 파일을 새 버전으로 교체한다.
+설치형 업데이트는 검증된 설치 파일을 무인 실행하고 완료 뒤 Sentory를 다시 연다.
 데이터는 `%LOCALAPPDATA%\Sentory`에 있으므로 실행 폴더를 바꿔도 유지된다.
 
 공개 배포 전에는 다음 작업이 추가로 필요하다.

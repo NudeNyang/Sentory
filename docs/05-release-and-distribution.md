@@ -4,7 +4,7 @@
 
 - 제품명: Sentory
 - 제작자·게시자: NudeNyang
-- 현재 배포 버전: `1.1.2`
+- 현재 배포 버전: `1.1.3`
 - 라이선스: GNU General Public License v3.0 only (`GPL-3.0-only`)
 - 현재 배포 운영체제: Windows 10/11 64비트
 - 지원 아키텍처: x64, ARM64
@@ -28,7 +28,7 @@ Sentory의 원본 소스 코드는 GPL-3.0-only로 공개합니다. 사용, 연�
 
 ```powershell
 git status --short
-.\scripts\Publish-Release.ps1 -Version 1.1.2
+.\scripts\Publish-Release.ps1 -Version 1.1.3
 ```
 
 `artifacts` 폴더에는 다음 파일이 생성됩니다.
@@ -39,11 +39,12 @@ git status --short
 | `Sentory-win-x64-portable.zip` | Intel·AMD Windows 포터블 |
 | `Sentory-win-arm64-setup.exe` | Windows on ARM 설치형 |
 | `Sentory-win-arm64-portable.zip` | Windows on ARM 포터블 |
-| `Sentory-1.1.2-source.zip` | 해당 바이너리에 대응하는 전체 소스 |
+| `Sentory-1.1.3-source.zip` | 해당 바이너리에 대응하는 전체 소스 |
 
 각 배포 파일의 `.sha256` 확인값과 `release-manifest.json`도 함께
 생성됩니다. 인앱 업데이트는 GitHub Releases API에서 현재 아키텍처와 설치
-방식에 맞는 파일을 선택하고 SHA-256을 확인한 뒤 설치합니다.
+방식에 맞는 파일을 먼저 내려받고 SHA-256을 확인합니다. 검증을 마친 뒤에만
+안내창과 수동 설치 버튼을 표시합니다.
 
 설치형 패키지는 Inno Setup 6으로 만듭니다. 빌드 PC에 컴파일러가 없으면 다음
 명령으로 설치할 수 있습니다.
@@ -68,7 +69,7 @@ winget install --id JRSoftware.InnoSetup -e
 
 공개 저장소에는 최소한 다음 항목을 같은 버전으로 올립니다.
 
-- 전체 소스 코드와 `v1.1.2` 태그
+- 전체 소스 코드와 `v1.1.3` 태그
 - `LICENSE.txt`의 GNU GPL v3 전문
 - `README.md`, `docs/README.en.md`
 - `docs/privacy.md`, `distribution/THIRD-PARTY-NOTICES.txt`, `CHANGELOG.md`,
@@ -90,7 +91,7 @@ GitHub가 자동으로 제공하는 “Source code” 파일만 이용해도 소
 6. 다른 앱에서 다룬 내용이 저장되지 않는지 확인합니다.
 7. x64 설치형과 포터블을 별도 데이터 폴더에서 실행합니다.
 8. ARM64 패키지는 가능하면 실제 Windows on ARM 장치에서 확인합니다.
-9. `v1.1.2` 태그가 배포 파일을 만든 커밋을 가리키는지 확인합니다.
+9. `v1.1.3` 태그가 배포 파일을 만든 커밋을 가리키는지 확인합니다.
 10. Release 자산의 SHA-256 값과 `release-manifest.json`을 대조합니다.
 
 기존 설치본이 없는 환경에서는 아래 명령으로 x64 설치·실행·제거 과정을
@@ -98,6 +99,13 @@ GitHub가 자동으로 제공하는 “Source code” 파일만 이용해도 소
 
 ```powershell
 .\scripts\Test-InstallerRoundTrip.ps1
+```
+
+기존 설치본과 충돌하지 않는 별도 AppId와 데이터 폴더로 무인 업데이트와 재실행을
+확인하려면 아래 명령을 실행합니다.
+
+```powershell
+.\scripts\Test-UpdateInstaller.ps1
 ```
 
 ## 문서와 라이선스 파일
@@ -117,7 +125,12 @@ GitHub가 자동으로 제공하는 “Source code” 파일만 이용해도 소
 ## 버전과 업데이트
 
 Sentory는 의미적 버전 형식을 사용합니다. 앱은 시작 후 GitHub Releases에서 새
-버전을 확인하며, 같은 채널의 더 높은 버전이 있을 때만 업데이트를 안내합니다.
-확인은 6시간에 한 번으로 제한합니다. 설치형은 새 설치 파일을 실행하고,
-포터블은 앱이 종료된 뒤 임시 업데이트 프로세스가 파일을 교체합니다. 사용자
-데이터는 설치 폴더 밖에 있으므로 업데이트 중에도 유지됩니다.
+버전을 확인하며, 같은 채널의 더 높은 버전이 있을 때만 업데이트를 준비합니다.
+확인은 6시간에 한 번으로 제한합니다. 파일 다운로드와 SHA-256 검증이 끝나면
+짧은 안내창과 보관함의 수동 설치 버튼을 표시합니다. 이미 검증된 파일이 있으면
+다시 내려받지 않습니다.
+
+설치형은 Sentory가 종료되는 동안 설치 파일을 무인 실행하고 완료 뒤 앱을 다시
+엽니다. 처음 설치할 때만 Sentory 색상과 전용 그림을 적용한 설치 마법사가
+나타납니다. 포터블은 앱이 종료된 뒤 임시 업데이트 프로세스가 파일을 교체합니다.
+사용자 데이터는 설치 폴더 밖에 있으므로 두 방식 모두 업데이트 중에 유지됩니다.

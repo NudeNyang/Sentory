@@ -1,8 +1,8 @@
 #ifndef MyVersion
-  #define MyVersion "1.1.2"
+  #define MyVersion "1.1.3"
 #endif
 #ifndef MyNumericVersion
-  #define MyNumericVersion "1.1.2.0"
+  #define MyNumericVersion "1.1.3.0"
 #endif
 #ifndef MyArch
   #define MyArch "x64"
@@ -19,6 +19,12 @@
 #ifndef IconFile
   #error IconFile must be provided by the release script.
 #endif
+#ifndef MyAppId
+  #define MyAppId "{{8A13D670-DAA4-4A45-AC21-90076A2B9E79}"
+#endif
+#ifndef MyOutputBaseFilename
+  #define MyOutputBaseFilename "Sentory-win-" + MyArch + "-setup"
+#endif
 
 #if MyArch == "arm64"
   #define ArchitectureName "ARM64"
@@ -31,7 +37,7 @@
 #endif
 
 [Setup]
-AppId={{8A13D670-DAA4-4A45-AC21-90076A2B9E79}
+AppId={#MyAppId}
 AppName=Sentory
 AppVersion={#MyVersion}
 AppVerName=Sentory {#MyVersion} ({#ArchitectureName})
@@ -53,10 +59,14 @@ SetupIconFile={#IconFile}
 UninstallDisplayIcon={app}\Sentory.exe
 LicenseFile={#LicenseFile}
 OutputDir={#OutputDir}
-OutputBaseFilename=Sentory-win-{#MyArch}-setup
+OutputBaseFilename={#MyOutputBaseFilename}
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
+WizardImageFile=Assets\SentoryWizard.bmp
+WizardSmallImageFile=Assets\SentoryWizardSmall.bmp
+WizardImageStretch=yes
+ShowLanguageDialog=no
 CloseApplications=force
 RestartApplications=no
 AppMutex=Local\Sentory.Desktop.Singleton
@@ -67,6 +77,17 @@ ChangesEnvironment=no
 Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
 Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"
+
+[Messages]
+english.WelcomeLabel1=Install Sentory
+english.WelcomeLabel2=Keep photos and links from your messengers in one place.%n%nSetup will install Sentory {#MyVersion} on this PC.
+english.FinishedHeadingLabel=Sentory is ready
+korean.WelcomeLabel1=Sentory를 설치합니다
+korean.WelcomeLabel2=메신저에서 보낸 사진과 링크를 한 곳에 정리합니다.%n%n계속하면 Sentory {#MyVersion} 설치를 시작합니다.
+korean.FinishedHeadingLabel=설치가 끝났습니다
+japanese.WelcomeLabel1=Sentory をインストールします
+japanese.WelcomeLabel2=メッセンジャーで送信した写真とリンクを一か所にまとめます。%n%n続行すると Sentory {#MyVersion} のインストールを開始します。
+japanese.FinishedHeadingLabel=インストールが完了しました
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
@@ -80,8 +101,61 @@ Name: "{autodesktop}\Sentory"; Filename: "{app}\Sentory.exe"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\Sentory.exe"; Description: "{cm:LaunchProgram,Sentory}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\Sentory.exe"; Flags: nowait; Check: IsRegularSentoryUpdate
+Filename: "{app}\Sentory.exe"; Parameters: "--verify-installation"; Flags: runhidden waituntilterminated; Check: IsSentoryUpdateTest
 
 [Code]
+const
+  SentoryBackground = $00DCE4E9;
+  SentorySurface = $00ECF3F7;
+  SentoryText = $00222729;
+  SentoryMutedText = $0061686D;
+  SentoryLine = $00BCC7CE;
+
+function IsSentoryUpdate: Boolean;
+begin
+  Result := CompareText(
+    ExpandConstant('{param:SENTORYUPDATE|0}'), '1') = 0;
+end;
+
+function IsSentoryUpdateTest: Boolean;
+begin
+  Result := IsSentoryUpdate and
+    (CompareText(ExpandConstant('{param:SENTORYTEST|0}'), '1') = 0);
+end;
+
+function IsRegularSentoryUpdate: Boolean;
+begin
+  Result := IsSentoryUpdate and not IsSentoryUpdateTest;
+end;
+
+procedure ApplySentoryWizardStyle;
+begin
+  WizardForm.Caption := 'Sentory {#MyVersion}';
+  WizardForm.Font.Name := 'Malgun Gothic';
+  WizardForm.Font.Size := 10;
+  WizardForm.Color := SentoryBackground;
+  WizardForm.MainPanel.Color := SentorySurface;
+  WizardForm.WelcomePage.Color := SentoryBackground;
+  WizardForm.FinishedPage.Color := SentoryBackground;
+  WizardForm.WelcomeLabel1.Font.Name := 'Georgia';
+  WizardForm.WelcomeLabel1.Font.Size := 14;
+  WizardForm.WelcomeLabel1.Font.Color := SentoryText;
+  WizardForm.WelcomeLabel2.Font.Color := SentoryMutedText;
+  WizardForm.FinishedHeadingLabel.Font.Name := 'Georgia';
+  WizardForm.FinishedHeadingLabel.Font.Size := 14;
+  WizardForm.FinishedHeadingLabel.Font.Color := SentoryText;
+  WizardForm.FinishedLabel.Font.Color := SentoryMutedText;
+  WizardForm.PageNameLabel.Font.Color := SentoryText;
+  WizardForm.PageDescriptionLabel.Font.Color := SentoryMutedText;
+  WizardForm.NextButton.Font.Style := [fsBold];
+end;
+
+procedure InitializeWizard;
+begin
+  ApplySentoryWizardStyle;
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usUninstall then

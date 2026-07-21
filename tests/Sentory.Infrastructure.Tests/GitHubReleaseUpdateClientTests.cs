@@ -130,6 +130,106 @@ public sealed class GitHubReleaseUpdateClientTests
         }
     }
 
+    [Fact]
+    public async Task ReusesVerifiedPackageWithoutDownloadingItAgain()
+    {
+        var payload = "already downloaded"u8.ToArray();
+        var hash = Convert.ToHexString(SHA256.HashData(payload)).ToLowerInvariant();
+        var downloadRequests = 0;
+        var handler = new StubHandler(request =>
+        {
+            if (request.RequestUri!.AbsolutePath.EndsWith("/releases"))
+            {
+                return Json($$"""
+                    [{
+                      "tag_name":"v0.9.1-beta","name":"update","body":"",
+                      "html_url":"https://example.test/release","draft":false,
+                      "prerelease":true,"assets":[{
+                        "name":"Sentory-win-x64-portable.zip",
+                        "browser_download_url":"https://example.test/update.zip",
+                        "digest":"sha256:{{hash}}"
+                      }]
+                    }]
+                    """);
+            }
+
+            downloadRequests++;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent("unexpected"u8.ToArray())
+            };
+        });
+        using var client = new GitHubReleaseUpdateClient(new HttpClient(handler));
+        var update = await client.CheckAsync(
+            "0.9.0-beta", Architecture.X64, UpdatePackageKind.Portable);
+        var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var expectedPath = Path.Combine(directory, update!.FileName);
+            await File.WriteAllBytesAsync(expectedPath, payload);
+
+            var actualPath = await client.DownloadAsync(update, directory);
+
+            Assert.Equal(expectedPath, actualPath);
+            Assert.Equal(0, downloadRequests);
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public async Task ReplacesCachedPackageWhenItsHashIsWrong()
+    {
+        var payload = "fresh package"u8.ToArray();
+        var hash = Convert.ToHexString(SHA256.HashData(payload)).ToLowerInvariant();
+        var downloadRequests = 0;
+        var handler = new StubHandler(request =>
+        {
+            if (request.RequestUri!.AbsolutePath.EndsWith("/releases"))
+            {
+                return Json($$"""
+                    [{
+                      "tag_name":"v0.9.1-beta","name":"update","body":"",
+                      "html_url":"https://example.test/release","draft":false,
+                      "prerelease":true,"assets":[{
+                        "name":"Sentory-win-x64-portable.zip",
+                        "browser_download_url":"https://example.test/update.zip",
+                        "digest":"sha256:{{hash}}"
+                      }]
+                    }]
+                    """);
+            }
+
+            downloadRequests++;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(payload)
+            };
+        });
+        using var client = new GitHubReleaseUpdateClient(new HttpClient(handler));
+        var update = await client.CheckAsync(
+            "0.9.0-beta", Architecture.X64, UpdatePackageKind.Portable);
+        var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var expectedPath = Path.Combine(directory, update!.FileName);
+            await File.WriteAllTextAsync(expectedPath, "stale package");
+
+            var actualPath = await client.DownloadAsync(update, directory);
+
+            Assert.Equal(payload, await File.ReadAllBytesAsync(actualPath));
+            Assert.Equal(1, downloadRequests);
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
     private static HttpResponseMessage Json(string value) => new(HttpStatusCode.OK)
     {
         Content = new StringContent(value, System.Text.Encoding.UTF8, "application/json")

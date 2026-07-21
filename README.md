@@ -35,7 +35,7 @@ Sentory는 메신저에서 주고받은 링크와 사진을 따로 모아 두는
 - 페이지 제목, 사이트 아이콘, 대표 이미지와 설명을 포함한 링크 미리보기
 - 라이트·다크 테마와 한국어·영어·일본어·중국어 UI
 - 새 설치에서 기본 활성화되는 Windows 시작 시 자동 실행과 트레이 메뉴
-- GitHub Releases를 이용한 인앱 자동 확인과 보관함의 수동 업데이트 버튼
+- GitHub Releases를 이용한 사전 다운로드형 업데이트와 보관함의 수동 설치 버튼
 
 ## 데이터 저장
 
@@ -53,7 +53,7 @@ Sentory가 운영하는 서버로 보관 데이터를 보내지 않으며 분석
 
 ## 다운로드
 
-현재 정식 버전은 **1.1.2**입니다. Windows 10/11 64비트에서 사용할 수 있으며,
+현재 정식 버전은 **1.1.3**입니다. Windows 10/11 64비트에서 사용할 수 있으며,
 [Releases](https://github.com/NudeNyang/Sentory/releases)에서 PC에 맞는 파일을
 내려받으면 됩니다. macOS와 Linux 버전도 계획하고 있지만 아직 배포 일정은
 정해지지 않았습니다.
@@ -84,7 +84,9 @@ SmartScreen 경고가 나타날 수 있습니다. 이 저장소의 공식 Releas
 유지됩니다.
 
 새 버전 안내를 닫은 뒤에도 보관함 상단의 업데이트 설치 버튼으로 다시 진행할
-수 있습니다. 안내창에는 버전과 설치 가능 여부만 짧게 표시됩니다.
+수 있습니다. 업데이트 파일과 SHA-256 확인이 끝난 뒤에만 안내창이 나타나므로
+설치 버튼을 누른 뒤 다운로드를 기다릴 필요가 없습니다. 설치형 업데이트는
+설치 마법사를 다시 띄우지 않고 적용한 뒤 Sentory를 다시 엽니다.
 
 Discord를 처음 연결할 때 접근성 모드 적용을 위해 Discord가 다시 시작될 수
 있습니다. 연결 상태와 메신저별 감지 설정은 Sentory 설정 화면에서 확인할 수
@@ -111,7 +113,7 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 1.1.2
+.\scripts\Publish-Release.ps1 -Version 1.1.3
 ```
 
 배포 스크립트는 Windows x64·ARM64 설치형과 포터블 패키지, SHA-256 확인값,

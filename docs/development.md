@@ -284,11 +284,15 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
   호환을 위해 변경하지 않는다.
 - 공개 배포는 x64·ARM64 self-contained 설치형과 포터블 패키지를 제공한다.
 - `0.9.1-beta`부터 GitHub Releases 기반 인앱 자동 업데이트를 사용한다.
-  현재 아키텍처와 설치형·포터블 여부에 맞는 자산만 선택하고 SHA-256을
-  확인한 뒤 사용자 승인 후 적용한다.
-- 감지한 업데이트는 앱이 실행되는 동안 보관하고 보관함 상단에 수동 설치
-  버튼을 표시한다. 자동 안내를 취소해도 버튼은 유지하며, 설치 중에는 중복
-  실행을 막는다.
+  현재 아키텍처와 설치형·포터블 여부에 맞는 자산만 선택한다.
+- `1.1.3`부터 자산 다운로드와 SHA-256 검증을 백그라운드에서 먼저 끝낸 뒤
+  안내창과 수동 설치 버튼을 표시한다. 같은 파일이 이미 있고 확인값이 맞으면
+  다시 내려받지 않는다.
+- 준비한 업데이트는 앱이 실행되는 동안 경로와 함께 보관한다. 자동 안내를
+  취소해도 버튼은 유지하며, 설치 중에는 중복 실행을 막는다.
+- 설치형 업데이트는 `/SILENT /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS /NORESTART
+  /SENTORYUPDATE=1`로 실행한다. 설치 마법사를 표시하지 않고 파일을 교체한 뒤
+  Sentory를 다시 연다. 최초 설치에는 Sentory 전용 색상과 고해상도 그림을 쓴다.
 - Sentory의 원본 소스는 GNU GPL v3 전용(`GPL-3.0-only`)으로 공개한다.
   바이너리 또는 수정본을 배포할 때는 해당 소스와 라이선스 고지를 GPL 조건에
   맞게 함께 제공한다.
@@ -339,11 +343,11 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
 모두 종료한 뒤 저장소 루트에서 다음 명령을 실행한다.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\Start-InstalledDiagnostics.ps1 -Version 1.1.2
+powershell -ExecutionPolicy Bypass -File .\scripts\Start-InstalledDiagnostics.ps1 -Version 1.1.3
 ```
 
 설치판의 데이터베이스, 설정, 캐시와 Discord 추적 로그는
-`%LOCALAPPDATA%\Sentory-Diagnostics\1.1.2` 아래에 생성된다. 환경 변수는 실행한
+`%LOCALAPPDATA%\Sentory-Diagnostics\1.1.3` 아래에 생성된다. 환경 변수는 실행한
 프로세스와 그 접근성 작업자에만 전달되므로 기본 데이터 폴더와 시스템 환경
 변수는 바뀌지 않는다. Windows 자동 실행이나 일반 바로가기로 연 Sentory는 이
 진단 폴더를 사용하지 않으므로 재현할 때마다 위 스크립트로 실행한다.

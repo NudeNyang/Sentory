@@ -123,6 +123,19 @@ public sealed class GitHubReleaseUpdateClient : IDisposable
     {
         Directory.CreateDirectory(directory);
         var destination = Path.Combine(directory, update.FileName);
+        if (File.Exists(destination))
+        {
+            if (await HasExpectedHashAsync(
+                    destination,
+                    update.Sha256,
+                    cancellationToken))
+            {
+                return destination;
+            }
+
+            File.Delete(destination);
+        }
+
         var temporary = $"{destination}.{Guid.NewGuid():N}.tmp";
         try
         {
@@ -143,13 +156,10 @@ public sealed class GitHubReleaseUpdateClient : IDisposable
                 await source.CopyToAsync(output, cancellationToken);
             }
 
-            string actual;
-            await using (var downloaded = File.OpenRead(temporary))
-            {
-                actual = Convert.ToHexString(
-                    await SHA256.HashDataAsync(downloaded, cancellationToken));
-            }
-            if (!string.Equals(actual, update.Sha256, StringComparison.OrdinalIgnoreCase))
+            if (!await HasExpectedHashAsync(
+                    temporary,
+                    update.Sha256,
+                    cancellationToken))
             {
                 throw new InvalidDataException("Downloaded update hash does not match the release checksum.");
             }
@@ -161,6 +171,26 @@ public sealed class GitHubReleaseUpdateClient : IDisposable
         {
             if (File.Exists(temporary)) File.Delete(temporary);
         }
+    }
+
+    private static async Task<bool> HasExpectedHashAsync(
+        string path,
+        string expectedHash,
+        CancellationToken cancellationToken)
+    {
+        await using var downloaded = new FileStream(
+            path,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            81920,
+            FileOptions.Asynchronous | FileOptions.SequentialScan);
+        var actual = Convert.ToHexString(
+            await SHA256.HashDataAsync(downloaded, cancellationToken));
+        return string.Equals(
+            actual,
+            expectedHash,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task<string?> ReadChecksumAssetAsync(

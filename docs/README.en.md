@@ -37,7 +37,7 @@ and KakaoTalk can be enabled or disabled separately in settings.
 - Show page titles, site icons, preview images, and descriptions for saved links
 - Use light or dark mode with Korean, English, Japanese, and Chinese interfaces
 - Start with Windows by default on new installations and manage the setting from the tray menu
-- Check GitHub Releases and update from inside the app
+- Download verified updates in the background and install them from inside the app
 
 ## Data storage
 
@@ -55,7 +55,7 @@ recognized text is stored in the Sentory database for search. See the
 
 ## Download
 
-The current stable version is **1.1.2**. It runs on 64-bit Windows 10 and 11. Download
+The current stable version is **1.1.3**. It runs on 64-bit Windows 10 and 11. Download
 the package for your PC from
 [Releases](https://github.com/NudeNyang/Sentory/releases). macOS and Linux versions
 are planned, but there is no release schedule yet.
@@ -83,6 +83,11 @@ Release, and compare its SHA-256 value with the accompanying `.sha256` file if n
 New installations enable Start with Windows by default. You can turn it off from
 Sentory settings or the tray menu, and later updates preserve your choice.
 
+Sentory downloads and verifies an available update before showing the install prompt.
+Installed copies update without reopening the setup wizard and start Sentory again when
+the update is complete. The manual install button remains available in the library if
+you close the first prompt.
+
 The first Discord connection may restart Discord to apply accessibility mode. The
 current connection state and separate messenger detection controls are available in
 Sentory settings.
@@ -108,7 +113,7 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 1.1.2
+.\scripts\Publish-Release.ps1 -Version 1.1.3
 ```
 
 The release script creates Windows x64 and ARM64 installers, portable packages,

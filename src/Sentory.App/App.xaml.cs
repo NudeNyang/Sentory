@@ -66,6 +66,7 @@ public partial class App : System.Windows.Application
     private string? _lastRuntimeIssue;
     private readonly GitHubReleaseUpdateClient _updateClient = new();
     private ReleaseUpdate? _availableUpdate;
+    private string? _downloadedUpdatePackage;
     private bool _updateInstallationInProgress;
 
     protected override async void OnStartup(StartupEventArgs e)
@@ -300,14 +301,32 @@ public partial class App : System.Windows.Application
                 cancellationToken);
             if (update is null || cancellationToken.IsCancellationRequested) return;
 
+            var directory = Path.Combine(
+                Path.GetTempPath(), "Sentory", "downloads", update.Version);
+            _diagnosticsLog?.Write(
+                "update-download-started",
+                $"Downloading Sentory {update.Version} update");
+            var package = await _updateClient.DownloadAsync(
+                update,
+                directory,
+                cancellationToken);
+            if (cancellationToken.IsCancellationRequested) return;
+
             _availableUpdate = update;
+            _downloadedUpdatePackage = package;
             settings.LastUpdateCheckAt = null;
             _settingsStore.Save(settings);
+            _diagnosticsLog?.Write(
+                "update-download-completed",
+                $"Sentory {update.Version} update is ready");
 
             await await Dispatcher.InvokeAsync(async () =>
             {
                 _galleryWindow?.SetAvailableUpdate(update.Version);
-                await PromptAndInstallUpdateAsync(update, cancellationToken);
+                await PromptAndInstallUpdateAsync(
+                    update,
+                    package,
+                    cancellationToken);
             });
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -327,18 +346,22 @@ public partial class App : System.Windows.Application
 
     private async void UpdateInstallRequested(object? sender, EventArgs e)
     {
-        if (_availableUpdate is null || _maintenanceCancellation is null)
+        if (_availableUpdate is null ||
+            _downloadedUpdatePackage is null ||
+            _maintenanceCancellation is null)
         {
             return;
         }
 
         await PromptAndInstallUpdateAsync(
             _availableUpdate,
+            _downloadedUpdatePackage,
             _maintenanceCancellation.Token);
     }
 
     private async Task PromptAndInstallUpdateAsync(
         ReleaseUpdate update,
+        string package,
         CancellationToken cancellationToken)
     {
         if (_updateInstallationInProgress || cancellationToken.IsCancellationRequested)
@@ -365,7 +388,10 @@ public partial class App : System.Windows.Application
             installationInProgress: true);
         try
         {
-            await DownloadAndApplyUpdateAsync(update, cancellationToken);
+            await ApplyDownloadedUpdateAsync(
+                update,
+                package,
+                cancellationToken);
         }
         finally
         {
@@ -377,24 +403,34 @@ public partial class App : System.Windows.Application
         }
     }
 
-    private async Task DownloadAndApplyUpdateAsync(
+    private async Task ApplyDownloadedUpdateAsync(
         ReleaseUpdate update,
+        string package,
         CancellationToken cancellationToken)
     {
         try
         {
-            var directory = Path.Combine(
-                Path.GetTempPath(), "Sentory", "downloads", update.Version);
-            var package = await _updateClient.DownloadAsync(
-                update, directory, cancellationToken);
+            if (!File.Exists(package))
+            {
+                throw new FileNotFoundException(
+                    "The downloaded update package is missing.",
+                    package);
+            }
+
             if (update.PackageKind == UpdatePackageKind.Installer)
             {
-                Process.Start(new ProcessStartInfo
+                var startInfo = new ProcessStartInfo
                 {
                     FileName = package,
                     UseShellExecute = true,
-                    WorkingDirectory = directory
-                });
+                    WorkingDirectory = Path.GetDirectoryName(package)
+                };
+                startInfo.ArgumentList.Add("/SILENT");
+                startInfo.ArgumentList.Add("/SUPPRESSMSGBOXES");
+                startInfo.ArgumentList.Add("/CLOSEAPPLICATIONS");
+                startInfo.ArgumentList.Add("/NORESTART");
+                startInfo.ArgumentList.Add("/SENTORYUPDATE=1");
+                Process.Start(startInfo);
             }
             else
             {
