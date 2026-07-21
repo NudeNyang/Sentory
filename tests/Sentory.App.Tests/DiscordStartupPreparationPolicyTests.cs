@@ -87,4 +87,28 @@ public sealed class DiscordStartupPreparationPolicyTests
                 currentlyRequired: false,
                 CaptureRuntimeState.ReconnectRequired));
     }
+
+    [Fact]
+    public void ClearsDiscordRecoveryIssueWhenRuntimeBecomesReady()
+    {
+        Assert.True(
+            DiscordStartupPreparationPolicy.ShouldClearRuntimeIssue(
+                "discord-detection-unavailable",
+                CaptureRuntimeState.Ready));
+    }
+
+    [Theory]
+    [InlineData("discord-detection-unavailable", CaptureRuntimeState.Connecting)]
+    [InlineData("discord-detection-unavailable", CaptureRuntimeState.Recovering)]
+    [InlineData("auto-cleanup-failed", CaptureRuntimeState.Ready)]
+    [InlineData(null, CaptureRuntimeState.Ready)]
+    public void KeepsRuntimeIssueUntilItsMatchingRecoveryCompletes(
+        string? issueCode,
+        CaptureRuntimeState state)
+    {
+        Assert.False(
+            DiscordStartupPreparationPolicy.ShouldClearRuntimeIssue(
+                issueCode,
+                state));
+    }
 }

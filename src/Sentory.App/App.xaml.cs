@@ -62,6 +62,7 @@ public partial class App : System.Windows.Application
     private CaptureRuntimeState _discordDetectionState =
         CaptureRuntimeState.Connecting;
     private bool _shuttingDown;
+    private string? _lastRuntimeIssueCode;
     private string? _lastRuntimeIssue;
     private readonly GitHubReleaseUpdateClient _updateClient = new();
     private ReleaseUpdate? _availableUpdate;
@@ -233,6 +234,7 @@ public partial class App : System.Windows.Application
             if (repairResult.FileDeleteFailures > 0 ||
                 repairResult.MissingImageFiles > 0)
             {
+                _lastRuntimeIssueCode = "storage-repair";
                 _lastRuntimeIssue =
                     SentoryLocalization.Text("StorageRepairIssue");
                 _diagnosticsLog.Write(
@@ -903,6 +905,7 @@ public partial class App : System.Windows.Application
     {
         Dispatcher.BeginInvoke(() =>
         {
+            _lastRuntimeIssueCode = null;
             _lastRuntimeIssue = null;
             _galleryWindow?.SetRuntimeIssue(null);
             _trayIcon?.ShowBalloonTip(
@@ -978,6 +981,7 @@ public partial class App : System.Windows.Application
             {
                 SetDiscordRepairNeeded(true, persistPrepared: false);
             }
+            _lastRuntimeIssueCode = issue.Code;
             _lastRuntimeIssue = discordUnavailable
                 ? SentoryLocalization.Text("DiscordRecoveryIssue")
                 : SentoryLocalization.Text("CaptureIssue");
@@ -1016,6 +1020,14 @@ public partial class App : System.Windows.Application
         {
             _discordDetectionState = status.State;
             _galleryWindow?.SetDiscordDetectionState(status.State);
+            if (DiscordStartupPreparationPolicy.ShouldClearRuntimeIssue(
+                    _lastRuntimeIssueCode,
+                    status.State))
+            {
+                _lastRuntimeIssueCode = null;
+                _lastRuntimeIssue = null;
+                _galleryWindow?.SetRuntimeIssue(null);
+            }
             if (_discordSupportEnabled)
             {
                 var repairNeeded =
@@ -1448,6 +1460,7 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
+            _lastRuntimeIssueCode = "auto-cleanup-failed";
             _lastRuntimeIssue =
                 SentoryLocalization.Text("AutoCleanupFailedNextTime");
             _galleryWindow?.SetRuntimeIssue(_lastRuntimeIssue);

@@ -41,4 +41,13 @@ internal static class DiscordStartupPreparationPolicy
             CaptureRuntimeState.ReconnectRequired => true,
             _ => currentlyRequired
         };
+
+    public static bool ShouldClearRuntimeIssue(
+        string? issueCode,
+        CaptureRuntimeState state) =>
+        state == CaptureRuntimeState.Ready &&
+        string.Equals(
+            issueCode,
+            "discord-detection-unavailable",
+            StringComparison.Ordinal);
 }
