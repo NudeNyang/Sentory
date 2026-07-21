@@ -2,6 +2,8 @@
 
 [한국어](./README.md) | [English](./docs/README.en.md)
 
+<img width="2166" height="1548" alt="image" src="https://github.com/user-attachments/assets/2ad95018-640c-4a45-a09d-17c3628db773" />
+
 > 붙여넣기한 사진과 링크를 한 곳에서
 
 Sentory는 메신저에서 주고받은 링크와 사진을 따로 모아 두는 데스크톱 앱입니다.
