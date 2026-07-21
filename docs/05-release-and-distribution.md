@@ -31,6 +31,21 @@ git status --short
 .\scripts\Publish-Release.ps1 -Version 1.1.3
 ```
 
+`Publish-Release.ps1`은 내부적으로 `SentoryBuildFlavor=Public`을 명시한다. 공개
+배포 실행 파일의 제품 버전에 `+developers`가 포함되면 작업을 중단하므로,
+설정 화면에 `for Developers`가 표시되는 검수판이 설치형이나 포터블 배포에
+들어가지 않는다.
+
+로컬 검수판은 다음 명령으로 만든다. `Publish-Portable.ps1`의 기본 빌드 구분은
+`Developer`이며, x64 검수판만 저장소 루트의 `Sentory.exe`를 교체한다.
+
+```powershell
+.\scripts\Publish-Portable.ps1 -Runtime win-x64 -BuildFlavor Developer
+```
+
+공개판을 수동으로 만들 때도 `-BuildFlavor Public`을 반드시 명시한다. 정식
+릴리스에서는 수동 호출 대신 `Publish-Release.ps1`을 사용한다.
+
 `artifacts` 폴더에는 다음 파일이 생성됩니다.
 
 | 파일 | 대상 |

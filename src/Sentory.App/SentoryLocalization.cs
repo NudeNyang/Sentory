@@ -81,6 +81,7 @@ internal static class SentoryLocalization
             L("LanguageDescription", "화면에 표시할 언어를 선택합니다", "Choose the display language", "表示する言語を選択します", "选择界面显示语言"),
             L("LightMode", "라이트 모드", "Light mode", "ライトモード", "浅色模式"),
             L("DarkMode", "다크 모드", "Dark mode", "ダークモード", "深色模式"),
+            L("SystemTheme", "시스템 테마", "System theme", "システムテーマ", "系统主题"),
             L("WindowsStartup", "Windows 시작 시 실행", "Start with Windows", "Windows 起動時に実行", "Windows 启动时运行"),
             L("MessengerDetection", "메신저 감지", "Messenger detection", "メッセンジャー検出", "聊天应用检测"),
             L("Reconnect", "다시 연결", "Reconnect", "再接続", "重新连接"),

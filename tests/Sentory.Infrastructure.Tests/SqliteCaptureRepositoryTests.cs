@@ -673,11 +673,13 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
 
         Assert.Equal("Oldest", settings.SortMode);
         Assert.False(settings.IsDarkTheme);
+        Assert.Equal("Light", settings.ThemeMode);
         Assert.True(settings.DiscordSupportEnabled);
         Assert.True(settings.KakaoTalkSupportEnabled);
         Assert.False(settings.DiscordAccessibilityPrepared);
         Assert.Null(settings.StartWithWindows);
         settings.IsDarkTheme = true;
+        settings.ThemeMode = "Dark";
         settings.DiscordAccessibilityPrepared = true;
         settings.StartWithWindows = false;
         settings.WindowLeft = 120;
@@ -689,6 +691,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
 
         var restored = store.Load();
         Assert.True(restored.IsDarkTheme);
+        Assert.Equal("Dark", restored.ThemeMode);
         Assert.True(restored.DiscordSupportEnabled);
         Assert.True(restored.KakaoTalkSupportEnabled);
         Assert.True(restored.DiscordAccessibilityPrepared);
@@ -698,6 +701,38 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         Assert.Equal(1100, restored.WindowWidth);
         Assert.Equal(720, restored.WindowHeight);
         Assert.True(restored.WindowMaximized);
+    }
+
+    [Fact]
+    public void SettingsStoreMigratesLegacyDarkThemeSelection()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        paths.EnsureDirectories();
+        File.WriteAllText(
+            paths.SettingsPath,
+            """{"IsDarkTheme":true}""");
+
+        var settings = new SentorySettingsStore(paths).Load();
+
+        Assert.Equal("Dark", settings.ThemeMode);
+        Assert.True(settings.IsDarkTheme);
+    }
+
+    [Fact]
+    public void SettingsStorePersistsSystemThemeSelection()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var store = new SentorySettingsStore(paths);
+        store.Save(new SentorySettings
+        {
+            ThemeMode = "System",
+            IsDarkTheme = true
+        });
+
+        var restored = store.Load();
+
+        Assert.Equal("System", restored.ThemeMode);
+        Assert.True(restored.IsDarkTheme);
     }
 
     [Fact]

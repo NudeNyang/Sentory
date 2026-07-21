@@ -24,6 +24,38 @@ public sealed class SentoryDiagnosticsLogTests : IDisposable
         Assert.StartsWith(DateTimeOffset.Now.Year.ToString(), line);
     }
 
+    [Fact]
+    public void ConstructorConsolidatesLegacyLogsIntoOneCurrentFile()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        paths.EnsureDirectories();
+        var previousPath = Path.Combine(
+            paths.LogsDirectory,
+            "sentory.previous.log");
+        var legacyDirectory = Path.Combine(_root, "diagnostics");
+        var legacyDiscordPath = Path.Combine(
+            legacyDirectory,
+            "discord-capture.log");
+        Directory.CreateDirectory(legacyDirectory);
+        File.WriteAllText(previousPath, "old app entry");
+        File.WriteAllText(legacyDiscordPath, "old discord entry");
+
+        var log = new SentoryDiagnosticsLog(paths);
+
+        var content = File.ReadAllText(log.CurrentLogPath);
+        Assert.Contains("old app entry", content);
+        Assert.Contains("old discord entry", content);
+        Assert.False(File.Exists(previousPath));
+        Assert.False(File.Exists(legacyDiscordPath));
+        Assert.Equal(
+            log.CurrentLogPath,
+            Assert.Single(
+                Directory.GetFiles(
+                    _root,
+                    "*.log",
+                    SearchOption.AllDirectories)));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root))

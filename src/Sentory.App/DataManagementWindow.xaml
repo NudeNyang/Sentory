@@ -437,10 +437,18 @@
                                        FontSize="14"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextBrush}" />
-                            <TextBlock x:Name="VersionText"
-                                       Margin="0,4,0,0"
-                                       FontSize="11"
-                                       Foreground="{DynamicResource MutedTextBrush}" />
+                            <StackPanel Margin="0,4,0,0"
+                                        Orientation="Horizontal">
+                                <TextBlock x:Name="VersionText"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource MutedTextBrush}" />
+                                <TextBlock x:Name="DeveloperBuildLabel"
+                                           Margin="8,0,0,0"
+                                           Text="for Developers"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource MutedTextBrush}"
+                                           Visibility="Collapsed" />
+                            </StackPanel>
                         </StackPanel>
                         <TextBlock Grid.Row="0"
                                    HorizontalAlignment="Right"

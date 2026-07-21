@@ -4,6 +4,8 @@ param(
     [string]$Configuration = "Release",
     [ValidateSet("win-x64", "win-arm64")]
     [string]$Runtime = "win-x64",
+    [ValidateSet("Developer", "Public")]
+    [string]$BuildFlavor = "Developer",
     [string]$OutputRoot = "artifacts"
 )
 
@@ -65,7 +67,8 @@ try {
     dotnet publish $projectPath `
         --configuration $Configuration `
         --runtime $Runtime `
-        /p:PublishProfile=$Runtime
+        /p:PublishProfile=$Runtime `
+        /p:SentoryBuildFlavor=$BuildFlavor
     if ($LASTEXITCODE -ne 0) {
         throw "Sentory 휴대용 빌드에 실패했습니다."
     }
@@ -73,6 +76,14 @@ try {
     $publishedExecutable = Join-Path $publishDirectory "Sentory.exe"
     if (-not (Test-Path -LiteralPath $publishedExecutable)) {
         throw "배포 실행 파일을 찾지 못했습니다: $publishedExecutable"
+    }
+    $productVersion = (Get-Item -LiteralPath $publishedExecutable).VersionInfo.ProductVersion
+    $hasDeveloperMarker = $productVersion -match '\+developers'
+    if ($BuildFlavor -eq "Developer" -and -not $hasDeveloperMarker) {
+        throw "검수판 실행 파일에 for Developers 빌드 표시가 없습니다."
+    }
+    if ($BuildFlavor -eq "Public" -and $hasDeveloperMarker) {
+        throw "공개 배포 실행 파일에 개발자판 표시가 포함되어 있습니다."
     }
 
     New-Item -ItemType Directory -Path $stagingDirectory -Force | Out-Null
@@ -155,7 +166,7 @@ try {
         throw "휴대용 폴더에 디버그 심볼이 포함되어 있습니다."
     }
 
-    if ($Runtime -eq "win-x64") {
+    if ($Runtime -eq "win-x64" -and $BuildFlavor -eq "Developer") {
         try {
             Copy-Item `
                 -LiteralPath $stagedExecutable `
@@ -179,7 +190,10 @@ try {
 
     Write-Host ""
     Write-Host "Sentory 휴대용 배포 파일을 만들었습니다." -ForegroundColor Green
-    Write-Host "바로 실행: $repositoryExecutable"
+    Write-Host "빌드 구분: $BuildFlavor"
+    if ($Runtime -eq "win-x64" -and $BuildFlavor -eq "Developer") {
+        Write-Host "바로 실행: $repositoryExecutable"
+    }
     Write-Host "폴더: $stagingDirectory"
     Write-Host "압축: $archivePath"
     Write-Host "확인값: $checksumPath"

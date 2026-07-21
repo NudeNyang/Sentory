@@ -532,7 +532,7 @@ public partial class App : System.Windows.Application
     private void ShowTrayMenu()
     {
         _trayMenuWindow?.Close();
-        var isDarkTheme = _settingsStore?.Load().IsDarkTheme == true;
+        var isDarkTheme = GetSavedDarkTheme();
         var menu = new TrayMenuWindow(
             _statusText,
             _runtime?.IsPaused == true,
@@ -837,9 +837,11 @@ public partial class App : System.Windows.Application
     {
         try
         {
-            return (_settingsStore ?? new SentorySettingsStore(_paths))
-                .Load()
-                .IsDarkTheme;
+            var settings =
+                (_settingsStore ?? new SentorySettingsStore(_paths)).Load();
+            return SentoryThemePreference.ResolveIsDark(
+                settings.GetThemeMode(),
+                SentoryThemePreference.ReadWindowsIsDark());
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException)
@@ -1036,7 +1038,7 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        var dark = _settingsStore?.Load().IsDarkTheme == true;
+        var dark = GetSavedDarkTheme();
         if (!SentoryDialogWindow.Confirm(
                 _galleryWindow,
                 SentoryLocalization.Text("ReconnectConfirmHeading"),

@@ -4,6 +4,13 @@ using Sentory.Core;
 
 namespace Sentory.Infrastructure.Data;
 
+public enum SentoryThemeMode
+{
+    Light,
+    Dark,
+    System
+}
+
 public sealed class SentorySettings
 {
     private static readonly int[] SupportedCleanupDays = [0, 7, 30, 90, 180];
@@ -17,6 +24,8 @@ public sealed class SentorySettings
     public List<string> FilterSourceApps { get; set; } = [];
 
     public bool IsDarkTheme { get; set; }
+
+    public string? ThemeMode { get; set; }
 
     public string Language { get; set; } = "ko-KR";
 
@@ -46,6 +55,8 @@ public sealed class SentorySettings
 
     internal void Normalize()
     {
+        ThemeMode = ResolveThemeMode(ThemeMode, IsDarkTheme).ToString();
+
         if (!SupportedLanguages.Contains(
                 Language,
                 StringComparer.OrdinalIgnoreCase))
@@ -76,6 +87,21 @@ public sealed class SentorySettings
             .Distinct(StringComparer.Ordinal)
             .ToList();
     }
+
+    public SentoryThemeMode GetThemeMode() =>
+        ResolveThemeMode(ThemeMode, IsDarkTheme);
+
+    private static SentoryThemeMode ResolveThemeMode(
+        string? value,
+        bool legacyIsDarkTheme) =>
+        Enum.TryParse<SentoryThemeMode>(
+            value,
+            ignoreCase: true,
+            out var mode)
+            ? mode
+            : legacyIsDarkTheme
+                ? SentoryThemeMode.Dark
+                : SentoryThemeMode.Light;
 }
 
 public sealed class SentorySettingsStore(SentoryDataPaths paths)

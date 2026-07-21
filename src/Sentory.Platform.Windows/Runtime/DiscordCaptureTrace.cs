@@ -1,20 +1,15 @@
 using System.IO;
-using System.Text;
+using Sentory.Core.Diagnostics;
 
 namespace Sentory.Platform.Windows.Runtime;
 
 internal static class DiscordCaptureTrace
 {
-    private const long MaximumLogBytes = 256 * 1024;
-    private static readonly object Gate = new();
-    private static readonly string LogDirectory = ResolveLogDirectory(
+    private static readonly string LogPath = ResolveLogPath(
         Environment.GetEnvironmentVariable("SENTORY_DATA_DIR"),
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
-    private static readonly string LogPath = Path.Combine(
-        LogDirectory,
-        "discord-capture.log");
 
-    internal static string ResolveLogDirectory(
+    internal static string ResolveLogPath(
         string? dataDirectoryOverride,
         string localAppDataDirectory)
     {
@@ -22,40 +17,16 @@ internal static class DiscordCaptureTrace
             ? Path.Combine(localAppDataDirectory, "Sentory")
             : Path.GetFullPath(dataDirectoryOverride);
 
-        return Path.Combine(dataDirectory, "diagnostics");
+        return Path.Combine(dataDirectory, "logs", "sentory.log");
     }
 
     public static void Write(string stage, string? detail = null)
     {
-        try
-        {
-            lock (Gate)
-            {
-                Directory.CreateDirectory(LogDirectory);
-                if (File.Exists(LogPath) &&
-                    new FileInfo(LogPath).Length >= MaximumLogBytes)
-                {
-                    File.Delete(LogPath);
-                }
-
-                var line = new StringBuilder()
-                    .Append(DateTimeOffset.UtcNow.ToString("O"))
-                    .Append(' ')
-                    .Append(stage);
-                if (!string.IsNullOrWhiteSpace(detail))
-                {
-                    line.Append(' ').Append(detail);
-                }
-
-                line.AppendLine();
-                File.AppendAllText(LogPath, line.ToString(), Encoding.UTF8);
-            }
-        }
-        catch (IOException)
-        {
-        }
-        catch (UnauthorizedAccessException)
-        {
-        }
+        SentoryDiagnosticLogFile.Append(
+            LogPath,
+            "discord-capture",
+            string.IsNullOrWhiteSpace(detail)
+                ? stage
+                : $"{stage} {detail}");
     }
 }

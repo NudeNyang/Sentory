@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
 using Sentory.Infrastructure.Links;
@@ -48,6 +49,7 @@ public partial class GalleryWindow : Window
     private CancellationTokenSource? _languageRefreshCancellation;
     private bool _loaded;
     private bool _isDarkTheme;
+    private SentoryThemeMode _themeMode;
     private bool _selectionMode;
     private Point? _selectionDragStart;
     private bool _selectionDragInProgress;
@@ -97,7 +99,11 @@ public partial class GalleryWindow : Window
         {
             _sourceApps.Add(source);
         }
-        _isDarkTheme = _settings.IsDarkTheme;
+        _themeMode = _settings.GetThemeMode();
+        _isDarkTheme = SentoryThemePreference.ResolveIsDark(
+            _themeMode,
+            SentoryThemePreference.ReadWindowsIsDark());
+        _settings.IsDarkTheme = _isDarkTheme;
         RestoreWindowPlacement();
         ApplyTheme(_isDarkTheme);
         GalleryItems.ItemsSource = _visibleItems;
@@ -114,6 +120,10 @@ public partial class GalleryWindow : Window
             ScrollIndicatorHideTimer_Tick;
         Loaded += OnLoaded;
         SourceInitialized += (_, _) => ApplyTitleBarTheme();
+        SystemEvents.UserPreferenceChanged +=
+            SystemEvents_UserPreferenceChanged;
+        Closed += (_, _) => SystemEvents.UserPreferenceChanged -=
+            SystemEvents_UserPreferenceChanged;
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -575,8 +585,7 @@ public partial class GalleryWindow : Window
             _settingsStore,
             _paths,
             _discordDetectionState,
-            _discordRepairNeeded,
-            _isDarkTheme)
+            _discordRepairNeeded)
         {
             Owner = this
         };
@@ -605,7 +614,12 @@ public partial class GalleryWindow : Window
 
         if (window.ThemeChanged)
         {
-            _isDarkTheme = _settingsStore.Load().IsDarkTheme;
+            var settings = _settingsStore.Load();
+            _themeMode = settings.GetThemeMode();
+            _isDarkTheme = SentoryThemePreference.ResolveIsDark(
+                _themeMode,
+                SentoryThemePreference.ReadWindowsIsDark());
+            _settings.ThemeMode = _themeMode.ToString();
             _settings.IsDarkTheme = _isDarkTheme;
             ApplyTheme(_isDarkTheme);
         }
@@ -698,11 +712,39 @@ public partial class GalleryWindow : Window
         MessengerSupportChanged?.Invoke(sourceApp, enabled);
     }
 
-    private void ApplyThemeSelection(bool isDark)
+    private void ApplyThemeSelection(
+        SentoryThemeMode mode,
+        bool isDark)
     {
+        _themeMode = mode;
         _isDarkTheme = isDark;
+        _settings.ThemeMode = mode.ToString();
         _settings.IsDarkTheme = isDark;
         ApplyTheme(isDark);
+    }
+
+    private void SystemEvents_UserPreferenceChanged(
+        object sender,
+        UserPreferenceChangedEventArgs e)
+    {
+        if (_themeMode != SentoryThemeMode.System)
+        {
+            return;
+        }
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            var isDark = SentoryThemePreference.ReadWindowsIsDark();
+            if (_isDarkTheme == isDark)
+            {
+                return;
+            }
+
+            _isDarkTheme = isDark;
+            _settings.IsDarkTheme = isDark;
+            ApplyTheme(isDark);
+            SaveSettings(SentoryLocalization.Text("ThemeSaveFailed"));
+        });
     }
 
     private void SelectModeButton_Click(
@@ -1872,7 +1914,11 @@ public partial class GalleryWindow : Window
     private async void ThemeButton_Click(object sender, RoutedEventArgs e)
     {
         _isDarkTheme = !_isDarkTheme;
+        _themeMode = _isDarkTheme
+            ? SentoryThemeMode.Dark
+            : SentoryThemeMode.Light;
         ApplyTheme(_isDarkTheme);
+        _settings.ThemeMode = _themeMode.ToString();
         _settings.IsDarkTheme = _isDarkTheme;
         await Dispatcher.Yield(DispatcherPriority.Background);
         SaveSettings(SentoryLocalization.Text("ThemeSaveFailed"));

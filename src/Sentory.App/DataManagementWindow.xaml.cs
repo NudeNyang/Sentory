@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Navigation;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
 
@@ -18,6 +19,7 @@ public partial class DataManagementWindow : Window
     private readonly WindowsStartupManager _startupManager = new();
     private readonly CaptureRuntimeState _discordState;
     private readonly bool _discordRepairNeeded;
+    private SentoryThemeMode _themeMode;
     private bool _isDarkTheme;
     private bool _busy;
     private bool _suppressBackgroundDismiss;
@@ -32,8 +34,7 @@ public partial class DataManagementWindow : Window
         SentorySettingsStore settingsStore,
         SentoryDataPaths paths,
         CaptureRuntimeState discordState,
-        bool discordRepairNeeded,
-        bool isDarkTheme)
+        bool discordRepairNeeded)
     {
         InitializeComponent();
         _repository = repository;
@@ -41,7 +42,11 @@ public partial class DataManagementWindow : Window
         _paths = paths;
         _discordState = discordState;
         _discordRepairNeeded = discordRepairNeeded;
-        _isDarkTheme = isDarkTheme;
+        var settings = _settingsStore.Load();
+        _themeMode = settings.GetThemeMode();
+        _isDarkTheme = SentoryThemePreference.ResolveIsDark(
+            _themeMode,
+            SentoryThemePreference.ReadWindowsIsDark());
         ApplyPalette();
         _scrollIndicator = new OverlayScrollIndicatorController(
             SettingsScrollViewer,
@@ -50,8 +55,11 @@ public partial class DataManagementWindow : Window
             SettingsScrollIndicatorThumb,
             SettingsScrollIndicatorThumbTransform);
 
-        var settings = _settingsStore.Load();
         RefreshLocalizedOptions(settings);
+        DeveloperBuildLabel.Visibility =
+            SentoryBuildIdentity.IsDeveloperBuild
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         VersionText.Text = SentoryLocalization.Format(
             "VersionFormat",
             GetVersionLabel());
@@ -64,12 +72,19 @@ public partial class DataManagementWindow : Window
         OwnedPopupDismissBehavior.Enable(
             this,
             () => !_busy && !_suppressBackgroundDismiss);
-        Closed += (_, _) => _scrollIndicator.Dispose();
+        SystemEvents.UserPreferenceChanged +=
+            SystemEvents_UserPreferenceChanged;
+        Closed += (_, _) =>
+        {
+            SystemEvents.UserPreferenceChanged -=
+                SystemEvents_UserPreferenceChanged;
+            _scrollIndicator.Dispose();
+        };
     }
 
     public bool ThemeChanged { get; private set; }
 
-    public event Action<bool>? ThemeSelectionChanged;
+    public event Action<SentoryThemeMode, bool>? ThemeSelectionChanged;
 
     public bool LanguageChanged { get; private set; }
 
@@ -108,12 +123,15 @@ public partial class DataManagementWindow : Window
             return;
         }
 
-        _isDarkTheme = option.IsDark;
+        _themeMode = option.Mode;
+        _isDarkTheme = SentoryThemePreference.ResolveIsDark(
+            _themeMode,
+            SentoryThemePreference.ReadWindowsIsDark());
         ThemeChanged = true;
         ApplyPalette();
         ApplyTitleBarTheme();
-        ThemeSelectionChanged?.Invoke(option.IsDark);
-        StatusText.Text = option.IsDark
+        ThemeSelectionChanged?.Invoke(_themeMode, _isDarkTheme);
+        StatusText.Text = _isDarkTheme
             ? SentoryLocalization.Text("DarkModeApplied")
             : SentoryLocalization.Text("LightModeApplied");
 
@@ -122,7 +140,8 @@ public partial class DataManagementWindow : Window
         try
         {
             var settings = _settingsStore.Load();
-            settings.IsDarkTheme = option.IsDark;
+            settings.ThemeMode = _themeMode.ToString();
+            settings.IsDarkTheme = _isDarkTheme;
             _settingsStore.Save(settings);
         }
         catch (Exception exception)
@@ -130,6 +149,30 @@ public partial class DataManagementWindow : Window
         {
             StatusText.Text = SentoryLocalization.Text("ThemeSaveFailed");
         }
+    }
+
+    private void SystemEvents_UserPreferenceChanged(
+        object sender,
+        UserPreferenceChangedEventArgs e)
+    {
+        if (_themeMode != SentoryThemeMode.System)
+        {
+            return;
+        }
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            var isDark = SentoryThemePreference.ReadWindowsIsDark();
+            if (_isDarkTheme == isDark)
+            {
+                return;
+            }
+
+            _isDarkTheme = isDark;
+            ApplyPalette();
+            ApplyTitleBarTheme();
+            ThemeSelectionChanged?.Invoke(_themeMode, _isDarkTheme);
+        });
     }
 
     private async void LanguageComboBox_SelectionChanged(
@@ -583,12 +626,19 @@ public partial class DataManagementWindow : Window
         {
             var themeOptions = new[]
             {
-                new ThemeOption(false, SentoryLocalization.Text("LightMode")),
-                new ThemeOption(true, SentoryLocalization.Text("DarkMode"))
+                new ThemeOption(
+                    SentoryThemeMode.Light,
+                    SentoryLocalization.Text("LightMode")),
+                new ThemeOption(
+                    SentoryThemeMode.Dark,
+                    SentoryLocalization.Text("DarkMode")),
+                new ThemeOption(
+                    SentoryThemeMode.System,
+                    SentoryLocalization.Text("SystemTheme"))
             };
             ThemeComboBox.ItemsSource = themeOptions;
             ThemeComboBox.SelectedItem = themeOptions.First(option =>
-                option.IsDark == settings.IsDarkTheme);
+                option.Mode == settings.GetThemeMode());
 
             var cleanupOptions = new[]
             {
@@ -660,7 +710,7 @@ public partial class DataManagementWindow : Window
         public override string ToString() => Label;
     }
 
-    private sealed record ThemeOption(bool IsDark, string Label)
+    private sealed record ThemeOption(SentoryThemeMode Mode, string Label)
     {
         public override string ToString() => Label;
     }

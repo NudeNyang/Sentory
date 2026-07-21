@@ -45,6 +45,7 @@ foreach ($runtime in @("win-x64", "win-arm64")) {
     & $portableScript `
         -Configuration Release `
         -Runtime $runtime `
+        -BuildFlavor Public `
         -OutputRoot $outputRootFull
     if ($LASTEXITCODE -ne 0) {
         throw "$runtime 휴대용 배포 생성에 실패했습니다."

@@ -27,3 +27,18 @@ Sentory는 개인 프로젝트로 운영되므로 정해진 답변 시간이나 
 
 버그 제보, 기능 요청과 GPL 적용에 관한 문의는 공식 GitHub 저장소에서 받습니다.
 주소는 `https://github.com/NudeNyang/Sentory`입니다.
+
+## 진단 로그 보내기
+
+문제가 발생한 PC에서는 다음 파일 하나만 보내면 됩니다.
+
+```text
+%LOCALAPPDATA%\Sentory\logs\sentory.log
+```
+
+설정의 `데이터 폴더 열기`를 누른 뒤 `logs` 폴더에서 `sentory.log`를 찾을 수
+있습니다. 이 파일에는 앱 동작과 Discord 접근성 작업자의 진단 단계가 함께
+기록됩니다. URL 원문, 사진 내용, 메시지 본문과 상대 이름은 기록하지 않습니다.
+
+이전 버전의 `sentory.previous.log`와 `diagnostics\discord-capture.log`가 남아
+있으면 새 버전 첫 실행 때 `sentory.log`로 합친 뒤 기존 파일을 정리합니다.
