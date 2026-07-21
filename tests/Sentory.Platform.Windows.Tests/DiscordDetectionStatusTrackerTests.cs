@@ -70,6 +70,37 @@ public sealed class DiscordDetectionStatusTrackerTests
 
     [Theory]
     [InlineData(
+        "message-list-unavailable",
+        CaptureRuntimeState.Connecting,
+        true,
+        false)]
+    [InlineData(
+        "worker-process-exited",
+        CaptureRuntimeState.Recovering,
+        true,
+        false)]
+    [InlineData(
+        "renderer-accessibility-root-unavailable",
+        CaptureRuntimeState.ReconnectRequired,
+        false,
+        true)]
+    public void PlansAutomaticRefreshBeforeRequestingDiscordRestart(
+        string signal,
+        CaptureRuntimeState expectedState,
+        bool expectedWarmup,
+        bool expectedIssue)
+    {
+        var response = DiscordConfirmationResponse.Unavailable(signal);
+
+        var plan = DiscordCaptureRuntime.PlanUnavailableRecovery(response);
+
+        Assert.Equal(expectedState, plan.State);
+        Assert.Equal(expectedWarmup, plan.BeginWarmup);
+        Assert.Equal(expectedIssue, plan.ReportIssue);
+    }
+
+    [Theory]
+    [InlineData(
         CaptureRuntimeState.Connecting,
         CaptureRuntimeState.ReconnectRequired)]
     [InlineData(

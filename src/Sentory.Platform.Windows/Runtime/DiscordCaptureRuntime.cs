@@ -16,6 +16,11 @@ public enum DiscordNativeDropRegistrationResult
     Failed
 }
 
+internal readonly record struct DiscordUnavailableRecoveryPlan(
+    CaptureRuntimeState State,
+    bool BeginWarmup,
+    bool ReportIssue);
+
 public sealed class DiscordCaptureRuntime :
     ICaptureRuntime,
     ICaptureRuntimeStatusSource,
@@ -526,15 +531,19 @@ public sealed class DiscordCaptureRuntime :
             if (response.Outcome ==
                 DiscordConfirmationOutcome.DetectionUnavailable)
             {
-                var unavailableState =
-                    ClassifyUnavailableState(response);
-                _statusTracker.Publish(unavailableState);
-                if (unavailableState == CaptureRuntimeState.Recovering)
+                var recoveryPlan = PlanUnavailableRecovery(response);
+                _statusTracker.Publish(recoveryPlan.State);
+                if (recoveryPlan.BeginWarmup)
                 {
-                    BeginWorkerWarmup(recovering: true);
+                    DiscordCaptureTrace.Write(
+                        "discord-target-refresh-started",
+                        $"state={recoveryPlan.State} signals={string.Join(',', response.ConfirmationSignals)}");
+                    BeginWorkerWarmup(
+                        recovering:
+                            recoveryPlan.State ==
+                            CaptureRuntimeState.Recovering);
                 }
-                else if (unavailableState ==
-                         CaptureRuntimeState.ReconnectRequired)
+                else if (recoveryPlan.ReportIssue)
                 {
                     ReportDetectionUnavailable();
                 }
@@ -708,6 +717,22 @@ public sealed class DiscordCaptureRuntime :
                    StringComparer.Ordinal)
             ? CaptureRuntimeState.ReconnectRequired
             : CaptureRuntimeState.Connecting;
+    }
+
+    internal static DiscordUnavailableRecoveryPlan PlanUnavailableRecovery(
+        DiscordConfirmationResponse response)
+    {
+        var state = ClassifyUnavailableState(response);
+        return state switch
+        {
+            CaptureRuntimeState.Connecting =>
+                new DiscordUnavailableRecoveryPlan(state, true, false),
+            CaptureRuntimeState.Recovering =>
+                new DiscordUnavailableRecoveryPlan(state, true, false),
+            CaptureRuntimeState.ReconnectRequired =>
+                new DiscordUnavailableRecoveryPlan(state, false, true),
+            _ => new DiscordUnavailableRecoveryPlan(state, false, false)
+        };
     }
 
     internal static CaptureRuntimeState ResolveWarmupExhaustedState(
