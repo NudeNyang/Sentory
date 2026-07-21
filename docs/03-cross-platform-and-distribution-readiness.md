@@ -58,7 +58,7 @@ macOS와 Linux에서 바로 실행되는 앱이 완성된 것은 아니다. 이�
 설치 프로그램과 압축을 풀고 실행하는 포터블 폴더를 함께 제공한다.
 
 ```powershell
-.\scripts\Publish-Release.ps1 -Version 1.1.3
+.\scripts\Publish-Release.ps1 -Version 1.1.31
 ```
 
 결과 위치:

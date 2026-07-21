@@ -3,10 +3,10 @@ namespace Sentory.App.Tests;
 public sealed class SentoryBuildIdentityTests
 {
     [Theory]
-    [InlineData("1.1.3+developers", true)]
-    [InlineData("1.1.3+DEVELOPERS", true)]
-    [InlineData("1.1.3", false)]
-    [InlineData("1.1.3+public", false)]
+    [InlineData("1.1.31+developers", true)]
+    [InlineData("1.1.31+DEVELOPERS", true)]
+    [InlineData("1.1.31", false)]
+    [InlineData("1.1.31+public", false)]
     [InlineData(null, false)]
     public void DetectsDeveloperMarkerInInformationalVersion(
         string? informationalVersion,

@@ -4,7 +4,7 @@
 
 - 제품명: Sentory
 - 제작자·게시자: NudeNyang
-- 현재 배포 버전: `1.1.3`
+- 현재 배포 버전: `1.1.31`
 - 라이선스: GNU General Public License v3.0 only (`GPL-3.0-only`)
 - 현재 배포 운영체제: Windows 10/11 64비트
 - 지원 아키텍처: x64, ARM64
@@ -28,7 +28,7 @@ Sentory의 원본 소스 코드는 GPL-3.0-only로 공개합니다. 사용, 연�
 
 ```powershell
 git status --short
-.\scripts\Publish-Release.ps1 -Version 1.1.3
+.\scripts\Publish-Release.ps1 -Version 1.1.31
 ```
 
 `Publish-Release.ps1`은 내부적으로 `SentoryBuildFlavor=Public`을 명시한다. 공개
@@ -54,7 +54,7 @@ git status --short
 | `Sentory-win-x64-portable.zip` | Intel·AMD Windows 포터블 |
 | `Sentory-win-arm64-setup.exe` | Windows on ARM 설치형 |
 | `Sentory-win-arm64-portable.zip` | Windows on ARM 포터블 |
-| `Sentory-1.1.3-source.zip` | 해당 바이너리에 대응하는 전체 소스 |
+| `Sentory-1.1.31-source.zip` | 해당 바이너리에 대응하는 전체 소스 |
 
 각 배포 파일의 `.sha256` 확인값과 `release-manifest.json`도 함께
 생성됩니다. 인앱 업데이트는 GitHub Releases API에서 현재 아키텍처와 설치
@@ -84,7 +84,7 @@ winget install --id JRSoftware.InnoSetup -e
 
 공개 저장소에는 최소한 다음 항목을 같은 버전으로 올립니다.
 
-- 전체 소스 코드와 `v1.1.3` 태그
+- 전체 소스 코드와 `v1.1.31` 태그
 - `LICENSE.txt`의 GNU GPL v3 전문
 - `README.md`, `docs/README.en.md`
 - `docs/privacy.md`, `distribution/THIRD-PARTY-NOTICES.txt`, `CHANGELOG.md`,
@@ -106,7 +106,7 @@ GitHub가 자동으로 제공하는 “Source code” 파일만 이용해도 소
 6. 다른 앱에서 다룬 내용이 저장되지 않는지 확인합니다.
 7. x64 설치형과 포터블을 별도 데이터 폴더에서 실행합니다.
 8. ARM64 패키지는 가능하면 실제 Windows on ARM 장치에서 확인합니다.
-9. `v1.1.3` 태그가 배포 파일을 만든 커밋을 가리키는지 확인합니다.
+9. `v1.1.31` 태그가 배포 파일을 만든 커밋을 가리키는지 확인합니다.
 10. Release 자산의 SHA-256 값과 `release-manifest.json`을 대조합니다.
 
 기존 설치본이 없는 환경에서는 아래 명령으로 x64 설치·실행·제거 과정을

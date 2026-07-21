@@ -1,6 +1,6 @@
 # 변경 기록
 
-## 다음 버전
+## 1.1.31 — 2026-07-21
 
 - 앱과 Discord 접근성 작업자의 진단 기록을
   `%LOCALAPPDATA%\Sentory\logs\sentory.log` 하나로 통합하고, 기존의 분리된
