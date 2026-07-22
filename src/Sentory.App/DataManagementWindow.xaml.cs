@@ -22,6 +22,7 @@ public partial class DataManagementWindow : Window
     private SentoryThemeMode _themeMode;
     private bool _isDarkTheme;
     private bool _busy;
+    private bool _updateCheckBusy;
     private bool _suppressBackgroundDismiss;
     private bool _initializing = true;
     private bool? _startupEnabled;
@@ -60,6 +61,10 @@ public partial class DataManagementWindow : Window
             SentoryBuildIdentity.IsDeveloperBuild
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+        DeveloperUpdateDivider.Visibility =
+            DeveloperBuildLabel.Visibility;
+        DeveloperUpdatePanel.Visibility =
+            DeveloperBuildLabel.Visibility;
         VersionText.Text = SentoryLocalization.Format(
             "VersionFormat",
             GetVersionLabel());
@@ -71,7 +76,7 @@ public partial class DataManagementWindow : Window
         SourceInitialized += (_, _) => ApplyTitleBarTheme();
         OwnedPopupDismissBehavior.Enable(
             this,
-            () => !_busy && !_suppressBackgroundDismiss);
+            () => !_busy && !_updateCheckBusy && !_suppressBackgroundDismiss);
         SystemEvents.UserPreferenceChanged +=
             SystemEvents_UserPreferenceChanged;
         Closed += (_, _) =>
@@ -100,7 +105,46 @@ public partial class DataManagementWindow : Window
 
     public event Func<Task>? DataChanged;
 
+    internal event Func<Task<ManualUpdateCheckResult>>? UpdateCheckRequested;
+
     public bool DiscordRepairRequested { get; private set; }
+
+    private async void UpdateCheckButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_updateCheckBusy || UpdateCheckRequested is null)
+        {
+            return;
+        }
+
+        _updateCheckBusy = true;
+        UpdateCheckButton.IsEnabled = false;
+        StatusText.Text = SentoryLocalization.Text("CheckingForUpdates");
+        try
+        {
+            var result = await UpdateCheckRequested();
+            StatusText.Text = result.Outcome switch
+            {
+                ManualUpdateCheckOutcome.UpToDate =>
+                    SentoryLocalization.Text("AppIsUpToDate"),
+                ManualUpdateCheckOutcome.UpdateAvailable =>
+                    SentoryLocalization.Format(
+                        "UpdateReadyFormat",
+                        result.Version ?? string.Empty),
+                _ => SentoryLocalization.Text("UpdateCheckFailed")
+            };
+        }
+        catch (Exception)
+        {
+            StatusText.Text = SentoryLocalization.Text("UpdateCheckFailed");
+        }
+        finally
+        {
+            _updateCheckBusy = false;
+            UpdateCheckButton.IsEnabled = !_busy;
+        }
+    }
 
     public void SetDiscordDetectionState(CaptureRuntimeState state)
     {
@@ -566,6 +610,7 @@ public partial class DataManagementWindow : Window
         SaveAutoCleanupButton.IsEnabled = !busy;
         AutoCleanupComboBox.IsEnabled = !busy;
         OpenDataFolderButton.IsEnabled = !busy;
+        UpdateCheckButton.IsEnabled = !busy && !_updateCheckBusy;
         if (busy)
         {
             StatusText.Text = SentoryLocalization.Text("CheckingCleanup");

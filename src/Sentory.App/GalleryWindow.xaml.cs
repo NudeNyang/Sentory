@@ -75,6 +75,9 @@ public partial class GalleryWindow : Window
 
     public event EventHandler? UpdateInstallRequested;
 
+    internal event Func<Window, Task<ManualUpdateCheckResult>>?
+        ManualUpdateCheckRequested;
+
     public event Action<SourceApp, bool>? MessengerSupportChanged;
 
     public event Func<bool, bool, Task>? StartupChanged;
@@ -602,6 +605,9 @@ public partial class GalleryWindow : Window
             ApplyMessengerSupportSelection;
         window.StartupSelectionChanged += ApplyStartupSelection;
         window.DataChanged += RefreshAsync;
+        Func<Task<ManualUpdateCheckResult>> updateCheckHandler =
+            () => RequestManualUpdateCheckAsync(window);
+        window.UpdateCheckRequested += updateCheckHandler;
         try
         {
             var closed = new TaskCompletionSource<bool>(
@@ -624,6 +630,7 @@ public partial class GalleryWindow : Window
                 ApplyMessengerSupportSelection;
             window.StartupSelectionChanged -= ApplyStartupSelection;
             window.DataChanged -= RefreshAsync;
+            window.UpdateCheckRequested -= updateCheckHandler;
         }
 
         if (window.ThemeChanged)
@@ -642,6 +649,15 @@ public partial class GalleryWindow : Window
         {
             DiscordRepairRequested?.Invoke(this, EventArgs.Empty);
         }
+    }
+
+    private async Task<ManualUpdateCheckResult>
+        RequestManualUpdateCheckAsync(Window owner)
+    {
+        var handler = ManualUpdateCheckRequested;
+        return handler is null
+            ? new ManualUpdateCheckResult(ManualUpdateCheckOutcome.Failed)
+            : await handler(owner);
     }
 
     private async Task ApplyLanguageSelection(string language)

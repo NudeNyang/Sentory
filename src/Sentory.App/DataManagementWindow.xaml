@@ -431,6 +431,8 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <StackPanel Grid.Row="0">
                             <TextBlock Text="Sentory"
@@ -471,7 +473,7 @@
                                 Height="1"
                                 Margin="0,14"
                                 Background="{DynamicResource LineBrush}" />
-                        <Grid Grid.Row="2">
+                        <Grid Grid.Row="4">
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="{DynamicResource Loc.CopyrightNotice}"
                                            FontSize="10.5"
@@ -485,6 +487,31 @@
                                     Content="{DynamicResource Loc.ViewLicense}"
                                     Style="{StaticResource SecondaryButtonStyle}"
                                     Click="ViewLicenseButton_Click" />
+                        </Grid>
+                        <Border x:Name="DeveloperUpdateDivider"
+                                Grid.Row="3"
+                                Height="1"
+                                Margin="0,14"
+                                Background="{DynamicResource LineBrush}"
+                                Visibility="Collapsed" />
+                        <Grid x:Name="DeveloperUpdatePanel"
+                              Grid.Row="2"
+                              Visibility="Collapsed">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{DynamicResource Loc.CheckForUpdates}"
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextBrush}" />
+                                <TextBlock Margin="0,4,0,0"
+                                           Text="{DynamicResource Loc.CheckForUpdatesDescription}"
+                                           FontSize="10.5"
+                                           Foreground="{DynamicResource MutedTextBrush}" />
+                            </StackPanel>
+                            <Button x:Name="UpdateCheckButton"
+                                    HorizontalAlignment="Right"
+                                    Content="{DynamicResource Loc.CheckNow}"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Click="UpdateCheckButton_Click" />
                         </Grid>
                     </Grid>
                 </Border>

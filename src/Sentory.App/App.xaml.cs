@@ -67,6 +67,7 @@ public partial class App : System.Windows.Application
     private string? _lastRuntimeIssueCode;
     private string? _lastRuntimeIssue;
     private readonly GitHubReleaseUpdateClient _updateClient = new();
+    private readonly SemaphoreSlim _updateCheckGate = new(1, 1);
     private ReleaseUpdate? _availableUpdate;
     private string? _downloadedUpdatePackage;
     private bool _updateInstallationInProgress;
@@ -312,56 +313,10 @@ public partial class App : System.Windows.Application
         try
         {
             await Task.Delay(TimeSpan.FromSeconds(6), cancellationToken);
-            if (_settingsStore is null) return;
-            var settings = _settingsStore.Load();
-            var now = DateTimeOffset.UtcNow;
-            if (settings.LastUpdateCheckAt is { } checkedAt &&
-                now - checkedAt < TimeSpan.FromHours(6))
-            {
-                return;
-            }
-
-            settings.LastUpdateCheckAt = now;
-            _settingsStore.Save(settings);
-            var packageKind = File.Exists(Path.Combine(
-                AppContext.BaseDirectory, "unins000.exe"))
-                ? UpdatePackageKind.Installer
-                : UpdatePackageKind.Portable;
-            var currentVersion = SentoryBuildIdentity.CurrentVersion;
-            var update = await _updateClient.CheckAsync(
-                currentVersion,
-                RuntimeInformation.ProcessArchitecture,
-                packageKind,
+            await CheckForUpdatesCoreAsync(
+                ignoreCooldown: false,
+                _galleryWindow,
                 cancellationToken);
-            if (update is null || cancellationToken.IsCancellationRequested) return;
-
-            var directory = Path.Combine(
-                Path.GetTempPath(), "Sentory", "downloads", update.Version);
-            _diagnosticsLog?.Write(
-                "update-download-started",
-                $"Downloading Sentory {update.Version} update");
-            var package = await _updateClient.DownloadAsync(
-                update,
-                directory,
-                cancellationToken);
-            if (cancellationToken.IsCancellationRequested) return;
-
-            _availableUpdate = update;
-            _downloadedUpdatePackage = package;
-            settings.LastUpdateCheckAt = null;
-            _settingsStore.Save(settings);
-            _diagnosticsLog?.Write(
-                "update-download-completed",
-                $"Sentory {update.Version} update is ready");
-
-            await await Dispatcher.InvokeAsync(async () =>
-            {
-                _galleryWindow?.SetAvailableUpdate(update.Version);
-                await PromptAndInstallUpdateAsync(
-                    update,
-                    package,
-                    cancellationToken);
-            });
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -378,6 +333,174 @@ public partial class App : System.Windows.Application
         }
     }
 
+    private async Task<ManualUpdateCheckResult> CheckForUpdatesManuallyAsync(
+        Window owner)
+    {
+        try
+        {
+            return await CheckForUpdatesCoreAsync(
+                ignoreCooldown: true,
+                owner,
+                _maintenanceCancellation.Token);
+        }
+        catch (OperationCanceledException)
+            when (_maintenanceCancellation.IsCancellationRequested)
+        {
+            return new ManualUpdateCheckResult(
+                ManualUpdateCheckOutcome.Failed);
+        }
+        catch (Exception exception)
+        {
+            _diagnosticsLog?.Write(
+                "manual-update-check-failed",
+                "Manual update check failed",
+                exception);
+            ClearLastUpdateCheckAt();
+            return new ManualUpdateCheckResult(
+                ManualUpdateCheckOutcome.Failed);
+        }
+    }
+
+    private async Task<ManualUpdateCheckResult> CheckForUpdatesCoreAsync(
+        bool ignoreCooldown,
+        Window? promptOwner,
+        CancellationToken cancellationToken)
+    {
+        await _updateCheckGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (_settingsStore is null)
+            {
+                return new ManualUpdateCheckResult(
+                    ManualUpdateCheckOutcome.Failed);
+            }
+
+            if (_availableUpdate is { } availableUpdate &&
+                _downloadedUpdatePackage is { } availablePackage &&
+                File.Exists(availablePackage))
+            {
+                if (promptOwner is not null)
+                {
+                    await PromptAndInstallUpdateOnUiAsync(
+                        availableUpdate,
+                        availablePackage,
+                        promptOwner,
+                        cancellationToken);
+                }
+
+                return new ManualUpdateCheckResult(
+                    ManualUpdateCheckOutcome.UpdateAvailable,
+                    availableUpdate.Version);
+            }
+
+            var settings = _settingsStore.Load();
+            var now = DateTimeOffset.UtcNow;
+            if (!UpdateCheckSchedule.ShouldCheck(
+                    settings.LastUpdateCheckAt,
+                    now,
+                    ignoreCooldown))
+            {
+                return new ManualUpdateCheckResult(
+                    ManualUpdateCheckOutcome.UpToDate);
+            }
+
+            settings.LastUpdateCheckAt = now;
+            _settingsStore.Save(settings);
+            var packageKind = File.Exists(Path.Combine(
+                AppContext.BaseDirectory, "unins000.exe"))
+                ? UpdatePackageKind.Installer
+                : UpdatePackageKind.Portable;
+            var currentVersion = SentoryBuildIdentity.CurrentVersion;
+            _diagnosticsLog?.Write(
+                ignoreCooldown
+                    ? "manual-update-check-started"
+                    : "update-check-started",
+                $"Checking for an update from Sentory {currentVersion}");
+            var update = await _updateClient.CheckAsync(
+                currentVersion,
+                RuntimeInformation.ProcessArchitecture,
+                packageKind,
+                cancellationToken);
+            if (update is null || cancellationToken.IsCancellationRequested)
+            {
+                _diagnosticsLog?.Write(
+                    ignoreCooldown
+                        ? "manual-update-check-completed"
+                        : "update-check-completed",
+                    $"Sentory {currentVersion} is up to date");
+                return new ManualUpdateCheckResult(
+                    ManualUpdateCheckOutcome.UpToDate);
+            }
+
+            var directory = Path.Combine(
+                Path.GetTempPath(), "Sentory", "downloads", update.Version);
+            _diagnosticsLog?.Write(
+                "update-download-started",
+                $"Downloading Sentory {update.Version} update");
+            var package = await _updateClient.DownloadAsync(
+                update,
+                directory,
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            _availableUpdate = update;
+            _downloadedUpdatePackage = package;
+            settings.LastUpdateCheckAt = null;
+            _settingsStore.Save(settings);
+            _diagnosticsLog?.Write(
+                "update-download-completed",
+                $"Sentory {update.Version} update is ready");
+
+            await Dispatcher.InvokeAsync(
+                () => _galleryWindow?.SetAvailableUpdate(update.Version));
+            if (promptOwner is not null)
+            {
+                await PromptAndInstallUpdateOnUiAsync(
+                    update,
+                    package,
+                    promptOwner,
+                    cancellationToken);
+            }
+
+            return new ManualUpdateCheckResult(
+                ManualUpdateCheckOutcome.UpdateAvailable,
+                update.Version);
+        }
+        finally
+        {
+            _updateCheckGate.Release();
+        }
+    }
+
+    private async Task PromptAndInstallUpdateOnUiAsync(
+        ReleaseUpdate update,
+        string package,
+        Window owner,
+        CancellationToken cancellationToken)
+    {
+        await await Dispatcher.InvokeAsync(async () =>
+        {
+            var activeOwner = owner.IsVisible ? owner : _galleryWindow;
+            await PromptAndInstallUpdateAsync(
+                update,
+                package,
+                cancellationToken,
+                activeOwner);
+        });
+    }
+
+    private void ClearLastUpdateCheckAt()
+    {
+        if (_settingsStore is null)
+        {
+            return;
+        }
+
+        var settings = _settingsStore.Load();
+        settings.LastUpdateCheckAt = null;
+        _settingsStore.Save(settings);
+    }
+
     private async void UpdateInstallRequested(object? sender, EventArgs e)
     {
         if (_availableUpdate is null ||
@@ -390,13 +513,15 @@ public partial class App : System.Windows.Application
         await PromptAndInstallUpdateAsync(
             _availableUpdate,
             _downloadedUpdatePackage,
-            _maintenanceCancellation.Token);
+            _maintenanceCancellation.Token,
+            _galleryWindow);
     }
 
     private async Task PromptAndInstallUpdateAsync(
         ReleaseUpdate update,
         string package,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Window? owner)
     {
         if (_updateInstallationInProgress || cancellationToken.IsCancellationRequested)
         {
@@ -420,7 +545,7 @@ public partial class App : System.Windows.Application
         }
 
         var accepted = SentoryDialogWindow.Confirm(
-            _galleryWindow,
+            owner ?? _galleryWindow,
             SentoryLocalization.Text("UpdateAvailableHeading"),
             SentoryLocalization.Format(
                 "UpdateAvailableMessage",
@@ -1259,6 +1384,8 @@ public partial class App : System.Windows.Application
             _galleryWindow.DiscordRepairRequested += async (_, _) =>
                 await RepairDiscordConnectionAsync();
             _galleryWindow.UpdateInstallRequested += UpdateInstallRequested;
+            _galleryWindow.ManualUpdateCheckRequested +=
+                CheckForUpdatesManuallyAsync;
             _galleryWindow.MessengerSupportChanged +=
                 ApplyMessengerSupportSetting;
             _galleryWindow.StartupChanged +=
@@ -1650,6 +1777,7 @@ public partial class App : System.Windows.Application
         _linkPreviewWakeSignal.Dispose();
         _ocrWakeSignal.Dispose();
         _updateClient.Dispose();
+        _updateCheckGate.Dispose();
         base.OnExit(e);
     }
 }
