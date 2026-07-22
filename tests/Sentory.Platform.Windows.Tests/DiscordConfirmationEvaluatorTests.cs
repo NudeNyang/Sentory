@@ -405,4 +405,23 @@ public sealed class DiscordConfirmationEvaluatorTests
         Assert.False(
             DiscordAccessibilityWorker.LooksLikeDiscordMemberList(value));
     }
+
+    [Theory]
+    [InlineData(true, 1, 2, true)]
+    [InlineData(true, 0, 2, false)]
+    [InlineData(false, 1, 2, false)]
+    [InlineData(false, 2, 2, true)]
+    public void RequiresOnlySentUrlMatchAfterExplicitSend(
+        bool explicitSendObserved,
+        int matchingUrlCount,
+        int expectedUrlCount,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            DiscordAccessibilityWorker.HasRequiredUrlMatch(
+                explicitSendObserved,
+                matchingUrlCount,
+                expectedUrlCount));
+    }
 }

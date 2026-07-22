@@ -322,15 +322,23 @@ public static class DiscordAccessibilityWorker
         var inputTarget = requireMatchingUrlInput
             ? resolved.InputTarget
             : null;
-        if (request.ExplicitSendObserved &&
-            baselineMessages.Count > 0 &&
-            IsVisibleUrlMessage(baselineMessages[^1], expectedUrls))
+        var currentMessageUrls = request.ExplicitSendObserved &&
+                                 baselineMessages.Count > 0
+            ? FindVisibleExpectedUrls(
+                baselineMessages[^1],
+                expectedUrls)
+            : [];
+        if (HasRequiredUrlMatch(
+                request.ExplicitSendObserved,
+                currentMessageUrls.Count,
+                expectedUrls.Count))
         {
             return CreateConfirmedUrlResponse(
                 DateTimeOffset.UtcNow,
                 "send-key-and-current-message-match",
                 request.ExplicitSendObserved,
-                resolved.CacheHit);
+                resolved.CacheHit,
+                currentMessageUrls);
         }
 
         ExcludeLatestFromBaselineWhenSendWasObserved(
@@ -360,8 +368,25 @@ public static class DiscordAccessibilityWorker
                 messages,
                 baselineMessageCount,
                 baselineFingerprints);
-            var matchingMessageFound = newMessages.Any(message =>
-                IsVisibleUrlMessage(message, expectedUrls));
+            IReadOnlyList<string> matchingUrls = [];
+            foreach (var message in newMessages)
+            {
+                var visibleUrls = FindVisibleExpectedUrls(
+                    message,
+                    expectedUrls);
+                if (!HasRequiredUrlMatch(
+                        request.ExplicitSendObserved,
+                        visibleUrls.Count,
+                        expectedUrls.Count))
+                {
+                    continue;
+                }
+
+                matchingUrls = visibleUrls;
+                break;
+            }
+
+            var matchingMessageFound = matchingUrls.Count > 0;
             var decision = DiscordConfirmationEvaluator.Evaluate(
                 baselineMessageCount,
                 new DiscordCandidateObservation(
@@ -378,7 +403,8 @@ public static class DiscordAccessibilityWorker
                     DateTimeOffset.UtcNow,
                     "new-message-set-url-match",
                     request.ExplicitSendObserved,
-                    resolved.CacheHit);
+                    resolved.CacheHit,
+                    matchingUrls);
             }
 
             if (decision == DiscordCandidateDecision.Cancelled)
@@ -562,7 +588,8 @@ public static class DiscordAccessibilityWorker
         DateTimeOffset confirmedAt,
         string correlationSignal,
         bool explicitSendObserved,
-        bool cacheHit) =>
+        bool cacheHit,
+        IReadOnlyList<string> confirmedUrls) =>
         new(
             DiscordConfirmationOutcome.Confirmed,
             confirmedAt,
@@ -576,7 +603,8 @@ public static class DiscordAccessibilityWorker
                     : "input-cleared-after-send",
                 cacheHit ? "target-cache-hit" : "target-cache-miss",
                 correlationSignal
-            ]);
+            ],
+            ConfirmedUrls: confirmedUrls);
 
     private static DiscordConfirmationResponse CreateConfirmedImageResponse(
         DateTimeOffset confirmedAt,
@@ -595,9 +623,23 @@ public static class DiscordAccessibilityWorker
     private static bool IsVisibleUrlMessage(
         AccessibleTarget message,
         IReadOnlySet<string> expectedUrls) =>
+        FindVisibleExpectedUrls(message, expectedUrls).Count ==
+        expectedUrls.Count;
+
+    private static IReadOnlyList<string> FindVisibleExpectedUrls(
+        AccessibleTarget message,
+        IReadOnlySet<string> expectedUrls) =>
         SafeState(message.Accessible, message.ChildId) ==
-            VisibleListItemState &&
-        SubtreeContainsAllUrls(message, expectedUrls);
+            VisibleListItemState
+            ? FindExpectedUrls(message, expectedUrls)
+            : [];
+
+    internal static bool HasRequiredUrlMatch(
+        bool explicitSendObserved,
+        int matchingUrlCount,
+        int expectedUrlCount) =>
+        matchingUrlCount > 0 &&
+        (explicitSendObserved || matchingUrlCount == expectedUrlCount);
 
     private static bool IsVisibleOwnedImageMessage(
         AccessibleTarget message) =>
@@ -1102,7 +1144,7 @@ public static class DiscordAccessibilityWorker
         messageListCount > 0 &&
         (!requireMatchingUrlInput || inputCandidateCount > 0);
 
-    private static bool SubtreeContainsAllUrls(
+    private static IReadOnlyList<string> FindExpectedUrls(
         AccessibleTarget root,
         IReadOnlySet<string> expectedUrls)
     {
@@ -1134,7 +1176,9 @@ public static class DiscordAccessibilityWorker
         }
 
         Inspect(root, 0);
-        return expectedUrls.All(found.Contains);
+        return expectedUrls
+            .Where(found.Contains)
+            .ToArray();
     }
 
     private static bool SubtreeContainsImageAttachment(AccessibleTarget root)

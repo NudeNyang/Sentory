@@ -47,7 +47,8 @@ public sealed record DiscordConfirmationResponse(
     DateTimeOffset? ConfirmedAt,
     IReadOnlyList<string> ConfirmationSignals,
     IReadOnlyList<string>? AttachmentUrls = null,
-    int? DraftImageCount = null)
+    int? DraftImageCount = null,
+    IReadOnlyList<string>? ConfirmedUrls = null)
 {
     public static DiscordConfirmationResponse Unavailable(
         params string[] signals) =>

@@ -576,6 +576,17 @@ public sealed class DiscordCaptureRuntime :
                 return;
             }
 
+            if (!registration.HasImages)
+            {
+                confirmedUrls = DiscordConfirmedUrlPolicy.SelectForCapture(
+                    confirmedUrls,
+                    response.ConfirmedUrls);
+                if (confirmedUrls.Count == 0)
+                {
+                    return;
+                }
+            }
+
             var signals = new List<string>(response.ConfirmationSignals.Count + 2)
             {
                 "ctrl-v",

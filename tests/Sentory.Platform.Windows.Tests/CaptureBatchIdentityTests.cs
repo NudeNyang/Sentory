@@ -65,6 +65,25 @@ public sealed class CaptureBatchIdentityTests
     }
 
     [Fact]
+    public void KeepsOnlyUrlsObservedInSentDiscordMessage()
+    {
+        var oldUrl = new NormalizedUrl(
+            "https://example.com/old",
+            "https://example.com/old",
+            "example.com");
+        var newUrl = new NormalizedUrl(
+            "https://example.com/new",
+            "https://example.com/new",
+            "example.com");
+
+        var confirmed = DiscordConfirmedUrlPolicy.SelectForCapture(
+            [oldUrl, newUrl],
+            [newUrl.Value]);
+
+        Assert.Equal([newUrl.Value], confirmed.Select(url => url.Value));
+    }
+
+    [Fact]
     public void CombinesSeparatelyPastedImagesConfirmedByOneDiscordSend()
     {
         var leaderEventId = Guid.Parse(

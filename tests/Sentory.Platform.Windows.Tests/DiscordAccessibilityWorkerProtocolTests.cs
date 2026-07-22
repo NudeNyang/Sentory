@@ -42,6 +42,27 @@ public sealed class DiscordAccessibilityWorkerProtocolTests
     }
 
     [Fact]
+    public void PreservesConfirmedUrlsAcrossWorkerProtocol()
+    {
+        var response = new DiscordConfirmationResponse(
+            DiscordConfirmationOutcome.Confirmed,
+            DateTimeOffset.Parse("2026-07-22T06:30:00Z"),
+            ["post-send-message-url-match"],
+            ConfirmedUrls:
+            [
+                "https://example.com/new"
+            ]);
+
+        var json = JsonSerializer.Serialize(response);
+        var roundTrip = JsonSerializer.Deserialize<
+            DiscordConfirmationResponse>(json);
+
+        Assert.Equal(
+            ["https://example.com/new"],
+            roundTrip?.ConfirmedUrls);
+    }
+
+    [Fact]
     public void WorkerExceptionSignalIncludesFailureLocationAndHResult()
     {
         Exception captured;
