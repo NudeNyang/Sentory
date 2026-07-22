@@ -29,6 +29,8 @@ code is distributed under GNU GPL v3 only (GPL-3.0-only).
    Copyright © PaddlePaddle Authors
    License: Apache License 2.0
    https://github.com/PaddlePaddle/PaddleOCR
+   Exact model revisions, source URLs and SHA-256 hashes are documented in
+   MODEL-PROVENANCE.md, included with portable and installer distributions.
 
 6. RapidOcrNet 3.0.0
    Copyright © BobLd and RapidOCR contributors

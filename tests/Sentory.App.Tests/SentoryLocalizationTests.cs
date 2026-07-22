@@ -37,4 +37,23 @@ public sealed class SentoryLocalizationTests
             "현재 최신 버전을 사용하고 있습니다.",
             SentoryLocalization.Text("AppIsUpToDate"));
     }
+
+    [Fact]
+    public void LicenseWindowDescribesBundledThirdPartyNotices()
+    {
+        SentoryLocalization.Apply(new ResourceDictionary(), "ko-KR");
+
+        Assert.Equal(
+            "라이선스 및 제3자 고지",
+            SentoryLocalization.Text("LicenseHeading"));
+        Assert.Contains(
+            "오픈소스 구성 요소",
+            SentoryLocalization.Text("LicenseDescription"));
+
+        var resourceNames = typeof(LicenseWindow).Assembly
+            .GetManifestResourceNames();
+        Assert.Contains("Sentory.LICENSE.txt", resourceNames);
+        Assert.Contains("Sentory.THIRD-PARTY-NOTICES.txt", resourceNames);
+        Assert.Contains("Sentory.MODEL-PROVENANCE.md", resourceNames);
+    }
 }

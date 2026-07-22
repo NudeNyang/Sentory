@@ -40,6 +40,12 @@
     <EmbeddedResource Include="..\..\LICENSE.txt"
                       Link="Resources\LICENSE.txt"
                       LogicalName="Sentory.LICENSE.txt" />
+    <EmbeddedResource Include="..\..\distribution\THIRD-PARTY-NOTICES.txt"
+                      Link="Resources\THIRD-PARTY-NOTICES.txt"
+                      LogicalName="Sentory.THIRD-PARTY-NOTICES.txt" />
+    <EmbeddedResource Include="..\..\docs\model-provenance.md"
+                      Link="Resources\MODEL-PROVENANCE.md"
+                      LogicalName="Sentory.MODEL-PROVENANCE.md" />
   </ItemGroup>
 
 </Project>

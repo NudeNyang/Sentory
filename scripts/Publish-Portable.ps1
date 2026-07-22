@@ -17,6 +17,7 @@ $guidePath = Join-Path $repositoryRoot "distribution\README-KO.txt"
 $licensePath = Join-Path $repositoryRoot "LICENSE.txt"
 $privacyPath = Join-Path $repositoryRoot "docs\privacy.md"
 $noticesPath = Join-Path $repositoryRoot "distribution\THIRD-PARTY-NOTICES.txt"
+$modelProvenancePath = Join-Path $repositoryRoot "docs\model-provenance.md"
 $thirdPartyLicensesPath = Join-Path $repositoryRoot "distribution\licenses"
 $repositoryExecutable = Join-Path $repositoryRoot "Sentory.exe"
 
@@ -92,12 +93,14 @@ try {
     $stagedLicense = Join-Path $stagingDirectory "LICENSE.txt"
     $stagedPrivacy = Join-Path $stagingDirectory "PRIVACY.md"
     $stagedNotices = Join-Path $stagingDirectory "THIRD-PARTY-NOTICES.txt"
+    $stagedModelProvenance = Join-Path $stagingDirectory "MODEL-PROVENANCE.md"
     $stagedThirdPartyLicenses = Join-Path $stagingDirectory "licenses"
     Copy-Item -LiteralPath $publishedExecutable -Destination $stagedExecutable
     Copy-Item -LiteralPath $guidePath -Destination $stagedGuide
     Copy-Item -LiteralPath $licensePath -Destination $stagedLicense
     Copy-Item -LiteralPath $privacyPath -Destination $stagedPrivacy
     Copy-Item -LiteralPath $noticesPath -Destination $stagedNotices
+    Copy-Item -LiteralPath $modelProvenancePath -Destination $stagedModelProvenance
     Copy-Item `
         -LiteralPath $thirdPartyLicensesPath `
         -Destination $stagedThirdPartyLicenses `
@@ -107,6 +110,7 @@ try {
             $stagedLicense,
             $stagedPrivacy,
             $stagedNotices,
+            $stagedModelProvenance,
             (Join-Path $stagedThirdPartyLicenses "Apache-2.0.txt"))) {
         if (-not (Test-Path -LiteralPath $requiredDocument)) {
             throw "휴대용 필수 문서를 복사하지 못했습니다: $requiredDocument"

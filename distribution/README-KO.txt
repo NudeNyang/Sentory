@@ -96,6 +96,7 @@ Sentory는 GNU General Public License v3.0 only로 배포합니다. 라이선스
 Sentory-1.4.1-source.zip과 같은 버전의 Git 태그에서 받을 수 있습니다.
 
 개인정보 및 로컬 데이터 처리 방식은 PRIVACY.md, 제3자 구성 요소의 라이선스는
-THIRD-PARTY-NOTICES.txt를 확인해 주세요.
+THIRD-PARTY-NOTICES.txt를 확인해 주세요. 포함된 OCR 모델의 정확한 출처와
+SHA-256은 MODEL-PROVENANCE.md에 기록되어 있습니다.
 
 Copyright © 2026 NudeNyang

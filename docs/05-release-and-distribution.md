@@ -138,9 +138,14 @@ GitHub가 자동으로 제공하는 “Source code” 파일만 이용해도 소
 - `README.md`: 소개, 다운로드와 소스 빌드 방법
 - `docs/privacy.md`: 로컬 데이터, 네트워크 요청과 삭제 방법
 - `distribution/THIRD-PARTY-NOTICES.txt`: 제3자 구성 요소와 라이선스
+- `docs/model-provenance.md`: OCR 모델의 고정된 원본, 버전과 SHA-256
 - `CHANGELOG.md`: 버전별 변경 내용과 알려진 제한 사항
 - `docs/support.md`: 지원 범위와 안전한 버그 제보 방법
 - `distribution/README-KO.txt`: 최종 사용자 설치·사용 안내
+
+포터블 압축 파일과 설치판에는 `docs/model-provenance.md`를
+`MODEL-PROVENANCE.md`라는 이름으로 포함합니다. 공개 배포 전에 저장소의 OCR
+모델과 공식 원본의 SHA-256이 문서에 기록한 값과 같은지 확인합니다.
 
 현재 실행 파일과 설치 프로그램에는 코드 서명이 적용되지 않았습니다. Windows가
 알 수 없는 게시자 또는 평판 기반 경고를 표시할 수 있으므로, 공개 Release에는
