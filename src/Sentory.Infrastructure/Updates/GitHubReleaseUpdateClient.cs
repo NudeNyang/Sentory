@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Sentory.Core;
@@ -24,6 +25,8 @@ public sealed record ReleaseUpdate(
 
 public sealed class GitHubReleaseUpdateClient : IDisposable
 {
+    internal const long MaximumPackageBytes = 256L * 1024 * 1024;
+    private const int MaximumChecksumBytes = 8 * 1024;
     private const string ReleasesUri =
         "https://api.github.com/repos/NudeNyang/Sentory/releases?per_page=20";
     private readonly HttpClient _httpClient;
@@ -90,7 +93,8 @@ public sealed class GitHubReleaseUpdateClient : IDisposable
             var expectedName = $"Sentory-win-{architectureName}-{suffix}";
             var asset = release.Assets.FirstOrDefault(item =>
                 string.Equals(item.Name, expectedName, StringComparison.OrdinalIgnoreCase));
-            if (asset is null || !Uri.TryCreate(asset.DownloadUrl, UriKind.Absolute, out var uri))
+            if (asset is null ||
+                !TryCreateHttpsUri(asset.DownloadUrl, out var uri))
             {
                 continue;
             }
@@ -98,7 +102,7 @@ public sealed class GitHubReleaseUpdateClient : IDisposable
             var hash = ParseDigest(asset.Digest) ??
                        await ReadChecksumAssetAsync(release, expectedName, cancellationToken);
             if (hash is null ||
-                !Uri.TryCreate(release.HtmlUrl, UriKind.Absolute, out var releasePage))
+                !TryCreateHttpsUri(release.HtmlUrl, out var releasePage))
             {
                 continue;
             }
@@ -125,7 +129,8 @@ public sealed class GitHubReleaseUpdateClient : IDisposable
         var destination = Path.Combine(directory, update.FileName);
         if (File.Exists(destination))
         {
-            if (await HasExpectedHashAsync(
+            if (new FileInfo(destination).Length <= MaximumPackageBytes &&
+                await HasExpectedHashAsync(
                     destination,
                     update.Sha256,
                     cancellationToken))
@@ -144,6 +149,11 @@ public sealed class GitHubReleaseUpdateClient : IDisposable
                 HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken);
             response.EnsureSuccessStatusCode();
+            if (response.Content.Headers.ContentLength is > MaximumPackageBytes)
+            {
+                throw new InvalidDataException("Downloaded update is too large.");
+            }
+
             await using (var source = await response.Content.ReadAsStreamAsync(cancellationToken))
             await using (var output = new FileStream(
                              temporary,
@@ -153,7 +163,11 @@ public sealed class GitHubReleaseUpdateClient : IDisposable
                              81920,
                              FileOptions.Asynchronous | FileOptions.SequentialScan))
             {
-                await source.CopyToAsync(output, cancellationToken);
+                await CopyToLimitedAsync(
+                    source,
+                    output,
+                    MaximumPackageBytes,
+                    cancellationToken);
             }
 
             if (!await HasExpectedHashAsync(
@@ -201,12 +215,38 @@ public sealed class GitHubReleaseUpdateClient : IDisposable
         var checksum = release.Assets.FirstOrDefault(asset =>
             string.Equals(asset.Name, $"{expectedName}.sha256", StringComparison.OrdinalIgnoreCase));
         if (checksum is null ||
-            !Uri.TryCreate(checksum.DownloadUrl, UriKind.Absolute, out var uri))
+            !TryCreateHttpsUri(checksum.DownloadUrl, out var uri))
         {
             return null;
         }
 
-        var text = await _httpClient.GetStringAsync(uri, cancellationToken);
+        using var response = await _httpClient.GetAsync(
+            uri,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+        if (response.Content.Headers.ContentLength is > MaximumChecksumBytes)
+        {
+            return null;
+        }
+
+        await using var source = await response.Content.ReadAsStreamAsync(
+            cancellationToken);
+        using var content = new MemoryStream();
+        try
+        {
+            await CopyToLimitedAsync(
+                source,
+                content,
+                MaximumChecksumBytes,
+                cancellationToken);
+        }
+        catch (InvalidDataException)
+        {
+            return null;
+        }
+
+        var text = Encoding.UTF8.GetString(content.ToArray());
         var token = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
             .FirstOrDefault();
         return IsSha256(token) ? token!.ToLowerInvariant() : null;
@@ -226,6 +266,49 @@ public sealed class GitHubReleaseUpdateClient : IDisposable
 
     private static bool IsSha256(string? value) =>
         value is { Length: 64 } && value.All(Uri.IsHexDigit);
+
+    private static bool TryCreateHttpsUri(string value, out Uri uri)
+    {
+        if (Uri.TryCreate(value, UriKind.Absolute, out var candidate) &&
+            candidate.Scheme == Uri.UriSchemeHttps &&
+            string.IsNullOrEmpty(candidate.UserInfo))
+        {
+            uri = candidate;
+            return true;
+        }
+
+        uri = null!;
+        return false;
+    }
+
+    internal static async Task CopyToLimitedAsync(
+        Stream source,
+        Stream destination,
+        long maximumBytes,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumBytes);
+        var buffer = new byte[81_920];
+        long total = 0;
+        while (true)
+        {
+            var read = await source.ReadAsync(buffer, cancellationToken);
+            if (read == 0)
+            {
+                return;
+            }
+
+            total += read;
+            if (total > maximumBytes)
+            {
+                throw new InvalidDataException("Downloaded update is too large.");
+            }
+
+            await destination.WriteAsync(
+                buffer.AsMemory(0, read),
+                cancellationToken);
+        }
+    }
 
     public void Dispose()
     {

@@ -8,7 +8,10 @@ namespace Sentory.Platform.Windows.Interop;
 
 public sealed class DiscordAttachmentDownloader : IDisposable
 {
-    internal const long MaximumImageBytes = 128L * 1024 * 1024;
+    internal const long MaximumImageBytes =
+        ClipboardImageCodec.MaximumEncodedImageBytes;
+    internal const int MaximumImagesPerBatch =
+        ClipboardImageCodec.MaximumImagesPerBatch;
 
     private readonly HttpClient _httpClient;
     private readonly bool _ownsClient;
@@ -31,11 +34,23 @@ public sealed class DiscordAttachmentDownloader : IDisposable
         CancellationToken cancellationToken = default)
     {
         var results = new List<ClipboardImageSnapshot>();
+        long totalBytes = 0;
         foreach (var url in attachmentUrls
                      .Where(DiscordAttachmentUrlExtractor.IsAllowedAttachmentUrl)
-                     .Distinct(StringComparer.Ordinal))
+                     .Distinct(StringComparer.Ordinal)
+                     .Take(MaximumImagesPerBatch))
         {
-            var image = await TryDownloadAsync(url, cancellationToken);
+            var remainingBytes =
+                ClipboardImageCodec.MaximumBatchImageBytes - totalBytes;
+            if (remainingBytes <= 0)
+            {
+                break;
+            }
+
+            var image = await TryDownloadAsync(
+                url,
+                Math.Min(MaximumImageBytes, remainingBytes),
+                cancellationToken);
             if (image is not null && results.All(existing =>
                     !string.Equals(
                         existing.Sha256,
@@ -43,6 +58,7 @@ public sealed class DiscordAttachmentDownloader : IDisposable
                         StringComparison.OrdinalIgnoreCase)))
             {
                 results.Add(image);
+                totalBytes += image.ContentBytes.LongLength;
             }
         }
 
@@ -51,6 +67,7 @@ public sealed class DiscordAttachmentDownloader : IDisposable
 
     private async Task<ClipboardImageSnapshot?> TryDownloadAsync(
         string url,
+        long maximumBytes,
         CancellationToken cancellationToken)
     {
         try
@@ -64,7 +81,8 @@ public sealed class DiscordAttachmentDownloader : IDisposable
                 response.RequestMessage?.RequestUri is not { } finalUri ||
                 !DiscordAttachmentUrlExtractor.IsAllowedAttachmentUrl(
                     finalUri.AbsoluteUri) ||
-                response.Content.Headers.ContentLength is > MaximumImageBytes)
+                response.Content.Headers.ContentLength is > 0 and var contentLength &&
+                contentLength > maximumBytes)
             {
                 return null;
             }
@@ -76,32 +94,19 @@ public sealed class DiscordAttachmentDownloader : IDisposable
                 return null;
             }
 
-            await using var stream = await response.Content.ReadAsStreamAsync(
+            var bytes = await ReadLimitedBytesAsync(
+                response.Content,
+                maximumBytes,
                 cancellationToken);
-            using var content = new MemoryStream();
-            var buffer = new byte[81_920];
-            while (true)
+            if (bytes is null)
             {
-                var read = await stream.ReadAsync(buffer, cancellationToken);
-                if (read == 0)
-                {
-                    break;
-                }
-
-                if (content.Length + read > MaximumImageBytes)
-                {
-                    return null;
-                }
-
-                await content.WriteAsync(
-                    buffer.AsMemory(0, read),
-                    cancellationToken);
+                return null;
             }
 
             var extension = Path.GetExtension(
                 Uri.UnescapeDataString(finalUri.AbsolutePath));
             return ClipboardImageCodec.TryDecode(
-                content.ToArray(),
+                bytes,
                 extension,
                 mimeType);
         }
@@ -110,6 +115,61 @@ public sealed class DiscordAttachmentDownloader : IDisposable
                   TaskCanceledException or UriFormatException)
         {
             return null;
+        }
+    }
+
+    private static async Task<byte[]?> ReadLimitedBytesAsync(
+        HttpContent content,
+        long maximumBytes,
+        CancellationToken cancellationToken)
+    {
+        await using var stream = await content.ReadAsStreamAsync(cancellationToken);
+        if (content.Headers.ContentLength is >= 0 and var contentLength)
+        {
+            if (contentLength > maximumBytes || contentLength > int.MaxValue)
+            {
+                return null;
+            }
+
+            var bytes = GC.AllocateUninitializedArray<byte>((int)contentLength);
+            var offset = 0;
+            while (offset < bytes.Length)
+            {
+                var read = await stream.ReadAsync(
+                    bytes.AsMemory(offset),
+                    cancellationToken);
+                if (read == 0)
+                {
+                    return null;
+                }
+
+                offset += read;
+            }
+
+            var overflowProbe = new byte[1];
+            return await stream.ReadAsync(overflowProbe, cancellationToken) == 0
+                ? bytes
+                : null;
+        }
+
+        using var buffered = new MemoryStream();
+        var buffer = new byte[81_920];
+        while (true)
+        {
+            var read = await stream.ReadAsync(buffer, cancellationToken);
+            if (read == 0)
+            {
+                return buffered.ToArray();
+            }
+
+            if (buffered.Length + read > maximumBytes)
+            {
+                return null;
+            }
+
+            await buffered.WriteAsync(
+                buffer.AsMemory(0, read),
+                cancellationToken);
         }
     }
 

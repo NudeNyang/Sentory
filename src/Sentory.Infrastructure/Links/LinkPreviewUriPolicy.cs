@@ -35,22 +35,36 @@ internal static class LinkPreviewUriPolicy
             return false;
         }
 
-        if (IPAddress.TryParse(uri.Host, out var literalAddress))
+        var addresses = await ResolveAllowedHostAddressesAsync(
+            uri.DnsSafeHost,
+            resolver,
+            cancellationToken);
+        return addresses.Length > 0;
+    }
+
+    internal static async Task<IPAddress[]> ResolveAllowedHostAddressesAsync(
+        string host,
+        IHostAddressResolver resolver,
+        CancellationToken cancellationToken)
+    {
+        if (IPAddress.TryParse(host, out var literalAddress))
         {
-            return IsPublic(literalAddress);
+            return IsPublic(literalAddress) ? [literalAddress] : [];
         }
 
         IPAddress[] addresses;
         try
         {
-            addresses = await resolver.ResolveAsync(uri.DnsSafeHost, cancellationToken);
+            addresses = await resolver.ResolveAsync(host, cancellationToken);
         }
         catch (SocketException)
         {
-            return false;
+            return [];
         }
 
-        return addresses.Length > 0 && addresses.All(IsPublic);
+        return addresses.Length > 0 && addresses.All(IsPublic)
+            ? addresses.Distinct().ToArray()
+            : [];
     }
 
     internal static bool IsPublic(IPAddress address)

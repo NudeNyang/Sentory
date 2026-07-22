@@ -134,6 +134,35 @@ public sealed class ClipboardImageCodecTests
         }
     }
 
+    [Fact]
+    public void RejectsImageFileLargerThanEncodedByteLimitBeforeReadingIt()
+    {
+        var path = Path.Combine(
+            Path.GetTempPath(),
+            $"sentory-oversized-{Guid.NewGuid():N}.png");
+        try
+        {
+            using (var stream = File.Create(path))
+            {
+                stream.SetLength(ClipboardImageCodec.MaximumEncodedImageBytes + 1);
+            }
+
+            Assert.Null(ClipboardImageCodec.TryReadFile(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void AllowsEightKButRejectsExcessiveDecodedPixelCount()
+    {
+        Assert.True(ClipboardImageCodec.IsAllowedDimensions(7680, 4320));
+        Assert.False(ClipboardImageCodec.IsAllowedDimensions(10_000, 10_000));
+        Assert.False(ClipboardImageCodec.IsAllowedDimensions(40_000, 1));
+    }
+
     private static byte[] DecodeBgra32(byte[] bytes, int width, int height)
     {
         using var stream = new MemoryStream(bytes, writable: false);

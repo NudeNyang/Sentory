@@ -181,11 +181,8 @@ public sealed class DiscordCaptureRuntime :
 
         try
         {
-            var images = await Task.Run(() => imagePaths
-                .Select(ClipboardImageCodec.TryReadFile)
-                .Where(image => image is not null)
-                .Cast<ClipboardImageSnapshot>()
-                .ToList());
+            var images = await Task.Run(() =>
+                ClipboardImageCodec.TryReadFiles(imagePaths));
             if (images.Count == 0)
             {
                 return DiscordNativeDropRegistrationResult.ImageReadFailed;

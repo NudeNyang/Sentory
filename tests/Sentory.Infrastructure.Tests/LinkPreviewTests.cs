@@ -60,6 +60,29 @@ public sealed class LinkPreviewTests : IDisposable
     }
 
     [Fact]
+    public async Task UriPolicyRejectsHostWhenAnyDnsAnswerIsPrivate()
+    {
+        var allowed = await LinkPreviewUriPolicy.IsAllowedAsync(
+            new Uri("https://rebind.example/path"),
+            new FixedResolver(
+                IPAddress.Parse("93.184.216.34"),
+                IPAddress.Loopback),
+            CancellationToken.None);
+
+        Assert.False(allowed);
+    }
+
+    [Fact]
+    public async Task ConnectionStepRejectsPrivateDnsRebindingAnswer()
+    {
+        await Assert.ThrowsAsync<HttpRequestException>(async () =>
+            await LinkPreviewFetcher.ConnectToPublicEndpointAsync(
+                new DnsEndPoint("rebind.example", 443),
+                new FixedResolver(IPAddress.Loopback),
+                CancellationToken.None));
+    }
+
+    [Fact]
     public async Task FetcherStoresMetadataAndAssetsInLocalCache()
     {
         var paths = SentoryDataPaths.ForRoot(_root);

@@ -15,12 +15,13 @@ code is distributed under GNU GPL v3 only (GPL-3.0-only).
    License: MIT
    https://learn.microsoft.com/dotnet/standard/data/sqlite/
 
-3. SQLitePCLRaw 2.1.6
-   Copyright 2014-2023 SourceGear, LLC
+3. SQLitePCLRaw 3.0.4
+   Copyright 2014-2026 SourceGear, LLC
    License: Apache License 2.0
    https://github.com/ericsink/SQLitePCL.raw
 
-4. SQLite
+4. SourceGear.sqlite3 3.53.3 and SQLite
+   Package copyright 2014-2026 SourceGear, LLC
    SQLite is in the public domain.
    https://www.sqlite.org/copyright.html
 

@@ -230,6 +230,70 @@ public sealed class GitHubReleaseUpdateClientTests
         }
     }
 
+    [Fact]
+    public async Task RejectsPackageDeclaredLargerThanDownloadLimit()
+    {
+        var payload = "small body"u8.ToArray();
+        var hash = Convert.ToHexString(SHA256.HashData(payload)).ToLowerInvariant();
+        var handler = new StubHandler(request =>
+        {
+            if (request.RequestUri!.AbsolutePath.EndsWith("/releases"))
+            {
+                return Json($$"""
+                    [{
+                      "tag_name":"v0.9.1-beta","name":"update","body":"",
+                      "html_url":"https://example.test/release","draft":false,
+                      "prerelease":true,"assets":[{
+                        "name":"Sentory-win-x64-portable.zip",
+                        "browser_download_url":"https://example.test/update.zip",
+                        "digest":"sha256:{{hash}}"
+                      }]
+                    }]
+                    """);
+            }
+
+            var content = new ByteArrayContent(payload);
+            content.Headers.ContentLength =
+                GitHubReleaseUpdateClient.MaximumPackageBytes + 1;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = content
+            };
+        });
+        using var client = new GitHubReleaseUpdateClient(new HttpClient(handler));
+        var update = await client.CheckAsync(
+            "0.9.0-beta", Architecture.X64, UpdatePackageKind.Portable);
+        var directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            await Assert.ThrowsAsync<InvalidDataException>(() =>
+                client.DownloadAsync(update!, directory));
+            Assert.Empty(Directory.Exists(directory)
+                ? Directory.EnumerateFiles(directory)
+                : []);
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public async Task StopsStreamingPackageAfterConfiguredLimit()
+    {
+        await using var source = new MemoryStream([1, 2, 3, 4, 5]);
+        await using var destination = new MemoryStream();
+
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            GitHubReleaseUpdateClient.CopyToLimitedAsync(
+                source,
+                destination,
+                4,
+                CancellationToken.None));
+
+        Assert.True(destination.Length <= 4);
+    }
+
     private static HttpResponseMessage Json(string value) => new(HttpStatusCode.OK)
     {
         Content = new StringContent(value, System.Text.Encoding.UTF8, "application/json")

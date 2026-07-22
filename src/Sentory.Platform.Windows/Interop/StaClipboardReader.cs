@@ -122,13 +122,11 @@ public sealed class StaClipboardReader : IDisposable
                 // the sequence-stability check instead of turning that work into
                 // a race against the messenger.
                 IReadOnlyList<ClipboardImageSnapshot> images = imagePaths.Length > 0
-                    ? imagePaths
-                        .Select(ClipboardImageCodec.TryReadFile)
-                        .Where(image => image is not null)
-                        .Cast<ClipboardImageSnapshot>()
-                        .ToList()
+                    ? ClipboardImageCodec.TryReadFiles(imagePaths)
                     : bitmap is { PixelWidth: > 0, PixelHeight: > 0 }
-                        ? [ClipboardImageCodec.Encode(bitmap)]
+                        ? ClipboardImageCodec.TryEncode(bitmap) is { } encoded
+                            ? [encoded]
+                            : []
                         : [];
                 if (images.Count == 0 && string.IsNullOrWhiteSpace(text))
                 {
@@ -175,6 +173,12 @@ public sealed class StaClipboardReader : IDisposable
 
 internal static class ClipboardImageCodec
 {
+    internal const long MaximumEncodedImageBytes = 64L * 1024 * 1024;
+    internal const long MaximumBatchImageBytes = 256L * 1024 * 1024;
+    internal const int MaximumImagesPerBatch = 12;
+    internal const long MaximumPixelCount = 60_000_000;
+    internal const int MaximumDimension = 32_768;
+
     private static readonly HashSet<string> SupportedExtensions = new(
         [".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tif", ".tiff", ".webp"],
         StringComparer.OrdinalIgnoreCase);
@@ -192,12 +196,13 @@ internal static class ClipboardImageCodec
                 FileMode.Open,
                 FileAccess.Read,
                 FileShare.ReadWrite | FileShare.Delete);
-            using (var content = new MemoryStream(
-                       stream.Length > int.MaxValue ? 0 : (int)stream.Length))
+            if (stream.Length is <= 0 or > MaximumEncodedImageBytes)
             {
-                stream.CopyTo(content);
-                bytes = content.ToArray();
+                return null;
             }
+
+            bytes = GC.AllocateUninitializedArray<byte>((int)stream.Length);
+            stream.ReadExactly(bytes);
 
             var extension = NormalizeExtension(Path.GetExtension(path));
             var decoded = TryDecode(
@@ -216,14 +221,71 @@ internal static class ClipboardImageCodec
         }
     }
 
+    public static IReadOnlyList<ClipboardImageSnapshot> TryReadFiles(
+        IEnumerable<string> paths)
+    {
+        var images = new List<ClipboardImageSnapshot>();
+        var hashes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        long totalBytes = 0;
+        foreach (var path in paths
+                     .Where(IsSupportedImagePath)
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                     .Take(MaximumImagesPerBatch))
+        {
+            var image = TryReadFile(path);
+            if (image is null || !hashes.Add(image.Sha256))
+            {
+                continue;
+            }
+
+            if (image.ContentBytes.LongLength >
+                MaximumBatchImageBytes - totalBytes)
+            {
+                continue;
+            }
+
+            images.Add(image);
+            totalBytes += image.ContentBytes.LongLength;
+        }
+
+        return images;
+    }
+
+    public static ClipboardImageSnapshot? TryEncode(BitmapSource bitmap)
+    {
+        if (!IsAllowedDimensions(bitmap.PixelWidth, bitmap.PixelHeight))
+        {
+            return null;
+        }
+
+        try
+        {
+            return Encode(bitmap);
+        }
+        catch (InvalidDataException)
+        {
+            return null;
+        }
+    }
+
     public static ClipboardImageSnapshot Encode(BitmapSource bitmap)
     {
+        if (!IsAllowedDimensions(bitmap.PixelWidth, bitmap.PixelHeight))
+        {
+            throw new InvalidDataException("Image dimensions exceed the capture limit.");
+        }
+
         bitmap = RepairMissingClipboardAlpha(bitmap);
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var stream = new MemoryStream();
         encoder.Save(stream);
         var bytes = stream.ToArray();
+        if (bytes.LongLength > MaximumEncodedImageBytes)
+        {
+            throw new InvalidDataException("Encoded image exceeds the capture limit.");
+        }
+
         return new ClipboardImageSnapshot(
             bytes,
             Convert.ToHexString(SHA256.HashData(bytes)),
@@ -288,12 +350,24 @@ internal static class ClipboardImageCodec
     {
         try
         {
+            if (bytes.LongLength is <= 0 or > MaximumEncodedImageBytes)
+            {
+                return null;
+            }
+
             using var stream = new MemoryStream(bytes, writable: false);
             var decoder = BitmapDecoder.Create(
                 stream,
-                BitmapCreateOptions.PreservePixelFormat,
-                BitmapCacheOption.OnLoad);
+                BitmapCreateOptions.PreservePixelFormat |
+                BitmapCreateOptions.DelayCreation,
+                BitmapCacheOption.None);
             if (decoder.Frames.Count == 0)
+            {
+                return null;
+            }
+
+            var frame = decoder.Frames[0];
+            if (!IsAllowedDimensions(frame.PixelWidth, frame.PixelHeight))
             {
                 return null;
             }
@@ -308,8 +382,8 @@ internal static class ClipboardImageCodec
             return new ClipboardImageSnapshot(
                 bytes,
                 Convert.ToHexString(SHA256.HashData(bytes)),
-                decoder.Frames[0].PixelWidth,
-                decoder.Frames[0].PixelHeight,
+                frame.PixelWidth,
+                frame.PixelHeight,
                 MimeTypeFor(extension),
                 extension);
         }
@@ -320,6 +394,11 @@ internal static class ClipboardImageCodec
             return null;
         }
     }
+
+    internal static bool IsAllowedDimensions(int width, int height) =>
+        width is > 0 and <= MaximumDimension &&
+        height is > 0 and <= MaximumDimension &&
+        (long)width * height <= MaximumPixelCount;
 
     private static string ResolveExtension(
         string? extension,

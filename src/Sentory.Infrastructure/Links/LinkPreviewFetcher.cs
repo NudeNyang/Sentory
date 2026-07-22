@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using Sentory.Core;
@@ -19,7 +20,14 @@ public sealed class LinkPreviewFetcher : IDisposable
     private readonly bool _ownsHttpClient;
 
     public LinkPreviewFetcher(SentoryDataPaths paths)
-        : this(paths, CreateHttpClient(), new DnsHostAddressResolver(), true)
+        : this(paths, new DnsHostAddressResolver())
+    {
+    }
+
+    private LinkPreviewFetcher(
+        SentoryDataPaths paths,
+        IHostAddressResolver resolver)
+        : this(paths, CreateHttpClient(resolver), resolver, true)
     {
     }
 
@@ -395,7 +403,7 @@ public sealed class LinkPreviewFetcher : IDisposable
             null,
             fetchedAt);
 
-    private static HttpClient CreateHttpClient()
+    private static HttpClient CreateHttpClient(IHostAddressResolver resolver)
     {
         var handler = new SocketsHttpHandler
         {
@@ -403,12 +411,67 @@ public sealed class LinkPreviewFetcher : IDisposable
             AutomaticDecompression = DecompressionMethods.GZip |
                                      DecompressionMethods.Deflate |
                                      DecompressionMethods.Brotli,
-            UseCookies = false
+            UseCookies = false,
+            UseProxy = false,
+            ConnectCallback = (context, cancellationToken) =>
+                ConnectToPublicEndpointAsync(
+                    context.DnsEndPoint,
+                    resolver,
+                    cancellationToken)
         };
         return new HttpClient(handler)
         {
             Timeout = TimeSpan.FromSeconds(10)
         };
+    }
+
+    internal static async ValueTask<Stream> ConnectToPublicEndpointAsync(
+        DnsEndPoint endpoint,
+        IHostAddressResolver resolver,
+        CancellationToken cancellationToken)
+    {
+        var addresses = await LinkPreviewUriPolicy.ResolveAllowedHostAddressesAsync(
+            endpoint.Host,
+            resolver,
+            cancellationToken);
+        if (addresses.Length == 0)
+        {
+            throw new HttpRequestException("Blocked link preview address.");
+        }
+
+        Exception? lastFailure = null;
+        foreach (var address in addresses)
+        {
+            var socket = new Socket(
+                address.AddressFamily,
+                SocketType.Stream,
+                ProtocolType.Tcp)
+            {
+                NoDelay = true
+            };
+            try
+            {
+                await socket.ConnectAsync(
+                    new IPEndPoint(address, endpoint.Port),
+                    cancellationToken);
+                return new NetworkStream(socket, ownsSocket: true);
+            }
+            catch (Exception exception)
+                when (exception is SocketException or OperationCanceledException)
+            {
+                socket.Dispose();
+                if (exception is OperationCanceledException)
+                {
+                    throw;
+                }
+
+                lastFailure = exception;
+            }
+        }
+
+        throw new HttpRequestException(
+            "Could not connect to an allowed link preview address.",
+            lastFailure);
     }
 
     public void Dispose()

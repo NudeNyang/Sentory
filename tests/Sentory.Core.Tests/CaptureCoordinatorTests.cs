@@ -54,9 +54,10 @@ public sealed class CaptureCoordinatorTests
         Assert.NotNull(result);
         var request = Assert.Single(repository.Collections);
         Assert.Equal(2, request.Members.Count);
-        Assert.Single(request.Members.Where(member => member.Kind == ContentKind.Url));
-        var image = Assert.Single(request.Members.Where(member =>
-            member.Kind == ContentKind.Image));
+        Assert.Single(request.Members, member => member.Kind == ContentKind.Url);
+        var image = Assert.Single(
+            request.Members,
+            member => member.Kind == ContentKind.Image);
         Assert.Equal("프로젝트 화면.png", image.OriginalUrl);
     }
 

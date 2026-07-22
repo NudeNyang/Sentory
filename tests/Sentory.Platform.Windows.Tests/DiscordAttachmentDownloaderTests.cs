@@ -68,6 +68,37 @@ public sealed class DiscordAttachmentDownloaderTests
         Assert.Empty(images);
     }
 
+    [Fact]
+    public async Task RequestsAtMostConfiguredAttachmentCount()
+    {
+        var png = CreatePng();
+        var requestCount = 0;
+        using var client = new HttpClient(new StubHandler(request =>
+        {
+            requestCount++;
+            var response = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                RequestMessage = request,
+                Content = new ByteArrayContent(png)
+            };
+            response.Content.Headers.ContentType =
+                new MediaTypeHeaderValue("image/png");
+            return response;
+        }));
+        using var downloader = new DiscordAttachmentDownloader(client);
+        var urls = Enumerable.Range(0, MaximumRequestCountForTest)
+            .Select(index =>
+                $"https://cdn.discordapp.com/attachments/1/{index}/photo.png")
+            .ToArray();
+
+        await downloader.DownloadAsync(urls);
+
+        Assert.Equal(DiscordAttachmentDownloader.MaximumImagesPerBatch, requestCount);
+    }
+
+    private const int MaximumRequestCountForTest =
+        DiscordAttachmentDownloader.MaximumImagesPerBatch + 5;
+
     private static byte[] CreatePng()
     {
         var pixels = new byte[]

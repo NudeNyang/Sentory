@@ -110,14 +110,7 @@ public sealed class KakaoCaptureRuntime : ICaptureRuntime
             }
 
             var images = await Task.Run(
-                () => supportedPaths
-                    .Select(ClipboardImageCodec.TryReadFile)
-                    .Where(image => image is not null)
-                    .Cast<ClipboardImageSnapshot>()
-                    .DistinctBy(
-                        image => image.Sha256,
-                        StringComparer.OrdinalIgnoreCase)
-                    .ToList(),
+                () => ClipboardImageCodec.TryReadFiles(supportedPaths),
                 cancellationToken);
             if (images.Count == 0)
             {
