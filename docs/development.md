@@ -404,11 +404,11 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
 모두 종료한 뒤 저장소 루트에서 다음 명령을 실행한다.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\Start-InstalledDiagnostics.ps1 -Version 1.4.1
+powershell -ExecutionPolicy Bypass -File .\scripts\Start-InstalledDiagnostics.ps1 -Version 1.4.2
 ```
 
 설치판의 데이터베이스, 설정, 캐시와 Discord 추적 로그는
-`%LOCALAPPDATA%\Sentory-Diagnostics\1.4.1` 아래에 생성된다. 환경 변수는 실행한
+`%LOCALAPPDATA%\Sentory-Diagnostics\1.4.2` 아래에 생성된다. 환경 변수는 실행한
 프로세스와 그 접근성 작업자에만 전달되므로 기본 데이터 폴더와 시스템 환경
 변수는 바뀌지 않는다. Windows 자동 실행이나 일반 바로가기로 연 Sentory는 이
 진단 폴더를 사용하지 않으므로 재현할 때마다 위 스크립트로 실행한다.
