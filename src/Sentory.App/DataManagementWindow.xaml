@@ -14,6 +14,7 @@
         <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#E9E4DC" />
         <SolidColorBrush x:Key="SurfaceBrush" Color="#F7F3EC" />
         <SolidColorBrush x:Key="InputBackgroundBrush" Color="#E4DED5" />
+        <SolidColorBrush x:Key="SecondaryButtonBackgroundBrush" Color="#E4DED5" />
         <SolidColorBrush x:Key="PopupBackgroundBrush" Color="#F7F3EC" />
         <SolidColorBrush x:Key="PopupHoverBrush" Color="#E4DED5" />
         <SolidColorBrush x:Key="TextBrush" Color="#292722" />
@@ -67,7 +68,7 @@
         <Style x:Key="SecondaryButtonStyle"
                TargetType="Button"
                BasedOn="{StaticResource ActionButtonStyle}">
-            <Setter Property="Background" Value="{DynamicResource InputBackgroundBrush}" />
+            <Setter Property="Background" Value="{DynamicResource SecondaryButtonBackgroundBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
         </Style>
         <Style TargetType="ComboBox">
