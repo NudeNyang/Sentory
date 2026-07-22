@@ -867,6 +867,8 @@ public sealed class DiscordCaptureRuntime :
         CancellationToken cancellationToken)
     {
         var observedDraftImage = false;
+        int? lastLoggedDraftImageCount = null;
+        DiscordConfirmationOutcome? lastLoggedOutcome = null;
         try
         {
             while (true)
@@ -905,11 +907,21 @@ public sealed class DiscordCaptureRuntime :
                 if (response.Outcome == DiscordConfirmationOutcome.Confirmed &&
                     response.DraftImageCount is { } draftImageCount)
                 {
+                    if (lastLoggedOutcome != response.Outcome ||
+                        lastLoggedDraftImageCount != draftImageCount)
+                    {
+                        DiscordCaptureTrace.Write(
+                            "draft-image-count-observed",
+                            $"count={draftImageCount}");
+                        lastLoggedOutcome = response.Outcome;
+                        lastLoggedDraftImageCount = draftImageCount;
+                    }
+
                     observedDraftImage |= draftImageCount > 0;
                     if (!observedDraftImage)
                     {
                         await Task.Delay(
-                            TimeSpan.FromMilliseconds(300),
+                            TimeSpan.FromMilliseconds(100),
                             cancellationToken);
                         continue;
                     }
@@ -950,9 +962,17 @@ public sealed class DiscordCaptureRuntime :
                         }
                     }
                 }
+                else if (lastLoggedOutcome != response.Outcome)
+                {
+                    DiscordCaptureTrace.Write(
+                        "draft-image-inspection-unavailable",
+                        $"outcome={response.Outcome} signals={string.Join(',', response.ConfirmationSignals.Take(3))}");
+                    lastLoggedOutcome = response.Outcome;
+                    lastLoggedDraftImageCount = null;
+                }
 
                 await Task.Delay(
-                    TimeSpan.FromMilliseconds(300),
+                    TimeSpan.FromMilliseconds(100),
                     cancellationToken);
             }
         }

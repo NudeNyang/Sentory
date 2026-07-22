@@ -18,6 +18,7 @@ public static class DiscordAccessibilityWorker
     private const int RoleSystemDocument = 15;
     private const int RoleSystemList = 33;
     private const int RoleSystemListItem = 34;
+    private const int RoleSystemOutline = 35;
     private const int RoleSystemGraphic = 40;
     private const int RoleSystemText = 42;
     private const int RoleSystemPushButton = 43;
@@ -220,6 +221,26 @@ public static class DiscordAccessibilityWorker
                 "request-or-window-validation-failed");
         }
 
+        if (request.ContentKind ==
+            DiscordConfirmationContentKind.DraftImageInspection)
+        {
+            if (!TryCreateAccessible(
+                    new nint(request.RendererWindowHandle),
+                    out var draftAccessibleRoot))
+            {
+                return DiscordConfirmationResponse.Unavailable(
+                    "renderer-accessibility-root-unavailable");
+            }
+
+            var draftImageCount = CountDraftImageAttachments(
+                draftAccessibleRoot);
+            return new DiscordConfirmationResponse(
+                DiscordConfirmationOutcome.Confirmed,
+                DateTimeOffset.UtcNow,
+                [$"draft-image-count:{draftImageCount}"],
+                DraftImageCount: draftImageCount);
+        }
+
         var requireMatchingUrlInput = RequiresMatchingUrlInput(request);
         TargetResolution resolved;
         string unavailableSignal;
@@ -253,17 +274,6 @@ public static class DiscordAccessibilityWorker
 
         var accessibleRoot = resolved.AccessibleRoot;
         var messageList = resolved.MessageList;
-        if (request.ContentKind ==
-            DiscordConfirmationContentKind.DraftImageInspection)
-        {
-            var draftImageCount = CountDraftImageAttachments(accessibleRoot);
-            return new DiscordConfirmationResponse(
-                DiscordConfirmationOutcome.Confirmed,
-                DateTimeOffset.UtcNow,
-                [$"draft-image-count:{draftImageCount}"],
-                DraftImageCount: draftImageCount);
-        }
-
         var baselineMessages = GetDirectListItems(messageList);
         var baselineMessageCount = baselineMessages.Count;
         var baselineFingerprints = CreateMessageFingerprintSet(
@@ -1251,6 +1261,13 @@ public static class DiscordAccessibilityWorker
         var visited = new HashSet<long>();
         var nodeCount = 0;
         var count = 0;
+        var hasRootBounds = TryGetAccessibleBounds(
+            root,
+            0,
+            out var rootLeft,
+            out var rootTop,
+            out var rootWidth,
+            out var rootHeight);
 
         void Inspect(AccessibleTarget target, int depth)
         {
@@ -1260,8 +1277,29 @@ public static class DiscordAccessibilityWorker
                 return;
             }
 
-            if (SafeRole(target.Accessible, target.ChildId) ==
-                    RoleSystemPushButton &&
+            if (hasRootBounds &&
+                TryGetAccessibleBounds(
+                    target.Accessible,
+                    target.ChildId,
+                    out var nodeLeft,
+                    out var nodeTop,
+                    out var nodeWidth,
+                    out var nodeHeight) &&
+                !IntersectsDraftInspectionRegion(
+                    rootLeft,
+                    rootTop,
+                    rootWidth,
+                    rootHeight,
+                    nodeLeft,
+                    nodeTop,
+                    nodeWidth,
+                    nodeHeight))
+            {
+                return;
+            }
+
+            var role = SafeRole(target.Accessible, target.ChildId);
+            if (role == RoleSystemPushButton &&
                 (LooksLikeDraftAttachmentRemoveControl(
                      SafeName(target.Accessible, target.ChildId)) ||
                  LooksLikeDraftAttachmentRemoveControl(
@@ -1270,6 +1308,11 @@ public static class DiscordAccessibilityWorker
                      SafeDescription(target.Accessible, target.ChildId))))
             {
                 count++;
+            }
+
+            if (role is RoleSystemOutline or RoleSystemList)
+            {
+                return;
             }
 
             var nested = ToAccessible(target);
@@ -1286,6 +1329,34 @@ public static class DiscordAccessibilityWorker
 
         Inspect(new AccessibleTarget(root, 0), 0);
         return count;
+    }
+
+    internal static bool IntersectsDraftInspectionRegion(
+        int rootLeft,
+        int rootTop,
+        int rootWidth,
+        int rootHeight,
+        int nodeLeft,
+        int nodeTop,
+        int nodeWidth,
+        int nodeHeight)
+    {
+        if (rootWidth <= 0 || rootHeight <= 0 ||
+            nodeWidth <= 0 || nodeHeight <= 0)
+        {
+            return true;
+        }
+
+        var inspectionLeft = rootLeft + (rootWidth / 4);
+        var inspectionTop = rootTop + (rootHeight / 4);
+        var rootRight = rootLeft + rootWidth;
+        var rootBottom = rootTop + rootHeight;
+        var nodeRight = nodeLeft + nodeWidth;
+        var nodeBottom = nodeTop + nodeHeight;
+        return nodeRight > inspectionLeft &&
+               nodeLeft < rootRight &&
+               nodeBottom > inspectionTop &&
+               nodeTop < rootBottom;
     }
 
     private static List<AccessibleTarget> GetDirectListItems(
@@ -1546,6 +1617,38 @@ public static class DiscordAccessibilityWorker
         catch (InvalidCastException)
         {
             return null;
+        }
+    }
+
+    private static bool TryGetAccessibleBounds(
+        IAccessible accessible,
+        object childId,
+        out int left,
+        out int top,
+        out int width,
+        out int height)
+    {
+        left = 0;
+        top = 0;
+        width = 0;
+        height = 0;
+        try
+        {
+            accessible.accLocation(
+                out left,
+                out top,
+                out width,
+                out height,
+                childId);
+            return width > 0 && height > 0;
+        }
+        catch (COMException)
+        {
+            return false;
+        }
+        catch (InvalidCastException)
+        {
+            return false;
         }
     }
 

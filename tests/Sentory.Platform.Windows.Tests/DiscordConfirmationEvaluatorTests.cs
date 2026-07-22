@@ -344,4 +344,31 @@ public sealed class DiscordConfirmationEvaluatorTests
             DiscordAccessibilityWorker
                 .LooksLikeDraftAttachmentRemoveControl(value));
     }
+
+    [Theory]
+    [InlineData(0, 0, 1080, 1874, true)]
+    [InlineData(0, 0, 1080, 80, false)]
+    [InlineData(0, 100, 260, 1700, false)]
+    [InlineData(300, 500, 780, 120, true)]
+    [InlineData(300, 1500, 780, 300, true)]
+    [InlineData(0, 0, 0, 0, true)]
+    public void LimitsDraftInspectionToChatComposerRegion(
+        int nodeLeft,
+        int nodeTop,
+        int nodeWidth,
+        int nodeHeight,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            DiscordAccessibilityWorker.IntersectsDraftInspectionRegion(
+                0,
+                0,
+                1080,
+                1874,
+                nodeLeft,
+                nodeTop,
+                nodeWidth,
+                nodeHeight));
+    }
 }
