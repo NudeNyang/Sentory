@@ -147,9 +147,10 @@ public partial class DataManagementWindow : Window
         ApplyPalette();
         ApplyTitleBarTheme();
         ThemeSelectionChanged?.Invoke(_themeMode, _isDarkTheme);
-        StatusText.Text = _isDarkTheme
-            ? SentoryLocalization.Text("DarkModeApplied")
-            : SentoryLocalization.Text("LightModeApplied");
+        StatusText.Text = SentoryLocalization.Text(
+            SentoryThemePreference.AppliedMessageKey(
+                _themeMode,
+                _isDarkTheme));
 
         await Dispatcher.Yield(DispatcherPriority.Background);
 

@@ -21,6 +21,15 @@ internal static class SentoryThemePreference
             _ => false
         };
 
+    public static string AppliedMessageKey(
+        SentoryThemeMode mode,
+        bool isDark) =>
+        mode == SentoryThemeMode.System
+            ? "SystemThemeApplied"
+            : isDark
+                ? "DarkModeApplied"
+                : "LightModeApplied";
+
     public static bool ReadWindowsIsDark()
     {
         try

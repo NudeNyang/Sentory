@@ -20,4 +20,19 @@ public sealed class SentoryThemePreferenceTests
             expected,
             SentoryThemePreference.ResolveIsDark(mode, windowsDark));
     }
+
+    [Theory]
+    [InlineData(SentoryThemeMode.Light, false, "LightModeApplied")]
+    [InlineData(SentoryThemeMode.Dark, true, "DarkModeApplied")]
+    [InlineData(SentoryThemeMode.System, false, "SystemThemeApplied")]
+    [InlineData(SentoryThemeMode.System, true, "SystemThemeApplied")]
+    public void SelectsAppliedMessageForThemeMode(
+        SentoryThemeMode mode,
+        bool isDark,
+        string expected)
+    {
+        Assert.Equal(
+            expected,
+            SentoryThemePreference.AppliedMessageKey(mode, isDark));
+    }
 }

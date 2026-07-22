@@ -231,6 +231,7 @@ internal static class SentoryLocalization
             L("StatisticsLoadFailed", "데이터 현황을 불러오지 못했습니다.", "Could not load storage statistics.", "データの状況を読み込めませんでした。", "无法加载数据统计。"),
             L("DarkModeApplied", "다크 모드를 적용했습니다.", "Dark mode applied.", "ダークモードを適用しました。", "已应用深色模式。"),
             L("LightModeApplied", "라이트 모드를 적용했습니다.", "Light mode applied.", "ライトモードを適用しました。", "已应用浅色模式。"),
+            L("SystemThemeApplied", "시스템 테마 모드를 적용했습니다.", "System theme mode applied.", "システムテーマモードを適用しました。", "已应用系统主题模式。"),
             L("ThemeSaveFailed", "테마 설정을 저장하지 못했습니다.", "Could not save the theme setting.", "テーマ設定を保存できませんでした。", "无法保存主题设置。"),
             L("LanguageApplied", "언어를 변경했습니다.", "Language changed.", "言語を変更しました。", "语言已更改。"),
             L("LanguageSaveFailed", "언어 설정을 저장하지 못했습니다.", "Could not save the language setting.", "言語設定を保存できませんでした。", "无法保存语言设置。"),
