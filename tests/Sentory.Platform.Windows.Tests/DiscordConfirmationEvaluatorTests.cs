@@ -320,4 +320,28 @@ public sealed class DiscordConfirmationEvaluatorTests
         Assert.False(
             DiscordAccessibilityWorker.LooksLikeOwnedAttachmentControl(value));
     }
+
+    [Theory]
+    [InlineData("첨부 파일 제거")]
+    [InlineData("Remove attachment")]
+    [InlineData("添付ファイルを削除")]
+    [InlineData("移除附件")]
+    public void RecognizesDraftAttachmentRemoveControls(string value)
+    {
+        Assert.True(
+            DiscordAccessibilityWorker
+                .LooksLikeDraftAttachmentRemoveControl(value));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("첨부 파일 수정")]
+    [InlineData("Edit attachment")]
+    public void RejectsSentAttachmentControlsAsDraftControls(string? value)
+    {
+        Assert.False(
+            DiscordAccessibilityWorker
+                .LooksLikeDraftAttachmentRemoveControl(value));
+    }
 }

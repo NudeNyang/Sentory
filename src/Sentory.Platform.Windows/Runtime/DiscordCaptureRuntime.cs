@@ -58,6 +58,8 @@ public sealed class DiscordCaptureRuntime :
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, DateTimeOffset> _recentSendSignals =
         new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Task> _draftImageMonitors =
+        new(StringComparer.Ordinal);
     private Task? _worker;
     private Task? _warmupTask;
     private volatile bool _paused;
@@ -230,7 +232,8 @@ public sealed class DiscordCaptureRuntime :
                         candidate.Context.ContextHash,
                         context.ContextHash,
                         StringComparison.Ordinal) &&
-                    candidate.Context.OccurredAt <= context.OccurredAt)
+                    candidate.Context.OccurredAt <= context.OccurredAt &&
+                    !candidate.Cancellation.IsCancellationRequested)
                 .ToList();
             var pendingCandidates = candidates
                 .Where(candidate => !candidate.SendObserved.Task.IsCompleted)
@@ -483,8 +486,14 @@ public sealed class DiscordCaptureRuntime :
             DiscordCaptureTrace.Write(
                 "batch-candidate-started",
                 $"urls={candidateUrls.Count} images={candidateImages.Count} active={_candidates.Count}");
-            return true;
         }
+
+        if (registration.HasImages)
+        {
+            EnsureDraftImageMonitor(registration.Context.ContextHash);
+        }
+
+        return true;
     }
 
     private async Task RunCandidateAsync(CandidateRegistration registration)
@@ -836,6 +845,136 @@ public sealed class DiscordCaptureRuntime :
             cancellationToken);
     }
 
+    private void EnsureDraftImageMonitor(string contextHash)
+    {
+        lock (_candidateGate)
+        {
+            if (_draftImageMonitors.TryGetValue(
+                    contextHash,
+                    out var existing) &&
+                !existing.IsCompleted)
+            {
+                return;
+            }
+
+            _draftImageMonitors[contextHash] = Task.Run(() =>
+                MonitorDraftImagesAsync(contextHash, _cancellation.Token));
+        }
+    }
+
+    private async Task MonitorDraftImagesAsync(
+        string contextHash,
+        CancellationToken cancellationToken)
+    {
+        var observedDraftImage = false;
+        try
+        {
+            while (true)
+            {
+                CandidateRegistration[] pending;
+                lock (_candidateGate)
+                {
+                    pending = _candidates
+                        .Where(candidate =>
+                            candidate.HasImages &&
+                            !candidate.SendObserved.Task.IsCompleted &&
+                            !candidate.Cancellation.IsCancellationRequested &&
+                            string.Equals(
+                                candidate.Context.ContextHash,
+                                contextHash,
+                                StringComparison.Ordinal))
+                        .OrderBy(candidate => candidate.Context.OccurredAt)
+                        .ToArray();
+                }
+
+                if (pending.Length == 0)
+                {
+                    return;
+                }
+
+                var context = pending[^1].Context;
+                var response = await _confirmationClient.ConfirmAsync(
+                    new DiscordConfirmationRequest(
+                        context.MainWindow.ToInt64(),
+                        context.RendererWindow.ToInt64(),
+                        context.ProcessId,
+                        DiscordConfirmationContentKind.DraftImageInspection,
+                        [],
+                        3_000),
+                    cancellationToken);
+                if (response.Outcome == DiscordConfirmationOutcome.Confirmed &&
+                    response.DraftImageCount is { } draftImageCount)
+                {
+                    observedDraftImage |= draftImageCount > 0;
+                    if (!observedDraftImage)
+                    {
+                        await Task.Delay(
+                            TimeSpan.FromMilliseconds(300),
+                            cancellationToken);
+                        continue;
+                    }
+
+                    var observedAt = DateTimeOffset.UtcNow;
+                    var cancellationIds = DiscordDraftImageCandidatePolicy
+                        .SelectCandidatesToCancel(
+                            pending.Select(candidate =>
+                                new DiscordPendingImageCandidate(
+                                    candidate.EventId,
+                                    candidate.Context.OccurredAt,
+                                    candidate.Images.Count))
+                                .ToArray(),
+                            draftImageCount,
+                            observedAt);
+                    if (cancellationIds.Count > 0)
+                    {
+                        CancellationTokenSource[] cancellations;
+                        lock (_candidateGate)
+                        {
+                            var cancellationSet = cancellationIds.ToHashSet();
+                            cancellations = _candidates
+                                .Where(candidate =>
+                                    cancellationSet.Contains(candidate.EventId) &&
+                                    !candidate.SendObserved.Task.IsCompleted &&
+                                    !candidate.Cancellation
+                                        .IsCancellationRequested)
+                                .Select(candidate => candidate.Cancellation)
+                                .ToArray();
+                        }
+
+                        if (cancellations.Length > 0)
+                        {
+                            DiscordCaptureTrace.Write(
+                                "draft-image-candidates-cancelled",
+                                $"draftImages={draftImageCount} candidates={cancellations.Length}");
+                            _ = BackgroundCancellation.Request(cancellations);
+                        }
+                    }
+                }
+
+                await Task.Delay(
+                    TimeSpan.FromMilliseconds(300),
+                    cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            DiscordCaptureTrace.Write(
+                "draft-image-monitor-failed",
+                $"type={exception.GetType().Name}");
+        }
+        finally
+        {
+            lock (_candidateGate)
+            {
+                _draftImageMonitors.Remove(contextHash);
+            }
+        }
+    }
+
     private void ApplyRecentSendSignal(CandidateRegistration registration)
     {
         var now = DateTimeOffset.UtcNow;
@@ -1137,12 +1276,14 @@ public sealed class DiscordCaptureRuntime :
 
         Task[] candidates;
         Task[] discoveries;
+        Task[] draftImageMonitors;
         lock (_candidateGate)
         {
             candidates = _candidates.Select(candidate => candidate.Task).ToArray();
             discoveries = _attachmentDiscoveries
                 .Select(discovery => discovery.Task)
                 .ToArray();
+            draftImageMonitors = _draftImageMonitors.Values.ToArray();
         }
 
         try
@@ -1156,6 +1297,14 @@ public sealed class DiscordCaptureRuntime :
         try
         {
             await Task.WhenAll(discoveries);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
+        try
+        {
+            await Task.WhenAll(draftImageMonitors);
         }
         catch (OperationCanceledException)
         {

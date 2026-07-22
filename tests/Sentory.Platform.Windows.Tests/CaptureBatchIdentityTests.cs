@@ -88,6 +88,71 @@ public sealed class CaptureBatchIdentityTests
             batch.SnapshotImages().Select(image => image.Sha256));
     }
 
+    [Fact]
+    public void CancelsOldImageCandidateRemovedBeforeNextPaste()
+    {
+        var now = DateTimeOffset.Parse("2026-07-22T03:00:10Z");
+        var first = new DiscordPendingImageCandidate(
+            Guid.Parse("46c52d12-7745-445e-adb2-02927e41beb0"),
+            now.AddSeconds(-5),
+            1);
+        var second = new DiscordPendingImageCandidate(
+            Guid.Parse("5b10b0dd-41a9-45b7-9e4f-fbf989759d99"),
+            now.AddMilliseconds(-100),
+            1);
+
+        var cancelled = DiscordDraftImageCandidatePolicy
+            .SelectCandidatesToCancel([first, second], 1, now);
+
+        Assert.Equal([first.EventId], cancelled);
+    }
+
+    [Fact]
+    public void KeepsAllCandidatesWhenDiscordStillShowsEveryImage()
+    {
+        var now = DateTimeOffset.Parse("2026-07-22T03:00:10Z");
+        var candidates = new[]
+        {
+            new DiscordPendingImageCandidate(Guid.NewGuid(), now.AddSeconds(-5), 1),
+            new DiscordPendingImageCandidate(Guid.NewGuid(), now.AddSeconds(-4), 1)
+        };
+
+        var cancelled = DiscordDraftImageCandidatePolicy
+            .SelectCandidatesToCancel(candidates, 2, now);
+
+        Assert.Empty(cancelled);
+    }
+
+    [Fact]
+    public void DoesNotCancelNewCandidateBeforePreviewAppears()
+    {
+        var now = DateTimeOffset.Parse("2026-07-22T03:00:10Z");
+        var candidate = new DiscordPendingImageCandidate(
+            Guid.NewGuid(),
+            now.AddMilliseconds(-100),
+            1);
+
+        var cancelled = DiscordDraftImageCandidatePolicy
+            .SelectCandidatesToCancel([candidate], 0, now);
+
+        Assert.Empty(cancelled);
+    }
+
+    [Fact]
+    public void DoesNotDropWholeMultiImagePasteForPartialDifference()
+    {
+        var now = DateTimeOffset.Parse("2026-07-22T03:00:10Z");
+        var candidate = new DiscordPendingImageCandidate(
+            Guid.NewGuid(),
+            now.AddSeconds(-5),
+            2);
+
+        var cancelled = DiscordDraftImageCandidatePolicy
+            .SelectCandidatesToCancel([candidate], 1, now);
+
+        Assert.Empty(cancelled);
+    }
+
     private static ClipboardImageSnapshot CreateImage(string hash) =>
         new([1, 2, 3], hash, 1, 1, "image/png", ".png");
 }

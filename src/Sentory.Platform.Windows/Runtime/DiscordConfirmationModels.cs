@@ -13,7 +13,8 @@ public enum DiscordConfirmationContentKind
     Url,
     Image,
     AttachmentDiscovery,
-    Warmup
+    Warmup,
+    DraftImageInspection
 }
 
 public enum DiscordWorkerOperation
@@ -44,7 +45,8 @@ public sealed record DiscordConfirmationResponse(
     DiscordConfirmationOutcome Outcome,
     DateTimeOffset? ConfirmedAt,
     IReadOnlyList<string> ConfirmationSignals,
-    IReadOnlyList<string>? AttachmentUrls = null)
+    IReadOnlyList<string>? AttachmentUrls = null,
+    int? DraftImageCount = null)
 {
     public static DiscordConfirmationResponse Unavailable(
         params string[] signals) =>

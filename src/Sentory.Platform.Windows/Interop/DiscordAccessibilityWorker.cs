@@ -20,6 +20,7 @@ public static class DiscordAccessibilityWorker
     private const int RoleSystemListItem = 34;
     private const int RoleSystemGraphic = 40;
     private const int RoleSystemText = 42;
+    private const int RoleSystemPushButton = 43;
     private const int MessageListState = 1_048_640;
     private const int VisibleListItemState = 64;
     private const int MaximumTraversalDepth = 60;
@@ -252,6 +253,17 @@ public static class DiscordAccessibilityWorker
 
         var accessibleRoot = resolved.AccessibleRoot;
         var messageList = resolved.MessageList;
+        if (request.ContentKind ==
+            DiscordConfirmationContentKind.DraftImageInspection)
+        {
+            var draftImageCount = CountDraftImageAttachments(accessibleRoot);
+            return new DiscordConfirmationResponse(
+                DiscordConfirmationOutcome.Confirmed,
+                DateTimeOffset.UtcNow,
+                [$"draft-image-count:{draftImageCount}"],
+                DraftImageCount: draftImageCount);
+        }
+
         var baselineMessages = GetDirectListItems(messageList);
         var baselineMessageCount = baselineMessages.Count;
         var baselineFingerprints = CreateMessageFingerprintSet(
@@ -1214,6 +1226,66 @@ public static class DiscordAccessibilityWorker
         var normalized = value.Trim().ToLowerInvariant();
         return normalized.Contains("첨부 파일 수정", StringComparison.Ordinal) ||
                normalized.Contains("edit attachment", StringComparison.Ordinal);
+    }
+
+    internal static bool LooksLikeDraftAttachmentRemoveControl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var normalized = value.Trim().ToLowerInvariant();
+        return normalized.Contains("첨부 파일 제거", StringComparison.Ordinal) ||
+               normalized.Contains("첨부파일 제거", StringComparison.Ordinal) ||
+               normalized.Contains("첨부 파일 삭제", StringComparison.Ordinal) ||
+               normalized.Contains("remove attachment", StringComparison.Ordinal) ||
+               normalized.Contains("添付ファイルを削除", StringComparison.Ordinal) ||
+               normalized.Contains("添付ファイルを除去", StringComparison.Ordinal) ||
+               normalized.Contains("移除附件", StringComparison.Ordinal) ||
+               normalized.Contains("删除附件", StringComparison.Ordinal);
+    }
+
+    private static int CountDraftImageAttachments(IAccessible root)
+    {
+        var visited = new HashSet<long>();
+        var nodeCount = 0;
+        var count = 0;
+
+        void Inspect(AccessibleTarget target, int depth)
+        {
+            if (depth > MaximumTraversalDepth ||
+                nodeCount++ >= MaximumTraversalNodes)
+            {
+                return;
+            }
+
+            if (SafeRole(target.Accessible, target.ChildId) ==
+                    RoleSystemPushButton &&
+                (LooksLikeDraftAttachmentRemoveControl(
+                     SafeName(target.Accessible, target.ChildId)) ||
+                 LooksLikeDraftAttachmentRemoveControl(
+                     SafeValue(target.Accessible, target.ChildId)) ||
+                 LooksLikeDraftAttachmentRemoveControl(
+                     SafeDescription(target.Accessible, target.ChildId))))
+            {
+                count++;
+            }
+
+            var nested = ToAccessible(target);
+            if (nested is null || !MarkVisited(nested, visited))
+            {
+                return;
+            }
+
+            foreach (var child in GetChildren(nested))
+            {
+                Inspect(child, depth + 1);
+            }
+        }
+
+        Inspect(new AccessibleTarget(root, 0), 0);
+        return count;
     }
 
     private static List<AccessibleTarget> GetDirectListItems(

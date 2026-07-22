@@ -1,10 +1,27 @@
 using System.Text.Json;
 using Sentory.Platform.Windows.Interop;
+using Sentory.Platform.Windows.Runtime;
 
 namespace Sentory.Platform.Windows.Tests;
 
 public sealed class DiscordAccessibilityWorkerProtocolTests
 {
+    [Fact]
+    public void PreservesDraftImageCountAcrossWorkerProtocol()
+    {
+        var response = new DiscordConfirmationResponse(
+            DiscordConfirmationOutcome.Confirmed,
+            DateTimeOffset.Parse("2026-07-22T03:00:00Z"),
+            ["draft-image-count:2"],
+            DraftImageCount: 2);
+
+        var json = JsonSerializer.Serialize(response);
+        var roundTrip = JsonSerializer.Deserialize<
+            DiscordConfirmationResponse>(json);
+
+        Assert.Equal(2, roundTrip?.DraftImageCount);
+    }
+
     [Fact]
     public void WorkerExceptionSignalIncludesFailureLocationAndHResult()
     {
