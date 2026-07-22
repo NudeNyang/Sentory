@@ -16,6 +16,7 @@ public static class DiscordAccessibilityWorker
     private const uint ObjectIdClient = 0xFFFFFFFC;
     private const uint GetAncestorRoot = 2;
     private const int RoleSystemDocument = 15;
+    private const int RoleSystemGrouping = 20;
     private const int RoleSystemList = 33;
     private const int RoleSystemListItem = 34;
     private const int RoleSystemOutline = 35;
@@ -225,7 +226,7 @@ public static class DiscordAccessibilityWorker
             DiscordConfirmationContentKind.DraftImageInspection)
         {
             if (!TryCreateAccessible(
-                    new nint(request.RendererWindowHandle),
+                    new nint(request.MainWindowHandle),
                     out var draftAccessibleRoot))
             {
                 return DiscordConfirmationResponse.Unavailable(
@@ -233,7 +234,8 @@ public static class DiscordAccessibilityWorker
             }
 
             var draftImageCount = CountDraftImageAttachments(
-                draftAccessibleRoot);
+                draftAccessibleRoot,
+                request.ExpectedDraftImageCount ?? int.MaxValue);
             return new DiscordConfirmationResponse(
                 DiscordConfirmationOutcome.Confirmed,
                 DateTimeOffset.UtcNow,
@@ -884,7 +886,8 @@ public static class DiscordAccessibilityWorker
         expectedUrls = [];
         if (!Enum.IsDefined(request.ContentKind) ||
             request.MainWindowHandle == 0 ||
-            request.RendererWindowHandle == 0 ||
+            (RequiresRendererWindow(request.ContentKind) &&
+             request.RendererWindowHandle == 0) ||
             request.ProcessId == 0 ||
             request.NormalizedUrls.Count > 20 ||
             (request.ContentKind == DiscordConfirmationContentKind.Url &&
@@ -941,6 +944,10 @@ public static class DiscordAccessibilityWorker
         request.ContentKind == DiscordConfirmationContentKind.Url &&
         !request.ExplicitSendObserved;
 
+    internal static bool RequiresRendererWindow(
+        DiscordConfirmationContentKind contentKind) =>
+        contentKind != DiscordConfirmationContentKind.DraftImageInspection;
+
     internal static bool ShouldRetryTargetResolution(
         DiscordConfirmationRequest request,
         string unavailableSignal) =>
@@ -973,21 +980,35 @@ public static class DiscordAccessibilityWorker
     private static bool IsContextValid(DiscordConfirmationRequest request)
     {
         var mainWindow = new nint(request.MainWindowHandle);
-        var rendererWindow = new nint(request.RendererWindowHandle);
-        if (!IsWindow(mainWindow) || !IsWindow(rendererWindow) ||
-            GetAncestor(rendererWindow, GetAncestorRoot) != mainWindow)
+        if (!IsWindow(mainWindow))
         {
             return false;
         }
 
         GetWindowThreadProcessId(mainWindow, out var mainProcessId);
+        if (mainProcessId != request.ProcessId ||
+            !string.Equals(
+                GetWindowClass(mainWindow),
+                DiscordContextValidator.MainWindowClassName,
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (!RequiresRendererWindow(request.ContentKind))
+        {
+            return true;
+        }
+
+        var rendererWindow = new nint(request.RendererWindowHandle);
+        if (!IsWindow(rendererWindow) ||
+            GetAncestor(rendererWindow, GetAncestorRoot) != mainWindow)
+        {
+            return false;
+        }
+
         GetWindowThreadProcessId(rendererWindow, out var rendererProcessId);
-        return mainProcessId == request.ProcessId &&
-               rendererProcessId == request.ProcessId &&
-               string.Equals(
-                   GetWindowClass(mainWindow),
-                   DiscordContextValidator.MainWindowClassName,
-                   StringComparison.Ordinal) &&
+        return rendererProcessId == request.ProcessId &&
                string.Equals(
                    GetWindowClass(rendererWindow),
                    DiscordContextValidator.RendererClassName,
@@ -1256,7 +1277,9 @@ public static class DiscordAccessibilityWorker
                normalized.Contains("删除附件", StringComparison.Ordinal);
     }
 
-    private static int CountDraftImageAttachments(IAccessible root)
+    private static int CountDraftImageAttachments(
+        IAccessible root,
+        int expectedImageCount)
     {
         var visited = new HashSet<long>();
         var nodeCount = 0;
@@ -1272,19 +1295,21 @@ public static class DiscordAccessibilityWorker
         void Inspect(AccessibleTarget target, int depth)
         {
             if (depth > MaximumTraversalDepth ||
-                nodeCount++ >= MaximumTraversalNodes)
+                nodeCount++ >= MaximumTraversalNodes ||
+                count >= expectedImageCount)
             {
                 return;
             }
 
+            var hasNodeBounds = TryGetAccessibleBounds(
+                target.Accessible,
+                target.ChildId,
+                out var nodeLeft,
+                out var nodeTop,
+                out var nodeWidth,
+                out var nodeHeight);
             if (hasRootBounds &&
-                TryGetAccessibleBounds(
-                    target.Accessible,
-                    target.ChildId,
-                    out var nodeLeft,
-                    out var nodeTop,
-                    out var nodeWidth,
-                    out var nodeHeight) &&
+                hasNodeBounds &&
                 !IntersectsDraftInspectionRegion(
                     rootLeft,
                     rootTop,
@@ -1310,7 +1335,10 @@ public static class DiscordAccessibilityWorker
                 count++;
             }
 
-            if (role is RoleSystemOutline or RoleSystemList)
+            if (role == RoleSystemOutline ||
+                (role == RoleSystemGrouping &&
+                 LooksLikeDiscordMemberList(
+                     SafeName(target.Accessible, target.ChildId))))
             {
                 return;
             }
@@ -1321,9 +1349,13 @@ public static class DiscordAccessibilityWorker
                 return;
             }
 
-            foreach (var child in GetChildren(nested))
+            foreach (var child in GetChildren(nested).AsEnumerable().Reverse())
             {
                 Inspect(child, depth + 1);
+                if (count >= expectedImageCount)
+                {
+                    break;
+                }
             }
         }
 
@@ -1347,8 +1379,8 @@ public static class DiscordAccessibilityWorker
             return true;
         }
 
-        var inspectionLeft = rootLeft + (rootWidth / 4);
-        var inspectionTop = rootTop + (rootHeight / 4);
+        var inspectionLeft = rootLeft + ((rootWidth * 3) / 10);
+        var inspectionTop = rootTop + ((rootHeight * 3) / 4);
         var rootRight = rootLeft + rootWidth;
         var rootBottom = rootTop + rootHeight;
         var nodeRight = nodeLeft + nodeWidth;
@@ -1357,6 +1389,22 @@ public static class DiscordAccessibilityWorker
                nodeLeft < rootRight &&
                nodeBottom > inspectionTop &&
                nodeTop < rootBottom;
+    }
+
+    internal static bool LooksLikeDiscordMemberList(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var normalized = value.Trim().ToLowerInvariant();
+        return normalized.Contains("멤버 목록", StringComparison.Ordinal) ||
+               normalized.Contains("member list", StringComparison.Ordinal) ||
+               normalized.Contains("メンバーリスト", StringComparison.Ordinal) ||
+               normalized.Contains("メンバー一覧", StringComparison.Ordinal) ||
+               normalized.Contains("成员列表", StringComparison.Ordinal) ||
+               normalized.Contains("成員列表", StringComparison.Ordinal);
     }
 
     private static List<AccessibleTarget> GetDirectListItems(

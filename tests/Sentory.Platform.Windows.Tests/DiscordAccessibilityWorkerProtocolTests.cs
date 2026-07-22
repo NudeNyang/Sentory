@@ -23,6 +23,25 @@ public sealed class DiscordAccessibilityWorkerProtocolTests
     }
 
     [Fact]
+    public void PreservesExpectedDraftImageCountAcrossWorkerProtocol()
+    {
+        var request = new DiscordConfirmationRequest(
+            10,
+            20,
+            30,
+            DiscordConfirmationContentKind.DraftImageInspection,
+            [],
+            3_000,
+            ExpectedDraftImageCount: 2);
+
+        var json = JsonSerializer.Serialize(request);
+        var roundTrip = JsonSerializer.Deserialize<
+            DiscordConfirmationRequest>(json);
+
+        Assert.Equal(2, roundTrip?.ExpectedDraftImageCount);
+    }
+
+    [Fact]
     public void WorkerExceptionSignalIncludesFailureLocationAndHResult()
     {
         Exception captured;

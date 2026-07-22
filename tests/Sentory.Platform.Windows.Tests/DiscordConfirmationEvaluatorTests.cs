@@ -349,7 +349,8 @@ public sealed class DiscordConfirmationEvaluatorTests
     [InlineData(0, 0, 1080, 1874, true)]
     [InlineData(0, 0, 1080, 80, false)]
     [InlineData(0, 100, 260, 1700, false)]
-    [InlineData(300, 500, 780, 120, true)]
+    [InlineData(820, 1000, 260, 800, true)]
+    [InlineData(300, 500, 780, 120, false)]
     [InlineData(300, 1500, 780, 300, true)]
     [InlineData(0, 0, 0, 0, true)]
     public void LimitsDraftInspectionToChatComposerRegion(
@@ -370,5 +371,38 @@ public sealed class DiscordConfirmationEvaluatorTests
                 nodeTop,
                 nodeWidth,
                 nodeHeight));
+    }
+
+    [Fact]
+    public void DraftInspectionDoesNotDependOnTransientRendererWindow()
+    {
+        Assert.False(
+            DiscordAccessibilityWorker.RequiresRendererWindow(
+                DiscordConfirmationContentKind.DraftImageInspection));
+        Assert.True(
+            DiscordAccessibilityWorker.RequiresRendererWindow(
+                DiscordConfirmationContentKind.Image));
+    }
+
+    [Theory]
+    [InlineData("작업장(채널) 멤버 목록")]
+    [InlineData("Members — member list")]
+    [InlineData("メンバーリスト")]
+    [InlineData("成员列表")]
+    public void RecognizesDiscordMemberLists(string value)
+    {
+        Assert.True(
+            DiscordAccessibilityWorker.LooksLikeDiscordMemberList(value));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("작업장 채팅")]
+    [InlineData("Message list")]
+    public void RejectsNonMemberLists(string? value)
+    {
+        Assert.False(
+            DiscordAccessibilityWorker.LooksLikeDiscordMemberList(value));
     }
 }

@@ -902,7 +902,9 @@ public sealed class DiscordCaptureRuntime :
                         context.ProcessId,
                         DiscordConfirmationContentKind.DraftImageInspection,
                         [],
-                        3_000),
+                        3_000,
+                        ExpectedDraftImageCount: pending.Sum(candidate =>
+                            candidate.Images.Count)),
                     cancellationToken);
                 if (response.Outcome == DiscordConfirmationOutcome.Confirmed &&
                     response.DraftImageCount is { } draftImageCount)

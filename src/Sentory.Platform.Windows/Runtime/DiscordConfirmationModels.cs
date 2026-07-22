@@ -39,7 +39,8 @@ public sealed record DiscordConfirmationRequest(
     DiscordConfirmationContentKind ContentKind,
     IReadOnlyList<string> NormalizedUrls,
     int TimeoutMilliseconds = 300_000,
-    bool ExplicitSendObserved = false);
+    bool ExplicitSendObserved = false,
+    int? ExpectedDraftImageCount = null);
 
 public sealed record DiscordConfirmationResponse(
     DiscordConfirmationOutcome Outcome,
