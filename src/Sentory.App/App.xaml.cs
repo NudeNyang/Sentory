@@ -927,6 +927,7 @@ public partial class App : System.Windows.Application
         }
 
         _runtime.IsPaused = !_runtime.IsPaused;
+        _galleryWindow?.SetDetectionPaused(_runtime.IsPaused);
         UpdatePauseUi();
     }
 
@@ -1398,6 +1399,8 @@ public partial class App : System.Windows.Application
             _galleryWindow.SetMessengerSupportState(
                 _discordSupportEnabled,
                 _kakaoSupportEnabled);
+            _galleryWindow.SetDetectionPaused(
+                _runtime?.IsPaused == true);
             _galleryWindow.SetRuntimeIssue(_lastRuntimeIssue);
             _galleryWindow.SetAvailableUpdate(
                 _availableUpdate?.Version,

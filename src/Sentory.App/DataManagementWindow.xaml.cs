@@ -19,6 +19,7 @@ public partial class DataManagementWindow : Window
     private readonly WindowsStartupManager _startupManager = new();
     private CaptureRuntimeState _discordState;
     private bool _discordRepairNeeded;
+    private bool _detectionPaused;
     private SentoryThemeMode _themeMode;
     private bool _isDarkTheme;
     private bool _busy;
@@ -35,7 +36,8 @@ public partial class DataManagementWindow : Window
         SentorySettingsStore settingsStore,
         SentoryDataPaths paths,
         CaptureRuntimeState discordState,
-        bool discordRepairNeeded)
+        bool discordRepairNeeded,
+        bool detectionPaused)
     {
         InitializeComponent();
         _repository = repository;
@@ -43,6 +45,7 @@ public partial class DataManagementWindow : Window
         _paths = paths;
         _discordState = discordState;
         _discordRepairNeeded = discordRepairNeeded;
+        _detectionPaused = detectionPaused;
         var settings = _settingsStore.Load();
         _themeMode = settings.GetThemeMode();
         _isDarkTheme = SentoryThemePreference.ResolveIsDark(
@@ -158,6 +161,12 @@ public partial class DataManagementWindow : Window
         _discordRepairNeeded = needed;
         var settings = _settingsStore.Load();
         UpdateDiscordControls(settings.DiscordSupportEnabled);
+    }
+
+    public void SetDetectionPaused(bool paused)
+    {
+        _detectionPaused = paused;
+        UpdateMessengerControls(_settingsStore.Load());
     }
 
     private async Task RefreshStatisticsAsync()
@@ -661,6 +670,9 @@ public partial class DataManagementWindow : Window
 
     private void UpdateDiscordControls(bool enabled)
     {
+        var settingsState = MessengerDetectionSettingsUiPolicy.Resolve(
+            enabled,
+            _detectionPaused);
         var presentation = DiscordDetectionUiPolicy.Resolve(
             enabled,
             _discordState,
@@ -668,24 +680,39 @@ public partial class DataManagementWindow : Window
         DiscordSupportToggleButton.Content = enabled
             ? SentoryLocalization.Text("InUse")
             : SentoryLocalization.Text("NotInUse");
-        DiscordRepairButton.Visibility = presentation.ShowRepairAction
+        DiscordRepairButton.Visibility =
+            settingsState == MessengerDetectionSettingsState.Active &&
+            presentation.ShowRepairAction
             ? Visibility.Visible
             : Visibility.Collapsed;
-        DiscordStatusText.Text = !enabled
-            ? SentoryLocalization.Text("DiscordNotInUse")
-            : presentation.ShowRepairAction
-                ? SentoryLocalization.Text("StateReconnect")
-                : DiscordDetectionPresentation.GetLabel(_discordState);
+        DiscordStatusText.Text = settingsState switch
+        {
+            MessengerDetectionSettingsState.Disabled =>
+                SentoryLocalization.Text("DiscordNotInUse"),
+            MessengerDetectionSettingsState.Paused =>
+                SentoryLocalization.Text("DetectionPaused"),
+            _ when presentation.ShowRepairAction =>
+                SentoryLocalization.Text("StateReconnect"),
+            _ => DiscordDetectionPresentation.GetLabel(_discordState)
+        };
     }
 
     private void UpdateKakaoControls(bool enabled)
     {
+        var settingsState = MessengerDetectionSettingsUiPolicy.Resolve(
+            enabled,
+            _detectionPaused);
         KakaoSupportToggleButton.Content = enabled
             ? SentoryLocalization.Text("InUse")
             : SentoryLocalization.Text("NotInUse");
-        KakaoStatusText.Text = enabled
-            ? SentoryLocalization.Text("DetectionReady")
-            : SentoryLocalization.Text("KakaoNotInUse");
+        KakaoStatusText.Text = settingsState switch
+        {
+            MessengerDetectionSettingsState.Disabled =>
+                SentoryLocalization.Text("KakaoNotInUse"),
+            MessengerDetectionSettingsState.Paused =>
+                SentoryLocalization.Text("DetectionPaused"),
+            _ => SentoryLocalization.Text("DetectionReady")
+        };
     }
 
     private void UpdateMessengerControls(SentorySettings settings)

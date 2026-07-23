@@ -38,6 +38,20 @@ public sealed class SentoryLocalizationTests
             SentoryLocalization.Text("AppIsUpToDate"));
     }
 
+    [Theory]
+    [InlineData("ko-KR", "감지 일시정지됨")]
+    [InlineData("en-US", "Detection paused")]
+    [InlineData("ja-JP", "検出一時停止中")]
+    [InlineData("zh-CN", "检测已暂停")]
+    public void DetectionPausedStatusIsLocalized(
+        string language,
+        string expected)
+    {
+        SentoryLocalization.Apply(new ResourceDictionary(), language);
+
+        Assert.Equal(expected, SentoryLocalization.Text("DetectionPaused"));
+    }
+
     [Fact]
     public void LicenseWindowDescribesBundledThirdPartyNotices()
     {

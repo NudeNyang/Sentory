@@ -276,6 +276,7 @@ internal static class SentoryLocalization
             L("DiscordNotInUse", "Discord 감지를 사용하지 않습니다", "Discord detection is disabled", "Discord 検出を使用していません", "Discord 检测已关闭"),
             L("DiscordDetectionOn", "Discord 감지 켜짐", "Discord detection is on", "Discord 検出はオンです", "Discord 检测已开启"),
             L("KakaoNotInUse", "카카오톡 감지를 사용하지 않습니다", "KakaoTalk detection is disabled", "カカオトーク検出を使用していません", "KakaoTalk 检测已关闭"),
+            L("DetectionPaused", "감지 일시정지됨", "Detection paused", "検出一時停止中", "检测已暂停"),
             L("DevelopmentVersion", "개발 버전", "Development build", "開発版", "开发版本"),
             L("Starting", "시작 중...", "Starting...", "起動中...", "正在启动…"),
             L("AlreadyRunningHeading", "Sentory가 이미 실행 중입니다", "Sentory is already running", "Sentory はすでに実行中です", "Sentory 已在运行"),

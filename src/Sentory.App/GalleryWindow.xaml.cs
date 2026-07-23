@@ -64,6 +64,7 @@ public partial class GalleryWindow : Window
     private bool _scrollIndicatorShown;
     private bool _scrollIndicatorThumbEmphasized;
     private bool _discordRepairNeeded;
+    private bool _detectionPaused;
     private DataManagementWindow? _dataManagementWindow;
     private bool _allowCloseWithOwnedWindows;
     private string? _availableUpdateVersion;
@@ -205,6 +206,12 @@ public partial class GalleryWindow : Window
         _settings.DiscordSupportEnabled = discordEnabled;
         _settings.KakaoTalkSupportEnabled = kakaoEnabled;
         UpdateDiscordDetectionVisibility();
+    }
+
+    public void SetDetectionPaused(bool paused)
+    {
+        _detectionPaused = paused;
+        _dataManagementWindow?.SetDetectionPaused(paused);
     }
 
     private void UpdateDiscordDetectionVisibility()
@@ -594,7 +601,8 @@ public partial class GalleryWindow : Window
             _settingsStore,
             _paths,
             _discordDetectionState,
-            _discordRepairNeeded)
+            _discordRepairNeeded,
+            _detectionPaused)
         {
             Owner = this
         };
