@@ -88,10 +88,10 @@ Installed copies update without reopening the setup wizard and start Sentory aga
 the update is complete. The manual install button remains available in the library if
 you close the first prompt.
 
-Sentory prepares detection against the currently running Discord process. If that
-process cannot provide the required accessibility connection, a 15-second prompt lets
-you cancel the restart or restart immediately. Sentory checks again when Discord starts
-before Sentory or is closed and reopened.
+Sentory prepares detection against the currently running Discord process. If a new
+Discord process is missing the accessibility launch argument, the 15-second restart
+prompt appears as soon as its main window is found. A process that already has the
+argument, or is still loading a chat, continues without an unnecessary restart.
 
 ## Good to know
 

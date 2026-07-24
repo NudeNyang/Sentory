@@ -27,6 +27,12 @@ internal readonly record struct DiscordWarmupExhaustionPlan(
     bool ReportIssue,
     TimeSpan RetryDelay);
 
+internal enum DiscordWarmupAttemptWaitAction
+{
+    ContinueBurst,
+    RestartBurst
+}
+
 public sealed class DiscordCaptureRuntime :
     ICaptureRuntime,
     ICaptureRuntimeStatusSource,
@@ -675,17 +681,15 @@ public sealed class DiscordCaptureRuntime :
                 ? CaptureRuntimeState.Recovering
                 : CaptureRuntimeState.Connecting);
         var attemptsThisCycle = 15;
-        var persistentConnectingFailures = 0;
         while (true)
         {
             var lastUnavailableState = CaptureRuntimeState.Connecting;
-            var sawDiscordWindow = false;
+            var restartBurst = false;
             for (var attempt = 0; attempt < attemptsThisCycle; attempt++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 if (TryCreateWarmupRequest(out var request))
                 {
-                    sawDiscordWindow = true;
                     var startedAt = DateTimeOffset.UtcNow;
                     var response = await _confirmationClient.ConfirmAsync(
                         request,
@@ -696,7 +700,29 @@ public sealed class DiscordCaptureRuntime :
                     if (response.Outcome ==
                         DiscordConfirmationOutcome.Confirmed)
                     {
-                        _statusTracker.Publish(CaptureRuntimeState.Ready);
+                        lock (_warmupGate)
+                        {
+                            restartBurst =
+                                ResolveAttemptWaitAction(
+                                    _warmupWakeSignal.Wait(0)) ==
+                                DiscordWarmupAttemptWaitAction
+                                    .RestartBurst;
+                            if (!restartBurst)
+                            {
+                                _statusTracker.Publish(
+                                    CaptureRuntimeState.Ready);
+                                _warmupTask = null;
+                            }
+                        }
+
+                        if (restartBurst)
+                        {
+                            DiscordCaptureTrace.Write(
+                                "worker-warmup-restarted",
+                                "reason=target-changed-after-confirmation");
+                            break;
+                        }
+
                         return;
                     }
 
@@ -704,20 +730,30 @@ public sealed class DiscordCaptureRuntime :
                         lastUnavailableState,
                         ClassifyUnavailableState(response));
                 }
-                _ = await WaitForWarmupRetryAsync(
-                    TimeSpan.FromSeconds(2),
-                    cancellationToken);
+                var attemptWaitAction = ResolveAttemptWaitAction(
+                    await WaitForWarmupRetryAsync(
+                        TimeSpan.FromSeconds(2),
+                        cancellationToken));
+                if (attemptWaitAction ==
+                    DiscordWarmupAttemptWaitAction.RestartBurst)
+                {
+                    restartBurst = true;
+                    DiscordCaptureTrace.Write(
+                        "worker-warmup-restarted",
+                        "reason=target-changed-during-attempt");
+                    break;
+                }
             }
 
-            persistentConnectingFailures =
-                lastUnavailableState == CaptureRuntimeState.Connecting &&
-                sawDiscordWindow
-                    ? persistentConnectingFailures + 1
-                    : 0;
+            if (restartBurst)
+            {
+                attemptsThisCycle = 15;
+                continue;
+            }
+
             var plan = PlanWarmupExhaustion(
                 lastUnavailableState,
-                reconnectWhenExhausted,
-                persistentConnectingFailures);
+                reconnectWhenExhausted);
             _statusTracker.Publish(plan.State);
             if (plan.ReportIssue)
             {
@@ -733,13 +769,21 @@ public sealed class DiscordCaptureRuntime :
                 return;
             }
 
-            var wakeRequested = await WaitForWarmupRetryAsync(
-                plan.RetryDelay,
-                cancellationToken);
-            attemptsThisCycle = wakeRequested ? 15 : 1;
-            if (wakeRequested)
+            var retryAction = ResolveAttemptWaitAction(
+                await WaitForWarmupRetryAsync(
+                    plan.RetryDelay,
+                    cancellationToken));
+            attemptsThisCycle =
+                retryAction ==
+                DiscordWarmupAttemptWaitAction.RestartBurst
+                    ? 15
+                    : 1;
+            if (retryAction ==
+                DiscordWarmupAttemptWaitAction.RestartBurst)
             {
-                persistentConnectingFailures = 0;
+                DiscordCaptureTrace.Write(
+                    "worker-warmup-restarted",
+                    "reason=target-changed-during-deferred-wait");
             }
         }
     }
@@ -750,6 +794,12 @@ public sealed class DiscordCaptureRuntime :
     {
         return await _warmupWakeSignal.WaitAsync(delay, cancellationToken);
     }
+
+    internal static DiscordWarmupAttemptWaitAction
+        ResolveAttemptWaitAction(bool wakeRequested) =>
+        wakeRequested
+            ? DiscordWarmupAttemptWaitAction.RestartBurst
+            : DiscordWarmupAttemptWaitAction.ContinueBurst;
 
     private void OnWorkerRecoveryRequired(object? sender, EventArgs eventArgs)
     {
@@ -804,13 +854,11 @@ public sealed class DiscordCaptureRuntime :
 
     internal static DiscordWarmupExhaustionPlan PlanWarmupExhaustion(
         CaptureRuntimeState lastState,
-        bool reconnectWhenExhausted,
-        int persistentConnectingFailures = 0)
+        bool reconnectWhenExhausted)
     {
         if (lastState == CaptureRuntimeState.ReconnectRequired ||
             (lastState == CaptureRuntimeState.Connecting &&
-             (reconnectWhenExhausted ||
-              persistentConnectingFailures >= 2)))
+             reconnectWhenExhausted))
         {
             return new DiscordWarmupExhaustionPlan(
                 CaptureRuntimeState.ReconnectRequired,

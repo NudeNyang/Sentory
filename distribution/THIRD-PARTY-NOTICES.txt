@@ -52,6 +52,11 @@ code is distributed under GNU GPL v3 only (GPL-3.0-only).
    https://github.com/AngusJohnson/Clipper2
    https://github.com/BobLd/PContourNet
 
+10. System.Management 8.0.0
+    Copyright © .NET Foundation and Contributors
+    License: MIT
+    https://github.com/dotnet/runtime
+
 MIT License
 -----------
 

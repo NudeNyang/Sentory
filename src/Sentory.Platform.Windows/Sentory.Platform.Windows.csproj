@@ -4,6 +4,7 @@
     <ProjectReference Include="..\Sentory.Core\Sentory.Core.csproj" />
     <PackageReference Include="RapidOcrNet" Version="3.0.0" />
     <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.119.1" />
+    <PackageReference Include="System.Management" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>

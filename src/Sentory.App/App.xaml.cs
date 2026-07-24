@@ -64,6 +64,9 @@ public partial class App : System.Windows.Application
     private bool _discordRestartPromptActive;
     private int? _observedDiscordProcessId;
     private int? _automaticRestartPromptedProcessId;
+    private DiscordAccessibilityArgumentState
+        _observedDiscordAccessibilityArgumentState =
+            DiscordAccessibilityArgumentState.Unknown;
     private CaptureRuntimeState _discordDetectionState =
         CaptureRuntimeState.Connecting;
     private Task? _discordConnectionMonitorTask;
@@ -1291,6 +1294,8 @@ public partial class App : System.Windows.Application
         try
         {
             await _discordLauncher.RestartAsync();
+            _observedDiscordAccessibilityArgumentState =
+                DiscordAccessibilityArgumentState.Unknown;
             SetDiscordRepairNeeded(false, persistPrepared: true);
             _discordDetectionState = CaptureRuntimeState.Connecting;
             _galleryWindow?.SetDiscordDetectionState(
@@ -1347,6 +1352,7 @@ public partial class App : System.Windows.Application
                 _runtime?.IsPaused == true,
                 _discordRepairBusy,
                 _discordDetectionState,
+                _observedDiscordAccessibilityArgumentState,
                 processId,
                 _automaticRestartPromptedProcessId))
         {
@@ -1558,11 +1564,54 @@ public partial class App : System.Windows.Application
                 {
                     var previousProcessId = _observedDiscordProcessId;
                     _observedDiscordProcessId = processId;
-                    _automaticRestartPromptedProcessId = null;
+                    if (_automaticRestartPromptedProcessId != processId)
+                    {
+                        _automaticRestartPromptedProcessId = null;
+                    }
+                    _observedDiscordAccessibilityArgumentState =
+                        DiscordAccessibilityArgumentState.Unknown;
                     _diagnosticsLog?.Write(
                         "discord-process-changed",
                         $"previous={previousProcessId?.ToString() ?? "none"} current={processId?.ToString() ?? "none"}");
-                    if (_runtime is ICaptureRuntimeRecoveryController controller)
+
+                    if (processId is int currentProcessId)
+                    {
+                        var argumentState = await Task.Run(
+                            () => _discordLauncher
+                                .GetAccessibilityArgumentState(
+                                    currentProcessId),
+                            cancellationToken);
+                        if (_discordLauncher.GetMainProcessId() !=
+                            currentProcessId)
+                        {
+                            continue;
+                        }
+
+                        _observedDiscordAccessibilityArgumentState =
+                            argumentState;
+                        _diagnosticsLog?.Write(
+                            "discord-process-accessibility-argument",
+                            $"processId={currentProcessId} state={argumentState}");
+                        if (DiscordAutomaticRestartPolicy
+                            .ShouldPromptImmediately(argumentState))
+                        {
+                            _discordDetectionState =
+                                CaptureRuntimeState.ReconnectRequired;
+                            _galleryWindow?.SetDiscordDetectionState(
+                                _discordDetectionState);
+                            SetDiscordRepairNeeded(
+                                true,
+                                persistPrepared: false);
+                            _ = PromptAutomaticDiscordRestartAsync();
+                        }
+                        else if (_runtime is
+                            ICaptureRuntimeRecoveryController controller)
+                        {
+                            controller.RequestRecovery(SourceApp.Discord);
+                        }
+                    }
+                    else if (_runtime is
+                        ICaptureRuntimeRecoveryController controller)
                     {
                         controller.RequestRecovery(SourceApp.Discord);
                     }
@@ -1572,7 +1621,18 @@ public partial class App : System.Windows.Application
                     DiscordAutomaticRestartPolicy.GetProcessCheckInterval(
                         _discordSupportEnabled,
                         _discordDetectionState);
-                await Task.Delay(delay, cancellationToken);
+                if (processId is int currentMainProcessId)
+                {
+                    _ = await _discordLauncher
+                        .WaitForMainProcessExitAsync(
+                            currentMainProcessId,
+                            delay,
+                            cancellationToken);
+                }
+                else
+                {
+                    await Task.Delay(delay, cancellationToken);
+                }
             }
         }
         catch (OperationCanceledException)

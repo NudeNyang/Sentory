@@ -1,7 +1,16 @@
 using System.Diagnostics;
 using System.IO;
+using System.Management;
+using System.Runtime.InteropServices;
 
 namespace Sentory.Platform.Windows.Runtime;
+
+public enum DiscordAccessibilityArgumentState
+{
+    Unknown,
+    Enabled,
+    Missing
+}
 
 internal readonly record struct DiscordProcessCandidate(
     int ProcessId,
@@ -12,6 +21,7 @@ public sealed class DiscordAccessibilityLauncher
 {
     private const string DiscordProcessName = "Discord";
     private readonly string _localAppData;
+    private readonly Func<int, string?> _commandLineReader;
 
     public DiscordAccessibilityLauncher()
         : this(Environment.GetFolderPath(
@@ -20,8 +30,16 @@ public sealed class DiscordAccessibilityLauncher
     }
 
     internal DiscordAccessibilityLauncher(string localAppData)
+        : this(localAppData, ReadProcessCommandLine)
+    {
+    }
+
+    internal DiscordAccessibilityLauncher(
+        string localAppData,
+        Func<int, string?> commandLineReader)
     {
         _localAppData = localAppData;
+        _commandLineReader = commandLineReader;
     }
 
     internal string LauncherPath => Path.Combine(
@@ -104,6 +122,86 @@ public sealed class DiscordAccessibilityLauncher
             .OrderByDescending(candidate => candidate.StartedAt)
             .Select(candidate => (int?)candidate.ProcessId)
             .FirstOrDefault();
+
+    public DiscordAccessibilityArgumentState
+        GetAccessibilityArgumentState(int processId)
+    {
+        try
+        {
+            return ClassifyAccessibilityArgument(
+                _commandLineReader(processId));
+        }
+        catch (Exception exception)
+            when (exception is ManagementException or
+                  COMException or
+                  InvalidOperationException or
+                  UnauthorizedAccessException)
+        {
+            return DiscordAccessibilityArgumentState.Unknown;
+        }
+    }
+
+    internal static DiscordAccessibilityArgumentState
+        ClassifyAccessibilityArgument(string? commandLine)
+    {
+        if (string.IsNullOrWhiteSpace(commandLine))
+        {
+            return DiscordAccessibilityArgumentState.Unknown;
+        }
+
+        return ContainsCommandLineArgument(
+            commandLine,
+            "--force-renderer-accessibility")
+                ? DiscordAccessibilityArgumentState.Enabled
+                : DiscordAccessibilityArgumentState.Missing;
+    }
+
+    public async Task<bool> WaitForMainProcessExitAsync(
+        int processId,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(
+            timeout,
+            TimeSpan.Zero);
+
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            if (process.HasExited)
+            {
+                return true;
+            }
+
+            using var timeoutCancellation =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken);
+            timeoutCancellation.CancelAfter(timeout);
+            try
+            {
+                await process.WaitForExitAsync(
+                    timeoutCancellation.Token);
+                return true;
+            }
+            catch (OperationCanceledException)
+                when (!cancellationToken.IsCancellationRequested)
+            {
+                return false;
+            }
+        }
+        catch (ArgumentException)
+        {
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return true;
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            return false;
+        }
+    }
 
     public void Start()
     {
@@ -227,4 +325,58 @@ public sealed class DiscordAccessibilityLauncher
         {
         }
     }
+
+    private static string? ReadProcessCommandLine(int processId)
+    {
+        using var searcher = new ManagementObjectSearcher(
+            "SELECT CommandLine FROM Win32_Process " +
+            $"WHERE ProcessId = {processId}");
+        using var results = searcher.Get();
+        foreach (ManagementObject process in results)
+        {
+            using (process)
+            {
+                return process["CommandLine"] as string;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool ContainsCommandLineArgument(
+        string commandLine,
+        string expectedArgument)
+    {
+        var searchFrom = 0;
+        while (searchFrom < commandLine.Length)
+        {
+            var index = commandLine.IndexOf(
+                expectedArgument,
+                searchFrom,
+                StringComparison.OrdinalIgnoreCase);
+            if (index < 0)
+            {
+                return false;
+            }
+
+            var beforeIsBoundary =
+                index == 0 ||
+                IsArgumentBoundary(commandLine[index - 1]);
+            var afterIndex = index + expectedArgument.Length;
+            var afterIsBoundary =
+                afterIndex == commandLine.Length ||
+                IsArgumentBoundary(commandLine[afterIndex]);
+            if (beforeIsBoundary && afterIsBoundary)
+            {
+                return true;
+            }
+
+            searchFrom = index + expectedArgument.Length;
+        }
+
+        return false;
+    }
+
+    private static bool IsArgumentBoundary(char value) =>
+        char.IsWhiteSpace(value) || value == '"';
 }

@@ -125,16 +125,15 @@ public sealed class DiscordDetectionStatusTrackerTests
     }
 
     [Fact]
-    public void PersistentInitialConnectionFailureEventuallyBecomesActionable()
+    public void RepeatedMessageListFailureKeepsWaitingWithoutLaunchEvidence()
     {
         var plan = DiscordCaptureRuntime.PlanWarmupExhaustion(
             CaptureRuntimeState.Connecting,
-            reconnectWhenExhausted: false,
-            persistentConnectingFailures: 2);
+            reconnectWhenExhausted: false);
 
-        Assert.Equal(CaptureRuntimeState.ReconnectRequired, plan.State);
-        Assert.False(plan.ContinueWaiting);
-        Assert.True(plan.ReportIssue);
+        Assert.Equal(CaptureRuntimeState.Connecting, plan.State);
+        Assert.True(plan.ContinueWaiting);
+        Assert.False(plan.ReportIssue);
     }
 
     [Fact]
@@ -145,5 +144,20 @@ public sealed class DiscordDetectionStatusTrackerTests
             DiscordCaptureRuntime.MergeUnavailableState(
                 CaptureRuntimeState.ReconnectRequired,
                 CaptureRuntimeState.Connecting));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public void ProcessChangeRestartsTheFullWarmupBurst(
+        bool wakeRequested,
+        bool expectedRestart)
+    {
+        var action = DiscordCaptureRuntime.ResolveAttemptWaitAction(
+            wakeRequested);
+
+        Assert.Equal(
+            expectedRestart,
+            action == DiscordWarmupAttemptWaitAction.RestartBurst);
     }
 }

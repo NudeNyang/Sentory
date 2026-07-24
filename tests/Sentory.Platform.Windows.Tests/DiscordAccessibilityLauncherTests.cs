@@ -74,4 +74,55 @@ public sealed class DiscordAccessibilityLauncherTests
 
         Assert.Equal(61, processId);
     }
+
+    [Theory]
+    [InlineData(
+        "\"C:\\Discord\\Discord.exe\" --force-renderer-accessibility",
+        DiscordAccessibilityArgumentState.Enabled)]
+    [InlineData(
+        "\"C:\\Discord\\Discord.exe\" \"--force-renderer-accessibility\"",
+        DiscordAccessibilityArgumentState.Enabled)]
+    [InlineData(
+        "\"C:\\Discord\\Discord.exe\"",
+        DiscordAccessibilityArgumentState.Missing)]
+    [InlineData(
+        "\"C:\\Discord\\Discord.exe\" --force-renderer-accessibility=false",
+        DiscordAccessibilityArgumentState.Missing)]
+    [InlineData(null, DiscordAccessibilityArgumentState.Unknown)]
+    [InlineData("", DiscordAccessibilityArgumentState.Unknown)]
+    public void ClassifiesAccessibilityArgumentFromTheCurrentProcess(
+        string? commandLine,
+        DiscordAccessibilityArgumentState expected)
+    {
+        Assert.Equal(
+            expected,
+            DiscordAccessibilityLauncher
+                .ClassifyAccessibilityArgument(commandLine));
+    }
+
+    [Fact]
+    public void ReturnsUnknownWhenTheCommandLineCannotBeRead()
+    {
+        var launcher = new DiscordAccessibilityLauncher(
+            @"C:\Users\tester\AppData\Local",
+            _ => throw new UnauthorizedAccessException());
+
+        Assert.Equal(
+            DiscordAccessibilityArgumentState.Unknown,
+            launcher.GetAccessibilityArgumentState(42));
+    }
+
+    [Fact]
+    public async Task ProcessExitWaitUsesATimeoutWithoutPolling()
+    {
+        var launcher = new DiscordAccessibilityLauncher(
+            @"C:\Users\tester\AppData\Local");
+
+        var exited = await launcher.WaitForMainProcessExitAsync(
+            Environment.ProcessId,
+            TimeSpan.FromMilliseconds(25),
+            CancellationToken.None);
+
+        Assert.False(exited);
+    }
 }
