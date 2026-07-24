@@ -20,7 +20,8 @@ public partial class ItemDetailWindow : Window
     private readonly bool _isDarkTheme;
     private readonly IReadOnlyList<GalleryImageViewModel> _detailImages;
     private readonly IReadOnlyList<DetailLinkViewModel> _detailLinks;
-    private readonly Func<string?, Task<bool>> _copyImageAsync;
+    private readonly Func<string?, Task<DetailImageCopyResult>>
+        _copyImageAsync;
     private readonly Func<DetailLinkViewModel, Task<GalleryLinkArtwork?>>
         _loadLinkArtworkAsync;
     private readonly Action<GalleryImageViewModel> _openImage;
@@ -38,7 +39,7 @@ public partial class ItemDetailWindow : Window
     public ItemDetailWindow(
         GalleryItemViewModel item,
         bool isDarkTheme,
-        Func<string?, Task<bool>> copyImageAsync,
+        Func<string?, Task<DetailImageCopyResult>> copyImageAsync,
         Func<DetailLinkViewModel, Task<GalleryLinkArtwork?>>
             loadLinkArtworkAsync,
         Action<GalleryImageViewModel> openImage,
@@ -176,10 +177,25 @@ public partial class ItemDetailWindow : Window
 
         var selectedImage = _detailImages[_collectionImageIndex];
         CurrentPhotoCopyButton.IsEnabled = false;
-        var copied = await _copyImageAsync(selectedImage.ContentPath);
-        CurrentPhotoCopyIcon.Text = copied ? "\uE73E" : "\uE783";
+        var result = await _copyImageAsync(selectedImage.ContentPath);
+        if (result.CopyCount is { } copyCount)
+        {
+            CopyCountText.Text = SentoryLocalization.Format(
+                "TimesFormat",
+                copyCount);
+        }
+
+        if (result.IsFavorite is { } isFavorite)
+        {
+            FavoriteText.Visibility = isFavorite
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        CurrentPhotoCopyIcon.Text =
+            result.Copied ? "\uE73E" : "\uE783";
         CurrentPhotoCopyButton.ToolTip = SentoryLocalization.Text(
-            copied ? "Copied" : "CopyFailedShort");
+            result.Copied ? "Copied" : "CopyFailedShort");
         await Task.Delay(1000);
         if (CurrentPhotoCopyButton.IsLoaded)
         {
@@ -486,3 +502,8 @@ public sealed record DetailLinkViewModel(
     string Url,
     string NormalizedKey,
     string Domain);
+
+public sealed record DetailImageCopyResult(
+    bool Copied,
+    int? CopyCount = null,
+    bool? IsFavorite = null);

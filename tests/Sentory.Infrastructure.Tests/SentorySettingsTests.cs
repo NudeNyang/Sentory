@@ -17,7 +17,7 @@ public sealed class SentorySettingsTests
 
     [Theory]
     [InlineData(1)]
-    [InlineData(11)]
+    [InlineData(6)]
     public void NormalizeResetsUnsupportedAutoFavoriteThreshold(
         int copyThreshold)
     {
@@ -38,7 +38,7 @@ public sealed class SentorySettingsTests
     [Theory]
     [InlineData(2)]
     [InlineData(3)]
-    [InlineData(10)]
+    [InlineData(5)]
     public void NormalizePreservesSupportedAutoFavoriteThreshold(
         int copyThreshold)
     {
