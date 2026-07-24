@@ -8,10 +8,14 @@ namespace Sentory.Infrastructure.Data;
 public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
     : ICaptureRepository, IImageOcrRepository
 {
-    private const int CurrentSchemaVersion = 5;
+    private const int CurrentSchemaVersion = 6;
+    private static readonly TimeSpan UsageSessionGap = TimeSpan.FromHours(6);
+    private static readonly TimeSpan RecentUsageWindow = TimeSpan.FromDays(30);
     private static readonly HashSet<string> StoredImageExtensions = new(
         [".png", ".jpg", ".bmp", ".gif", ".tif", ".webp"],
         StringComparer.OrdinalIgnoreCase);
+    private AutoFavoriteConfiguration _autoFavoriteConfiguration =
+        new(false, 3);
     private readonly string _connectionString =
         new SqliteConnectionStringBuilder
         {
@@ -20,6 +24,20 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             Cache = SqliteCacheMode.Shared,
             Pooling = true
         }.ToString();
+
+    public void ConfigureAutomaticFavorites(
+        bool enabled,
+        int usageThreshold)
+    {
+        if (usageThreshold <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(usageThreshold));
+        }
+
+        Volatile.Write(
+            ref _autoFavoriteConfiguration,
+            new AutoFavoriteConfiguration(enabled, usageThreshold));
+    }
 
     public async Task InitializeAsync(
         CancellationToken cancellationToken = default)
@@ -85,6 +103,15 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 FOREIGN KEY(item_id) REFERENCES items(id)
             );
 
+            CREATE TABLE IF NOT EXISTS usage_sessions (
+                session_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                item_id TEXT NOT NULL,
+                session_started_at TEXT NOT NULL,
+                last_event_at TEXT NOT NULL,
+                FOREIGN KEY(item_id) REFERENCES items(id)
+                    ON DELETE CASCADE
+            );
+
             CREATE TABLE IF NOT EXISTS collection_members (
                 collection_id TEXT NOT NULL,
                 position INTEGER NOT NULL,
@@ -119,6 +146,10 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 ON items(last_captured_at DESC);
             CREATE INDEX IF NOT EXISTS ix_capture_events_item_id
                 ON capture_events(item_id);
+            CREATE INDEX IF NOT EXISTS ix_capture_events_item_captured_at
+                ON capture_events(item_id, julianday(captured_at) DESC);
+            CREATE INDEX IF NOT EXISTS ix_usage_sessions_item_last_event
+                ON usage_sessions(item_id, julianday(last_event_at) DESC);
             CREATE INDEX IF NOT EXISTS ix_collection_members_collection_id
                 ON collection_members(collection_id, position);
             CREATE INDEX IF NOT EXISTS ix_collection_members_normalized_key
@@ -280,6 +311,16 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 """,
                 cancellationToken);
         }
+        if (schemaVersion < 6)
+        {
+            await BackfillUsageSessionsAsync(
+                connection,
+                cancellationToken);
+            await ApplyAutomaticFavoritesAsync(
+                connection,
+                DateTimeOffset.UtcNow,
+                cancellationToken);
+        }
         await ExecuteNonQueryAsync(
             connection,
             $"PRAGMA user_version = {CurrentSchemaVersion};",
@@ -343,6 +384,19 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             request,
             itemId,
             cancellationToken);
+        var recentUsageSessionCount = await RecordUsageSessionAsync(
+            connection,
+            transaction,
+            itemId,
+            request.CapturedAt,
+            cancellationToken);
+        await ApplyAutomaticFavoriteAsync(
+            connection,
+            transaction,
+            itemId,
+            ContentKind.Url,
+            recentUsageSessionCount,
+            cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
         return new CaptureResult(
@@ -350,7 +404,8 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             itemCreated,
             true,
             captureCount,
-            shareCount);
+            shareCount,
+            recentUsageSessionCount);
     }
 
     public async Task<CaptureResult> UpsertImageAsync(
@@ -436,6 +491,19 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             request.CapturedAt,
             request.ConfirmationSignals,
             cancellationToken);
+        var recentUsageSessionCount = await RecordUsageSessionAsync(
+            connection,
+            transaction,
+            itemId,
+            request.CapturedAt,
+            cancellationToken);
+        await ApplyAutomaticFavoriteAsync(
+            connection,
+            transaction,
+            itemId,
+            ContentKind.Image,
+            recentUsageSessionCount,
+            cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
         return new CaptureResult(
@@ -443,7 +511,8 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             itemCreated,
             true,
             captureCount,
-            shareCount);
+            shareCount,
+            recentUsageSessionCount);
     }
 
     public async Task<CaptureResult> UpsertCollectionAsync(
@@ -1926,6 +1995,220 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    private static async Task<int> RecordUsageSessionAsync(
+        SqliteConnection connection,
+        System.Data.Common.DbTransaction transaction,
+        Guid itemId,
+        DateTimeOffset capturedAt,
+        CancellationToken cancellationToken)
+    {
+        long? latestSessionId = null;
+        DateTimeOffset? sessionStartedAt = null;
+        DateTimeOffset? lastEventAt = null;
+        await using (var latest = connection.CreateCommand())
+        {
+            latest.Transaction = (SqliteTransaction)transaction;
+            latest.CommandText =
+                """
+                SELECT session_id, session_started_at, last_event_at
+                FROM usage_sessions
+                WHERE item_id = $itemId
+                ORDER BY julianday(last_event_at) DESC
+                LIMIT 1;
+                """;
+            latest.Parameters.AddWithValue("$itemId", itemId.ToString("D"));
+            await using var reader =
+                await latest.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                latestSessionId = reader.GetInt64(0);
+                sessionStartedAt = DateTimeOffset.Parse(
+                    reader.GetString(1),
+                    System.Globalization.CultureInfo.InvariantCulture);
+                lastEventAt = DateTimeOffset.Parse(
+                    reader.GetString(2),
+                    System.Globalization.CultureInfo.InvariantCulture);
+            }
+        }
+
+        var joinsLatestSession =
+            sessionStartedAt is not null &&
+            lastEventAt is not null &&
+            capturedAt >= sessionStartedAt.Value - UsageSessionGap &&
+            capturedAt <= lastEventAt.Value + UsageSessionGap;
+        await using (var write = connection.CreateCommand())
+        {
+            write.Transaction = (SqliteTransaction)transaction;
+            if (joinsLatestSession)
+            {
+                write.CommandText =
+                    """
+                    UPDATE usage_sessions
+                    SET session_started_at = $sessionStartedAt,
+                        last_event_at = $lastEventAt
+                    WHERE session_id = $sessionId;
+                    """;
+                write.Parameters.AddWithValue(
+                    "$sessionStartedAt",
+                    (capturedAt < sessionStartedAt!.Value
+                        ? capturedAt
+                        : sessionStartedAt.Value).ToString("O"));
+                write.Parameters.AddWithValue(
+                    "$lastEventAt",
+                    (capturedAt > lastEventAt!.Value
+                        ? capturedAt
+                        : lastEventAt.Value).ToString("O"));
+                write.Parameters.AddWithValue(
+                    "$sessionId",
+                    latestSessionId!.Value);
+            }
+            else
+            {
+                write.CommandText =
+                    """
+                    INSERT INTO usage_sessions (
+                        item_id, session_started_at, last_event_at)
+                    VALUES ($itemId, $capturedAt, $capturedAt);
+                    """;
+                write.Parameters.AddWithValue(
+                    "$itemId",
+                    itemId.ToString("D"));
+                write.Parameters.AddWithValue(
+                    "$capturedAt",
+                    capturedAt.ToString("O"));
+            }
+
+            await write.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using var count = connection.CreateCommand();
+        count.Transaction = (SqliteTransaction)transaction;
+        count.CommandText =
+            """
+            SELECT COUNT(*)
+            FROM usage_sessions
+            WHERE item_id = $itemId
+              AND julianday(last_event_at) >= julianday($cutoff);
+            """;
+        count.Parameters.AddWithValue("$itemId", itemId.ToString("D"));
+        count.Parameters.AddWithValue(
+            "$cutoff",
+            (capturedAt - RecentUsageWindow).ToString("O"));
+        return Convert.ToInt32(
+            await count.ExecuteScalarAsync(cancellationToken));
+    }
+
+    private async Task ApplyAutomaticFavoriteAsync(
+        SqliteConnection connection,
+        System.Data.Common.DbTransaction transaction,
+        Guid itemId,
+        ContentKind kind,
+        int recentUsageSessionCount,
+        CancellationToken cancellationToken)
+    {
+        var configuration =
+            Volatile.Read(ref _autoFavoriteConfiguration);
+        if (!configuration.Enabled ||
+            recentUsageSessionCount < configuration.UsageThreshold ||
+            kind is not (ContentKind.Url or ContentKind.Image))
+        {
+            return;
+        }
+
+        await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction)transaction;
+        command.CommandText =
+            """
+            UPDATE items
+            SET is_favorite = 1
+            WHERE id = $itemId;
+            """;
+        command.Parameters.AddWithValue("$itemId", itemId.ToString("D"));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static Task BackfillUsageSessionsAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken) =>
+        ExecuteNonQueryAsync(
+            connection,
+            """
+            DELETE FROM usage_sessions;
+
+            WITH ordered_events AS (
+                SELECT item_id,
+                       event_id,
+                       captured_at,
+                       CASE
+                           WHEN (
+                               julianday(captured_at) -
+                               julianday(LAG(captured_at) OVER (
+                                   PARTITION BY item_id
+                                   ORDER BY julianday(captured_at), event_id))
+                           ) * 24.0 > 6.0
+                           THEN 1
+                           ELSE 0
+                       END AS starts_new_session
+                FROM capture_events
+                WHERE item_id IN (
+                    SELECT id
+                    FROM items
+                    WHERE kind IN ('Url', 'Image'))
+            ),
+            grouped_events AS (
+                SELECT item_id,
+                       captured_at,
+                       SUM(starts_new_session) OVER (
+                           PARTITION BY item_id
+                           ORDER BY julianday(captured_at), event_id
+                           ROWS UNBOUNDED PRECEDING) AS session_group
+                FROM ordered_events
+            )
+            INSERT INTO usage_sessions (
+                item_id, session_started_at, last_event_at)
+            SELECT item_id,
+                   MIN(captured_at),
+                   MAX(captured_at)
+            FROM grouped_events
+            GROUP BY item_id, session_group;
+            """,
+            cancellationToken);
+
+    private async Task ApplyAutomaticFavoritesAsync(
+        SqliteConnection connection,
+        DateTimeOffset evaluatedAt,
+        CancellationToken cancellationToken)
+    {
+        var configuration =
+            Volatile.Read(ref _autoFavoriteConfiguration);
+        if (!configuration.Enabled)
+        {
+            return;
+        }
+
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE items
+            SET is_favorite = 1
+            WHERE kind IN ('Url', 'Image')
+              AND id IN (
+                  SELECT item_id
+                  FROM usage_sessions
+                  WHERE julianday(last_event_at) >= julianday($cutoff)
+                  GROUP BY item_id
+                  HAVING COUNT(*) >= $threshold
+              );
+            """;
+        command.Parameters.AddWithValue(
+            "$cutoff",
+            (evaluatedAt - RecentUsageWindow).ToString("O"));
+        command.Parameters.AddWithValue(
+            "$threshold",
+            configuration.UsageThreshold);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     private static async Task UpsertImageItemAsync(
         SqliteConnection connection,
         System.Data.Common.DbTransaction transaction,
@@ -2265,4 +2548,8 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             pair => pair.Key,
             pair => (IReadOnlyList<CapturedCollectionMember>)pair.Value);
     }
+
+    private sealed record AutoFavoriteConfiguration(
+        bool Enabled,
+        int UsageThreshold);
 }

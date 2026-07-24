@@ -102,7 +102,8 @@ public sealed record CaptureResult(
     bool ItemCreated,
     bool EventApplied,
     int CaptureCount,
-    int ShareCount);
+    int ShareCount,
+    int RecentUsageSessionCount = 0);
 
 public sealed record CapturedItemSummary(
     Guid ItemId,

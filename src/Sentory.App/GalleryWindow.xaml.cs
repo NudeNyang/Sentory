@@ -27,6 +27,7 @@ public partial class GalleryWindow : Window
     private const int ScrollIndicatorActiveMilliseconds = 1200;
 
     private readonly ICaptureRepository _repository;
+    private readonly CopyUsageRecorder _copyUsageRecorder;
     private readonly SentoryDataPaths _paths;
     private readonly SentorySettingsStore _settingsStore;
     private readonly LinkPreviewFetcher _linkPreviewFetcher;
@@ -86,6 +87,8 @@ public partial class GalleryWindow : Window
 
     public event EventHandler? LanguageChanged;
 
+    public event Action<bool, int>? AutoFavoriteSettingsChanged;
+
     public bool IsDarkTheme => _isDarkTheme;
 
     public GalleryWindow(
@@ -96,6 +99,7 @@ public partial class GalleryWindow : Window
     {
         InitializeComponent();
         _repository = repository;
+        _copyUsageRecorder = new CopyUsageRecorder(repository);
         _paths = paths;
         _settingsStore = settingsStore;
         _linkPreviewFetcher = linkPreviewFetcher;
@@ -769,6 +773,7 @@ public partial class GalleryWindow : Window
     {
         _settings.AutoFavoriteEnabled = enabled;
         _settings.AutoFavoriteCopyThreshold = copyThreshold;
+        AutoFavoriteSettingsChanged?.Invoke(enabled, copyThreshold);
     }
 
     private async Task ApplyStartupSelection(bool enabled)
@@ -2280,7 +2285,10 @@ public partial class GalleryWindow : Window
         var window = new ItemDetailWindow(
             item,
             _isDarkTheme,
-            CopyDetailImageAsync,
+            contentPath => CopyDetailImageAsync(
+                item.Item.ItemId,
+                item.Item.Kind == ContentKind.Image,
+                contentPath),
             LoadDetailLinkArtworkAsync,
             OpenDetailImage,
             OpenDetailLink)
@@ -2352,75 +2360,8 @@ public partial class GalleryWindow : Window
             return;
         }
 
-        var copiedAt = DateTimeOffset.Now;
-        var updatedItem = item.Item;
-        var copyRecorded = false;
-        try
-        {
-            if (await _repository.RecordCopyAsync(
-                    item.Item.ItemId,
-                    copiedAt))
-            {
-                copyRecorded = true;
-                updatedItem = item.Item with
-                {
-                    CopyCount = item.Item.CopyCount + 1,
-                    LastCopiedAt = copiedAt
-                };
-            }
-        }
-        catch (Exception)
-        {
-            ShowFeedback(SentoryLocalization.Text("CopyHistorySaveFailed"));
-            return;
-        }
-
-        var autoFavoriteAdded = false;
-        if (copyRecorded &&
-            AutoFavoritePolicy.ShouldAdd(
-                updatedItem.Kind,
-                updatedItem.IsFavorite,
-                updatedItem.CopyCount,
-                _settings.AutoFavoriteEnabled,
-                _settings.AutoFavoriteCopyThreshold))
-        {
-            try
-            {
-                if (!await _repository.SetFavoriteAsync(
-                        updatedItem.ItemId,
-                        true))
-                {
-                    ReplaceItem(item, updatedItem);
-                    ShowFeedback(
-                        SentoryLocalization.Text(
-                            "AutoFavoriteAddFailed"));
-                    return;
-                }
-
-                updatedItem = updatedItem with
-                {
-                    IsFavorite = true
-                };
-                autoFavoriteAdded = true;
-            }
-            catch (Exception)
-            {
-                ReplaceItem(item, updatedItem);
-                ShowFeedback(
-                    SentoryLocalization.Text("AutoFavoriteAddFailed"));
-                return;
-            }
-        }
-
-        if (!ReferenceEquals(updatedItem, item.Item))
-        {
-            ReplaceItem(item, updatedItem);
-        }
-
-        ShowFeedback(
-            autoFavoriteAdded
-                ? SentoryLocalization.Text("AutoFavoriteAdded")
-                : successMessage);
+        var usage = await RecordCopyUsageAsync(item);
+        ShowFeedback(CopyFeedbackMessage(usage.Outcome, successMessage));
     }
 
     private void ReplaceItem(
@@ -2448,28 +2389,89 @@ public partial class GalleryWindow : Window
         return image;
     }
 
-    private async Task<bool> CopyDetailImageAsync(string? contentPath)
+    private async Task<DetailImageCopyResult> CopyDetailImageAsync(
+        Guid itemId,
+        bool recordCopyUsage,
+        string? contentPath)
     {
         var path = ResolveContentPath(contentPath);
         if (path is null || !File.Exists(path))
         {
-            return false;
+            return new DetailImageCopyResult(false);
         }
 
         try
         {
             var image = LoadClipboardImage(path);
             await SetClipboardWithRetryAsync(() => WpfClipboard.SetImage(image));
-            return true;
         }
         catch (Exception exception)
             when (exception is COMException or ExternalException or
                   IOException or UnauthorizedAccessException or
                   NotSupportedException)
         {
-            return false;
+            return new DetailImageCopyResult(false);
         }
+
+        if (!recordCopyUsage)
+        {
+            return new DetailImageCopyResult(true);
+        }
+
+        var item = _allItems.FirstOrDefault(candidate =>
+            candidate.Item.ItemId == itemId);
+        if (item is null)
+        {
+            ShowFeedback(SentoryLocalization.Text("ItemNotFound"));
+            return new DetailImageCopyResult(true);
+        }
+
+        var usage = await RecordCopyUsageAsync(item);
+        if (usage.Outcome is CopyUsageRecordOutcome.RecordFailed or
+            CopyUsageRecordOutcome.AutoFavoriteFailed)
+        {
+            ShowFeedback(CopyFeedbackMessage(
+                usage.Outcome,
+                SentoryLocalization.Text("PhotoCopied")));
+        }
+
+        return new DetailImageCopyResult(
+            true,
+            usage.Item.CopyCount,
+            usage.Item.IsFavorite);
     }
+
+    private async Task<CopyUsageRecordResult> RecordCopyUsageAsync(
+        GalleryItemViewModel item)
+    {
+        var currentItem = _allItems.FirstOrDefault(candidate =>
+            candidate.Item.ItemId == item.Item.ItemId) ?? item;
+        var result = await _copyUsageRecorder.RecordAsync(
+            currentItem.Item,
+            _settings.AutoFavoriteEnabled,
+            _settings.AutoFavoriteCopyThreshold,
+            DateTimeOffset.Now);
+        if (!ReferenceEquals(result.Item, currentItem.Item))
+        {
+            ReplaceItem(currentItem, result.Item);
+        }
+
+        return result;
+    }
+
+    private static string CopyFeedbackMessage(
+        CopyUsageRecordOutcome outcome,
+        string copiedMessage) =>
+        outcome switch
+        {
+            CopyUsageRecordOutcome.AutoFavoriteAdded =>
+                SentoryLocalization.Text("AutoFavoriteAdded"),
+            CopyUsageRecordOutcome.RecordFailed =>
+                SentoryLocalization.Text("CopyHistorySaveFailed"),
+            CopyUsageRecordOutcome.AutoFavoriteFailed =>
+                SentoryLocalization.Text("AutoFavoriteAddFailed"),
+            _ => copiedMessage
+        };
 
     private void OpenDetailImage(GalleryImageViewModel image) =>
         OpenImageTarget(

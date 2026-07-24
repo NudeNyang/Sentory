@@ -15,7 +15,7 @@ public sealed class SentorySettings
 {
     public const int DefaultAutoFavoriteCopyThreshold = 3;
     public const int MinimumAutoFavoriteCopyThreshold = 2;
-    public const int MaximumAutoFavoriteCopyThreshold = 10;
+    public const int MaximumAutoFavoriteCopyThreshold = 5;
 
     private static readonly int[] SupportedCleanupDays = [0, 7, 30, 90, 180];
     private static readonly string[] SupportedLanguages =

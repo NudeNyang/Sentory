@@ -192,7 +192,11 @@ public partial class App : System.Windows.Application
             }
 
             PrepareDiscordDefault();
-            _repository = new SqliteCaptureRepository(_paths);
+            var captureRepository = new SqliteCaptureRepository(_paths);
+            captureRepository.ConfigureAutomaticFavorites(
+                initialSettings.AutoFavoriteEnabled,
+                initialSettings.AutoFavoriteCopyThreshold);
+            _repository = captureRepository;
             await _repository.InitializeAsync();
             var repairResult = await _repository.RepairStorageAsync();
             _linkPreviewFetcher = new LinkPreviewFetcher(_paths);
@@ -1497,6 +1501,8 @@ public partial class App : System.Windows.Application
             _galleryWindow.StartupChanged +=
                 SynchronizeDiscordStartupRegistrationAsync;
             _galleryWindow.LanguageChanged += (_, _) => UpdatePauseUi();
+            _galleryWindow.AutoFavoriteSettingsChanged +=
+                ApplyAutomaticFavoriteSettings;
             _galleryWindow.SetDiscordRepairNeeded(
                 _discordSupportEnabled && _discordRepairNeeded);
             _galleryWindow.SetDiscordDetectionState(
@@ -1513,6 +1519,8 @@ public partial class App : System.Windows.Application
             MainWindow = _galleryWindow;
             _galleryWindow.Closed += (_, _) =>
             {
+                _galleryWindow.AutoFavoriteSettingsChanged -=
+                    ApplyAutomaticFavoriteSettings;
                 if (ReferenceEquals(MainWindow, _galleryWindow))
                 {
                     MainWindow = null;
@@ -1538,6 +1546,18 @@ public partial class App : System.Windows.Application
         _galleryWindow.ShowInTaskbar = true;
         _galleryWindow.Show();
         _galleryWindow.Activate();
+    }
+
+    private void ApplyAutomaticFavoriteSettings(
+        bool enabled,
+        int usageThreshold)
+    {
+        if (_repository is SqliteCaptureRepository captureRepository)
+        {
+            captureRepository.ConfigureAutomaticFavorites(
+                enabled,
+                usageThreshold);
+        }
     }
 
     private async Task RunMaintenanceLoopAsync(
