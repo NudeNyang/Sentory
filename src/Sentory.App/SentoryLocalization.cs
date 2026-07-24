@@ -92,7 +92,7 @@ internal static class SentoryLocalization
             L("DataManagement", "데이터 관리", "Data management", "データ管理", "数据管理"),
             L("FavoriteCleanupExclusion", "즐겨찾기에 등록된 항목은 자동 정리에서 포함되지 않음", "Favorites are excluded from automatic cleanup", "お気に入りは自動整理の対象外です", "收藏项目不会被自动清理"),
             L("AutoFavorite", "자동 즐겨찾기", "Automatic favorites", "自動お気に入り", "自动收藏"),
-            L("AutoFavoriteDescription", "같은 링크나 사진을 반복해서 사용하면 즐겨찾기에 추가합니다. Sentory 밖의 공유는 최근 30일을 기준으로 하며 6시간 이내 공유는 한 번으로 계산합니다", "Add a link or photo to favorites after repeated use. Shares outside Sentory use the last 30 days, with shares within 6 hours counting as one use", "同じリンクや写真を繰り返し使用するとお気に入りに追加します。Sentory外での共有は直近30日間を対象とし、6時間以内の共有は1回として数えます", "同一链接或图片被重复使用后自动收藏。Sentory 外的分享以最近30天为准，6小时内的分享计为一次"),
+            L("AutoFavoriteDescription", "같은 링크나 사진을 반복해서 사용하면 즐겨찾기에 추가합니다", "Add a link or photo to favorites after repeated use", "同じリンクや写真を繰り返し使用するとお気に入りに追加します", "同一链接或图片被重复使用后自动收藏"),
             L("AutoFavoriteOff", "사용 안 함", "Disabled", "使用しない", "不使用"),
             L("AutoFavoriteCopyCountFormat", "{0}회 반복 사용 후 추가", "Add after {0} repeated uses", "{0}回の繰り返し使用後に追加", "重复使用 {0} 次后收藏"),
             L("Stored", "보관 중", "Stored", "保存中", "已保存"),

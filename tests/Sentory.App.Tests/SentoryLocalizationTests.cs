@@ -5,15 +5,12 @@ namespace Sentory.App.Tests;
 public sealed class SentoryLocalizationTests
 {
     [Fact]
-    public void AutomaticFavoriteExplainsRepeatedUsageWindow()
+    public void AutomaticFavoriteUsesConciseRepeatedUsageDescription()
     {
         SentoryLocalization.Apply(new ResourceDictionary(), "ko-KR");
 
-        Assert.Contains(
-            "최근 30일",
-            SentoryLocalization.Text("AutoFavoriteDescription"));
-        Assert.Contains(
-            "6시간",
+        Assert.Equal(
+            "같은 링크나 사진을 반복해서 사용하면 즐겨찾기에 추가합니다",
             SentoryLocalization.Text("AutoFavoriteDescription"));
         Assert.Equal(
             "3회 반복 사용 후 추가",
