@@ -620,6 +620,8 @@ public partial class GalleryWindow : Window
         window.LanguageSelectionChanged += ApplyLanguageSelection;
         window.MessengerSupportSelectionChanged +=
             ApplyMessengerSupportSelection;
+        window.AutoFavoriteSettingsChanged +=
+            ApplyAutoFavoriteSettings;
         window.StartupSelectionChanged += ApplyStartupSelection;
         window.DataChanged += RefreshAsync;
         Func<Task<ManualUpdateCheckResult>> updateCheckHandler =
@@ -645,6 +647,8 @@ public partial class GalleryWindow : Window
             window.LanguageSelectionChanged -= ApplyLanguageSelection;
             window.MessengerSupportSelectionChanged -=
                 ApplyMessengerSupportSelection;
+            window.AutoFavoriteSettingsChanged -=
+                ApplyAutoFavoriteSettings;
             window.StartupSelectionChanged -= ApplyStartupSelection;
             window.DataChanged -= RefreshAsync;
             window.UpdateCheckRequested -= updateCheckHandler;
@@ -757,6 +761,14 @@ public partial class GalleryWindow : Window
         }
 
         MessengerSupportChanged?.Invoke(sourceApp, enabled);
+    }
+
+    private void ApplyAutoFavoriteSettings(
+        bool enabled,
+        int copyThreshold)
+    {
+        _settings.AutoFavoriteEnabled = enabled;
+        _settings.AutoFavoriteCopyThreshold = copyThreshold;
     }
 
     private async Task ApplyStartupSelection(bool enabled)
@@ -2095,6 +2107,10 @@ public partial class GalleryWindow : Window
                 current.KakaoTalkSupportEnabled;
             _settings.DiscordAccessibilityPrepared =
                 current.DiscordAccessibilityPrepared;
+            _settings.AutoFavoriteEnabled =
+                current.AutoFavoriteEnabled;
+            _settings.AutoFavoriteCopyThreshold =
+                current.AutoFavoriteCopyThreshold;
             _settingsStore.Save(_settings);
         }
         catch (Exception exception)
@@ -2337,17 +2353,20 @@ public partial class GalleryWindow : Window
         }
 
         var copiedAt = DateTimeOffset.Now;
+        var updatedItem = item.Item;
+        var copyRecorded = false;
         try
         {
             if (await _repository.RecordCopyAsync(
                     item.Item.ItemId,
                     copiedAt))
             {
-                ReplaceItem(item, item.Item with
+                copyRecorded = true;
+                updatedItem = item.Item with
                 {
                     CopyCount = item.Item.CopyCount + 1,
                     LastCopiedAt = copiedAt
-                });
+                };
             }
         }
         catch (Exception)
@@ -2356,7 +2375,52 @@ public partial class GalleryWindow : Window
             return;
         }
 
-        ShowFeedback(successMessage);
+        var autoFavoriteAdded = false;
+        if (copyRecorded &&
+            AutoFavoritePolicy.ShouldAdd(
+                updatedItem.Kind,
+                updatedItem.IsFavorite,
+                updatedItem.CopyCount,
+                _settings.AutoFavoriteEnabled,
+                _settings.AutoFavoriteCopyThreshold))
+        {
+            try
+            {
+                if (!await _repository.SetFavoriteAsync(
+                        updatedItem.ItemId,
+                        true))
+                {
+                    ReplaceItem(item, updatedItem);
+                    ShowFeedback(
+                        SentoryLocalization.Text(
+                            "AutoFavoriteAddFailed"));
+                    return;
+                }
+
+                updatedItem = updatedItem with
+                {
+                    IsFavorite = true
+                };
+                autoFavoriteAdded = true;
+            }
+            catch (Exception)
+            {
+                ReplaceItem(item, updatedItem);
+                ShowFeedback(
+                    SentoryLocalization.Text("AutoFavoriteAddFailed"));
+                return;
+            }
+        }
+
+        if (!ReferenceEquals(updatedItem, item.Item))
+        {
+            ReplaceItem(item, updatedItem);
+        }
+
+        ShowFeedback(
+            autoFavoriteAdded
+                ? SentoryLocalization.Text("AutoFavoriteAdded")
+                : successMessage);
     }
 
     private void ReplaceItem(
