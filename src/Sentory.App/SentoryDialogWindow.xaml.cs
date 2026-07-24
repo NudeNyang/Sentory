@@ -1,9 +1,12 @@
 using System.Windows;
+using System.Windows.Threading;
 
 namespace Sentory.App;
 
 public partial class SentoryDialogWindow : Window
 {
+    private DispatcherTimer? _countdownTimer;
+
     private SentoryDialogWindow(
         string heading,
         string message,
@@ -50,6 +53,38 @@ public partial class SentoryDialogWindow : Window
         return dialog.ShowDialog() == true;
     }
 
+    public static bool ConfirmWithCountdown(
+        Window? owner,
+        string heading,
+        Func<int, string> messageFactory,
+        string confirmText,
+        bool isDarkTheme,
+        int countdownSeconds)
+    {
+        ArgumentNullException.ThrowIfNull(messageFactory);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(
+            countdownSeconds,
+            0);
+
+        var dialog = new SentoryDialogWindow(
+            heading,
+            messageFactory(countdownSeconds),
+            confirmText,
+            isDarkTheme,
+            danger: false);
+        if (owner is { IsLoaded: true })
+        {
+            dialog.Owner = owner;
+        }
+        else
+        {
+            dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        }
+
+        dialog.StartCountdown(countdownSeconds, messageFactory);
+        return dialog.ShowDialog() == true;
+    }
+
     public static void ShowMessage(
         Window? owner,
         string heading,
@@ -81,4 +116,33 @@ public partial class SentoryDialogWindow : Window
 
     private void CancelButton_Click(object sender, RoutedEventArgs e) =>
         DialogResult = false;
+
+    private void StartCountdown(
+        int seconds,
+        Func<int, string> messageFactory)
+    {
+        var remainingSeconds = seconds;
+        _countdownTimer = new DispatcherTimer(
+            TimeSpan.FromSeconds(1),
+            DispatcherPriority.Normal,
+            (_, _) =>
+            {
+                remainingSeconds--;
+                if (remainingSeconds <= 0)
+                {
+                    _countdownTimer?.Stop();
+                    DialogResult = true;
+                    return;
+                }
+
+                MessageText.Text = messageFactory(remainingSeconds);
+            },
+            Dispatcher);
+        Closed += (_, _) =>
+        {
+            _countdownTimer?.Stop();
+            _countdownTimer = null;
+        };
+        _countdownTimer.Start();
+    }
 }

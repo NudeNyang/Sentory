@@ -3,6 +3,11 @@ using System.IO;
 
 namespace Sentory.Platform.Windows.Runtime;
 
+internal readonly record struct DiscordProcessCandidate(
+    int ProcessId,
+    bool HasMainWindow,
+    DateTimeOffset StartedAt);
+
 public sealed class DiscordAccessibilityLauncher
 {
     private const string DiscordProcessName = "Discord";
@@ -55,6 +60,50 @@ public sealed class DiscordAccessibilityLauncher
             }
         }
     }
+
+    public int? GetMainProcessId()
+    {
+        var processes = Process.GetProcessesByName(DiscordProcessName);
+        try
+        {
+            var candidates = new List<DiscordProcessCandidate>(
+                processes.Length);
+            foreach (var process in processes)
+            {
+                try
+                {
+                    candidates.Add(new DiscordProcessCandidate(
+                        process.Id,
+                        IsRunning(process) &&
+                        process.MainWindowHandle != nint.Zero,
+                        process.StartTime));
+                }
+                catch (InvalidOperationException)
+                {
+                }
+                catch (System.ComponentModel.Win32Exception)
+                {
+                }
+            }
+
+            return SelectMainProcessId(candidates);
+        }
+        finally
+        {
+            foreach (var process in processes)
+            {
+                process.Dispose();
+            }
+        }
+    }
+
+    internal static int? SelectMainProcessId(
+        IEnumerable<DiscordProcessCandidate> candidates) =>
+        candidates
+            .Where(candidate => candidate.HasMainWindow)
+            .OrderByDescending(candidate => candidate.StartedAt)
+            .Select(candidate => (int?)candidate.ProcessId)
+            .FirstOrDefault();
 
     public void Start()
     {

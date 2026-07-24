@@ -61,8 +61,12 @@ public partial class App : System.Windows.Application
     private bool _kakaoSupportEnabled = true;
     private bool _discordRepairNeeded;
     private bool _discordRepairBusy;
+    private bool _discordRestartPromptActive;
+    private int? _observedDiscordProcessId;
+    private int? _automaticRestartPromptedProcessId;
     private CaptureRuntimeState _discordDetectionState =
         CaptureRuntimeState.Connecting;
+    private Task? _discordConnectionMonitorTask;
     private bool _shuttingDown;
     private string? _lastRuntimeIssueCode;
     private string? _lastRuntimeIssue;
@@ -282,6 +286,9 @@ public partial class App : System.Windows.Application
                 _maintenanceCancellation.Token));
             ApplyRuntimeSourceSettings();
             _runtime.Start();
+            _discordConnectionMonitorTask =
+                RunDiscordConnectionMonitorAsync(
+                    _maintenanceCancellation.Token);
             _kakaoDropOverlay.Start();
             _discordDropOverlay.Start();
             UpdatePauseUi();
@@ -1241,6 +1248,11 @@ public partial class App : System.Windows.Application
                     persistPrepared);
             }
 
+            if (status.State == CaptureRuntimeState.ReconnectRequired)
+            {
+                _ = PromptAutomaticDiscordRestartAsync();
+            }
+
             if (_runtime?.IsPaused != true)
             {
                 SetStatus(
@@ -1271,6 +1283,11 @@ public partial class App : System.Windows.Application
         }
 
         _discordRepairBusy = true;
+        await RestartDiscordConnectionCoreAsync();
+    }
+
+    private async Task RestartDiscordConnectionCoreAsync()
+    {
         try
         {
             await _discordLauncher.RestartAsync();
@@ -1314,6 +1331,73 @@ public partial class App : System.Windows.Application
         finally
         {
             _discordRepairBusy = false;
+        }
+    }
+
+    private async Task PromptAutomaticDiscordRestartAsync()
+    {
+        if (_discordRestartPromptActive)
+        {
+            return;
+        }
+
+        var processId = _discordLauncher.GetMainProcessId();
+        if (!DiscordAutomaticRestartPolicy.ShouldPrompt(
+                _discordSupportEnabled,
+                _runtime?.IsPaused == true,
+                _discordRepairBusy,
+                _discordDetectionState,
+                processId,
+                _automaticRestartPromptedProcessId))
+        {
+            return;
+        }
+
+        _discordRestartPromptActive = true;
+        _automaticRestartPromptedProcessId = processId;
+        try
+        {
+            _diagnosticsLog?.Write(
+                "discord-auto-restart-prompted",
+                $"processId={processId} countdownSeconds=15");
+            var restart = SentoryDialogWindow.ConfirmWithCountdown(
+                _galleryWindow,
+                SentoryLocalization.Text("AutomaticReconnectHeading"),
+                seconds => SentoryLocalization.Format(
+                    "AutomaticReconnectMessageFormat",
+                    seconds),
+                SentoryLocalization.Text("RestartNow"),
+                GetSavedDarkTheme(),
+                countdownSeconds: 15);
+            if (!restart)
+            {
+                _diagnosticsLog?.Write(
+                    "discord-auto-restart-cancelled",
+                    $"processId={processId}");
+                return;
+            }
+
+            if (_discordLauncher.GetMainProcessId() != processId)
+            {
+                _diagnosticsLog?.Write(
+                    "discord-auto-restart-skipped",
+                    $"processId={processId} reason=process-changed");
+                if (_runtime is ICaptureRuntimeRecoveryController controller)
+                {
+                    controller.RequestRecovery(SourceApp.Discord);
+                }
+                return;
+            }
+
+            _discordRepairBusy = true;
+            _diagnosticsLog?.Write(
+                "discord-auto-restart-started",
+                $"processId={processId}");
+            await RestartDiscordConnectionCoreAsync();
+        }
+        finally
+        {
+            _discordRestartPromptActive = false;
         }
     }
 
@@ -1451,6 +1535,44 @@ public partial class App : System.Windows.Application
                         GetStartupEnabled());
                 }
                 await ApplyAutomaticCleanupAsync(cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task RunDiscordConnectionMonitorAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var processId = _discordSupportEnabled
+                    ? _discordLauncher.GetMainProcessId()
+                    : null;
+                if (processId != _observedDiscordProcessId)
+                {
+                    var previousProcessId = _observedDiscordProcessId;
+                    _observedDiscordProcessId = processId;
+                    _automaticRestartPromptedProcessId = null;
+                    _diagnosticsLog?.Write(
+                        "discord-process-changed",
+                        $"previous={previousProcessId?.ToString() ?? "none"} current={processId?.ToString() ?? "none"}");
+                    if (_runtime is ICaptureRuntimeRecoveryController controller)
+                    {
+                        controller.RequestRecovery(SourceApp.Discord);
+                    }
+                }
+
+                var delay =
+                    DiscordAutomaticRestartPolicy.GetProcessCheckInterval(
+                        _discordSupportEnabled,
+                        _discordDetectionState);
+                await Task.Delay(delay, cancellationToken);
             }
         }
         catch (OperationCanceledException)
@@ -1703,6 +1825,11 @@ public partial class App : System.Windows.Application
         {
             await _maintenanceTask;
             _maintenanceTask = null;
+        }
+        if (_discordConnectionMonitorTask is not null)
+        {
+            await _discordConnectionMonitorTask;
+            _discordConnectionMonitorTask = null;
         }
         if (_linkPreviewTask is not null)
         {

@@ -34,4 +34,44 @@ public sealed class DiscordAccessibilityLauncherTests
             ],
             startInfo.ArgumentList);
     }
+
+    [Fact]
+    public void SelectsOnlyTheDiscordProcessWithAMainWindow()
+    {
+        var processId = DiscordAccessibilityLauncher.SelectMainProcessId(
+            [
+                new DiscordProcessCandidate(
+                    31,
+                    false,
+                    DateTimeOffset.Parse("2026-07-24T08:00:00+09:00")),
+                new DiscordProcessCandidate(
+                    47,
+                    true,
+                    DateTimeOffset.Parse("2026-07-24T08:01:00+09:00")),
+                new DiscordProcessCandidate(
+                    52,
+                    false,
+                    DateTimeOffset.Parse("2026-07-24T08:02:00+09:00"))
+            ]);
+
+        Assert.Equal(47, processId);
+    }
+
+    [Fact]
+    public void SelectsTheNewestMainProcessDuringDiscordRestart()
+    {
+        var processId = DiscordAccessibilityLauncher.SelectMainProcessId(
+            [
+                new DiscordProcessCandidate(
+                    47,
+                    true,
+                    DateTimeOffset.Parse("2026-07-24T08:01:00+09:00")),
+                new DiscordProcessCandidate(
+                    61,
+                    true,
+                    DateTimeOffset.Parse("2026-07-24T08:03:00+09:00"))
+            ]);
+
+        Assert.Equal(61, processId);
+    }
 }

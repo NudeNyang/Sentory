@@ -58,7 +58,7 @@ macOS와 Linux에서 바로 실행되는 앱이 완성된 것은 아니다. 이�
 설치 프로그램과 압축을 풀고 실행하는 포터블 폴더를 함께 제공한다.
 
 ```powershell
-.\scripts\Publish-Release.ps1 -Version 1.4.2
+.\scripts\Publish-Release.ps1 -Version 1.4.3
 ```
 
 결과 위치:
@@ -99,6 +99,11 @@ Windows 자동 실행과 Discord 감지를 함께 켜면 Discord의 기존 로�
 끄면 기존 값을 복원하며, 관리 중 사용자가 직접 바꾼 값은 덮어쓰지 않는다.
 설치형 제거 프로그램도 Sentory 시작 항목을 삭제하기 전에 Discord 시작 명령
 복원을 실행한다. 이 레지스트리 연동은 Windows 플랫폼 계층에만 둔다.
+
+Discord가 다른 바로가기나 업데이트 경로로 먼저 실행된 경우에는 현재 메인
+프로세스 PID를 확인해 연결 준비를 다시 수행한다. 접근성 연결을 계속 만들지
+못하면 15초 동안 취소하거나 즉시 실행할 수 있는 안내 뒤 Discord를 한 번
+재시작한다. 연결 뒤에는 접근성 탐색을 중단하고 PID 변경만 확인한다.
 
 ## macOS·Linux 이식 순서
 

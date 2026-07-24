@@ -55,7 +55,7 @@ recognized text is stored in the Sentory database for search. See the
 
 ## Download
 
-The current stable version is **1.4.2**. It runs on 64-bit Windows 10 and 11. Download
+The current stable version is **1.4.3**. It runs on 64-bit Windows 10 and 11. Download
 the package for your PC from
 [Releases](https://github.com/NudeNyang/Sentory/releases). macOS and Linux versions
 are planned, but there is no release schedule yet.
@@ -88,11 +88,10 @@ Installed copies update without reopening the setup wizard and start Sentory aga
 the update is complete. The manual install button remains available in the library if
 you close the first prompt.
 
-The first Discord connection may restart Discord to apply accessibility mode. The
-current connection state and separate messenger detection controls are available in
-Sentory settings. When both Start with Windows and Discord detection are enabled,
-Discord starts in accessibility mode on later sign-ins, so a normal reboot does not
-require another reconnect.
+Sentory prepares detection against the currently running Discord process. If that
+process cannot provide the required accessibility connection, a 15-second prompt lets
+you cancel the restart or restart immediately. Sentory checks again when Discord starts
+before Sentory or is closed and reopened.
 
 ## Good to know
 
@@ -115,7 +114,7 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 1.4.2
+.\scripts\Publish-Release.ps1 -Version 1.4.3
 ```
 
 The release script creates Windows x64 and ARM64 installers, portable packages,

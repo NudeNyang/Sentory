@@ -99,32 +99,51 @@ public sealed class DiscordDetectionStatusTrackerTests
         Assert.Equal(expectedIssue, plan.ReportIssue);
     }
 
-    [Theory]
-    [InlineData(
-        CaptureRuntimeState.Connecting,
-        false,
-        CaptureRuntimeState.Connecting)]
-    [InlineData(
-        CaptureRuntimeState.Connecting,
-        true,
-        CaptureRuntimeState.ReconnectRequired)]
-    [InlineData(
-        CaptureRuntimeState.Recovering,
-        true,
-        CaptureRuntimeState.Recovering)]
-    [InlineData(
-        CaptureRuntimeState.ReconnectRequired,
-        false,
-        CaptureRuntimeState.ReconnectRequired)]
-    public void WarmupFailureOnlyBecomesActionableAfterSendFailure(
-        CaptureRuntimeState lastState,
-        bool reconnectWhenExhausted,
-        CaptureRuntimeState expected)
+    [Fact]
+    public void InitialWarmupKeepsAThrottledRetryAlive()
+    {
+        var plan = DiscordCaptureRuntime.PlanWarmupExhaustion(
+            CaptureRuntimeState.Connecting,
+            reconnectWhenExhausted: false);
+
+        Assert.Equal(CaptureRuntimeState.Connecting, plan.State);
+        Assert.True(plan.ContinueWaiting);
+        Assert.False(plan.ReportIssue);
+        Assert.Equal(TimeSpan.FromSeconds(30), plan.RetryDelay);
+    }
+
+    [Fact]
+    public void SendFailureEscalatesAfterAutomaticRefreshIsExhausted()
+    {
+        var plan = DiscordCaptureRuntime.PlanWarmupExhaustion(
+            CaptureRuntimeState.Connecting,
+            reconnectWhenExhausted: true);
+
+        Assert.Equal(CaptureRuntimeState.ReconnectRequired, plan.State);
+        Assert.False(plan.ContinueWaiting);
+        Assert.True(plan.ReportIssue);
+    }
+
+    [Fact]
+    public void PersistentInitialConnectionFailureEventuallyBecomesActionable()
+    {
+        var plan = DiscordCaptureRuntime.PlanWarmupExhaustion(
+            CaptureRuntimeState.Connecting,
+            reconnectWhenExhausted: false,
+            persistentConnectingFailures: 2);
+
+        Assert.Equal(CaptureRuntimeState.ReconnectRequired, plan.State);
+        Assert.False(plan.ContinueWaiting);
+        Assert.True(plan.ReportIssue);
+    }
+
+    [Fact]
+    public void DefinitiveAccessibilityFailureSurvivesAWindowTransition()
     {
         Assert.Equal(
-            expected,
-            DiscordCaptureRuntime.ResolveWarmupExhaustedState(
-                lastState,
-                reconnectWhenExhausted));
+            CaptureRuntimeState.ReconnectRequired,
+            DiscordCaptureRuntime.MergeUnavailableState(
+                CaptureRuntimeState.ReconnectRequired,
+                CaptureRuntimeState.Connecting));
     }
 }

@@ -404,14 +404,31 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
 모두 종료한 뒤 저장소 루트에서 다음 명령을 실행한다.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\Start-InstalledDiagnostics.ps1 -Version 1.4.2
+powershell -ExecutionPolicy Bypass -File .\scripts\Start-InstalledDiagnostics.ps1 -Version 1.4.3
 ```
 
 설치판의 데이터베이스, 설정, 캐시와 Discord 추적 로그는
-`%LOCALAPPDATA%\Sentory-Diagnostics\1.4.2` 아래에 생성된다. 환경 변수는 실행한
+`%LOCALAPPDATA%\Sentory-Diagnostics\1.4.3` 아래에 생성된다. 환경 변수는 실행한
 프로세스와 그 접근성 작업자에만 전달되므로 기본 데이터 폴더와 시스템 환경
 변수는 바뀌지 않는다. Windows 자동 실행이나 일반 바로가기로 연 Sentory는 이
 진단 폴더를 사용하지 않으므로 재현할 때마다 위 스크립트로 실행한다.
+
+## Discord 프로세스별 자동 연결 복구
+
+1.4.2의 초기 준비 작업은 15회 실패 뒤 `worker-warmup-deferred
+state=Connecting`을 남기고 끝났다. 이후 채팅방을 열어도 준비 작업이 다시
+시작되지 않아 트레이와 설정이 계속 `연결 준비 중`으로 보일 수 있었다.
+
+- Discord 메인 창 PID를 별도로 추적한다. 새 PID가 나타나면 진행 중인 준비
+  대기를 즉시 깨우고, 준비 완료 상태였다면 새 접근성 대상을 다시 찾는다.
+- 초기 재시도 뒤에는 한 번에 한 차례만 접근성 대상을 확인하고 다음 확인까지
+  30초 기다린다. 준비 완료 뒤 접근성 확인 작업은 종료되며 PID 조회만 10초
+  간격으로 남는다.
+- 같은 PID에서 연결 실패가 계속되면 15초 카운트다운 창을 연다. 사용자는
+  `취소` 또는 `지금 재시작`을 고를 수 있고, 아무 동작이 없으면 Discord를
+  접근성 옵션과 함께 한 번 재시작한다.
+- 동일 PID에는 자동 안내를 반복하지 않는다. 창이 떠 있는 동안 Discord가
+  자체 재실행되면 PID를 다시 비교해 오래된 프로세스에 대한 재시작을 건너뛴다.
 
 ## 안전 원칙
 

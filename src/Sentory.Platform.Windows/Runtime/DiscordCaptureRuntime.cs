@@ -21,6 +21,12 @@ internal readonly record struct DiscordUnavailableRecoveryPlan(
     bool BeginWarmup,
     bool ReportIssue);
 
+internal readonly record struct DiscordWarmupExhaustionPlan(
+    CaptureRuntimeState State,
+    bool ContinueWaiting,
+    bool ReportIssue,
+    TimeSpan RetryDelay);
+
 public sealed class DiscordCaptureRuntime :
     ICaptureRuntime,
     ICaptureRuntimeStatusSource,
@@ -49,6 +55,7 @@ public sealed class DiscordCaptureRuntime :
     private readonly CancellationTokenSource _cancellation = new();
     private readonly object _candidateGate = new();
     private readonly object _warmupGate = new();
+    private readonly SemaphoreSlim _warmupWakeSignal = new(0, 1);
     private readonly List<CandidateRegistration> _candidates = [];
     private readonly List<AttachmentDiscoveryRegistration>
         _attachmentDiscoveries = [];
@@ -644,6 +651,10 @@ public sealed class DiscordCaptureRuntime :
         {
             if (_warmupTask is { IsCompleted: false })
             {
+                if (_warmupWakeSignal.CurrentCount == 0)
+                {
+                    _warmupWakeSignal.Release();
+                }
                 return;
             }
 
@@ -663,50 +674,81 @@ public sealed class DiscordCaptureRuntime :
             recovering
                 ? CaptureRuntimeState.Recovering
                 : CaptureRuntimeState.Connecting);
-        var lastUnavailableState = CaptureRuntimeState.Connecting;
-        for (var attempt = 0; attempt < 15; attempt++)
+        var attemptsThisCycle = 15;
+        var persistentConnectingFailures = 0;
+        while (true)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (TryCreateWarmupRequest(out var request))
+            var lastUnavailableState = CaptureRuntimeState.Connecting;
+            var sawDiscordWindow = false;
+            for (var attempt = 0; attempt < attemptsThisCycle; attempt++)
             {
-                var startedAt = DateTimeOffset.UtcNow;
-                var response = await _confirmationClient.ConfirmAsync(
-                    request,
-                    cancellationToken);
-                DiscordCaptureTrace.Write(
-                    "worker-warmup-response",
-                    $"outcome={response.Outcome} elapsedMs={(DateTimeOffset.UtcNow - startedAt).TotalMilliseconds:F0} signals={string.Join(',', response.ConfirmationSignals)}");
-                if (response.Outcome == DiscordConfirmationOutcome.Confirmed)
+                cancellationToken.ThrowIfCancellationRequested();
+                if (TryCreateWarmupRequest(out var request))
                 {
-                    _statusTracker.Publish(CaptureRuntimeState.Ready);
-                    return;
+                    sawDiscordWindow = true;
+                    var startedAt = DateTimeOffset.UtcNow;
+                    var response = await _confirmationClient.ConfirmAsync(
+                        request,
+                        cancellationToken);
+                    DiscordCaptureTrace.Write(
+                        "worker-warmup-response",
+                        $"outcome={response.Outcome} elapsedMs={(DateTimeOffset.UtcNow - startedAt).TotalMilliseconds:F0} signals={string.Join(',', response.ConfirmationSignals)}");
+                    if (response.Outcome ==
+                        DiscordConfirmationOutcome.Confirmed)
+                    {
+                        _statusTracker.Publish(CaptureRuntimeState.Ready);
+                        return;
+                    }
+
+                    lastUnavailableState = MergeUnavailableState(
+                        lastUnavailableState,
+                        ClassifyUnavailableState(response));
                 }
-
-                lastUnavailableState =
-                    ClassifyUnavailableState(response);
+                _ = await WaitForWarmupRetryAsync(
+                    TimeSpan.FromSeconds(2),
+                    cancellationToken);
             }
-            else
+
+            persistentConnectingFailures =
+                lastUnavailableState == CaptureRuntimeState.Connecting &&
+                sawDiscordWindow
+                    ? persistentConnectingFailures + 1
+                    : 0;
+            var plan = PlanWarmupExhaustion(
+                lastUnavailableState,
+                reconnectWhenExhausted,
+                persistentConnectingFailures);
+            _statusTracker.Publish(plan.State);
+            if (plan.ReportIssue)
             {
-                lastUnavailableState = CaptureRuntimeState.Connecting;
+                ReportDetectionUnavailable();
+                return;
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
-        }
-
-        var exhaustedState = ResolveWarmupExhaustedState(
-            lastUnavailableState,
-            reconnectWhenExhausted);
-        _statusTracker.Publish(exhaustedState);
-        if (exhaustedState == CaptureRuntimeState.ReconnectRequired)
-        {
-            ReportDetectionUnavailable();
-        }
-        else
-        {
             DiscordCaptureTrace.Write(
                 "worker-warmup-deferred",
-                $"state={exhaustedState}");
+                $"state={plan.State} retryMs={plan.RetryDelay.TotalMilliseconds:F0}");
+            if (!plan.ContinueWaiting)
+            {
+                return;
+            }
+
+            var wakeRequested = await WaitForWarmupRetryAsync(
+                plan.RetryDelay,
+                cancellationToken);
+            attemptsThisCycle = wakeRequested ? 15 : 1;
+            if (wakeRequested)
+            {
+                persistentConnectingFailures = 0;
+            }
         }
+    }
+
+    private async Task<bool> WaitForWarmupRetryAsync(
+        TimeSpan delay,
+        CancellationToken cancellationToken)
+    {
+        return await _warmupWakeSignal.WaitAsync(delay, cancellationToken);
     }
 
     private void OnWorkerRecoveryRequired(object? sender, EventArgs eventArgs)
@@ -760,13 +802,51 @@ public sealed class DiscordCaptureRuntime :
         };
     }
 
-    internal static CaptureRuntimeState ResolveWarmupExhaustedState(
+    internal static DiscordWarmupExhaustionPlan PlanWarmupExhaustion(
         CaptureRuntimeState lastState,
-        bool reconnectWhenExhausted) =>
-        lastState == CaptureRuntimeState.Connecting &&
-        reconnectWhenExhausted
-            ? CaptureRuntimeState.ReconnectRequired
-            : lastState;
+        bool reconnectWhenExhausted,
+        int persistentConnectingFailures = 0)
+    {
+        if (lastState == CaptureRuntimeState.ReconnectRequired ||
+            (lastState == CaptureRuntimeState.Connecting &&
+             (reconnectWhenExhausted ||
+              persistentConnectingFailures >= 2)))
+        {
+            return new DiscordWarmupExhaustionPlan(
+                CaptureRuntimeState.ReconnectRequired,
+                ContinueWaiting: false,
+                ReportIssue: true,
+                RetryDelay: TimeSpan.Zero);
+        }
+
+        return new DiscordWarmupExhaustionPlan(
+            lastState,
+            ContinueWaiting: true,
+            ReportIssue: false,
+            RetryDelay:
+                lastState == CaptureRuntimeState.Recovering
+                    ? TimeSpan.FromSeconds(5)
+                    : TimeSpan.FromSeconds(30));
+    }
+
+    internal static CaptureRuntimeState MergeUnavailableState(
+        CaptureRuntimeState current,
+        CaptureRuntimeState next)
+    {
+        if (current == CaptureRuntimeState.ReconnectRequired ||
+            next == CaptureRuntimeState.ReconnectRequired)
+        {
+            return CaptureRuntimeState.ReconnectRequired;
+        }
+
+        if (current == CaptureRuntimeState.Recovering ||
+            next == CaptureRuntimeState.Recovering)
+        {
+            return CaptureRuntimeState.Recovering;
+        }
+
+        return CaptureRuntimeState.Connecting;
+    }
 
     private bool TryCreateWarmupRequest(
         out DiscordConfirmationRequest request)
@@ -1342,6 +1422,7 @@ public sealed class DiscordCaptureRuntime :
 
         _clipboardReader.Dispose();
         _attachmentDownloader.Dispose();
+        _warmupWakeSignal.Dispose();
         _cancellation.Dispose();
         GC.SuppressFinalize(this);
     }

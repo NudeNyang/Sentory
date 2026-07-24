@@ -52,6 +52,27 @@ public sealed class SentoryLocalizationTests
         Assert.Equal(expected, SentoryLocalization.Text("DetectionPaused"));
     }
 
+    [Theory]
+    [InlineData("ko-KR", "지금 재시작")]
+    [InlineData("en-US", "Restart now")]
+    [InlineData("ja-JP", "今すぐ再起動")]
+    [InlineData("zh-CN", "立即重新启动")]
+    public void AutomaticDiscordRestartPromptIsLocalized(
+        string language,
+        string expectedButton)
+    {
+        SentoryLocalization.Apply(new ResourceDictionary(), language);
+
+        Assert.Equal(
+            expectedButton,
+            SentoryLocalization.Text("RestartNow"));
+        Assert.Contains(
+            "15",
+            SentoryLocalization.Format(
+                "AutomaticReconnectMessageFormat",
+                15));
+    }
+
     [Fact]
     public void LicenseWindowDescribesBundledThirdPartyNotices()
     {
