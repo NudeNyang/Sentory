@@ -294,6 +294,88 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task CapturesWithinSixHoursCountAsOneUsageSession()
+    {
+        var repository = CreateRepository();
+        repository.ConfigureAutomaticFavorites(
+            enabled: true,
+            usageThreshold: 2);
+        await repository.InitializeAsync();
+        var firstCapturedAt = DateTimeOffset.UtcNow.AddDays(-1);
+
+        var first = await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/session",
+            DeliveryStatus.Confirmed,
+            firstCapturedAt));
+        var second = await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/session",
+            DeliveryStatus.Confirmed,
+            firstCapturedAt.AddHours(5)));
+        var item = Assert.Single(await repository.GetRecentAsync(10));
+
+        Assert.Equal(1, first.RecentUsageSessionCount);
+        Assert.Equal(1, second.RecentUsageSessionCount);
+        Assert.False(item.IsFavorite);
+    }
+
+    [Fact]
+    public async Task SeparateUsageSessionsAutomaticallyAddFavorite()
+    {
+        var repository = CreateRepository();
+        repository.ConfigureAutomaticFavorites(
+            enabled: true,
+            usageThreshold: 2);
+        await repository.InitializeAsync();
+        var firstCapturedAt = DateTimeOffset.UtcNow.AddDays(-1);
+        byte[] bytes = [3, 1, 4, 1, 5];
+        var hash = Convert.ToHexString(SHA256.HashData(bytes));
+
+        var first = await repository.UpsertImageAsync(
+            CreateImageRequest(Guid.NewGuid(), bytes, hash) with
+            {
+                CapturedAt = firstCapturedAt
+            });
+        var second = await repository.UpsertImageAsync(
+            CreateImageRequest(Guid.NewGuid(), bytes, hash) with
+            {
+                CapturedAt = firstCapturedAt.AddHours(7)
+            });
+        var item = Assert.Single(await repository.GetRecentAsync(10));
+
+        Assert.Equal(1, first.RecentUsageSessionCount);
+        Assert.Equal(2, second.RecentUsageSessionCount);
+        Assert.True(item.IsFavorite);
+    }
+
+    [Fact]
+    public async Task UsageSessionOlderThanThirtyDaysDoesNotAddFavorite()
+    {
+        var repository = CreateRepository();
+        repository.ConfigureAutomaticFavorites(
+            enabled: true,
+            usageThreshold: 2);
+        await repository.InitializeAsync();
+        var firstCapturedAt = DateTimeOffset.UtcNow.AddDays(-31);
+
+        await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/old-session",
+            DeliveryStatus.Confirmed,
+            firstCapturedAt));
+        var recent = await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/old-session",
+            DeliveryStatus.Confirmed,
+            firstCapturedAt.AddDays(31)));
+        var item = Assert.Single(await repository.GetRecentAsync(10));
+
+        Assert.Equal(1, recent.RecentUsageSessionCount);
+        Assert.False(item.IsFavorite);
+    }
+
+    [Fact]
     public async Task UsageUpdatesReturnFalseForMissingItem()
     {
         var repository = CreateRepository();
@@ -345,7 +427,47 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         await using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version;";
 
-        Assert.Equal(5L, (long)(await command.ExecuteScalarAsync())!);
+        Assert.Equal(6L, (long)(await command.ExecuteScalarAsync())!);
+    }
+
+    [Fact]
+    public async Task VersionFiveDatabaseBackfillsUsageSessions()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var repository = new SqliteCaptureRepository(paths);
+        await repository.InitializeAsync();
+        var firstCapturedAt = DateTimeOffset.UtcNow.AddDays(-2);
+        await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/backfill",
+            DeliveryStatus.Confirmed,
+            firstCapturedAt));
+        await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/backfill",
+            DeliveryStatus.Confirmed,
+            firstCapturedAt.AddHours(7)));
+        await using (var connection = new SqliteConnection(
+                         $"Data Source={paths.DatabasePath}"))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                DROP TABLE usage_sessions;
+                PRAGMA user_version = 5;
+                """;
+            await command.ExecuteNonQueryAsync();
+        }
+
+        var migrated = new SqliteCaptureRepository(paths);
+        migrated.ConfigureAutomaticFavorites(
+            enabled: true,
+            usageThreshold: 2);
+        await migrated.InitializeAsync();
+        var item = Assert.Single(await migrated.GetRecentAsync(10));
+
+        Assert.True(item.IsFavorite);
     }
 
     [Fact]

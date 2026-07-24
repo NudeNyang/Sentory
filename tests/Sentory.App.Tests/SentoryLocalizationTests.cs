@@ -5,6 +5,24 @@ namespace Sentory.App.Tests;
 public sealed class SentoryLocalizationTests
 {
     [Fact]
+    public void AutomaticFavoriteExplainsRepeatedUsageWindow()
+    {
+        SentoryLocalization.Apply(new ResourceDictionary(), "ko-KR");
+
+        Assert.Contains(
+            "최근 30일",
+            SentoryLocalization.Text("AutoFavoriteDescription"));
+        Assert.Contains(
+            "6시간",
+            SentoryLocalization.Text("AutoFavoriteDescription"));
+        Assert.Equal(
+            "3회 반복 사용 후 추가",
+            SentoryLocalization.Format(
+                "AutoFavoriteCopyCountFormat",
+                3));
+    }
+
+    [Fact]
     public void EmptyLibraryDescriptionUsesMessengerPasteInstruction()
     {
         SentoryLocalization.Apply(new ResourceDictionary(), "ko-KR");

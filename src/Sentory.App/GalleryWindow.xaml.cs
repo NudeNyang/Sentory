@@ -87,6 +87,8 @@ public partial class GalleryWindow : Window
 
     public event EventHandler? LanguageChanged;
 
+    public event Action<bool, int>? AutoFavoriteSettingsChanged;
+
     public bool IsDarkTheme => _isDarkTheme;
 
     public GalleryWindow(
@@ -771,6 +773,7 @@ public partial class GalleryWindow : Window
     {
         _settings.AutoFavoriteEnabled = enabled;
         _settings.AutoFavoriteCopyThreshold = copyThreshold;
+        AutoFavoriteSettingsChanged?.Invoke(enabled, copyThreshold);
     }
 
     private async Task ApplyStartupSelection(bool enabled)
