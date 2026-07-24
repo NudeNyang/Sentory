@@ -337,6 +337,32 @@
                            Foreground="{DynamicResource MutedTextBrush}" />
                 <Border Style="{StaticResource SettingCardStyle}">
                     <StackPanel>
+                        <TextBlock Text="{DynamicResource Loc.AutoFavorite}"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextBrush}" />
+                        <TextBlock Margin="0,4,0,0"
+                                   Text="{DynamicResource Loc.AutoFavoriteDescription}"
+                                   TextWrapping="Wrap"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource MutedTextBrush}" />
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="10" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ComboBox x:Name="AutoFavoriteComboBox"
+                                      DisplayMemberPath="Label" />
+                            <Button x:Name="SaveAutoFavoriteButton"
+                                    Grid.Column="2"
+                                    Content="{DynamicResource Loc.SaveSettings}"
+                                    Style="{StaticResource ActionButtonStyle}"
+                                    Click="SaveAutoFavoriteButton_Click" />
+                        </Grid>
+                        <Border Height="1"
+                                Margin="0,17"
+                                Background="{DynamicResource LineBrush}" />
                         <TextBlock Text="{DynamicResource Loc.FavoriteCleanupExclusion}"
                                    FontSize="11"
                                    Foreground="{DynamicResource MutedTextBrush}" />

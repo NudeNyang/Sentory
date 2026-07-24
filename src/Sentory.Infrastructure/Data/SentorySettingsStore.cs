@@ -13,6 +13,10 @@ public enum SentoryThemeMode
 
 public sealed class SentorySettings
 {
+    public const int DefaultAutoFavoriteCopyThreshold = 3;
+    public const int MinimumAutoFavoriteCopyThreshold = 2;
+    public const int MaximumAutoFavoriteCopyThreshold = 10;
+
     private static readonly int[] SupportedCleanupDays = [0, 7, 30, 90, 180];
     private static readonly string[] SupportedLanguages =
         ["ko-KR", "en-US", "ja-JP", "zh-CN"];
@@ -51,6 +55,11 @@ public sealed class SentorySettings
 
     public DateTimeOffset? LastAutoCleanupAt { get; set; }
 
+    public bool AutoFavoriteEnabled { get; set; }
+
+    public int AutoFavoriteCopyThreshold { get; set; } =
+        DefaultAutoFavoriteCopyThreshold;
+
     public DateTimeOffset? LastUpdateCheckAt { get; set; }
 
     internal void Normalize()
@@ -75,6 +84,14 @@ public sealed class SentorySettings
         if (!SupportedCleanupDays.Contains(AutoCleanupDays))
         {
             AutoCleanupDays = 0;
+        }
+
+        if (AutoFavoriteCopyThreshold is <
+                MinimumAutoFavoriteCopyThreshold or >
+                MaximumAutoFavoriteCopyThreshold)
+        {
+            AutoFavoriteCopyThreshold =
+                DefaultAutoFavoriteCopyThreshold;
         }
 
         if (!Enum.TryParse<GalleryDateRange>(FilterDateRange, out _))

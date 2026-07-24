@@ -106,6 +106,8 @@ public partial class DataManagementWindow : Window
 
     public event Action<SourceApp, bool>? MessengerSupportSelectionChanged;
 
+    public event Action<bool, int>? AutoFavoriteSettingsChanged;
+
     public event Func<Task>? DataChanged;
 
     internal event Func<Task<ManualUpdateCheckResult>>? UpdateCheckRequested;
@@ -508,6 +510,39 @@ public partial class DataManagementWindow : Window
             null,
             SentoryLocalization.Text("AllNonFavoriteItems"));
 
+    private void SaveAutoFavoriteButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (AutoFavoriteComboBox.SelectedItem is not
+            AutoFavoriteOption option)
+        {
+            return;
+        }
+
+        try
+        {
+            var settings = _settingsStore.Load();
+            settings.AutoFavoriteEnabled = option.Enabled;
+            settings.AutoFavoriteCopyThreshold = option.CopyThreshold;
+            _settingsStore.Save(settings);
+            AutoFavoriteSettingsChanged?.Invoke(
+                option.Enabled,
+                option.CopyThreshold);
+            StatusText.Text = option.Enabled
+                ? SentoryLocalization.Format(
+                    "AutoFavoriteSavedFormat",
+                    option.CopyThreshold)
+                : SentoryLocalization.Text("AutoFavoriteDisabled");
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException)
+        {
+            StatusText.Text =
+                SentoryLocalization.Text("AutoFavoriteSaveFailed");
+        }
+    }
+
     private void SaveAutoCleanupButton_Click(
         object sender,
         RoutedEventArgs e)
@@ -616,6 +651,8 @@ public partial class DataManagementWindow : Window
     {
         _busy = busy;
         DeleteNonFavoritesButton.IsEnabled = !busy;
+        SaveAutoFavoriteButton.IsEnabled = !busy;
+        AutoFavoriteComboBox.IsEnabled = !busy;
         SaveAutoCleanupButton.IsEnabled = !busy;
         AutoCleanupComboBox.IsEnabled = !busy;
         OpenDataFolderButton.IsEnabled = !busy;
@@ -754,6 +791,33 @@ public partial class DataManagementWindow : Window
             AutoCleanupComboBox.SelectedItem = cleanupOptions.First(option =>
                 option.Days == settings.AutoCleanupDays);
 
+            var autoFavoriteOptions = new List<AutoFavoriteOption>
+            {
+                new(
+                    false,
+                    settings.AutoFavoriteCopyThreshold,
+                    SentoryLocalization.Text("AutoFavoriteOff"))
+            };
+            autoFavoriteOptions.AddRange(Enumerable
+                .Range(
+                    SentorySettings.MinimumAutoFavoriteCopyThreshold,
+                    SentorySettings.MaximumAutoFavoriteCopyThreshold -
+                    SentorySettings.MinimumAutoFavoriteCopyThreshold + 1)
+                .Select(copyThreshold => new AutoFavoriteOption(
+                    true,
+                    copyThreshold,
+                    SentoryLocalization.Format(
+                        "AutoFavoriteCopyCountFormat",
+                        copyThreshold))));
+            AutoFavoriteComboBox.ItemsSource = autoFavoriteOptions;
+            AutoFavoriteComboBox.SelectedItem =
+                settings.AutoFavoriteEnabled
+                    ? autoFavoriteOptions.First(option =>
+                        option.Enabled &&
+                        option.CopyThreshold ==
+                        settings.AutoFavoriteCopyThreshold)
+                    : autoFavoriteOptions[0];
+
             var languageOptions = SentoryLocalization.GetLanguageOptions();
             LanguageComboBox.ItemsSource = languageOptions;
             LanguageComboBox.SelectedItem = languageOptions.First(option =>
@@ -808,6 +872,14 @@ public partial class DataManagementWindow : Window
         SentoryTheme.ApplyTitleBar(this, _isDarkTheme);
 
     private sealed record CleanupOption(int Days, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    private sealed record AutoFavoriteOption(
+        bool Enabled,
+        int CopyThreshold,
+        string Label)
     {
         public override string ToString() => Label;
     }
