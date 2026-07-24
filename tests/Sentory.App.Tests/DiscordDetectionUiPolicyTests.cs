@@ -39,6 +39,23 @@ public sealed class DiscordDetectionUiPolicyTests
     }
 
     [Fact]
+    public void DismissedRepairBannerLeavesCompactReconnectStatus()
+    {
+        var presentation = DiscordDetectionUiPolicy.Resolve(
+            enabled: true,
+            CaptureRuntimeState.Connecting,
+            repairNeeded: true,
+            repairBannerDismissed: true);
+
+        Assert.True(presentation.ShowPassiveStatus);
+        Assert.True(presentation.ShowTrayStatus);
+        Assert.True(presentation.ShowRepairAction);
+        Assert.Equal(
+            CaptureRuntimeState.ReconnectRequired,
+            presentation.DisplayState);
+    }
+
+    [Fact]
     public void DisabledDetectionHidesEveryDiscordStatusAction()
     {
         var presentation = DiscordDetectionUiPolicy.Resolve(

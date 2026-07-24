@@ -1291,26 +1291,26 @@ public partial class App : System.Windows.Application
 
     private async Task RestartDiscordConnectionCoreAsync()
     {
+        _observedDiscordAccessibilityArgumentState =
+            DiscordAccessibilityArgumentState.Unknown;
+        ApplyDiscordRestartUiState(
+            DiscordStartupPreparationPolicy.RestartStarted);
+        SetStatus(
+            _runtime?.IsPaused == true
+                ? SentoryLocalization.Text("StatusPaused")
+                : SentoryLocalization.Text("StatusDetecting"),
+            _runtime?.IsPaused == true
+                ? SentoryLocalization.Text("TrayPaused")
+                : SentoryLocalization.Text("TrayDetecting"));
+
         try
         {
             await _discordLauncher.RestartAsync();
-            _observedDiscordAccessibilityArgumentState =
-                DiscordAccessibilityArgumentState.Unknown;
             SetDiscordRepairNeeded(false, persistPrepared: true);
-            _discordDetectionState = CaptureRuntimeState.Connecting;
-            _galleryWindow?.SetDiscordDetectionState(
-                _discordDetectionState);
             if (_runtime is ICaptureRuntimeRecoveryController controller)
             {
                 controller.RequestRecovery(SourceApp.Discord);
             }
-            SetStatus(
-                _runtime?.IsPaused == true
-                    ? SentoryLocalization.Text("StatusPaused")
-                    : SentoryLocalization.Text("StatusDetecting"),
-                _runtime?.IsPaused == true
-                    ? SentoryLocalization.Text("TrayPaused")
-                    : SentoryLocalization.Text("TrayDetecting"));
             _trayIcon?.ShowBalloonTip(
                 3500,
                 "Sentory",
@@ -1323,6 +1323,9 @@ public partial class App : System.Windows.Application
                   System.ComponentModel.Win32Exception or
                   UnauthorizedAccessException)
         {
+            ApplyDiscordRestartUiState(
+                DiscordStartupPreparationPolicy.RestartFailed,
+                persistPrepared: false);
             _diagnosticsLog?.Write(
                 "discord-repair-failed",
                 "Discord connection repair failed",
@@ -1337,6 +1340,18 @@ public partial class App : System.Windows.Application
         {
             _discordRepairBusy = false;
         }
+    }
+
+    private void ApplyDiscordRestartUiState(
+        DiscordRestartUiState state,
+        bool? persistPrepared = null)
+    {
+        _discordDetectionState = state.DetectionState;
+        _galleryWindow?.SetDiscordDetectionState(
+            state.DetectionState);
+        SetDiscordRepairNeeded(
+            state.RepairNeeded,
+            persistPrepared);
     }
 
     private async Task PromptAutomaticDiscordRestartAsync()

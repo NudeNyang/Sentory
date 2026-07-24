@@ -89,6 +89,32 @@ public sealed class DiscordStartupPreparationPolicyTests
     }
 
     [Fact]
+    public void RestartRequestImmediatelySwitchesToConnectingPresentation()
+    {
+        var state = DiscordStartupPreparationPolicy.RestartStarted;
+        var presentation = DiscordDetectionUiPolicy.Resolve(
+            enabled: true,
+            state.DetectionState,
+            state.RepairNeeded);
+
+        Assert.Equal(CaptureRuntimeState.Connecting, state.DetectionState);
+        Assert.False(state.RepairNeeded);
+        Assert.True(presentation.ShowPassiveStatus);
+        Assert.False(presentation.ShowRepairAction);
+    }
+
+    [Fact]
+    public void FailedRestartRestoresTheRepairPresentation()
+    {
+        var state = DiscordStartupPreparationPolicy.RestartFailed;
+
+        Assert.Equal(
+            CaptureRuntimeState.ReconnectRequired,
+            state.DetectionState);
+        Assert.True(state.RepairNeeded);
+    }
+
+    [Fact]
     public void ClearsDiscordRecoveryIssueWhenRuntimeBecomesReady()
     {
         Assert.True(

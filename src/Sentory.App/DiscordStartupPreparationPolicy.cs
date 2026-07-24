@@ -9,8 +9,18 @@ internal enum DiscordStartupPreparationAction
     RequireRestart
 }
 
+internal readonly record struct DiscordRestartUiState(
+    CaptureRuntimeState DetectionState,
+    bool RepairNeeded);
+
 internal static class DiscordStartupPreparationPolicy
 {
+    public static DiscordRestartUiState RestartStarted =>
+        new(CaptureRuntimeState.Connecting, RepairNeeded: false);
+
+    public static DiscordRestartUiState RestartFailed =>
+        new(CaptureRuntimeState.ReconnectRequired, RepairNeeded: true);
+
     public static DiscordStartupPreparationAction Resolve(
         bool supportEnabled,
         bool launcherInstalled,

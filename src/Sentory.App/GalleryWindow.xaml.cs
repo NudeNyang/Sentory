@@ -64,6 +64,7 @@ public partial class GalleryWindow : Window
     private bool _scrollIndicatorShown;
     private bool _scrollIndicatorThumbEmphasized;
     private bool _discordRepairNeeded;
+    private bool _discordRepairBannerDismissed;
     private bool _detectionPaused;
     private DataManagementWindow? _dataManagementWindow;
     private bool _allowCloseWithOwnedWindows;
@@ -178,8 +179,14 @@ public partial class GalleryWindow : Window
 
     public void SetDiscordRepairNeeded(bool needed)
     {
+        if (!needed || !_discordRepairNeeded)
+        {
+            _discordRepairBannerDismissed = false;
+        }
+
         _discordRepairNeeded = needed;
-        DiscordConnectionBanner.Visibility = needed
+        DiscordConnectionBanner.Visibility =
+            needed && !_discordRepairBannerDismissed
             ? Visibility.Visible
             : Visibility.Collapsed;
         UpdateDiscordDetectionVisibility();
@@ -189,12 +196,6 @@ public partial class GalleryWindow : Window
     public void SetDiscordDetectionState(CaptureRuntimeState state)
     {
         _discordDetectionState = state;
-        DiscordDetectionStatusText.Text =
-            DiscordDetectionPresentation.GetLabel(state);
-        SentoryTheme.ApplyDetectionStatus(
-            Resources,
-            state,
-            _isDarkTheme);
         UpdateDiscordDetectionVisibility();
         _dataManagementWindow?.SetDiscordDetectionState(state);
     }
@@ -219,7 +220,15 @@ public partial class GalleryWindow : Window
         var presentation = DiscordDetectionUiPolicy.Resolve(
             _settings.DiscordSupportEnabled,
             _discordDetectionState,
-            _discordRepairNeeded);
+            _discordRepairNeeded,
+            _discordRepairBannerDismissed);
+        DiscordDetectionStatusText.Text =
+            DiscordDetectionPresentation.GetLabel(
+                presentation.DisplayState);
+        SentoryTheme.ApplyDetectionStatus(
+            Resources,
+            presentation.DisplayState,
+            _isDarkTheme);
         DiscordDetectionPanel.Visibility = presentation.ShowPassiveStatus
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -2646,8 +2655,12 @@ public partial class GalleryWindow : Window
 
     private void DiscordLaterButton_Click(
         object sender,
-        RoutedEventArgs e) =>
+        RoutedEventArgs e)
+    {
+        _discordRepairBannerDismissed = true;
         DiscordConnectionBanner.Visibility = Visibility.Collapsed;
+        UpdateDiscordDetectionVisibility();
+    }
 
     private void DismissRuntimeIssueButton_Click(
         object sender,
