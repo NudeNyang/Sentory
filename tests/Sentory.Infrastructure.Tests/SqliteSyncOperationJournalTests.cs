@@ -1,7 +1,9 @@
 using System.Text;
 using Microsoft.Data.Sqlite;
+using Sentory.Core;
 using Sentory.Core.Sync;
 using Sentory.Infrastructure.Data;
+using Sentory.Infrastructure.Sync;
 
 namespace Sentory.Infrastructure.Tests;
 
@@ -322,6 +324,108 @@ public sealed class SqliteSyncOperationJournalTests : IDisposable
         Assert.Contains("다른 동기화 기기 ID", exception.Message);
     }
 
+    [Fact]
+    public async Task PendingItemExportIsRecordedAtomically()
+    {
+        var replica = await CreateReplicaAsync("a");
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/export",
+            out var normalized));
+        await replica.Captures.UpsertUrlAsync(
+            new UrlCaptureRequest(
+                Guid.NewGuid(),
+                normalized.Original,
+                normalized,
+                SourceApp.Discord,
+                CaptureMethod.DiscordConfirmedSend,
+                DeliveryStatus.Confirmed,
+                "context",
+                DateTimeOffset.Parse("2026-07-26T11:00:00+09:00"),
+                ["url-match"]));
+        var objectStore = new InMemorySyncObjectStore();
+        var exporter = new SyncItemExportService(
+            replica.Journal,
+            objectStore,
+            replica.Paths);
+
+        var first = await exporter.ExportPendingAsync(10);
+        var repeated = await exporter.ExportPendingAsync(10);
+        var operations = await replica.Journal.GetUnpublishedAsync(10);
+
+        Assert.Equal(1, first.Exported);
+        Assert.Equal(0, repeated.Exported);
+        Assert.Single(operations);
+
+        await replica.Captures.UpsertUrlAsync(
+            new UrlCaptureRequest(
+                Guid.NewGuid(),
+                normalized.Original,
+                normalized,
+                SourceApp.Discord,
+                CaptureMethod.DiscordConfirmedSend,
+                DeliveryStatus.Confirmed,
+                "context",
+                DateTimeOffset.Parse("2026-07-26T11:01:00+09:00"),
+                ["url-match"]));
+        var changed = await exporter.ExportPendingAsync(10);
+
+        Assert.Equal(1, changed.Exported);
+        Assert.Equal(
+            new long[] { 1, 2 },
+            (await replica.Journal.GetUnpublishedAsync(10))
+            .Select(operation => operation.Sequence));
+    }
+
+    [Fact]
+    public async Task ChangingStoreResetsOnlySyncStateAndRequeuesItems()
+    {
+        var replica = await CreateReplicaAsync("a");
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/new-store",
+            out var normalized));
+        await replica.Captures.UpsertUrlAsync(
+            new UrlCaptureRequest(
+                Guid.NewGuid(),
+                normalized.Original,
+                normalized,
+                SourceApp.KakaoTalk,
+                CaptureMethod.KakaoCtrlVUrl,
+                DeliveryStatus.NotObserved,
+                "context",
+                DateTimeOffset.UtcNow,
+                ["clipboard-url"]));
+        var exporter = new SyncItemExportService(
+            replica.Journal,
+            new InMemorySyncObjectStore(),
+            replica.Paths);
+        Assert.Equal(
+            1,
+            (await exporter.ExportPendingAsync(10)).Exported);
+        var newDeviceId = SyncDeviceIdentity.Create();
+
+        await SqliteSyncOperationJournal.ResetForNewStoreAsync(
+            replica.Paths,
+            newDeviceId);
+        var resetJournal = new SqliteSyncOperationJournal(
+            replica.Paths,
+            newDeviceId);
+        await resetJournal.InitializeAsync();
+
+        Assert.Empty(await resetJournal.GetUnpublishedAsync(10));
+        Assert.Single(
+            await resetJournal.GetPendingItemExportsAsync(10));
+        Assert.Single(await replica.Captures.GetRecentAsync(10));
+        var operation = await new SyncItemExportService(
+            resetJournal,
+            new InMemorySyncObjectStore(),
+            replica.Paths).ExportPendingAsync(10);
+        Assert.Equal(1, operation.Exported);
+        Assert.Equal(
+            1,
+            Assert.Single(
+                await resetJournal.GetUnpublishedAsync(10)).Sequence);
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
@@ -341,10 +445,11 @@ public sealed class SqliteSyncOperationJournalTests : IDisposable
             paths,
             SyncDeviceIdentity.Create());
         await journal.InitializeAsync();
-        return new Replica(paths, journal);
+        return new Replica(paths, captureRepository, journal);
     }
 
     private sealed record Replica(
         SentoryDataPaths Paths,
+        SqliteCaptureRepository Captures,
         SqliteSyncOperationJournal Journal);
 }

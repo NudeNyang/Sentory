@@ -112,6 +112,63 @@ public sealed class LocalFolderSyncIntegrationTests : IDisposable
             (await replicaB.Captures.GetRecentAsync(10)).Count);
     }
 
+    [Fact]
+    public async Task AutomaticRuntimeDoesNotEchoRemoteItemBackToSource()
+    {
+        var replicaA = await CreateReplicaAsync("a");
+        var replicaB = await CreateReplicaAsync("b");
+        var sharedFolder = Path.Combine(_root, "shared-runtime");
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/no-echo",
+            out var normalized));
+        await replicaA.Captures.UpsertUrlAsync(
+            new UrlCaptureRequest(
+                Guid.NewGuid(),
+                normalized.Original,
+                normalized,
+                SourceApp.Discord,
+                CaptureMethod.DiscordConfirmedSend,
+                DeliveryStatus.Confirmed,
+                "context",
+                DateTimeOffset.Parse("2026-07-26T11:30:00+09:00"),
+                ["url-match"]));
+        var runtimeA = new LocalFolderSyncRuntimeService(
+            replicaA.Paths,
+            replicaA.Captures);
+        var runtimeB = new LocalFolderSyncRuntimeService(
+            replicaB.Paths,
+            replicaB.Captures);
+
+        var source = await runtimeA.RunOnceAsync(
+            replicaA.Journal.DeviceId,
+            sharedFolder);
+        var destination = await runtimeB.RunOnceAsync(
+            replicaB.Journal.DeviceId,
+            sharedFolder);
+        var destinationRepeated = await runtimeB.RunOnceAsync(
+            replicaB.Journal.DeviceId,
+            sharedFolder);
+        var sourceRepeated = await runtimeA.RunOnceAsync(
+            replicaA.Journal.DeviceId,
+            sharedFolder);
+
+        Assert.Equal(1, source.Export.Exported);
+        Assert.Equal(1, source.Publish.Uploaded);
+        Assert.Equal(1, destination.Cycle.Transfer.Downloaded);
+        Assert.Equal(1, destination.Cycle.Projection.Projected);
+        Assert.Equal(0, destination.Export.Exported);
+        Assert.Equal(0, destinationRepeated.Export.Exported);
+        Assert.Equal(0, sourceRepeated.Cycle.Transfer.Downloaded);
+        Assert.Equal(
+            1,
+            Assert.Single(
+                await replicaA.Captures.GetRecentAsync(10)).CaptureCount);
+        Assert.Equal(
+            1,
+            Assert.Single(
+                await replicaB.Captures.GetRecentAsync(10)).CaptureCount);
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();

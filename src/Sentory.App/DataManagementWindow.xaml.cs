@@ -7,7 +7,10 @@ using System.Windows.Navigation;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using Sentory.Core;
+using Sentory.Core.Sync;
 using Sentory.Infrastructure.Data;
+using Sentory.Infrastructure.Sync;
+using Forms = System.Windows.Forms;
 
 namespace Sentory.App;
 
@@ -16,6 +19,7 @@ public partial class DataManagementWindow : Window
     private readonly ICaptureRepository _repository;
     private readonly SentorySettingsStore _settingsStore;
     private readonly SentoryDataPaths _paths;
+    private readonly SyncRuntimeStatusTracker _syncStatusTracker;
     private readonly WindowsStartupManager _startupManager = new();
     private CaptureRuntimeState _discordState;
     private bool _discordRepairNeeded;
@@ -37,12 +41,14 @@ public partial class DataManagementWindow : Window
         SentoryDataPaths paths,
         CaptureRuntimeState discordState,
         bool discordRepairNeeded,
-        bool detectionPaused)
+        bool detectionPaused,
+        SyncRuntimeStatusTracker syncStatusTracker)
     {
         InitializeComponent();
         _repository = repository;
         _settingsStore = settingsStore;
         _paths = paths;
+        _syncStatusTracker = syncStatusTracker;
         _discordState = discordState;
         _discordRepairNeeded = discordRepairNeeded;
         _detectionPaused = detectionPaused;
@@ -73,6 +79,7 @@ public partial class DataManagementWindow : Window
             GetVersionLabel());
         UpdateStartupControls();
         UpdateMessengerControls(settings);
+        UpdateSyncControls(settings, _syncStatusTracker.Current);
         _initializing = false;
 
         Loaded += async (_, _) => await RefreshStatisticsAsync();
@@ -82,10 +89,12 @@ public partial class DataManagementWindow : Window
             () => !_busy && !_updateCheckBusy && !_suppressBackgroundDismiss);
         SystemEvents.UserPreferenceChanged +=
             SystemEvents_UserPreferenceChanged;
+        _syncStatusTracker.Changed += SyncStatusTracker_Changed;
         Closed += (_, _) =>
         {
             SystemEvents.UserPreferenceChanged -=
                 SystemEvents_UserPreferenceChanged;
+            _syncStatusTracker.Changed -= SyncStatusTracker_Changed;
             _scrollIndicator.Dispose();
         };
     }
@@ -107,6 +116,8 @@ public partial class DataManagementWindow : Window
     public event Action<SourceApp, bool>? MessengerSupportSelectionChanged;
 
     public event Action<bool, int>? AutoFavoriteSettingsChanged;
+
+    public event Action? SyncConfigurationChanged;
 
     public event Func<Task>? DataChanged;
 
@@ -442,6 +453,140 @@ public partial class DataManagementWindow : Window
         Close();
     }
 
+    private async void ChooseSyncFolderButton_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        await ChooseAndEnableSyncFolderAsync();
+
+    private async void SyncToggleButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        var settings = _settingsStore.Load();
+        if (!settings.SyncEnabled &&
+            string.IsNullOrWhiteSpace(settings.SyncFolderPath))
+        {
+            await ChooseAndEnableSyncFolderAsync();
+            return;
+        }
+
+        try
+        {
+            settings.SyncEnabled = !settings.SyncEnabled;
+            if (settings.SyncEnabled &&
+                !SyncDeviceIdentity.IsValid(settings.SyncDeviceId))
+            {
+                settings.SyncDeviceId = SyncDeviceIdentity.Create();
+            }
+
+            _settingsStore.Save(settings);
+            UpdateSyncControls(settings, _syncStatusTracker.Current);
+            SyncConfigurationChanged?.Invoke();
+            StatusText.Text = SentoryLocalization.Text(
+                settings.SyncEnabled
+                    ? "SyncEnabledSaved"
+                    : "SyncDisabledSaved");
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException)
+        {
+            StatusText.Text =
+                SentoryLocalization.Text("SyncSettingFailed");
+        }
+    }
+
+    private async Task ChooseAndEnableSyncFolderAsync()
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        var settings = _settingsStore.Load();
+        using var dialog = new Forms.FolderBrowserDialog
+        {
+            Description =
+                SentoryLocalization.Text("ChooseSyncFolderDescription"),
+            UseDescriptionForTitle = true,
+            ShowNewFolderButton = true,
+            SelectedPath = settings.SyncFolderPath ?? string.Empty
+        };
+        _suppressBackgroundDismiss = true;
+        try
+        {
+            if (dialog.ShowDialog() != Forms.DialogResult.OK ||
+                string.IsNullOrWhiteSpace(dialog.SelectedPath))
+            {
+                return;
+            }
+
+            var selectedPath = Path.GetFullPath(
+                dialog.SelectedPath);
+            var oldFolderPath = settings.SyncFolderPath;
+            var oldDeviceId = settings.SyncDeviceId;
+            var folderChanged =
+                !string.IsNullOrWhiteSpace(oldFolderPath) &&
+                !string.Equals(
+                    Path.GetFullPath(oldFolderPath),
+                    selectedPath,
+                    OperatingSystem.IsWindows()
+                        ? StringComparison.OrdinalIgnoreCase
+                        : StringComparison.Ordinal);
+            settings.SyncFolderPath = selectedPath;
+            settings.SyncEnabled = true;
+            if (folderChanged ||
+                !SyncDeviceIdentity.IsValid(settings.SyncDeviceId))
+            {
+                settings.SyncDeviceId = SyncDeviceIdentity.Create();
+            }
+
+            _settingsStore.Save(settings);
+            if (folderChanged)
+            {
+                try
+                {
+                    await SqliteSyncOperationJournal
+                        .ResetForNewStoreAsync(
+                            _paths,
+                            settings.SyncDeviceId!);
+                }
+                catch
+                {
+                    settings.SyncFolderPath = oldFolderPath;
+                    settings.SyncDeviceId = oldDeviceId;
+                    settings.SyncEnabled = false;
+                    _settingsStore.Save(settings);
+                    throw;
+                }
+            }
+
+            UpdateSyncControls(settings, _syncStatusTracker.Current);
+            SyncConfigurationChanged?.Invoke();
+            StatusText.Text =
+                SentoryLocalization.Text("SyncFolderSaved");
+        }
+        catch (Exception exception)
+            when (exception is IOException or
+                  UnauthorizedAccessException or
+                  ArgumentException or
+                  NotSupportedException or
+                  InvalidOperationException or
+                  System.Data.Common.DbException)
+        {
+            StatusText.Text =
+                SentoryLocalization.Text("SyncSettingFailed");
+        }
+        finally
+        {
+            _suppressBackgroundDismiss = false;
+        }
+    }
+
     private void OpenDataFolderButton_Click(
         object sender,
         RoutedEventArgs e)
@@ -656,6 +801,8 @@ public partial class DataManagementWindow : Window
         SaveAutoCleanupButton.IsEnabled = !busy;
         AutoCleanupComboBox.IsEnabled = !busy;
         OpenDataFolderButton.IsEnabled = !busy;
+        ChooseSyncFolderButton.IsEnabled = !busy;
+        SyncToggleButton.IsEnabled = !busy;
         UpdateCheckButton.IsEnabled = !busy && !_updateCheckBusy;
         if (busy)
         {
@@ -758,6 +905,47 @@ public partial class DataManagementWindow : Window
         UpdateKakaoControls(settings.KakaoTalkSupportEnabled);
     }
 
+    private void SyncStatusTracker_Changed(
+        SyncRuntimeSnapshot snapshot)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(
+                () => SyncStatusTracker_Changed(snapshot));
+            return;
+        }
+
+        UpdateSyncControls(_settingsStore.Load(), snapshot);
+    }
+
+    private void UpdateSyncControls(
+        SentorySettings settings,
+        SyncRuntimeSnapshot snapshot)
+    {
+        SyncFolderPathText.Text =
+            string.IsNullOrWhiteSpace(settings.SyncFolderPath)
+                ? SentoryLocalization.Text("SyncFolderNotSelected")
+                : settings.SyncFolderPath;
+        ChooseSyncFolderButton.Content = SentoryLocalization.Text(
+            string.IsNullOrWhiteSpace(settings.SyncFolderPath)
+                ? "ChooseSyncFolder"
+                : "ChangeSyncFolder");
+        SyncToggleButton.Content = SentoryLocalization.Text(
+            settings.SyncEnabled ? "TurnOff" : "TurnOn");
+        SyncRuntimeStatusText.Text = settings.SyncEnabled
+            ? SentoryLocalization.Text(snapshot.State switch
+            {
+                SyncRuntimeState.Syncing => "SyncStateSyncing",
+                SyncRuntimeState.Succeeded => "SyncStateSucceeded",
+                SyncRuntimeState.FolderUnavailable =>
+                    "SyncStateFolderUnavailable",
+                SyncRuntimeState.InvalidData => "SyncStateInvalidData",
+                SyncRuntimeState.Failed => "SyncStateFailed",
+                _ => "SyncStateWaiting"
+            })
+            : SentoryLocalization.Text("SyncStateDisabled");
+    }
+
     private void RefreshLocalizedOptions(SentorySettings settings)
     {
         _initializing = true;
@@ -822,6 +1010,7 @@ public partial class DataManagementWindow : Window
             LanguageComboBox.ItemsSource = languageOptions;
             LanguageComboBox.SelectedItem = languageOptions.First(option =>
                 option.Code == settings.Language);
+            UpdateSyncControls(settings, _syncStatusTracker.Current);
         }
         finally
         {

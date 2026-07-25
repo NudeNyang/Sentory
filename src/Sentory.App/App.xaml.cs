@@ -8,6 +8,7 @@ using Sentory.Core;
 using Sentory.Infrastructure.Data;
 using Sentory.Infrastructure.Links;
 using Sentory.Infrastructure.Ocr;
+using Sentory.Infrastructure.Sync;
 using Sentory.Infrastructure.Updates;
 using Sentory.Platform.Windows.Interop;
 using Sentory.Platform.Windows.Ocr;
@@ -53,6 +54,9 @@ public partial class App : System.Windows.Application
     private OcrEnrichmentService? _ocrService;
     private PaddleOcrImageTextRecognizer? _ocrRecognizer;
     private Task? _ocrTask;
+    private readonly SemaphoreSlim _syncWakeSignal = new(0, 1);
+    private readonly SyncRuntimeStatusTracker _syncStatusTracker = new();
+    private Task? _syncTask;
     private readonly WindowsStartupManager _startupManager = new();
     private readonly DiscordAccessibilityLauncher _discordLauncher = new();
     private readonly DiscordStartupRegistrationManager
@@ -290,6 +294,8 @@ public partial class App : System.Windows.Application
             _linkPreviewTask = RunLinkPreviewLoopAsync(
                 _maintenanceCancellation.Token);
             _ocrTask = Task.Run(() => RunOcrLoopAsync(
+                _maintenanceCancellation.Token));
+            _syncTask = Task.Run(() => RunSyncLoopAsync(
                 _maintenanceCancellation.Token));
             ApplyRuntimeSourceSettings();
             _runtime.Start();
@@ -1113,6 +1119,7 @@ public partial class App : System.Windows.Application
         object? sender,
         CaptureNotification notification)
     {
+        WakeSyncWorker();
         Dispatcher.BeginInvoke(() =>
         {
             _lastRuntimeIssueCode = null;
@@ -1490,7 +1497,8 @@ public partial class App : System.Windows.Application
                 _repository,
                 _paths,
                 _settingsStore,
-                _linkPreviewFetcher);
+                _linkPreviewFetcher,
+                _syncStatusTracker);
             _galleryWindow.DiscordRepairRequested += async (_, _) =>
                 await RepairDiscordConnectionAsync();
             _galleryWindow.UpdateInstallRequested += UpdateInstallRequested;
@@ -1503,6 +1511,8 @@ public partial class App : System.Windows.Application
             _galleryWindow.LanguageChanged += (_, _) => UpdatePauseUi();
             _galleryWindow.AutoFavoriteSettingsChanged +=
                 ApplyAutomaticFavoriteSettings;
+            _galleryWindow.SyncConfigurationChanged += (_, _) =>
+                WakeSyncWorker();
             _galleryWindow.SetDiscordRepairNeeded(
                 _discordSupportEnabled && _discordRepairNeeded);
             _galleryWindow.SetDiscordDetectionState(
@@ -1836,6 +1846,138 @@ public partial class App : System.Windows.Application
         }
     }
 
+    private async Task RunSyncLoopAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (true)
+            {
+                await RunConfiguredSyncOnceAsync(cancellationToken);
+                await _syncWakeSignal.WaitAsync(
+                    TimeSpan.FromSeconds(30),
+                    cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task RunConfiguredSyncOnceAsync(
+        CancellationToken cancellationToken)
+    {
+        if (_settingsStore is null || _repository is null)
+        {
+            return;
+        }
+
+        var settings = _settingsStore.Load();
+        if (!settings.SyncEnabled ||
+            settings.SyncFolderPath is not { Length: > 0 }
+                selectedDirectory ||
+            settings.SyncDeviceId is not { } deviceId ||
+            !Sentory.Core.Sync.SyncDeviceIdentity.IsValid(deviceId))
+        {
+            _syncStatusTracker.Update(
+                SyncRuntimeState.Disabled,
+                DateTimeOffset.UtcNow);
+            return;
+        }
+
+        _syncStatusTracker.Update(
+            SyncRuntimeState.Syncing,
+            DateTimeOffset.UtcNow);
+        try
+        {
+            var result = await new LocalFolderSyncRuntimeService(
+                _paths,
+                _repository).RunOnceAsync(
+                deviceId,
+                selectedDirectory,
+                cancellationToken);
+            var succeededAt = DateTimeOffset.UtcNow;
+            _syncStatusTracker.Update(
+                SyncRuntimeState.Succeeded,
+                succeededAt,
+                succeededAt);
+            _diagnosticsLog?.Write(
+                "cloud-sync-completed",
+                $"exported={result.Export.Exported}, uploaded={result.Cycle.Transfer.Uploaded + result.Publish.Uploaded}, downloaded={result.Cycle.Transfer.Downloaded + result.Publish.Downloaded}, projected={result.Cycle.Projection.Projected}");
+
+            if (result.Cycle.Projection.Projected > 0)
+            {
+                Task refreshTask = Task.CompletedTask;
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    if (_galleryWindow is { IsLoaded: true })
+                    {
+                        refreshTask = _galleryWindow.RefreshAsync();
+                    }
+                });
+                await refreshTask;
+                WakeLinkPreviewWorker();
+                WakeOcrWorker();
+            }
+
+            if (result.Export.Exported == 200 ||
+                result.Publish.Downloaded > 0)
+            {
+                WakeSyncWorker();
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Sentory.Core.Sync.SyncStoreUnavailableException exception)
+        {
+            _syncStatusTracker.Update(
+                SyncRuntimeState.FolderUnavailable,
+                DateTimeOffset.UtcNow);
+            _diagnosticsLog?.Write(
+                "cloud-sync-folder-unavailable",
+                "Cloud sync folder is unavailable",
+                exception);
+        }
+        catch (InvalidDataException exception)
+        {
+            _syncStatusTracker.Update(
+                SyncRuntimeState.InvalidData,
+                DateTimeOffset.UtcNow);
+            _diagnosticsLog?.Write(
+                "cloud-sync-invalid-data",
+                "Cloud sync data is invalid",
+                exception);
+        }
+        catch (Exception exception)
+        {
+            _syncStatusTracker.Update(
+                SyncRuntimeState.Failed,
+                DateTimeOffset.UtcNow);
+            _diagnosticsLog?.Write(
+                "cloud-sync-failed",
+                "Cloud sync failed",
+                exception);
+        }
+    }
+
+    private void WakeSyncWorker()
+    {
+        if (_syncWakeSignal.CurrentCount == 0)
+        {
+            try
+            {
+                _syncWakeSignal.Release();
+            }
+            catch (SemaphoreFullException)
+            {
+            }
+        }
+    }
+
     private async Task ApplyAutomaticCleanupAsync(
         CancellationToken cancellationToken = default)
     {
@@ -1936,6 +2078,11 @@ public partial class App : System.Windows.Application
             await _ocrTask;
             _ocrTask = null;
         }
+        if (_syncTask is not null)
+        {
+            await _syncTask;
+            _syncTask = null;
+        }
         _linkPreviewFetcher?.Dispose();
         _linkPreviewFetcher = null;
         _linkPreviewService = null;
@@ -2001,6 +2148,7 @@ public partial class App : System.Windows.Application
         _maintenanceCancellation.Dispose();
         _linkPreviewWakeSignal.Dispose();
         _ocrWakeSignal.Dispose();
+        _syncWakeSignal.Dispose();
         _updateClient.Dispose();
         _updateCheckGate.Dispose();
         base.OnExit(e);

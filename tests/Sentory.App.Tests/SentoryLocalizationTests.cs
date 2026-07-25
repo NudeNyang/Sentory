@@ -68,6 +68,29 @@ public sealed class SentoryLocalizationTests
     }
 
     [Theory]
+    [InlineData("ko-KR", "컴퓨터 간 동기화", "동기화 중")]
+    [InlineData("en-US", "Computer sync", "Syncing")]
+    [InlineData("ja-JP", "コンピューター間同期", "同期中")]
+    [InlineData("zh-CN", "电脑间同步", "正在同步")]
+    public void ComputerSyncSettingsAreLocalized(
+        string language,
+        string expectedHeading,
+        string expectedState)
+    {
+        SentoryLocalization.Apply(new ResourceDictionary(), language);
+
+        Assert.Equal(
+            expectedHeading,
+            SentoryLocalization.Text("ComputerSync"));
+        Assert.Equal(
+            expectedState,
+            SentoryLocalization.Text("SyncStateSyncing"));
+        Assert.NotEqual(
+            "ChooseSyncFolder",
+            SentoryLocalization.Text("ChooseSyncFolder"));
+    }
+
+    [Theory]
     [InlineData("ko-KR", "지금 재시작")]
     [InlineData("en-US", "Restart now")]
     [InlineData("ja-JP", "今すぐ再起動")]

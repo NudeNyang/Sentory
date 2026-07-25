@@ -12,6 +12,7 @@ using Microsoft.Win32;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
 using Sentory.Infrastructure.Links;
+using Sentory.Infrastructure.Sync;
 using Sentory.Infrastructure.Ocr;
 using Sentory.Platform.Windows.Interop;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
@@ -31,6 +32,7 @@ public partial class GalleryWindow : Window
     private readonly SentoryDataPaths _paths;
     private readonly SentorySettingsStore _settingsStore;
     private readonly LinkPreviewFetcher _linkPreviewFetcher;
+    private readonly SyncRuntimeStatusTracker _syncStatusTracker;
     private readonly SentorySettings _settings;
     private readonly ResettableObservableCollection<GalleryItemViewModel>
         _visibleItems = [];
@@ -89,13 +91,16 @@ public partial class GalleryWindow : Window
 
     public event Action<bool, int>? AutoFavoriteSettingsChanged;
 
+    public event EventHandler? SyncConfigurationChanged;
+
     public bool IsDarkTheme => _isDarkTheme;
 
     public GalleryWindow(
         ICaptureRepository repository,
         SentoryDataPaths paths,
         SentorySettingsStore settingsStore,
-        LinkPreviewFetcher linkPreviewFetcher)
+        LinkPreviewFetcher linkPreviewFetcher,
+        SyncRuntimeStatusTracker syncStatusTracker)
     {
         InitializeComponent();
         _repository = repository;
@@ -103,6 +108,7 @@ public partial class GalleryWindow : Window
         _paths = paths;
         _settingsStore = settingsStore;
         _linkPreviewFetcher = linkPreviewFetcher;
+        _syncStatusTracker = syncStatusTracker;
         _settings = settingsStore.Load();
         _sortMode = LoadSortPreference(_settings.SortMode);
         _dateRange = LoadDatePreference(_settings.FilterDateRange);
@@ -615,7 +621,8 @@ public partial class GalleryWindow : Window
             _paths,
             _discordDetectionState,
             _discordRepairNeeded,
-            _detectionPaused)
+            _detectionPaused,
+            _syncStatusTracker)
         {
             Owner = this
         };
@@ -626,6 +633,8 @@ public partial class GalleryWindow : Window
             ApplyMessengerSupportSelection;
         window.AutoFavoriteSettingsChanged +=
             ApplyAutoFavoriteSettings;
+        window.SyncConfigurationChanged +=
+            OnSyncConfigurationChanged;
         window.StartupSelectionChanged += ApplyStartupSelection;
         window.DataChanged += RefreshAsync;
         Func<Task<ManualUpdateCheckResult>> updateCheckHandler =
@@ -653,6 +662,8 @@ public partial class GalleryWindow : Window
                 ApplyMessengerSupportSelection;
             window.AutoFavoriteSettingsChanged -=
                 ApplyAutoFavoriteSettings;
+            window.SyncConfigurationChanged -=
+                OnSyncConfigurationChanged;
             window.StartupSelectionChanged -= ApplyStartupSelection;
             window.DataChanged -= RefreshAsync;
             window.UpdateCheckRequested -= updateCheckHandler;
@@ -675,6 +686,9 @@ public partial class GalleryWindow : Window
             DiscordRepairRequested?.Invoke(this, EventArgs.Empty);
         }
     }
+
+    private void OnSyncConfigurationChanged() =>
+        SyncConfigurationChanged?.Invoke(this, EventArgs.Empty);
 
     private async Task<ManualUpdateCheckResult>
         RequestManualUpdateCheckAsync(Window owner)

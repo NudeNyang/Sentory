@@ -1,4 +1,5 @@
 using Sentory.Infrastructure.Data;
+using Sentory.Core.Sync;
 
 namespace Sentory.Infrastructure.Tests;
 
@@ -52,5 +53,58 @@ public sealed class SentorySettingsTests
         Assert.Equal(
             copyThreshold,
             settings.AutoFavoriteCopyThreshold);
+    }
+
+    [Fact]
+    public void SyncDefaultsToDisabledWithoutFolderOrDevice()
+    {
+        var settings = new SentorySettings();
+
+        settings.Normalize();
+
+        Assert.False(settings.SyncEnabled);
+        Assert.Null(settings.SyncFolderPath);
+        Assert.Null(settings.SyncDeviceId);
+    }
+
+    [Fact]
+    public void NormalizePreservesCompleteSyncConfiguration()
+    {
+        var folder = Path.Combine(
+            Path.GetTempPath(),
+            "Sentory.Sync.Settings");
+        var deviceId = SyncDeviceIdentity.Create();
+        var settings = new SentorySettings
+        {
+            SyncEnabled = true,
+            SyncFolderPath = folder,
+            SyncDeviceId = deviceId
+        };
+
+        settings.Normalize();
+
+        Assert.True(settings.SyncEnabled);
+        Assert.Equal(Path.GetFullPath(folder), settings.SyncFolderPath);
+        Assert.Equal(deviceId, settings.SyncDeviceId);
+    }
+
+    [Theory]
+    [InlineData(null, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    [InlineData("relative-folder", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
+    [InlineData("C:\\Cloud", "invalid-device")]
+    public void NormalizeDisablesIncompleteSyncConfiguration(
+        string? folder,
+        string deviceId)
+    {
+        var settings = new SentorySettings
+        {
+            SyncEnabled = true,
+            SyncFolderPath = folder,
+            SyncDeviceId = deviceId
+        };
+
+        settings.Normalize();
+
+        Assert.False(settings.SyncEnabled);
     }
 }

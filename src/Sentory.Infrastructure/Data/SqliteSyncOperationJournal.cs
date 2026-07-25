@@ -1,9 +1,12 @@
 using Microsoft.Data.Sqlite;
+using Sentory.Core;
 using Sentory.Core.Sync;
 
 namespace Sentory.Infrastructure.Data;
 
-public sealed class SqliteSyncOperationJournal : ISyncOperationJournal
+public sealed class SqliteSyncOperationJournal :
+    ISyncOperationJournal,
+    ISyncItemExportJournal
 {
     private readonly string _connectionString;
 
@@ -33,6 +36,50 @@ public sealed class SqliteSyncOperationJournal : ISyncOperationJournal
     public SentoryDataPaths Paths { get; }
 
     public string DeviceId { get; }
+
+    public static async Task ResetForNewStoreAsync(
+        SentoryDataPaths paths,
+        string newDeviceId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+        if (!SyncDeviceIdentity.IsValid(newDeviceId))
+        {
+            throw new ArgumentException(
+                "새 동기화 기기 ID 형식이 올바르지 않습니다.",
+                nameof(newDeviceId));
+        }
+
+        paths.EnsureDirectories();
+        var connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = paths.DatabasePath,
+            Mode = SqliteOpenMode.ReadWriteCreate,
+            Cache = SqliteCacheMode.Shared,
+            Pooling = true
+        }.ToString();
+        await using (var connection = new SqliteConnection(
+                         connectionString))
+        {
+            await connection.OpenAsync(cancellationToken);
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                PRAGMA busy_timeout = 5000;
+
+                DROP TABLE IF EXISTS sync_item_exports;
+                DROP TABLE IF EXISTS sync_checkpoints;
+                DROP TABLE IF EXISTS sync_operations;
+                DROP TABLE IF EXISTS sync_replica_state;
+                """;
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        var journal = new SqliteSyncOperationJournal(
+            paths,
+            newDeviceId);
+        await journal.InitializeAsync(cancellationToken);
+    }
 
     public async Task InitializeAsync(
         CancellationToken cancellationToken = default)
@@ -72,6 +119,12 @@ public sealed class SqliteSyncOperationJournal : ISyncOperationJournal
                 last_sequence INTEGER NOT NULL
                     CHECK(last_sequence >= 0),
                 updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS sync_item_exports (
+                item_id TEXT NOT NULL PRIMARY KEY,
+                last_captured_at TEXT NOT NULL,
+                operation_id TEXT NOT NULL
             );
 
             CREATE INDEX IF NOT EXISTS ix_sync_operations_publish
@@ -375,6 +428,259 @@ public sealed class SqliteSyncOperationJournal : ISyncOperationJournal
         return await ReadOperationsAsync(command, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<SyncItemExportCandidate>>
+        GetPendingItemExportsAsync(
+            int limit,
+            CancellationToken cancellationToken = default)
+    {
+        if (limit <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(limit));
+        }
+
+        await using var connection = await OpenConnectionAsync(
+            cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT items.id, items.kind, items.original_url,
+                   items.normalized_key, items.domain,
+                   items.last_source_app, items.last_capture_method,
+                   items.delivery_status, items.created_at,
+                   items.last_captured_at, items.content_path,
+                   items.content_hash, items.mime_type,
+                   items.image_width, items.image_height
+            FROM items
+            LEFT JOIN sync_item_exports
+              ON sync_item_exports.item_id = items.id
+            WHERE items.kind IN ($urlKind, $imageKind)
+              AND (
+                  sync_item_exports.item_id IS NULL OR
+                  sync_item_exports.last_captured_at <>
+                      items.last_captured_at
+              )
+            ORDER BY julianday(items.last_captured_at), items.id
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue(
+            "$urlKind",
+            ContentKind.Url.ToString());
+        command.Parameters.AddWithValue(
+            "$imageKind",
+            ContentKind.Image.ToString());
+        command.Parameters.AddWithValue("$limit", limit);
+
+        var values = new List<SyncItemExportCandidate>();
+        await using var reader = await command.ExecuteReaderAsync(
+            cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            if (!Enum.TryParse<ContentKind>(
+                    reader.GetString(1),
+                    out var kind) ||
+                !Enum.TryParse<SourceApp>(
+                    reader.GetString(5),
+                    out var sourceApp) ||
+                !Enum.TryParse<CaptureMethod>(
+                    reader.GetString(6),
+                    out var captureMethod) ||
+                !Enum.TryParse<DeliveryStatus>(
+                    reader.GetString(7),
+                    out var deliveryStatus))
+            {
+                throw new InvalidDataException(
+                    "동기화할 보관함 항목 값을 읽을 수 없습니다.");
+            }
+
+            values.Add(new SyncItemExportCandidate(
+                Guid.Parse(reader.GetString(0)),
+                kind,
+                reader.GetString(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                sourceApp,
+                captureMethod,
+                deliveryStatus,
+                DateTimeOffset.Parse(
+                    reader.GetString(8),
+                    System.Globalization.CultureInfo.InvariantCulture),
+                DateTimeOffset.Parse(
+                    reader.GetString(9),
+                    System.Globalization.CultureInfo.InvariantCulture),
+                reader.IsDBNull(10) ? null : reader.GetString(10),
+                reader.IsDBNull(11) ? null : reader.GetString(11),
+                reader.IsDBNull(12) ? null : reader.GetString(12),
+                reader.IsDBNull(13) ? null : reader.GetInt32(13),
+                reader.IsDBNull(14) ? null : reader.GetInt32(14)));
+        }
+
+        return values;
+    }
+
+    public async Task<SyncOperation?> AppendLocalItemExportAsync(
+        SyncItemExportCandidate candidate,
+        ReadOnlyMemory<byte> payload,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+        await using var connection = await OpenConnectionAsync(
+            cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(
+            cancellationToken);
+
+        await using (var currentItem = connection.CreateCommand())
+        {
+            currentItem.Transaction = (SqliteTransaction)transaction;
+            currentItem.CommandText =
+                """
+                SELECT last_captured_at
+                FROM items
+                WHERE id = $itemId;
+                """;
+            currentItem.Parameters.AddWithValue(
+                "$itemId",
+                candidate.ItemId.ToString("D"));
+            var value = Convert.ToString(
+                await currentItem.ExecuteScalarAsync(cancellationToken));
+            if (!string.Equals(
+                    value,
+                    candidate.LastCapturedAt.ToString("O"),
+                    StringComparison.Ordinal))
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return null;
+            }
+        }
+
+        await using (var existingExport = connection.CreateCommand())
+        {
+            existingExport.Transaction = (SqliteTransaction)transaction;
+            existingExport.CommandText =
+                """
+                SELECT last_captured_at
+                FROM sync_item_exports
+                WHERE item_id = $itemId;
+                """;
+            existingExport.Parameters.AddWithValue(
+                "$itemId",
+                candidate.ItemId.ToString("D"));
+            var value = Convert.ToString(
+                await existingExport.ExecuteScalarAsync(cancellationToken));
+            if (string.Equals(
+                    value,
+                    candidate.LastCapturedAt.ToString("O"),
+                    StringComparison.Ordinal))
+            {
+                await transaction.CommitAsync(cancellationToken);
+                return null;
+            }
+        }
+
+        var sequence = await TakeNextSequenceAsync(
+            connection,
+            transaction,
+            cancellationToken);
+        var operation = SyncOperation.Create(
+            DeviceId,
+            sequence,
+            candidate.ItemId,
+            SyncOperationKind.Upsert,
+            candidate.LastCapturedAt,
+            payload.Span);
+        await InsertOperationAsync(
+            connection,
+            transaction,
+            operation,
+            isPublished: false,
+            receivedAt: null,
+            cancellationToken);
+        await using (var markExported = connection.CreateCommand())
+        {
+            markExported.Transaction = (SqliteTransaction)transaction;
+            markExported.CommandText =
+                """
+                INSERT INTO sync_item_exports (
+                    item_id,
+                    last_captured_at,
+                    operation_id
+                ) VALUES (
+                    $itemId,
+                    $lastCapturedAt,
+                    $operationId
+                )
+                ON CONFLICT(item_id) DO UPDATE SET
+                    last_captured_at = excluded.last_captured_at,
+                    operation_id = excluded.operation_id;
+                """;
+            markExported.Parameters.AddWithValue(
+                "$itemId",
+                candidate.ItemId.ToString("D"));
+            markExported.Parameters.AddWithValue(
+                "$lastCapturedAt",
+                candidate.LastCapturedAt.ToString("O"));
+            markExported.Parameters.AddWithValue(
+                "$operationId",
+                operation.OperationId.ToString("D"));
+            await markExported.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return operation;
+    }
+
+    public async Task MarkRemoteItemProjectedAsync(
+        Guid localItemId,
+        DateTimeOffset lastCapturedAt,
+        Guid remoteOperationId,
+        CancellationToken cancellationToken = default)
+    {
+        if (localItemId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "로컬 보관함 항목 ID가 필요합니다.",
+                nameof(localItemId));
+        }
+
+        if (remoteOperationId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "원격 동기화 작업 ID가 필요합니다.",
+                nameof(remoteOperationId));
+        }
+
+        await using var connection = await OpenConnectionAsync(
+            cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO sync_item_exports (
+                item_id,
+                last_captured_at,
+                operation_id
+            )
+            SELECT $itemId, $lastCapturedAt, $operationId
+            WHERE EXISTS (
+                SELECT 1
+                FROM items
+                WHERE id = $itemId
+                  AND last_captured_at = $lastCapturedAt
+            )
+            ON CONFLICT(item_id) DO UPDATE SET
+                last_captured_at = excluded.last_captured_at,
+                operation_id = excluded.operation_id;
+            """;
+        command.Parameters.AddWithValue(
+            "$itemId",
+            localItemId.ToString("D"));
+        command.Parameters.AddWithValue(
+            "$lastCapturedAt",
+            lastCapturedAt.ToString("O"));
+        command.Parameters.AddWithValue(
+            "$operationId",
+            remoteOperationId.ToString("D"));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     private async Task<SqliteConnection> OpenConnectionAsync(
         CancellationToken cancellationToken)
     {
@@ -388,6 +694,33 @@ public sealed class SqliteSyncOperationJournal : ISyncOperationJournal
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
         return connection;
+    }
+
+    private async Task<long> TakeNextSequenceAsync(
+        SqliteConnection connection,
+        System.Data.Common.DbTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        await using var nextSequence = connection.CreateCommand();
+        nextSequence.Transaction = (SqliteTransaction)transaction;
+        nextSequence.CommandText =
+            """
+            UPDATE sync_replica_state
+            SET next_sequence = next_sequence + 1
+            WHERE singleton_id = 1
+              AND device_id = $deviceId
+            RETURNING next_sequence - 1;
+            """;
+        nextSequence.Parameters.AddWithValue("$deviceId", DeviceId);
+        var value = await nextSequence.ExecuteScalarAsync(
+            cancellationToken);
+        if (value is null)
+        {
+            throw new InvalidOperationException(
+                "동기화 저널을 먼저 초기화해야 합니다.");
+        }
+
+        return Convert.ToInt64(value);
     }
 
     private static async Task InsertOperationAsync(

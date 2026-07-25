@@ -5,6 +5,10 @@ using Sentory.Infrastructure.Data;
 
 namespace Sentory.Infrastructure.Sync;
 
+public sealed record SyncItemExportBatchResult(
+    int Exported,
+    int ChangedDuringExport);
+
 public sealed class SyncItemExportService(
     ISyncOperationJournal journal,
     ISyncObjectStore objectStore,
@@ -15,15 +19,10 @@ public sealed class SyncItemExportService(
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(item);
-        var payload = item.Kind switch
-        {
-            ContentKind.Url => CreateUrlPayload(item),
-            ContentKind.Image => await CreateImagePayloadAsync(
-                item,
-                cancellationToken),
-            _ => throw new NotSupportedException(
-                "현재 동기화는 단일 URL과 사진 항목만 내보낼 수 있습니다.")
-        };
+        var candidate = ToCandidate(item);
+        var payload = await CreatePayloadAsync(
+            candidate,
+            cancellationToken);
         var content = SyncItemPayloadSerializer.Serialize(payload);
         return await journal.AppendLocalAsync(
             item.ItemId,
@@ -33,8 +32,61 @@ public sealed class SyncItemExportService(
             cancellationToken);
     }
 
+    public async Task<SyncItemExportBatchResult> ExportPendingAsync(
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        if (journal is not ISyncItemExportJournal exportJournal)
+        {
+            throw new InvalidOperationException(
+                "동기화 저널이 항목 내보내기 기록을 지원하지 않습니다.");
+        }
+
+        var exported = 0;
+        var changedDuringExport = 0;
+        var candidates = await exportJournal.GetPendingItemExportsAsync(
+            limit,
+            cancellationToken);
+        foreach (var candidate in candidates)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var payload = await CreatePayloadAsync(
+                candidate,
+                cancellationToken);
+            var operation = await exportJournal.AppendLocalItemExportAsync(
+                candidate,
+                SyncItemPayloadSerializer.Serialize(payload),
+                cancellationToken);
+            if (operation is null)
+            {
+                changedDuringExport++;
+            }
+            else
+            {
+                exported++;
+            }
+        }
+
+        return new SyncItemExportBatchResult(
+            exported,
+            changedDuringExport);
+    }
+
+    private async Task<SyncItemPayload> CreatePayloadAsync(
+        SyncItemExportCandidate item,
+        CancellationToken cancellationToken) =>
+        item.Kind switch
+        {
+            ContentKind.Url => CreateUrlPayload(item),
+            ContentKind.Image => await CreateImagePayloadAsync(
+                item,
+                cancellationToken),
+            _ => throw new NotSupportedException(
+                "현재 동기화는 단일 URL과 사진 항목만 내보낼 수 있습니다.")
+        };
+
     private static SyncItemPayload CreateUrlPayload(
-        CapturedItemSummary item)
+        SyncItemExportCandidate item)
     {
         if (string.IsNullOrWhiteSpace(item.OriginalUrl) ||
             string.IsNullOrWhiteSpace(item.NormalizedKey) ||
@@ -62,11 +114,11 @@ public sealed class SyncItemExportService(
 
         return SyncItemPayload.CreateUrl(
             new SyncUrlContent(
-                item.OriginalUrl,
-                item.NormalizedKey,
-                item.Domain),
-            item.LastSourceApp,
-            item.LastCaptureMethod,
+            item.OriginalUrl,
+            item.NormalizedKey,
+            item.Domain),
+            item.SourceApp,
+            item.CaptureMethod,
             item.DeliveryStatus,
             CreateContextHash(item.ItemId),
             item.LastCapturedAt,
@@ -74,7 +126,7 @@ public sealed class SyncItemExportService(
     }
 
     private async Task<SyncItemPayload> CreateImagePayloadAsync(
-        CapturedItemSummary item,
+        SyncItemExportCandidate item,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(item.ContentPath) ||
@@ -134,13 +186,32 @@ public sealed class SyncItemExportService(
                 string.IsNullOrWhiteSpace(item.OriginalUrl)
                     ? null
                     : item.OriginalUrl),
-            item.LastSourceApp,
-            item.LastCaptureMethod,
+            item.SourceApp,
+            item.CaptureMethod,
             item.DeliveryStatus,
             CreateContextHash(item.ItemId),
             item.LastCapturedAt,
             ["sentory-sync-export"]);
     }
+
+    private static SyncItemExportCandidate ToCandidate(
+        CapturedItemSummary item) =>
+        new(
+            item.ItemId,
+            item.Kind,
+            item.OriginalUrl,
+            item.NormalizedKey,
+            item.Domain,
+            item.LastSourceApp,
+            item.LastCaptureMethod,
+            item.DeliveryStatus,
+            item.CreatedAt,
+            item.LastCapturedAt,
+            item.ContentPath,
+            item.Sha256,
+            item.MimeType,
+            item.PixelWidth,
+            item.PixelHeight);
 
     private string ResolveImagePath(string relativePath)
     {

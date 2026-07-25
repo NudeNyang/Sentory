@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using Sentory.Core;
+using Sentory.Core.Sync;
 
 namespace Sentory.Infrastructure.Data;
 
@@ -62,6 +63,12 @@ public sealed class SentorySettings
 
     public DateTimeOffset? LastUpdateCheckAt { get; set; }
 
+    public bool SyncEnabled { get; set; }
+
+    public string? SyncFolderPath { get; set; }
+
+    public string? SyncDeviceId { get; set; }
+
     internal void Normalize()
     {
         ThemeMode = ResolveThemeMode(ThemeMode, IsDarkTheme).ToString();
@@ -103,6 +110,42 @@ public sealed class SentorySettings
             .Where(value => Enum.TryParse<SourceApp>(value, out _))
             .Distinct(StringComparer.Ordinal)
             .ToList();
+
+        if (!string.IsNullOrWhiteSpace(SyncFolderPath))
+        {
+            try
+            {
+                SyncFolderPath = Path.IsPathRooted(SyncFolderPath)
+                    ? Path.GetFullPath(SyncFolderPath)
+                    : null;
+            }
+            catch (Exception exception)
+                when (exception is ArgumentException or
+                      NotSupportedException or
+                      PathTooLongException)
+            {
+                SyncFolderPath = null;
+            }
+        }
+        else
+        {
+            SyncFolderPath = null;
+        }
+
+        if (SyncFolderPath is null)
+        {
+            SyncEnabled = false;
+        }
+
+        if (!SyncDeviceIdentity.IsValid(SyncDeviceId))
+        {
+            SyncDeviceId = null;
+        }
+
+        if (SyncDeviceId is null)
+        {
+            SyncEnabled = false;
+        }
     }
 
     public SentoryThemeMode GetThemeMode() =>

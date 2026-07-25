@@ -54,6 +54,15 @@ public sealed class SyncItemProjectionService(
             {
                 alreadyProjected++;
             }
+
+            if (journal is ISyncItemExportJournal exportJournal)
+            {
+                await exportJournal.MarkRemoteItemProjectedAsync(
+                    result.ItemId,
+                    payload.CapturedAt,
+                    operation.OperationId,
+                    cancellationToken);
+            }
         }
 
         return new SyncItemProjectionResult(
