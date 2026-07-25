@@ -15,6 +15,7 @@
 - [실사용 안정성과 감지 상태](./04-real-use-stability-and-detection-status.md)
 - [공개 배포 절차](./05-release-and-distribution.md)
 - [성능 점검](./06-performance-audit.md)
+- [클라우드 동기화 설계와 구현 순서](./07-cloud-sync-design.md)
 
 ## 릴리즈 기록
 
