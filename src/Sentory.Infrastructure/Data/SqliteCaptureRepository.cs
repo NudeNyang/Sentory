@@ -362,7 +362,13 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             transaction,
             request.NormalizedUrl.Value,
             cancellationToken);
-        var itemId = existingItem?.ItemId ?? Guid.NewGuid();
+        var itemId = await ResolveItemIdAsync(
+            connection,
+            transaction,
+            existingItem?.ItemId,
+            request.PreferredItemId,
+            request.NormalizedUrl.Value,
+            cancellationToken);
         var itemCreated = existingItem is null;
         var captureCount = (existingItem?.CaptureCount ?? 0) + 1;
         var shareCount = (existingItem?.ShareCount ?? 0) +
@@ -456,7 +462,13 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             transaction,
             normalizedKey,
             cancellationToken);
-        var itemId = existingItem?.ItemId ?? Guid.NewGuid();
+        var itemId = await ResolveItemIdAsync(
+            connection,
+            transaction,
+            existingItem?.ItemId,
+            request.PreferredItemId,
+            normalizedKey,
+            cancellationToken);
         var itemCreated = existingItem is null;
         var captureCount = (existingItem?.CaptureCount ?? 0) + 1;
         var shareCount = (existingItem?.ShareCount ?? 0) +
@@ -674,7 +686,8 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                     FROM capture_events
                     WHERE item_id = items.id) AS source_apps,
                    image_ocr.display_name, image_ocr.recognized_text,
-                   image_ocr.status, image_ocr.language
+                   image_ocr.status, image_ocr.language,
+                   image_width, image_height
             FROM items
             LEFT JOIN image_ocr
               ON image_ocr.content_hash = lower(items.content_hash)
@@ -733,7 +746,13 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                         : Enum.Parse<ImageOcrStatus>(reader.GetString(27)),
                     OcrLanguage: reader.IsDBNull(28)
                         ? null
-                        : reader.GetString(28)));
+                        : reader.GetString(28),
+                    PixelWidth: reader.IsDBNull(29)
+                        ? null
+                        : reader.GetInt32(29),
+                    PixelHeight: reader.IsDBNull(30)
+                        ? null
+                        : reader.GetInt32(30)));
             }
         }
 
@@ -1835,6 +1854,56 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             Guid.Parse(reader.GetString(0)),
             reader.GetInt32(1),
             reader.GetInt32(2));
+    }
+
+    private static async Task<Guid> ResolveItemIdAsync(
+        SqliteConnection connection,
+        System.Data.Common.DbTransaction transaction,
+        Guid? existingItemId,
+        Guid? preferredItemId,
+        string normalizedKey,
+        CancellationToken cancellationToken)
+    {
+        if (existingItemId is not null)
+        {
+            return existingItemId.Value;
+        }
+
+        if (preferredItemId is null)
+        {
+            return Guid.NewGuid();
+        }
+
+        if (preferredItemId == Guid.Empty)
+        {
+            throw new ArgumentException(
+                "선호 보관함 항목 ID는 빈 GUID일 수 없습니다.",
+                nameof(preferredItemId));
+        }
+
+        await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction)transaction;
+        command.CommandText =
+            """
+            SELECT normalized_key
+            FROM items
+            WHERE id = $itemId;
+            """;
+        command.Parameters.AddWithValue(
+            "$itemId",
+            preferredItemId.Value.ToString("D"));
+        var existingKey = await command.ExecuteScalarAsync(cancellationToken);
+        if (existingKey is string value &&
+            !string.Equals(
+                value,
+                normalizedKey,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "같은 보관함 항목 ID가 다른 콘텐츠에 사용되고 있습니다.");
+        }
+
+        return preferredItemId.Value;
     }
 
     private static async Task<(int CaptureCount, int ShareCount)> GetCountsAsync(

@@ -47,7 +47,8 @@ public sealed record UrlCaptureRequest(
     DeliveryStatus DeliveryStatus,
     string ContextHash,
     DateTimeOffset CapturedAt,
-    IReadOnlyList<string> ConfirmationSignals);
+    IReadOnlyList<string> ConfirmationSignals,
+    Guid? PreferredItemId = null);
 
 public sealed record ImageCaptureRequest(
     Guid EventId,
@@ -63,7 +64,8 @@ public sealed record ImageCaptureRequest(
     string ContextHash,
     DateTimeOffset CapturedAt,
     IReadOnlyList<string> ConfirmationSignals,
-    string? OriginalFileName = null);
+    string? OriginalFileName = null,
+    Guid? PreferredItemId = null);
 
 public sealed record ImageCapturePayload(
     ReadOnlyMemory<byte> ContentBytes,
@@ -135,7 +137,9 @@ public sealed record CapturedItemSummary(
     string? OcrDisplayName = null,
     string? OcrText = null,
     ImageOcrStatus? OcrStatus = null,
-    string? OcrLanguage = null);
+    string? OcrLanguage = null,
+    int? PixelWidth = null,
+    int? PixelHeight = null);
 
 public sealed record CapturedCollectionMember(
     int Position,
