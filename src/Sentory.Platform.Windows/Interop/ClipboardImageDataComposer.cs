@@ -22,7 +22,9 @@ public static class ClipboardImageDataComposer
         encoderShouldEmitUTF8Identifier: false,
         throwOnInvalidBytes: true);
 
-    public static System.Windows.DataObject? TryCreate(string path)
+    public static System.Windows.DataObject? TryCreate(
+        string path,
+        string? originalFileName = null)
     {
         var original = ClipboardImageCodec.TryReadFile(path);
         if (original is null)
@@ -32,6 +34,14 @@ public static class ClipboardImageDataComposer
 
         try
         {
+            if (!string.IsNullOrWhiteSpace(originalFileName))
+            {
+                original = original with
+                {
+                    OriginalFileName = Path.GetFileName(originalFileName)
+                };
+            }
+
             var bitmap = LoadBitmap(path);
             var data = new System.Windows.DataObject();
             data.SetImage(bitmap);

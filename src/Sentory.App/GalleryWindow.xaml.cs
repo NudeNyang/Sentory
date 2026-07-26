@@ -2302,7 +2302,8 @@ public partial class GalleryWindow : Window
             contentPath => CopyDetailImageAsync(
                 item.Item.ItemId,
                 item.Item.Kind == ContentKind.Image,
-                contentPath),
+                contentPath,
+                GetOriginalImageFileName(item.Item, contentPath)),
             LoadDetailLinkArtworkAsync,
             OpenDetailImage,
             OpenDetailLink)
@@ -2356,7 +2357,9 @@ public partial class GalleryWindow : Window
                     return;
                 }
 
-                var data = ClipboardImageDataComposer.TryCreate(path);
+                var data = ClipboardImageDataComposer.TryCreate(
+                    path,
+                    item.Item.OriginalUrl);
                 if (data is null)
                 {
                     ShowFeedback(SentoryLocalization.Text("PhotoFileNotFound"));
@@ -2402,7 +2405,8 @@ public partial class GalleryWindow : Window
     private async Task<DetailImageCopyResult> CopyDetailImageAsync(
         Guid itemId,
         bool recordCopyUsage,
-        string? contentPath)
+        string? contentPath,
+        string? originalFileName)
     {
         var path = ResolveContentPath(contentPath);
         if (path is null || !File.Exists(path))
@@ -2412,7 +2416,9 @@ public partial class GalleryWindow : Window
 
         try
         {
-            var data = ClipboardImageDataComposer.TryCreate(path);
+            var data = ClipboardImageDataComposer.TryCreate(
+                path,
+                originalFileName);
             if (data is null)
             {
                 return new DetailImageCopyResult(false);
@@ -2455,6 +2461,23 @@ public partial class GalleryWindow : Window
             true,
             usage.Item.CopyCount,
             usage.Item.IsFavorite);
+    }
+
+    private static string? GetOriginalImageFileName(
+        CapturedItemSummary item,
+        string? contentPath)
+    {
+        if (item.Kind == ContentKind.Image)
+        {
+            return item.OriginalUrl;
+        }
+
+        return item.Members?.FirstOrDefault(member =>
+            member.Kind == ContentKind.Image &&
+            string.Equals(
+                member.ContentPath,
+                contentPath,
+                StringComparison.OrdinalIgnoreCase))?.OriginalUrl;
     }
 
     private async Task<CopyUsageRecordResult> RecordCopyUsageAsync(

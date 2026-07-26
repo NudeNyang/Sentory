@@ -58,6 +58,46 @@ public sealed class ClipboardImageCodecTests
     }
 
     [Fact]
+    public void SentoryClipboardDataUsesTheGalleryOriginalFileName()
+    {
+        var path = Path.Combine(
+            Path.GetTempPath(),
+            $"{new string('a', 64)}.png");
+        const string originalFileName =
+            "VRChat 2026-07-26 23-18-47.png";
+        try
+        {
+            var bitmap = BitmapSource.Create(
+                1,
+                1,
+                96,
+                96,
+                PixelFormats.Bgra32,
+                null,
+                new byte[] { 255, 0, 0, 255 },
+                4);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using (var stream = File.Create(path))
+            {
+                encoder.Save(stream);
+            }
+
+            var data = ClipboardImageDataComposer.TryCreate(
+                path,
+                originalFileName);
+            var restored = ClipboardImageDataComposer.TryReadOriginal(data);
+
+            Assert.NotNull(restored);
+            Assert.Equal(originalFileName, restored.OriginalFileName);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void RejectsMalformedSentoryClipboardImageData()
     {
         var data = new System.Windows.DataObject();

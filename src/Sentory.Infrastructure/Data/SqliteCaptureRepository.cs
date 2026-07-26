@@ -2584,7 +2584,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         command.Parameters.AddWithValue("$normalizedKey", normalizedKey);
         command.Parameters.AddWithValue(
             "$originalFileName",
-            request.OriginalFileName ?? string.Empty);
+            GetMeaningfulOriginalFileName(request) ?? string.Empty);
         command.Parameters.AddWithValue(
             "$createdAt",
             request.CapturedAt.ToString("O"));
@@ -2613,6 +2613,24 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         command.Parameters.AddWithValue("$imageWidth", request.PixelWidth);
         command.Parameters.AddWithValue("$imageHeight", request.PixelHeight);
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static string? GetMeaningfulOriginalFileName(
+        ImageCaptureRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.OriginalFileName))
+        {
+            return null;
+        }
+
+        var fileName = Path.GetFileName(request.OriginalFileName);
+        var baseName = Path.GetFileNameWithoutExtension(fileName);
+        return string.Equals(
+            baseName,
+            request.Sha256,
+            StringComparison.OrdinalIgnoreCase)
+            ? null
+            : fileName;
     }
 
     private async Task<string> EnsureImageStoredAsync(

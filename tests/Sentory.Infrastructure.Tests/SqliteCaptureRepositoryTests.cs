@@ -223,6 +223,31 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task ImageKeepsOriginalFileNameWhenLaterCaptureUsesStorageHashName()
+    {
+        var repository = CreateRepository();
+        await repository.InitializeAsync();
+        byte[] bytes = [11, 22, 33, 44];
+        var hash = Convert.ToHexString(SHA256.HashData(bytes));
+        const string originalFileName =
+            "VRChat 2026-07-26 23-18-47.png";
+
+        await repository.UpsertImageAsync(
+            CreateImageRequest(Guid.NewGuid(), bytes, hash) with
+            {
+                OriginalFileName = originalFileName
+            });
+        await repository.UpsertImageAsync(
+            CreateImageRequest(Guid.NewGuid(), bytes, hash) with
+            {
+                OriginalFileName = $"{hash.ToLowerInvariant()}.png"
+            });
+        var item = Assert.Single(await repository.GetRecentAsync(10));
+
+        Assert.Equal(originalFileName, item.OriginalUrl);
+    }
+
+    [Fact]
     public async Task ImageLargerThanEightMegabytesIsStoredWithoutTruncation()
     {
         var repository = CreateRepository();
