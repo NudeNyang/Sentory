@@ -6,12 +6,14 @@ namespace Sentory.Infrastructure.Sync;
 
 public sealed record LocalFolderSyncRunResult(
     SyncItemExportBatchResult Export,
+    SyncMetadataRunResult Metadata,
     SyncCycleResult Cycle,
     SyncRunResult Publish);
 
 public sealed class LocalFolderSyncRuntimeService(
     SentoryDataPaths paths,
-    ICaptureRepository captureRepository)
+    ICaptureRepository captureRepository,
+    SentorySettingsStore? settingsStore = null)
 {
     private const int ExportBatchSize = 200;
 
@@ -42,6 +44,18 @@ public sealed class LocalFolderSyncRuntimeService(
             paths,
             deviceId);
         await journal.InitializeAsync(cancellationToken);
+        var metadataService = captureRepository is
+            SqliteCaptureRepository sqliteRepository
+            ? new SyncMetadataService(
+                paths,
+                journal,
+                sqliteRepository,
+                settingsStore)
+            : null;
+        var metadataExported = metadataService is null
+            ? 0
+            : await metadataService.CaptureLocalChangesAsync(
+                cancellationToken);
         var exporter = new SyncItemExportService(
             journal,
             objectStore,
@@ -53,6 +67,13 @@ public sealed class LocalFolderSyncRuntimeService(
                 captureRepository,
                 objectStore))
             .RunOnceAsync(cancellationToken);
+        var metadata = metadataService is null
+            ? new SyncMetadataRunResult(0, 0, 0, 0, false)
+            : await metadataService.ProjectReceivedAsync(
+                cancellationToken) with
+            {
+                Exported = metadataExported
+            };
         var export = await exporter.ExportPendingAsync(
             ExportBatchSize,
             cancellationToken);
@@ -61,6 +82,7 @@ public sealed class LocalFolderSyncRuntimeService(
             objectStore).RunOnceAsync(cancellationToken);
         return new LocalFolderSyncRunResult(
             export,
+            metadata,
             cycle,
             publish);
     }

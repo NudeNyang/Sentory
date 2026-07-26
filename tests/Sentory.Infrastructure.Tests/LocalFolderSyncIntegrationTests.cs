@@ -154,7 +154,7 @@ public sealed class LocalFolderSyncIntegrationTests : IDisposable
 
         Assert.Equal(1, source.Export.Exported);
         Assert.Equal(1, source.Publish.Uploaded);
-        Assert.Equal(1, destination.Cycle.Transfer.Downloaded);
+        Assert.Equal(2, destination.Cycle.Transfer.Downloaded);
         Assert.Equal(1, destination.Cycle.Projection.Projected);
         Assert.Equal(0, destination.Export.Exported);
         Assert.Equal(0, destinationRepeated.Export.Exported);
@@ -344,6 +344,12 @@ public sealed class LocalFolderSyncIntegrationTests : IDisposable
             await replicaB.Captures.GetRecentAsync(10));
         Assert.Equal(existingDestinationItem.ItemId, destinationItem.ItemId);
 
+        var sourceBeforeDelete = Assert.Single(
+            await replicaA.Captures.GetRecentAsync(10));
+        Assert.True(await replicaA.Captures.RecordCopyAsync(
+            sourceBeforeDelete.ItemId,
+            DateTimeOffset.UtcNow));
+
         Assert.True(await replicaB.Captures.DeleteItemAsync(
             destinationItem.ItemId));
         await runtimeB.RunOnceAsync(
@@ -354,6 +360,9 @@ public sealed class LocalFolderSyncIntegrationTests : IDisposable
             sharedFolder);
         await runtimeA.RunOnceAsync(
             replicaA.Journal.DeviceId,
+            sharedFolder);
+        await runtimeB.RunOnceAsync(
+            replicaB.Journal.DeviceId,
             sharedFolder);
 
         Assert.Empty(await replicaB.Captures.GetRecentAsync(10));
@@ -393,6 +402,234 @@ public sealed class LocalFolderSyncIntegrationTests : IDisposable
 
         Assert.Empty(await replicaA.Captures.GetRecentAsync(10));
         Assert.Empty(await replicaB.Captures.GetRecentAsync(10));
+    }
+
+    [Fact]
+    public async Task NewCaptureAfterDeletionStartsFreshMetadataGeneration()
+    {
+        var replicaA = await CreateReplicaAsync("recapture-a");
+        var replicaB = await CreateReplicaAsync("recapture-b");
+        var sharedFolder = Path.Combine(_root, "shared-recapture");
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/recapture",
+            out var normalized));
+        var first = await replicaA.Captures.UpsertUrlAsync(
+            new UrlCaptureRequest(
+                Guid.NewGuid(),
+                normalized.Original,
+                normalized,
+                SourceApp.Discord,
+                CaptureMethod.DiscordConfirmedSend,
+                DeliveryStatus.Confirmed,
+                "first-generation",
+                DateTimeOffset.Parse("2026-07-26T09:00:00+09:00"),
+                ["url-match"]));
+        Assert.True(await replicaA.Captures.RecordCopyAsync(
+            first.ItemId,
+            DateTimeOffset.Parse("2026-07-26T10:00:00+09:00")));
+        var runtimeA = new LocalFolderSyncRuntimeService(
+            replicaA.Paths,
+            replicaA.Captures);
+        var runtimeB = new LocalFolderSyncRuntimeService(
+            replicaB.Paths,
+            replicaB.Captures);
+        await runtimeA.RunOnceAsync(replicaA.Journal.DeviceId, sharedFolder);
+        await runtimeB.RunOnceAsync(replicaB.Journal.DeviceId, sharedFolder);
+
+        Assert.True(await replicaA.Captures.DeleteItemAsync(first.ItemId));
+        await runtimeA.RunOnceAsync(replicaA.Journal.DeviceId, sharedFolder);
+        await runtimeB.RunOnceAsync(replicaB.Journal.DeviceId, sharedFolder);
+        Assert.Empty(await replicaB.Captures.GetRecentAsync(10));
+
+        var second = await replicaA.Captures.UpsertUrlAsync(
+            new UrlCaptureRequest(
+                Guid.NewGuid(),
+                normalized.Original,
+                normalized,
+                SourceApp.Discord,
+                CaptureMethod.DiscordConfirmedSend,
+                DeliveryStatus.Confirmed,
+                "second-generation",
+                DateTimeOffset.Parse("2026-07-27T09:00:00+09:00"),
+                ["url-match"]));
+        Assert.True(await replicaA.Captures.RecordCopyAsync(
+            second.ItemId,
+            DateTimeOffset.Parse("2026-07-27T10:00:00+09:00")));
+        Assert.True(await replicaA.Captures.SetFavoriteAsync(
+            second.ItemId,
+            true));
+        await runtimeA.RunOnceAsync(replicaA.Journal.DeviceId, sharedFolder);
+        await runtimeB.RunOnceAsync(replicaB.Journal.DeviceId, sharedFolder);
+
+        var remote = Assert.Single(await replicaB.Captures.GetRecentAsync(10));
+        Assert.Equal(1, remote.CopyCount);
+        Assert.True(remote.IsFavorite);
+        Assert.Equal(second.ItemId, remote.ItemId);
+    }
+
+    [Fact]
+    public async Task FavoritesAndPerDeviceCopyCountsConverge()
+    {
+        var replicaA = await CreateReplicaAsync("metadata-a");
+        var replicaB = await CreateReplicaAsync("metadata-b");
+        var sharedFolder = Path.Combine(_root, "shared-metadata");
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/metadata",
+            out var normalized));
+        await replicaA.Captures.UpsertUrlAsync(
+            new UrlCaptureRequest(
+                Guid.NewGuid(),
+                normalized.Original,
+                normalized,
+                SourceApp.Discord,
+                CaptureMethod.KakaoCtrlVUrl,
+                DeliveryStatus.NotObserved,
+                "metadata-test",
+                DateTimeOffset.Parse("2026-07-27T09:00:00+09:00"),
+                []));
+        await replicaB.Captures.UpsertUrlAsync(
+            new UrlCaptureRequest(
+                Guid.NewGuid(),
+                normalized.Original,
+                normalized,
+                SourceApp.KakaoTalk,
+                CaptureMethod.KakaoCtrlVUrl,
+                DeliveryStatus.NotObserved,
+                "metadata-test-b",
+                DateTimeOffset.Parse("2026-07-27T09:05:00+09:00"),
+                []));
+        var runtimeA = new LocalFolderSyncRuntimeService(
+            replicaA.Paths,
+            replicaA.Captures);
+        var runtimeB = new LocalFolderSyncRuntimeService(
+            replicaB.Paths,
+            replicaB.Captures);
+        await runtimeA.RunOnceAsync(replicaA.Journal.DeviceId, sharedFolder);
+        await runtimeB.RunOnceAsync(replicaB.Journal.DeviceId, sharedFolder);
+
+        var itemA = Assert.Single(await replicaA.Captures.GetRecentAsync(10));
+        var itemB = Assert.Single(await replicaB.Captures.GetRecentAsync(10));
+        Assert.True(await replicaA.Captures.RecordCopyAsync(
+            itemA.ItemId,
+            DateTimeOffset.Parse("2026-07-27T10:00:00+09:00")));
+        Assert.True(await replicaA.Captures.RecordCopyAsync(
+            itemA.ItemId,
+            DateTimeOffset.Parse("2026-07-27T10:01:00+09:00")));
+        Assert.True(await replicaA.Captures.SetFavoriteAsync(
+            itemA.ItemId,
+            true));
+        Assert.True(await replicaB.Captures.RecordCopyAsync(
+            itemB.ItemId,
+            DateTimeOffset.Parse("2026-07-27T10:02:00+09:00")));
+
+        await runtimeA.RunOnceAsync(replicaA.Journal.DeviceId, sharedFolder);
+        await runtimeB.RunOnceAsync(replicaB.Journal.DeviceId, sharedFolder);
+        await runtimeA.RunOnceAsync(replicaA.Journal.DeviceId, sharedFolder);
+
+        itemA = Assert.Single(await replicaA.Captures.GetRecentAsync(10));
+        itemB = Assert.Single(await replicaB.Captures.GetRecentAsync(10));
+        Assert.Equal(3, itemA.CopyCount);
+        Assert.Equal(3, itemB.CopyCount);
+        Assert.True(itemA.IsFavorite);
+        Assert.True(itemB.IsFavorite);
+
+        Assert.True(await replicaB.Captures.SetFavoriteAsync(
+            itemB.ItemId,
+            false));
+        await runtimeB.RunOnceAsync(replicaB.Journal.DeviceId, sharedFolder);
+        await runtimeA.RunOnceAsync(replicaA.Journal.DeviceId, sharedFolder);
+
+        Assert.False(Assert.Single(
+            await replicaA.Captures.GetRecentAsync(10)).IsFavorite);
+        Assert.False(Assert.Single(
+            await replicaB.Captures.GetRecentAsync(10)).IsFavorite);
+    }
+
+    [Fact]
+    public async Task AutoFavoriteSettingsAndExternalUsageSessionsSynchronize()
+    {
+        var replicaA = await CreateReplicaAsync("auto-favorite-a");
+        var replicaB = await CreateReplicaAsync("auto-favorite-b");
+        var sharedFolder = Path.Combine(_root, "shared-auto-favorite");
+        var settingsStoreA = new SentorySettingsStore(replicaA.Paths);
+        var settingsStoreB = new SentorySettingsStore(replicaB.Paths);
+        var settingsA = settingsStoreA.Load();
+        settingsA.AutoFavoriteEnabled = true;
+        settingsA.AutoFavoriteCopyThreshold = 2;
+        settingsA.AutoFavoriteChangedAt = DateTimeOffset.Parse(
+            "2026-07-27T08:00:00+09:00");
+        settingsStoreA.Save(settingsA);
+        replicaA.Captures.ConfigureAutomaticFavorites(true, 2);
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/automatic",
+            out var normalized));
+        foreach (var capturedAt in new[]
+                 {
+                     DateTimeOffset.Parse("2026-07-27T09:00:00+09:00"),
+                     DateTimeOffset.Parse("2026-07-27T16:00:00+09:00")
+                 })
+        {
+            await replicaA.Captures.UpsertUrlAsync(
+                new UrlCaptureRequest(
+                    Guid.NewGuid(),
+                    normalized.Original,
+                    normalized,
+                    SourceApp.Discord,
+                    CaptureMethod.DiscordConfirmedSend,
+                    DeliveryStatus.Confirmed,
+                    "external-session-test",
+                    capturedAt,
+                    ["url-match"]));
+        }
+
+        var runtimeA = new LocalFolderSyncRuntimeService(
+            replicaA.Paths,
+            replicaA.Captures,
+            settingsStoreA);
+        var runtimeB = new LocalFolderSyncRuntimeService(
+            replicaB.Paths,
+            replicaB.Captures,
+            settingsStoreB);
+        await runtimeA.RunOnceAsync(replicaA.Journal.DeviceId, sharedFolder);
+        await runtimeB.RunOnceAsync(replicaB.Journal.DeviceId, sharedFolder);
+
+        var remoteItem = Assert.Single(
+            await replicaB.Captures.GetRecentAsync(10));
+        var remoteSettings = settingsStoreB.Load();
+        Assert.True(remoteItem.IsFavorite);
+        Assert.True(remoteSettings.AutoFavoriteEnabled);
+        Assert.Equal(2, remoteSettings.AutoFavoriteCopyThreshold);
+        Assert.Equal(
+            settingsA.AutoFavoriteChangedAt,
+            remoteSettings.AutoFavoriteChangedAt);
+
+        Assert.True(await replicaB.Captures.SetFavoriteAsync(
+            remoteItem.ItemId,
+            false));
+        await runtimeB.RunOnceAsync(replicaB.Journal.DeviceId, sharedFolder);
+        await runtimeA.RunOnceAsync(replicaA.Journal.DeviceId, sharedFolder);
+        Assert.False(Assert.Single(
+            await replicaA.Captures.GetRecentAsync(10)).IsFavorite);
+        Assert.False(Assert.Single(
+            await replicaB.Captures.GetRecentAsync(10)).IsFavorite);
+
+        await replicaA.Captures.UpsertUrlAsync(
+            new UrlCaptureRequest(
+                Guid.NewGuid(),
+                normalized.Original,
+                normalized,
+                SourceApp.Discord,
+                CaptureMethod.DiscordConfirmedSend,
+                DeliveryStatus.Confirmed,
+                "external-session-test",
+                DateTimeOffset.Parse("2026-07-27T23:00:00+09:00"),
+                ["url-match"]));
+        await runtimeA.RunOnceAsync(replicaA.Journal.DeviceId, sharedFolder);
+        await runtimeB.RunOnceAsync(replicaB.Journal.DeviceId, sharedFolder);
+        Assert.True(Assert.Single(
+            await replicaA.Captures.GetRecentAsync(10)).IsFavorite);
+        Assert.True(Assert.Single(
+            await replicaB.Captures.GetRecentAsync(10)).IsFavorite);
     }
 
     public void Dispose()

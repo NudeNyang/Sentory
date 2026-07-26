@@ -452,7 +452,48 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         await using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version;";
 
-        Assert.Equal(6L, (long)(await command.ExecuteScalarAsync())!);
+        Assert.Equal(7L, (long)(await command.ExecuteScalarAsync())!);
+    }
+
+    [Fact]
+    public async Task VersionSixDatabaseBackfillsFavoriteChangeTime()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var repository = new SqliteCaptureRepository(paths);
+        await repository.InitializeAsync();
+        var captured = await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/favorite-clock",
+            DeliveryStatus.NotObserved));
+        Assert.True(await repository.SetFavoriteAsync(
+            captured.ItemId,
+            true));
+        await using (var connection = new SqliteConnection(
+                         $"Data Source={paths.DatabasePath}"))
+        {
+            await connection.OpenAsync();
+            await using var downgrade = connection.CreateCommand();
+            downgrade.CommandText =
+                """
+                UPDATE items SET favorite_changed_at = NULL;
+                PRAGMA user_version = 6;
+                """;
+            await downgrade.ExecuteNonQueryAsync();
+        }
+
+        await repository.InitializeAsync();
+        await using var verifyConnection = new SqliteConnection(
+            $"Data Source={paths.DatabasePath}");
+        await verifyConnection.OpenAsync();
+        await using var verify = verifyConnection.CreateCommand();
+        verify.CommandText =
+            "SELECT favorite_changed_at FROM items WHERE id = $itemId;";
+        verify.Parameters.AddWithValue(
+            "$itemId",
+            captured.ItemId.ToString("D"));
+
+        Assert.False(string.IsNullOrWhiteSpace(Convert.ToString(
+            await verify.ExecuteScalarAsync())));
     }
 
     [Fact]

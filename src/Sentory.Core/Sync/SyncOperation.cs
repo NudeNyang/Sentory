@@ -6,7 +6,9 @@ public enum SyncOperationKind
 {
     Upsert,
     Delete,
-    Restore
+    Restore,
+    Metadata,
+    Configuration
 }
 
 public sealed record SyncOperation

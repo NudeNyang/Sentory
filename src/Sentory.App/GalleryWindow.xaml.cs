@@ -93,6 +93,8 @@ public partial class GalleryWindow : Window
 
     public event EventHandler? SyncConfigurationChanged;
 
+    public event EventHandler? ItemMetadataChanged;
+
     public bool IsDarkTheme => _isDarkTheme;
 
     public GalleryWindow(
@@ -788,6 +790,14 @@ public partial class GalleryWindow : Window
         _settings.AutoFavoriteEnabled = enabled;
         _settings.AutoFavoriteCopyThreshold = copyThreshold;
         AutoFavoriteSettingsChanged?.Invoke(enabled, copyThreshold);
+    }
+
+    internal void ApplySyncedAutoFavoriteSettings(
+        bool enabled,
+        int copyThreshold)
+    {
+        _settings.AutoFavoriteEnabled = enabled;
+        _settings.AutoFavoriteCopyThreshold = copyThreshold;
     }
 
     private async Task ApplyStartupSelection(bool enabled)
@@ -2186,6 +2196,7 @@ public partial class GalleryWindow : Window
             {
                 IsFavorite = isFavorite
             });
+            ItemMetadataChanged?.Invoke(this, EventArgs.Empty);
             ShowFeedback(
                 isFavorite
                     ? SentoryLocalization.Text("FavoriteAdded")
@@ -2493,6 +2504,11 @@ public partial class GalleryWindow : Window
         if (!ReferenceEquals(result.Item, currentItem.Item))
         {
             ReplaceItem(currentItem, result.Item);
+        }
+
+        if (result.Outcome != CopyUsageRecordOutcome.RecordFailed)
+        {
+            ItemMetadataChanged?.Invoke(this, EventArgs.Empty);
         }
 
         return result;

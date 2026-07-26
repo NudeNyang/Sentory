@@ -9,7 +9,7 @@ namespace Sentory.Infrastructure.Data;
 public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
     : ICaptureRepository, IImageOcrRepository, ISyncItemDeletionRepository
 {
-    private const int CurrentSchemaVersion = 6;
+    private const int CurrentSchemaVersion = 7;
     private static readonly TimeSpan UsageSessionGap = TimeSpan.FromHours(6);
     private static readonly TimeSpan RecentUsageWindow = TimeSpan.FromDays(30);
     private static readonly HashSet<string> StoredImageExtensions = new(
@@ -82,6 +82,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 image_width INTEGER NULL,
                 image_height INTEGER NULL,
                 is_favorite INTEGER NOT NULL DEFAULT 0,
+                favorite_changed_at TEXT NULL,
                 copy_count INTEGER NOT NULL DEFAULT 0,
                 last_copied_at TEXT NULL,
                 page_title TEXT NULL,
@@ -215,6 +216,12 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         await EnsureColumnAsync(
             connection,
             "items",
+            "favorite_changed_at",
+            "TEXT NULL",
+            cancellationToken);
+        await EnsureColumnAsync(
+            connection,
+            "items",
             "copy_count",
             "INTEGER NOT NULL DEFAULT 0",
             cancellationToken);
@@ -320,6 +327,18 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             await ApplyAutomaticFavoritesAsync(
                 connection,
                 DateTimeOffset.UtcNow,
+                cancellationToken);
+        }
+        if (schemaVersion < 7)
+        {
+            await ExecuteNonQueryAsync(
+                connection,
+                """
+                UPDATE items
+                SET favorite_changed_at = last_captured_at
+                WHERE is_favorite = 1
+                  AND favorite_changed_at IS NULL;
+                """,
                 cancellationToken);
         }
         await ExecuteNonQueryAsync(
@@ -937,12 +956,16 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         command.CommandText =
             """
             UPDATE items
-            SET is_favorite = $isFavorite
+            SET is_favorite = $isFavorite,
+                favorite_changed_at = $changedAt
             WHERE id = $itemId;
             """;
         command.Parameters.AddWithValue(
             "$isFavorite",
             isFavorite ? 1 : 0);
+        command.Parameters.AddWithValue(
+            "$changedAt",
+            DateTimeOffset.UtcNow.ToString("O"));
         command.Parameters.AddWithValue("$itemId", itemId.ToString("D"));
         return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
     }
@@ -1002,6 +1025,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             await connection.BeginTransactionAsync(cancellationToken);
 
         Guid resolvedItemId;
+        string resolvedNormalizedKey;
         ContentKind kind;
         DateTimeOffset lastCapturedAt;
         var storedPaths = new List<string>();
@@ -1035,6 +1059,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             }
 
             resolvedItemId = Guid.Parse(reader.GetString(0));
+            resolvedNormalizedKey = reader.GetString(2);
             if (!Enum.TryParse(reader.GetString(1), out kind))
             {
                 throw new InvalidDataException(
@@ -1090,6 +1115,13 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 cancellationToken);
         }
 
+        await DeleteSyncMetadataStateAsync(
+            connection,
+            (SqliteTransaction)transaction,
+            resolvedItemId,
+            resolvedNormalizedKey,
+            cancellationToken);
+
         await using (var deleteEvents = connection.CreateCommand())
         {
             deleteEvents.Transaction = (SqliteTransaction)transaction;
@@ -1131,6 +1163,49 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         }
 
         return affected > 0;
+    }
+
+    private static async Task DeleteSyncMetadataStateAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid itemId,
+        string normalizedKey,
+        CancellationToken cancellationToken)
+    {
+        await using (var tables = connection.CreateCommand())
+        {
+            tables.Transaction = transaction;
+            tables.CommandText =
+                """
+                SELECT COUNT(*)
+                FROM sqlite_master
+                WHERE type = 'table' AND name IN (
+                    'sync_item_copy_components',
+                    'sync_item_favorite_clock',
+                    'sync_item_metadata_exports'
+                );
+                """;
+            if (Convert.ToInt32(
+                    await tables.ExecuteScalarAsync(cancellationToken)) != 3)
+            {
+                return;
+            }
+        }
+
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            DELETE FROM sync_item_copy_components
+            WHERE normalized_key = $normalizedKey;
+            DELETE FROM sync_item_favorite_clock
+            WHERE normalized_key = $normalizedKey;
+            DELETE FROM sync_item_metadata_exports
+            WHERE item_id = $itemId;
+            """;
+        command.Parameters.AddWithValue("$normalizedKey", normalizedKey);
+        command.Parameters.AddWithValue("$itemId", itemId.ToString("D"));
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task TryAppendSyncDeletionAsync(
@@ -1519,7 +1594,10 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             transaction,
             olderThan,
             cancellationToken);
-        var syncDeletionItems = new List<(Guid ItemId, ContentKind Kind)>();
+        var syncDeletionItems = new List<(
+            Guid ItemId,
+            ContentKind Kind,
+            string NormalizedKey)>();
         var imagePaths = new List<string>();
         var previewPaths = new List<string>();
         await using (var select = connection.CreateCommand())
@@ -1527,7 +1605,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             select.Transaction = transaction;
             select.CommandText =
                 $"""
-                SELECT id, kind, content_path,
+                SELECT id, kind, normalized_key, content_path,
                        site_icon_path, preview_image_path
                 FROM items
                 WHERE {CleanupPredicate}
@@ -1547,13 +1625,14 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
 
                 syncDeletionItems.Add((
                     Guid.Parse(reader.GetString(0)),
-                    kind));
-                if (!reader.IsDBNull(2))
+                    kind,
+                    reader.GetString(2)));
+                if (!reader.IsDBNull(3))
                 {
-                    imagePaths.Add(reader.GetString(2));
+                    imagePaths.Add(reader.GetString(3));
                 }
 
-                for (var index = 3; index < 5; index++)
+                for (var index = 4; index < 6; index++)
                 {
                     if (!reader.IsDBNull(index))
                     {
@@ -1584,7 +1663,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         }
 
         var deletedAt = DateTimeOffset.UtcNow;
-        foreach (var (itemId, kind) in syncDeletionItems)
+        foreach (var (itemId, kind, normalizedKey) in syncDeletionItems)
         {
             if (kind is not (ContentKind.Url or ContentKind.Image))
             {
@@ -1596,6 +1675,12 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 transaction,
                 itemId,
                 deletedAt,
+                cancellationToken);
+            await DeleteSyncMetadataStateAsync(
+                connection,
+                transaction,
+                itemId,
+                normalizedKey,
                 cancellationToken);
         }
 
@@ -2443,10 +2528,15 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         command.CommandText =
             """
             UPDATE items
-            SET is_favorite = 1
-            WHERE id = $itemId;
+            SET is_favorite = 1,
+                favorite_changed_at = $changedAt
+            WHERE id = $itemId
+              AND is_favorite = 0;
             """;
         command.Parameters.AddWithValue("$itemId", itemId.ToString("D"));
+        command.Parameters.AddWithValue(
+            "$changedAt",
+            DateTimeOffset.UtcNow.ToString("O"));
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -2513,8 +2603,10 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         command.CommandText =
             """
             UPDATE items
-            SET is_favorite = 1
+            SET is_favorite = 1,
+                favorite_changed_at = $changedAt
             WHERE kind IN ('Url', 'Image')
+              AND is_favorite = 0
               AND id IN (
                   SELECT item_id
                   FROM usage_sessions
@@ -2529,6 +2621,9 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         command.Parameters.AddWithValue(
             "$threshold",
             configuration.UsageThreshold);
+        command.Parameters.AddWithValue(
+            "$changedAt",
+            evaluatedAt.ToString("O"));
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

@@ -68,6 +68,11 @@ public sealed class SqliteSyncOperationJournal :
                 PRAGMA busy_timeout = 5000;
 
                 DROP TABLE IF EXISTS sync_item_exports;
+                DROP TABLE IF EXISTS sync_item_metadata_exports;
+                DROP TABLE IF EXISTS sync_item_copy_components;
+                DROP TABLE IF EXISTS sync_item_favorite_clock;
+                DROP TABLE IF EXISTS sync_metadata_applied;
+                DROP TABLE IF EXISTS sync_auto_favorite_clock;
                 DROP TABLE IF EXISTS sync_checkpoints;
                 DROP TABLE IF EXISTS sync_operations;
                 DROP TABLE IF EXISTS sync_replica_state;
@@ -125,6 +130,44 @@ public sealed class SqliteSyncOperationJournal :
                 item_id TEXT NOT NULL PRIMARY KEY,
                 last_captured_at TEXT NOT NULL,
                 operation_id TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS sync_item_copy_components (
+                normalized_key TEXT NOT NULL,
+                device_id TEXT NOT NULL,
+                item_captured_at TEXT NOT NULL,
+                copy_count INTEGER NOT NULL CHECK(copy_count >= 0),
+                last_copied_at TEXT NULL,
+                PRIMARY KEY(normalized_key, device_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS sync_item_favorite_clock (
+                normalized_key TEXT NOT NULL PRIMARY KEY,
+                is_favorite INTEGER NOT NULL,
+                changed_at TEXT NOT NULL,
+                device_id TEXT NOT NULL,
+                sequence INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS sync_item_metadata_exports (
+                item_id TEXT NOT NULL PRIMARY KEY,
+                fingerprint TEXT NOT NULL,
+                operation_id TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS sync_metadata_applied (
+                operation_id TEXT NOT NULL PRIMARY KEY,
+                applied_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS sync_auto_favorite_clock (
+                singleton_id INTEGER NOT NULL PRIMARY KEY
+                    CHECK(singleton_id = 1),
+                enabled INTEGER NOT NULL,
+                usage_threshold INTEGER NOT NULL,
+                changed_at TEXT NOT NULL,
+                device_id TEXT NOT NULL,
+                sequence INTEGER NOT NULL
             );
 
             CREATE INDEX IF NOT EXISTS ix_sync_operations_publish

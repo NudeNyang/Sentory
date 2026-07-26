@@ -1528,6 +1528,8 @@ public partial class App : System.Windows.Application
                 ApplyAutomaticFavoriteSettings;
             _galleryWindow.SyncConfigurationChanged += (_, _) =>
                 WakeSyncWorker();
+            _galleryWindow.ItemMetadataChanged += (_, _) =>
+                WakeSyncWorker();
             _galleryWindow.SetDiscordRepairNeeded(
                 _discordSupportEnabled && _discordRepairNeeded);
             _galleryWindow.SetDiscordDetectionState(
@@ -1583,6 +1585,8 @@ public partial class App : System.Windows.Application
                 enabled,
                 usageThreshold);
         }
+
+        WakeSyncWorker();
     }
 
     private async Task RunMaintenanceLoopAsync(
@@ -1930,7 +1934,8 @@ public partial class App : System.Windows.Application
 
             var result = await new LocalFolderSyncRuntimeService(
                 _paths,
-                _repository).RunOnceAsync(
+                _repository,
+                _settingsStore).RunOnceAsync(
                 deviceId,
                 selectedDirectory,
                 cancellationToken);
@@ -1941,9 +1946,19 @@ public partial class App : System.Windows.Application
                 succeededAt);
             _diagnosticsLog?.Write(
                 "cloud-sync-completed",
-                $"exported={result.Export.Exported}, uploaded={result.Cycle.Transfer.Uploaded + result.Publish.Uploaded}, downloaded={result.Cycle.Transfer.Downloaded + result.Publish.Downloaded}, projected={result.Cycle.Projection.Projected}");
+                $"exported={result.Export.Exported}, metadataExported={result.Metadata.Exported}, uploaded={result.Cycle.Transfer.Uploaded + result.Publish.Uploaded}, downloaded={result.Cycle.Transfer.Downloaded + result.Publish.Downloaded}, projected={result.Cycle.Projection.Projected}, metadataProjected={result.Metadata.Projected}");
+
+            if (result.Metadata.SettingsChanged)
+            {
+                var synchronizedSettings = _settingsStore.Load();
+                await Dispatcher.InvokeAsync(() =>
+                    _galleryWindow?.ApplySyncedAutoFavoriteSettings(
+                        synchronizedSettings.AutoFavoriteEnabled,
+                        synchronizedSettings.AutoFavoriteCopyThreshold));
+            }
 
             if (result.Cycle.Projection.Projected > 0 ||
+                result.Metadata.Projected > 0 ||
                 migration.LegacyProjected > 0)
             {
                 Task refreshTask = Task.CompletedTask;

@@ -680,8 +680,13 @@ public partial class DataManagementWindow : Window
         try
         {
             var settings = _settingsStore.Load();
-            settings.AutoFavoriteEnabled = option.Enabled;
-            settings.AutoFavoriteCopyThreshold = option.CopyThreshold;
+            if (settings.AutoFavoriteEnabled != option.Enabled ||
+                settings.AutoFavoriteCopyThreshold != option.CopyThreshold)
+            {
+                settings.AutoFavoriteEnabled = option.Enabled;
+                settings.AutoFavoriteCopyThreshold = option.CopyThreshold;
+                settings.AutoFavoriteChangedAt = DateTimeOffset.UtcNow;
+            }
             _settingsStore.Save(settings);
             AutoFavoriteSettingsChanged?.Invoke(
                 option.Enabled,

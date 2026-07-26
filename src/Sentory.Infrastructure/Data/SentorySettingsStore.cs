@@ -62,6 +62,8 @@ public sealed class SentorySettings
     public int AutoFavoriteCopyThreshold { get; set; } =
         DefaultAutoFavoriteCopyThreshold;
 
+    public DateTimeOffset? AutoFavoriteChangedAt { get; set; }
+
     public DateTimeOffset? LastUpdateCheckAt { get; set; }
 
     public bool SyncEnabled { get; set; }
