@@ -3,7 +3,8 @@ namespace Sentory.Core;
 public enum SourceApp
 {
     Discord,
-    KakaoTalk
+    KakaoTalk,
+    Slack
 }
 
 public enum ContentKind
@@ -29,7 +30,10 @@ public enum CaptureMethod
     KakaoCtrlVImage,
     KakaoTypedUrl,
     KakaoFileDialog,
-    KakaoDragDrop
+    KakaoDragDrop,
+    SlackConfirmedSend,
+    SlackConfirmedImage,
+    SlackConfirmedDrop
 }
 
 public enum LinkPreviewStatus

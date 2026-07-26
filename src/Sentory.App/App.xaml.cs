@@ -43,6 +43,7 @@ public partial class App : System.Windows.Application
     private ICaptureRuntime? _runtime;
     private KakaoDropOverlayRuntime? _kakaoDropOverlay;
     private DiscordDropOverlayRuntime? _discordDropOverlay;
+    private SlackDropOverlayRuntime? _slackDropOverlay;
     private GalleryWindow? _galleryWindow;
     private readonly CancellationTokenSource _maintenanceCancellation = new();
     private Task? _maintenanceTask;
@@ -63,6 +64,7 @@ public partial class App : System.Windows.Application
         _discordStartupRegistration = new();
     private bool _discordSupportEnabled = true;
     private bool _kakaoSupportEnabled = true;
+    private bool _slackSupportEnabled = true;
     private bool _discordRepairNeeded;
     private bool _discordRepairBusy;
     private bool _discordRestartPromptActive;
@@ -263,9 +265,15 @@ public partial class App : System.Windows.Application
             var discordRuntime = new DiscordCaptureRuntime(
                 _repository,
                 acceptInjectedInput);
+            var slackRuntime = new SlackCaptureRuntime(
+                _repository,
+                acceptInjectedInput,
+                (category, message) =>
+                    _diagnosticsLog?.Write(category, message));
             _runtime = new CompositeCaptureRuntime(
                 (SourceApp.KakaoTalk, kakaoRuntime),
-                (SourceApp.Discord, discordRuntime));
+                (SourceApp.Discord, discordRuntime),
+                (SourceApp.Slack, slackRuntime));
             _kakaoDropOverlay = new KakaoDropOverlayRuntime(
                 kakaoRuntime,
                 GetSavedDarkTheme,
@@ -275,6 +283,10 @@ public partial class App : System.Windows.Application
                     _diagnosticsLog?.Write(category, message));
             _discordDropOverlay = new DiscordDropOverlayRuntime(
                 discordRuntime,
+                (category, message) =>
+                    _diagnosticsLog?.Write(category, message));
+            _slackDropOverlay = new SlackDropOverlayRuntime(
+                slackRuntime,
                 (category, message) =>
                     _diagnosticsLog?.Write(category, message));
             _runtime.Captured += OnCaptured;
@@ -319,6 +331,7 @@ public partial class App : System.Windows.Application
                     _maintenanceCancellation.Token);
             _kakaoDropOverlay.Start();
             _discordDropOverlay.Start();
+            _slackDropOverlay.Start();
             UpdatePauseUi();
             OpenGallery();
             _ = CheckForUpdatesAsync(_maintenanceCancellation.Token);
@@ -797,6 +810,7 @@ public partial class App : System.Windows.Application
         var settings = _settingsStore.Load();
         _discordSupportEnabled = settings.DiscordSupportEnabled;
         _kakaoSupportEnabled = settings.KakaoTalkSupportEnabled;
+        _slackSupportEnabled = settings.SlackSupportEnabled;
         if (!_discordSupportEnabled || !_discordLauncher.IsInstalled)
         {
             return;
@@ -861,7 +875,8 @@ public partial class App : System.Windows.Application
             ApplyRuntimeSourceSettings();
             _galleryWindow?.SetMessengerSupportState(
                 _discordSupportEnabled,
-                _kakaoSupportEnabled);
+                _kakaoSupportEnabled,
+                _slackSupportEnabled);
             QueueDiscordStartupRegistrationSync(
                 discordSupportEnabled: false,
                 GetStartupEnabled());
@@ -903,7 +918,8 @@ public partial class App : System.Windows.Application
         _galleryWindow?.SetDiscordRepairNeeded(_discordRepairNeeded);
         _galleryWindow?.SetMessengerSupportState(
             _discordSupportEnabled,
-            _kakaoSupportEnabled);
+            _kakaoSupportEnabled,
+            _slackSupportEnabled);
         QueueDiscordStartupRegistrationSync(
             _discordSupportEnabled,
             GetStartupEnabled());
@@ -926,16 +942,23 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        if (sourceApp != SourceApp.KakaoTalk)
+        if (sourceApp == SourceApp.KakaoTalk)
+        {
+            _kakaoSupportEnabled = enabled;
+        }
+        else if (sourceApp == SourceApp.Slack)
+        {
+            _slackSupportEnabled = enabled;
+        }
+        else
         {
             return;
         }
-
-        _kakaoSupportEnabled = enabled;
         ApplyRuntimeSourceSettings();
         _galleryWindow?.SetMessengerSupportState(
             _discordSupportEnabled,
-            _kakaoSupportEnabled);
+            _kakaoSupportEnabled,
+            _slackSupportEnabled);
         UpdatePauseUi();
     }
 
@@ -952,6 +975,9 @@ public partial class App : System.Windows.Application
         controller.SetSourceEnabled(
             SourceApp.KakaoTalk,
             _kakaoSupportEnabled);
+        controller.SetSourceEnabled(
+            SourceApp.Slack,
+            _slackSupportEnabled);
     }
 
     private void ApplyPauseState()
@@ -1536,7 +1562,8 @@ public partial class App : System.Windows.Application
                 _discordDetectionState);
             _galleryWindow.SetMessengerSupportState(
                 _discordSupportEnabled,
-                _kakaoSupportEnabled);
+                _kakaoSupportEnabled,
+                _slackSupportEnabled);
             _galleryWindow.SetDetectionPaused(
                 _runtime?.IsPaused == true);
             _galleryWindow.SetRuntimeIssue(_lastRuntimeIssue);
@@ -2146,6 +2173,8 @@ public partial class App : System.Windows.Application
         _kakaoDropOverlay = null;
         _discordDropOverlay?.Dispose();
         _discordDropOverlay = null;
+        _slackDropOverlay?.Dispose();
+        _slackDropOverlay = null;
         if (_runtime is not null)
         {
             _runtime.Captured -= OnCaptured;

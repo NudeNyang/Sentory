@@ -327,6 +327,26 @@
                                     Style="{StaticResource ActionButtonStyle}"
                                     Click="KakaoSupportToggleButton_Click" />
                         </Grid>
+                        <Border Height="1"
+                                Margin="0,16"
+                                Background="{DynamicResource LineBrush}" />
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="Slack"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextBrush}" />
+                                <TextBlock x:Name="SlackStatusText"
+                                           Margin="0,4,0,0"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource MutedTextBrush}" />
+                            </StackPanel>
+                            <Button x:Name="SlackSupportToggleButton"
+                                    Width="92"
+                                    HorizontalAlignment="Right"
+                                    Style="{StaticResource ActionButtonStyle}"
+                                    Click="SlackSupportToggleButton_Click" />
+                        </Grid>
                     </StackPanel>
                 </Border>
 

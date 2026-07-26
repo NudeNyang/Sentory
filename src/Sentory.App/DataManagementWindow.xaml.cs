@@ -124,6 +124,8 @@ public partial class DataManagementWindow : Window
 
     public bool KakaoSupportChanged { get; private set; }
 
+    public bool SlackSupportChanged { get; private set; }
+
     public event Action<SourceApp, bool>? MessengerSupportSelectionChanged;
 
     public event Action<bool, int>? AutoFavoriteSettingsChanged;
@@ -508,6 +510,31 @@ public partial class DataManagementWindow : Window
         {
             StatusText.Text =
                 SentoryLocalization.Text("SyncSettingFailed");
+        }
+    }
+
+    private void SlackSupportToggleButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        try
+        {
+            var settings = _settingsStore.Load();
+            settings.SlackSupportEnabled = !settings.SlackSupportEnabled;
+            _settingsStore.Save(settings);
+            SlackSupportChanged = true;
+            UpdateSlackControls(settings.SlackSupportEnabled);
+            MessengerSupportSelectionChanged?.Invoke(
+                SourceApp.Slack,
+                settings.SlackSupportEnabled);
+            StatusText.Text = settings.SlackSupportEnabled
+                ? SentoryLocalization.Text("SlackDetectionEnabled")
+                : SentoryLocalization.Text("SlackDetectionDisabled");
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException)
+        {
+            StatusText.Text = SentoryLocalization.Text("SlackSettingFailed");
         }
     }
 
@@ -992,10 +1019,29 @@ public partial class DataManagementWindow : Window
         };
     }
 
+    private void UpdateSlackControls(bool enabled)
+    {
+        var settingsState = MessengerDetectionSettingsUiPolicy.Resolve(
+            enabled,
+            _detectionPaused);
+        SlackSupportToggleButton.Content = enabled
+            ? SentoryLocalization.Text("InUse")
+            : SentoryLocalization.Text("NotInUse");
+        SlackStatusText.Text = settingsState switch
+        {
+            MessengerDetectionSettingsState.Disabled =>
+                SentoryLocalization.Text("SlackNotInUse"),
+            MessengerDetectionSettingsState.Paused =>
+                SentoryLocalization.Text("DetectionPaused"),
+            _ => SentoryLocalization.Text("DetectionReady")
+        };
+    }
+
     private void UpdateMessengerControls(SentorySettings settings)
     {
         UpdateDiscordControls(settings.DiscordSupportEnabled);
         UpdateKakaoControls(settings.KakaoTalkSupportEnabled);
+        UpdateSlackControls(settings.SlackSupportEnabled);
     }
 
     private void SyncStatusTracker_Changed(

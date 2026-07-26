@@ -214,10 +214,12 @@ public partial class GalleryWindow : Window
 
     public void SetMessengerSupportState(
         bool discordEnabled,
-        bool kakaoEnabled)
+        bool kakaoEnabled,
+        bool slackEnabled)
     {
         _settings.DiscordSupportEnabled = discordEnabled;
         _settings.KakaoTalkSupportEnabled = kakaoEnabled;
+        _settings.SlackSupportEnabled = slackEnabled;
         UpdateDiscordDetectionVisibility();
     }
 
@@ -778,6 +780,10 @@ public partial class GalleryWindow : Window
         else if (sourceApp == SourceApp.KakaoTalk)
         {
             _settings.KakaoTalkSupportEnabled = enabled;
+        }
+        else if (sourceApp == SourceApp.Slack)
+        {
+            _settings.SlackSupportEnabled = enabled;
         }
 
         MessengerSupportChanged?.Invoke(sourceApp, enabled);
@@ -2012,6 +2018,7 @@ public partial class GalleryWindow : Window
         {
             SourceApp.Discord => "Discord",
             SourceApp.KakaoTalk => SentoryLocalization.Text("KakaoTalk"),
+            SourceApp.Slack => "Slack",
             _ => sourceApp.ToString()
         };
 
@@ -2134,6 +2141,8 @@ public partial class GalleryWindow : Window
                 current.DiscordSupportEnabled;
             _settings.KakaoTalkSupportEnabled =
                 current.KakaoTalkSupportEnabled;
+            _settings.SlackSupportEnabled =
+                current.SlackSupportEnabled;
             _settings.DiscordAccessibilityPrepared =
                 current.DiscordAccessibilityPrepared;
             _settings.AutoFavoriteEnabled =

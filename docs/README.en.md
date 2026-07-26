@@ -8,7 +8,7 @@ Sentory is a desktop app for keeping links and images from your messenger chats 
 separate, searchable library. Instead of scrolling through an old conversation, you
 can find an item, open the original, or copy it back to the clipboard.
 
-Discord and KakaoTalk are currently supported. Sentory is not a system-wide clipboard
+Discord, Slack, and KakaoTalk are currently supported. Sentory is not a system-wide clipboard
 logger. It checks the chat input area of a supported messenger and saves only the
 content that meets that messenger's detection rules. Support for more messengers is
 planned.
@@ -18,10 +18,11 @@ planned.
 | Messenger | When Sentory saves | What Sentory ignores |
 | --- | --- | --- |
 | Discord | After a pasted link or image is actually sent | Paste without sending, `Shift+Enter`, canceled attachments |
+| Slack | After a pasted or Explorer-dropped link or image is actually sent from the desktop app | Paste or drop without sending, canceled attachments, other input fields |
 | KakaoTalk | When a link or image is pasted into an individual chat, or local images are dropped into that chat | Manually typed URLs, search input, anything outside a chat input |
 
-Clipboard activity in other apps does not create library items. Detection for Discord
-and KakaoTalk can be enabled or disabled separately in settings.
+Clipboard activity in other apps does not create library items. Detection for Discord,
+Slack, and KakaoTalk can be enabled or disabled separately in settings.
 
 ## Features
 
@@ -76,8 +77,8 @@ Release, and compare its SHA-256 value with the accompanying `.sha256` file if n
 ## Getting started
 
 1. Run Sentory. The library window and taskbar icon appear together.
-2. Paste a link or image into an individual KakaoTalk chat. In Discord, send the pasted
-   content before Sentory saves it.
+2. Paste a link or image into an individual KakaoTalk chat. In Discord and Slack, send
+   pasted or Explorer-dropped content before Sentory saves it.
 3. Open a card in the library to review, open, or copy its contents.
 
 New installations enable Start with Windows by default. You can turn it off from
@@ -95,7 +96,7 @@ argument, or is still loading a chat, continues without an unnecessary restart.
 
 ## Good to know
 
-Detection may temporarily stop if Discord or KakaoTalk changes its interface. The
+Detection may temporarily stop if Discord, Slack, or KakaoTalk changes its interface. The
 Windows on ARM packages have passed cross-build and executable architecture checks,
 but final testing on a physical ARM64 device is still pending.
 

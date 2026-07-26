@@ -109,9 +109,13 @@ public partial class ItemDetailWindow : Window
         CopyCountText.Text = SentoryLocalization.Format(
             "TimesFormat",
             item.Item.CopyCount);
-        SourceText.Text = item.Item.LastSourceApp == SourceApp.Discord
-            ? "Discord"
-            : SentoryLocalization.Text("KakaoTalk");
+        SourceText.Text = item.Item.LastSourceApp switch
+        {
+            SourceApp.Discord => "Discord",
+            SourceApp.KakaoTalk => SentoryLocalization.Text("KakaoTalk"),
+            SourceApp.Slack => "Slack",
+            _ => item.Item.LastSourceApp.ToString()
+        };
         SavedAtText.Text = item.Item.LastCapturedAt.LocalDateTime
             .ToString("yyyy. M. d. HH:mm");
         DeliveryText.Text = item.StatusLabel;

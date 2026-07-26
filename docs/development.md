@@ -132,6 +132,28 @@ URL은 제외되고, 실제로 함께 전송한 여러 URL은 모두 유지된�
 뒤의 새 메시지 집합을 확인한다. 관련 없는 메시지가 뒤이어 도착해도 후보를
 즉시 폐기하지 않으며, 대응하는 이미지가 없으면 2분 뒤 폐기한다.
 
+## Slack 캡처 필수 게이트
+
+Slack 데스크톱 앱은 Discord와 마찬가지로 실제 전송이 확인된 콘텐츠만
+`Confirmed`로 저장한다. 별도의 접근성 실행 옵션은 요구하지 않고 Electron이
+공개하는 Windows UI Automation 트리를 사용한다.
+
+1. 대상 프로세스가 `Slack.exe`이고 최상위 창 클래스가 `Chrome_WidgetWin_1`
+2. 이벤트 대상 렌더러가 같은 Slack 프로세스의 `Chrome_RenderWidgetHostHWND`
+3. 붙여넣기는 화면 아래쪽의 검증된 작성기 `Edit`에 포커스가 있을 때만 후보 생성
+4. 탐색기 드롭은 실제 OLE `FileDrop` 경로에서 지원 이미지 파일만 읽음
+5. 후보 생성 당시 대화 목록의 안정된 `message-list_*` ID를 기준점으로 보관
+6. 같은 대화에서 기준점 뒤에 생긴 새 메시지가 현재 사용자 이름으로 시작
+7. URL은 새 메시지의 표시 URL과 모두 일치하고, 사진은 파일명 또는 의미 있는
+   이미지 접근성 요소가 확인됨
+
+붙여넣기나 드롭만 하고 보내지 않은 초안은 저장하지 않는다. 초안이 한 번
+확인된 뒤 사라지면 실제 메시지가 나타날 시간을 10초 동안 기다리고, Enter
+전송 키도 관찰되지 않았으면 후보를 취소한다. 마우스 전송 버튼은 전송 키가
+없어도 같은 대화의 새 본인 메시지를 확인하면 지원한다. 후보는 최대 2분 뒤
+만료되며, 접근성 구조·현재 사용자·대화가 불확실하면 fail-closed로 저장하지
+않는다.
+
 ### KakaoTalk
 
 - 개별 채팅창의 검증된 메시지 입력창에 URL 또는 클립보드 이미지를 넣으면 즉시 저장한다.
@@ -165,12 +187,15 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
 각 항목과 이벤트는 다음 의미를 구분한다.
 
 - `delivery_status = confirmed`
-  - Discord에서 실제 전송 확인
+  - Discord 또는 Slack에서 실제 전송 확인
 - `delivery_status = not_observed`
   - KakaoTalk 입력 시 저장
 
 - `capture_method = discord_confirmed_send`
 - `capture_method = discord_confirmed_image`
+- `capture_method = slack_confirmed_send`
+- `capture_method = slack_confirmed_image`
+- `capture_method = slack_confirmed_drop`
 - `capture_method = kakao_ctrl_v_url`
 - `capture_method = kakao_ctrl_v_image`
 - `capture_method = kakao_typed_url`
@@ -202,6 +227,8 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
 - 카카오톡 개별 채팅 입력창에서 Ctrl+V 사진 즉시 저장
 - Discord 채팅 입력창에서 Ctrl+V 후 실제 전송이 확인된 URL 저장
 - Discord 채팅 입력창에서 Ctrl+V 후 실제 전송이 확인된 사진 저장
+- Slack 채팅 작성기에서 Ctrl+V 후 실제 전송이 확인된 URL·사진 저장
+- 탐색기에서 Slack으로 드롭한 사진을 실제 전송 확인 뒤 저장
 - Discord 접근성 확인을 본 앱과 분리한 fail-closed MSAA 워커
 - Discord가 꺼져 있으면 접근성 모드로 자동 시작하는 기본 연결 준비
 - 이미 실행 중인 Discord의 연결 준비가 필요할 때 보관함 배너로 안내
@@ -462,7 +489,7 @@ state=Connecting`을 남기고 끝났다. 이후 채팅방을 열어도 준비 �
 - 키 입력 전체를 기록하지 않는다.
 - 필요한 조합만 관찰하고 훅 콜백은 즉시 반환한다.
 - 메시지 입력과 전송을 가로채지 않는다.
-- 클립보드는 검증된 Discord 또는 KakaoTalk 입력 이벤트 직후에만 읽는다.
+- 클립보드는 검증된 Discord, Slack 또는 KakaoTalk 입력 이벤트 직후에만 읽는다.
 - URL과 이미지 이외의 일반 텍스트는 폐기한다.
 - 입력값 원문은 로그에 기록하지 않는다.
 - 앱 UI 구조가 달라지면 해당 어댑터를 `DetectionUnavailable`로 바꾼다.

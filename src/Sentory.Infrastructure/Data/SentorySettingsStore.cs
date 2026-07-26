@@ -39,6 +39,8 @@ public sealed class SentorySettings
 
     public bool KakaoTalkSupportEnabled { get; set; } = true;
 
+    public bool SlackSupportEnabled { get; set; } = true;
+
     public bool? StartWithWindows { get; set; }
 
     public bool DiscordAccessibilityPrepared { get; set; }

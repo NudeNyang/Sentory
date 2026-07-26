@@ -68,6 +68,25 @@ public sealed class SentoryLocalizationTests
     }
 
     [Theory]
+    [InlineData("ko-KR", "Slack 감지를 켰습니다.")]
+    [InlineData("en-US", "Slack detection is on.")]
+    [InlineData("ja-JP", "Slack 検出をオンにしました。")]
+    [InlineData("zh-CN", "已开启 Slack 检测。")]
+    public void SlackDetectionStatusIsLocalized(
+        string language,
+        string expected)
+    {
+        SentoryLocalization.Apply(new ResourceDictionary(), language);
+
+        Assert.Equal(
+            expected,
+            SentoryLocalization.Text("SlackDetectionEnabled"));
+        Assert.NotEqual(
+            "SlackNotInUse",
+            SentoryLocalization.Text("SlackNotInUse"));
+    }
+
+    [Theory]
     [InlineData("ko-KR", "컴퓨터 · 모바일 간 동기화", "클라우드 공유", "동기화 중")]
     [InlineData("en-US", "Computer and mobile sync", "Cloud sharing", "Syncing")]
     [InlineData("ja-JP", "パソコン・モバイル間同期", "クラウド共有", "同期中")]

@@ -864,6 +864,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         Assert.Equal("Light", settings.ThemeMode);
         Assert.True(settings.DiscordSupportEnabled);
         Assert.True(settings.KakaoTalkSupportEnabled);
+        Assert.True(settings.SlackSupportEnabled);
         Assert.False(settings.DiscordAccessibilityPrepared);
         Assert.Null(settings.StartWithWindows);
         settings.IsDarkTheme = true;
@@ -882,6 +883,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         Assert.Equal("Dark", restored.ThemeMode);
         Assert.True(restored.DiscordSupportEnabled);
         Assert.True(restored.KakaoTalkSupportEnabled);
+        Assert.True(restored.SlackSupportEnabled);
         Assert.True(restored.DiscordAccessibilityPrepared);
         Assert.False(restored.StartWithWindows);
         Assert.Equal(120, restored.WindowLeft);
@@ -931,13 +933,15 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         store.Save(new SentorySettings
         {
             DiscordSupportEnabled = false,
-            KakaoTalkSupportEnabled = true
+            KakaoTalkSupportEnabled = true,
+            SlackSupportEnabled = false
         });
 
         var restored = store.Load();
 
         Assert.False(restored.DiscordSupportEnabled);
         Assert.True(restored.KakaoTalkSupportEnabled);
+        Assert.False(restored.SlackSupportEnabled);
     }
 
     [Fact]
