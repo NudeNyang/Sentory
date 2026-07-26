@@ -81,48 +81,6 @@ public sealed class KakaoCaptureRuntime : ICaptureRuntime
         KakaoDropTarget target,
         IReadOnlyList<string> filePaths,
         CancellationToken cancellationToken = default)
-        => await CaptureSelectedFilesAsync(
-            target,
-            filePaths,
-            CaptureMethod.KakaoDragDrop,
-            [
-                "sentory-pass-through-drop-target",
-                "native-explorer-file-drop",
-                "kakao-process",
-                "individual-chat-root",
-                "input-class-and-id",
-                "message-list-class-and-id",
-                "release-over-same-chat-root",
-                "escape-not-observed",
-                "exact-file-paths"
-            ],
-            cancellationToken);
-
-    public async Task<KakaoNativeDropCaptureResult> CaptureManualSelectedFilesAsync(
-        KakaoDropTarget target,
-        IReadOnlyList<string> filePaths,
-        CancellationToken cancellationToken = default)
-        => await CaptureSelectedFilesAsync(
-            target,
-            filePaths,
-            CaptureMethod.KakaoFileDialog,
-            [
-                "native-file-dialog",
-                "file-selection-confirmed",
-                "kakao-process",
-                "individual-chat-root",
-                "input-class-and-id",
-                "message-list-class-and-id",
-                "exact-file-paths"
-            ],
-            cancellationToken);
-
-    private async Task<KakaoNativeDropCaptureResult> CaptureSelectedFilesAsync(
-        KakaoDropTarget target,
-        IReadOnlyList<string> filePaths,
-        CaptureMethod captureMethod,
-        IReadOnlyList<string> confirmationSignals,
-        CancellationToken cancellationToken)
     {
         if (_paused)
         {
@@ -171,11 +129,21 @@ public sealed class KakaoCaptureRuntime : ICaptureRuntime
                     image.FileExtension,
                     image.OriginalFileName)).ToList(),
                 SourceApp.KakaoTalk,
-                captureMethod,
+                CaptureMethod.KakaoDragDrop,
                 DeliveryStatus.NotObserved,
                 context.ContextHash,
                 context.OccurredAt,
-                confirmationSignals,
+                [
+                    "sentory-pass-through-drop-target",
+                    "native-explorer-file-drop",
+                    "kakao-process",
+                    "individual-chat-root",
+                    "input-class-and-id",
+                    "message-list-class-and-id",
+                    "release-over-same-chat-root",
+                    "escape-not-observed",
+                    "exact-file-paths"
+                ],
                 cancellationToken);
             if (result?.EventApplied != true)
             {
