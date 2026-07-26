@@ -119,6 +119,112 @@ public sealed class MessengerFileUploadRuntimeTests
     }
 
     [Fact]
+    public void DecisionTracker_AccumulatesSingleAndMultipleSelectionEvents()
+    {
+        var tracker = new FileDialogDecisionTracker();
+        var dialog = new nint(1234);
+        var observedAt = DateTimeOffset.UtcNow;
+        tracker.Track(dialog);
+
+        tracker.RecordSelection(
+            dialog,
+            FileDialogSelectionChange.Replace,
+            ["first"],
+            observedAt);
+        tracker.RecordSelection(
+            dialog,
+            FileDialogSelectionChange.Add,
+            ["second"],
+            observedAt.AddMilliseconds(10));
+
+        var snapshot = tracker.TakeSnapshot(dialog);
+
+        Assert.Equal(FileDialogDecision.Unknown, snapshot.Decision);
+        Assert.Equal(["first", "second"], snapshot.RawSelections);
+        Assert.Equal(observedAt.AddMilliseconds(10), snapshot.SelectedAt);
+    }
+
+    [Fact]
+    public void DecisionTracker_RemovesDeselectedItemAndImplicitTimestamp()
+    {
+        var tracker = new FileDialogDecisionTracker();
+        var dialog = new nint(1234);
+        var observedAt = DateTimeOffset.UtcNow;
+        tracker.Track(dialog);
+        tracker.RecordSelection(
+            dialog,
+            FileDialogSelectionChange.Replace,
+            ["photo"],
+            observedAt);
+
+        tracker.RecordSelection(
+            dialog,
+            FileDialogSelectionChange.Remove,
+            ["photo"],
+            observedAt.AddMilliseconds(10));
+        var snapshot = tracker.TakeSnapshot(dialog);
+
+        Assert.Empty(snapshot.RawSelections);
+        Assert.Null(snapshot.SelectedAt);
+    }
+
+    [Fact]
+    public void FileDialogCompletion_AcceptsOnlyRecentImplicitSelection()
+    {
+        var selectedAt = DateTimeOffset.UtcNow;
+
+        Assert.Equal(
+            FileDialogDecision.Accepted,
+            FileDialogCompletionPolicy.Resolve(
+                FileDialogDecision.Unknown,
+                selectedPathCount: 1,
+                selectedAt,
+                selectedAt.AddMilliseconds(400)));
+        Assert.Equal(
+            FileDialogDecision.Unknown,
+            FileDialogCompletionPolicy.Resolve(
+                FileDialogDecision.Unknown,
+                selectedPathCount: 1,
+                selectedAt,
+                selectedAt.AddSeconds(2)));
+        Assert.Equal(
+            FileDialogDecision.Unknown,
+            FileDialogCompletionPolicy.Resolve(
+                FileDialogDecision.Unknown,
+                selectedPathCount: 1,
+                selectedAt.AddSeconds(1),
+                selectedAt));
+        Assert.Equal(
+            FileDialogDecision.Cancelled,
+            FileDialogCompletionPolicy.Resolve(
+                FileDialogDecision.Cancelled,
+                selectedPathCount: 1,
+                selectedAt,
+                selectedAt.AddMilliseconds(100)));
+    }
+
+    [Theory]
+    [InlineData(0x8006, (int)FileDialogSelectionChange.Replace)]
+    [InlineData(0x8007, (int)FileDialogSelectionChange.Add)]
+    [InlineData(0x8008, (int)FileDialogSelectionChange.Remove)]
+    [InlineData(0x800E, (int)FileDialogSelectionChange.Replace)]
+    public void AccessibilityEvent_MapsSelectionChanges(
+        uint eventType,
+        int expected)
+    {
+        Assert.Equal(
+            (FileDialogSelectionChange)expected,
+            FileDialogAccessibilityEventPolicy.MapSelectionChange(eventType));
+    }
+
+    [Fact]
+    public void AccessibilityEvent_IgnoresUnrelatedEvents()
+    {
+        Assert.Null(
+            FileDialogAccessibilityEventPolicy.MapSelectionChange(0x800A));
+    }
+
+    [Fact]
     public void DiscordManualUpload_RequiresObservedDraftBeforeMessageConfirmation()
     {
         Assert.False(DiscordManualUploadConfirmationPolicy.CanConfirm(

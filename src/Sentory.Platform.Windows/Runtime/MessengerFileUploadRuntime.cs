@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Windows.Automation;
 using System.Windows.Threading;
+using Accessibility;
 using Sentory.Core;
 using Sentory.Platform.Windows.Interop;
 
@@ -43,7 +44,10 @@ public sealed class MessengerFileUploadRuntime : IDisposable
         _discordRuntime = discordRuntime;
         _kakaoRuntime = kakaoRuntime;
         _diagnostic = diagnostic;
-        _eventHook = new FileDialogWinEventHook(native, _decisions);
+        _eventHook = new FileDialogWinEventHook(
+            native,
+            _decisions,
+            diagnostic);
         _timer = new DispatcherTimer(
             PollInterval,
             DispatcherPriority.Background,
@@ -119,11 +123,16 @@ public sealed class MessengerFileUploadRuntime : IDisposable
             }
 
             session.MissingSince = null;
-            var selectedPaths = await Task.Run(() =>
-                _selectionReader.ReadSelectedImagePaths(dialog));
-            if (selectedPaths.Count > 0)
+            var observation = await Task.Run(() =>
+                _selectionReader.Read(dialog));
+            if (observation.AddressValues.Count > 0)
             {
-                session.SelectedPaths = selectedPaths;
+                session.AddressValues = observation.AddressValues;
+            }
+
+            if (observation.SelectedPaths.Count > 0)
+            {
+                session.SelectedPaths = observation.SelectedPaths;
             }
         }
 
@@ -134,7 +143,29 @@ public sealed class MessengerFileUploadRuntime : IDisposable
                 continue;
             }
 
-            var decision = _decisions.Take(session.DialogWindow);
+            session.MissingSince ??= now;
+            if (now - session.MissingSince < ClosedDialogGracePeriod)
+            {
+                continue;
+            }
+
+            var snapshot = _decisions.TakeSnapshot(
+                session.DialogWindow);
+            var eventPaths = FileDialogPathResolver.Resolve(
+                snapshot.RawSelections,
+                session.AddressValues);
+            if (eventPaths.Count > 0)
+            {
+                session.SelectedPaths = eventPaths;
+            }
+
+            var decision = FileDialogCompletionPolicy.Resolve(
+                snapshot.Decision,
+                snapshot.Decision == FileDialogDecision.Unknown
+                    ? eventPaths.Count
+                    : session.SelectedPaths.Count,
+                snapshot.SelectedAt,
+                now);
             if (decision != FileDialogDecision.Unknown)
             {
                 _sessions.Remove(session.DialogWindow);
@@ -142,21 +173,18 @@ public sealed class MessengerFileUploadRuntime : IDisposable
                 if (decision == FileDialogDecision.Accepted &&
                     session.SelectedPaths.Count > 0)
                 {
+                    _diagnostic?.Invoke(
+                        "manual-file-dialog-accepted",
+                        $"source={session.SourceApp} selected={session.SelectedPaths.Count} eventValues={snapshot.RawSelections.Count} addresses={session.AddressValues.Count}");
                     await DispatchAcceptedSelectionAsync(session);
                 }
                 else
                 {
                     _diagnostic?.Invoke(
                         "manual-file-dialog-ignored",
-                        $"source={session.SourceApp} decision={decision} selected={session.SelectedPaths.Count}");
+                        $"source={session.SourceApp} decision={decision} selected={session.SelectedPaths.Count} eventValues={snapshot.RawSelections.Count} addresses={session.AddressValues.Count}");
                 }
 
-                continue;
-            }
-
-            session.MissingSince ??= now;
-            if (now - session.MissingSince < ClosedDialogGracePeriod)
-            {
                 continue;
             }
 
@@ -164,7 +192,7 @@ public sealed class MessengerFileUploadRuntime : IDisposable
             _decisions.Untrack(session.DialogWindow);
             _diagnostic?.Invoke(
                 "manual-file-dialog-ignored",
-                $"source={session.SourceApp} decision={FileDialogDecision.Unknown} selected={session.SelectedPaths.Count}");
+                $"source={session.SourceApp} decision={FileDialogDecision.Unknown} selected={session.SelectedPaths.Count} eventValues={snapshot.RawSelections.Count} addresses={session.AddressValues.Count}");
         }
     }
 
@@ -294,6 +322,7 @@ public sealed class MessengerFileUploadRuntime : IDisposable
         public DiscordDropTarget? DiscordTarget { get; } = discordTarget;
         public KakaoDropTarget? KakaoTarget { get; } = kakaoTarget;
         public IReadOnlyList<string> SelectedPaths { get; set; } = [];
+        public IReadOnlyList<string> AddressValues { get; set; } = [];
         public DateTimeOffset? MissingSince { get; set; }
     }
 }
@@ -305,11 +334,25 @@ internal enum FileDialogDecision
     Cancelled
 }
 
+internal enum FileDialogSelectionChange
+{
+    Replace,
+    Add,
+    Remove
+}
+
+internal sealed record FileDialogDecisionSnapshot(
+    FileDialogDecision Decision,
+    IReadOnlyList<string> RawSelections,
+    DateTimeOffset? SelectedAt);
+
 internal sealed class FileDialogDecisionTracker
 {
     private readonly object _gate = new();
     private readonly HashSet<nint> _trackedDialogs = [];
     private readonly Dictionary<nint, FileDialogDecision> _decisions = [];
+    private readonly Dictionary<nint, HashSet<string>> _selections = [];
+    private readonly Dictionary<nint, DateTimeOffset> _selectionTimes = [];
 
     public void Track(nint dialog)
     {
@@ -325,6 +368,8 @@ internal sealed class FileDialogDecisionTracker
         {
             _trackedDialogs.Remove(dialog);
             _decisions.Remove(dialog);
+            _selections.Remove(dialog);
+            _selectionTimes.Remove(dialog);
         }
     }
 
@@ -342,22 +387,108 @@ internal sealed class FileDialogDecisionTracker
     }
 
     public FileDialogDecision Take(nint dialog)
+        => TakeSnapshot(dialog).Decision;
+
+    public bool RecordSelection(
+        nint dialog,
+        FileDialogSelectionChange change,
+        IEnumerable<string> values,
+        DateTimeOffset observedAt)
     {
         lock (_gate)
         {
-            if (!_decisions.Remove(dialog, out var decision))
+            if (!_trackedDialogs.Contains(dialog))
             {
-                return FileDialogDecision.Unknown;
+                return false;
             }
 
-            return decision;
+            if (!_selections.TryGetValue(dialog, out var selections) ||
+                change == FileDialogSelectionChange.Replace)
+            {
+                selections = new HashSet<string>(
+                    StringComparer.OrdinalIgnoreCase);
+                _selections[dialog] = selections;
+            }
+
+            foreach (var value in values.Where(value =>
+                         !string.IsNullOrWhiteSpace(value)))
+            {
+                if (change == FileDialogSelectionChange.Remove)
+                {
+                    selections.Remove(value.Trim());
+                }
+                else
+                {
+                    selections.Add(value.Trim());
+                }
+            }
+
+            if (selections.Count > 0)
+            {
+                _selectionTimes[dialog] = observedAt;
+            }
+            else
+            {
+                _selectionTimes.Remove(dialog);
+            }
+
+            return true;
         }
+    }
+
+    public FileDialogDecisionSnapshot TakeSnapshot(nint dialog)
+    {
+        lock (_gate)
+        {
+            var decision = _decisions.Remove(dialog, out var recorded)
+                ? recorded
+                : FileDialogDecision.Unknown;
+            var selections = _selections.Remove(dialog, out var values)
+                ? values.ToArray()
+                : [];
+            var selectedAt = _selectionTimes.Remove(
+                dialog,
+                out var observedAt)
+                ? observedAt
+                : (DateTimeOffset?)null;
+            return new FileDialogDecisionSnapshot(
+                decision,
+                selections,
+                selectedAt);
+        }
+    }
+}
+
+internal static class FileDialogCompletionPolicy
+{
+    private static readonly TimeSpan ImplicitSelectionWindow =
+        TimeSpan.FromSeconds(1);
+
+    public static FileDialogDecision Resolve(
+        FileDialogDecision explicitDecision,
+        int selectedPathCount,
+        DateTimeOffset? selectedAt,
+        DateTimeOffset closedAt)
+    {
+        if (explicitDecision != FileDialogDecision.Unknown)
+        {
+            return explicitDecision;
+        }
+
+        return selectedPathCount > 0 &&
+               selectedAt is not null &&
+               closedAt >= selectedAt &&
+               closedAt - selectedAt <= ImplicitSelectionWindow
+            ? FileDialogDecision.Accepted
+            : FileDialogDecision.Unknown;
     }
 }
 
 internal sealed class FileDialogWinEventHook : IDisposable
 {
     internal const string DialogClassName = "#32770";
+    private const uint EventObjectSelection = 0x8006;
+    private const uint EventObjectValueChange = 0x800E;
     private const uint EventObjectInvoked = 0x8013;
     private const uint WineventOutOfContext = 0x0000;
     private const int WhKeyboardLl = 13;
@@ -367,22 +498,27 @@ internal sealed class FileDialogWinEventHook : IDisposable
     private const int WmLButtonUp = 0x0202;
     private const int OpenButtonControlId = 1;
     private const int CancelButtonControlId = 2;
+    private const int FileNameControlId = 1148;
 
     private readonly INativeWindowApi _native;
     private readonly FileDialogDecisionTracker _decisions;
+    private readonly Action<string, string>? _diagnostic;
     private readonly WinEventDelegate _callback;
     private readonly LowLevelHookDelegate _keyboardCallback;
     private readonly LowLevelHookDelegate _mouseCallback;
-    private nint _hook;
+    private nint _invokedHook;
+    private nint _selectionHook;
     private nint _keyboardHook;
     private nint _mouseHook;
 
     public FileDialogWinEventHook(
         INativeWindowApi native,
-        FileDialogDecisionTracker decisions)
+        FileDialogDecisionTracker decisions,
+        Action<string, string>? diagnostic = null)
     {
         _native = native;
         _decisions = decisions;
+        _diagnostic = diagnostic;
         _callback = OnWinEvent;
         _keyboardCallback = OnKeyboardInput;
         _mouseCallback = OnMouseInput;
@@ -390,14 +526,22 @@ internal sealed class FileDialogWinEventHook : IDisposable
 
     public void Start()
     {
-        if (_hook != nint.Zero)
+        if (_invokedHook != nint.Zero)
         {
             return;
         }
 
-        _hook = SetWinEventHook(
+        _invokedHook = SetWinEventHook(
             EventObjectInvoked,
             EventObjectInvoked,
+            nint.Zero,
+            _callback,
+            0,
+            0,
+            WineventOutOfContext);
+        _selectionHook = SetWinEventHook(
+            EventObjectSelection,
+            EventObjectValueChange,
             nint.Zero,
             _callback,
             0,
@@ -413,7 +557,10 @@ internal sealed class FileDialogWinEventHook : IDisposable
             _mouseCallback,
             GetModuleHandle(null),
             0);
-        if (_keyboardHook == nint.Zero || _mouseHook == nint.Zero)
+        if (_invokedHook == nint.Zero ||
+            _selectionHook == nint.Zero ||
+            _keyboardHook == nint.Zero ||
+            _mouseHook == nint.Zero)
         {
             var error = Marshal.GetLastWin32Error();
             Dispose();
@@ -471,8 +618,7 @@ internal sealed class FileDialogWinEventHook : IDisposable
             if (code >= 0 && message == WmLButtonUp)
             {
                 var data = Marshal.PtrToStructure<MouseHookData>(mouseData);
-                var windowAtPoint = WindowFromPoint(data.Point);
-                var dialog = _native.GetRootWindow(windowAtPoint);
+                var dialog = _native.GetForegroundWindow();
                 if (IsFileDialog(dialog))
                 {
                     var decision = FileDialogDecision.Unknown;
@@ -553,6 +699,40 @@ internal sealed class FileDialogWinEventHook : IDisposable
             return;
         }
 
+        var selectionChange =
+            FileDialogAccessibilityEventPolicy.MapSelectionChange(eventType);
+        if (selectionChange is not null)
+        {
+            if (eventType == EventObjectValueChange &&
+                _native.GetControlId(window) != FileNameControlId)
+            {
+                return;
+            }
+
+            var values = ReadAccessibleValues(window, objectId, childId);
+            if (values.Count > 0)
+            {
+                var tracked = _decisions.RecordSelection(
+                    dialog,
+                    selectionChange.Value,
+                    values,
+                    DateTimeOffset.UtcNow);
+                if (tracked)
+                {
+                    _diagnostic?.Invoke(
+                        "manual-file-dialog-selection-event",
+                        $"event=0x{eventType:X4} values={values.Count}");
+                }
+            }
+
+            return;
+        }
+
+        if (eventType != EventObjectInvoked)
+        {
+            return;
+        }
+
         var controlId = _native.GetControlId(window);
         if (controlId == CancelButtonControlId)
         {
@@ -564,12 +744,237 @@ internal sealed class FileDialogWinEventHook : IDisposable
         }
     }
 
+    private static IReadOnlyList<string> ReadAccessibleValues(
+        nint window,
+        int objectId,
+        int childId)
+    {
+        IAccessible? accessible = null;
+        try
+        {
+            if (AccessibleObjectFromEvent(
+                    window,
+                    objectId,
+                    childId,
+                    out var eventAccessible,
+                    out var childVariant) < 0)
+            {
+                return [];
+            }
+
+            accessible = eventAccessible;
+            var values = new HashSet<string>(
+                StringComparer.OrdinalIgnoreCase);
+            AddAccessibleValue(
+                values,
+                SafeAccessibleName(eventAccessible, childVariant));
+            AddAccessibleValue(
+                values,
+                SafeAccessibleValue(eventAccessible, childVariant));
+            AddAccessibleValue(
+                values,
+                SafeAccessibleDescription(eventAccessible, childVariant));
+            AddAccessibleSelectionValues(eventAccessible, values);
+            return values.ToArray();
+        }
+        catch (COMException)
+        {
+            return [];
+        }
+        catch (InvalidCastException)
+        {
+            return [];
+        }
+        finally
+        {
+            if (accessible is not null && Marshal.IsComObject(accessible))
+            {
+                try
+                {
+                    Marshal.ReleaseComObject(accessible);
+                }
+                catch (COMException)
+                {
+                    // 이미 해제된 접근성 개체는 무시한다.
+                }
+            }
+        }
+    }
+
+    private static void AddAccessibleSelectionValues(
+        IAccessible accessible,
+        ISet<string> values)
+    {
+        object? selection;
+        try
+        {
+            selection = accessible.accSelection;
+        }
+        catch (COMException)
+        {
+            return;
+        }
+        catch (InvalidCastException)
+        {
+            return;
+        }
+
+        switch (selection)
+        {
+            case System.Runtime.InteropServices.ComTypes.IEnumVARIANT
+                selectedItems:
+                AddAccessibleEnumerationValues(
+                    accessible,
+                    selectedItems,
+                    values);
+                break;
+            case System.Collections.IEnumerable enumerable:
+                foreach (var selected in enumerable)
+                {
+                    AddAccessibleSelectionValue(
+                        accessible,
+                        selected,
+                        values);
+                }
+
+                break;
+            default:
+                AddAccessibleSelectionValue(accessible, selection, values);
+                break;
+        }
+    }
+
+    private static void AddAccessibleEnumerationValues(
+        IAccessible parent,
+        System.Runtime.InteropServices.ComTypes.IEnumVARIANT items,
+        ISet<string> values)
+    {
+        var item = new object[1];
+        var fetched = Marshal.AllocCoTaskMem(sizeof(int));
+        try
+        {
+            while (items.Next(1, item, fetched) == 0 &&
+                   Marshal.ReadInt32(fetched) == 1)
+            {
+                AddAccessibleSelectionValue(parent, item[0], values);
+            }
+        }
+        catch (COMException)
+        {
+            // 선택이 바뀌어 열거가 무효가 되면 현재까지 읽은 값만 사용한다.
+        }
+        finally
+        {
+            Marshal.FreeCoTaskMem(fetched);
+        }
+    }
+
+    private static void AddAccessibleSelectionValue(
+        IAccessible parent,
+        object? selected,
+        ISet<string> values)
+    {
+        switch (selected)
+        {
+            case int child:
+                AddAccessibleValue(
+                    values,
+                    SafeAccessibleName(parent, child));
+                AddAccessibleValue(
+                    values,
+                    SafeAccessibleValue(parent, child));
+                break;
+            case IAccessible item:
+                AddAccessibleValue(
+                    values,
+                    SafeAccessibleName(item, 0));
+                AddAccessibleValue(
+                    values,
+                    SafeAccessibleValue(item, 0));
+                break;
+        }
+    }
+
+    private static string? SafeAccessibleName(
+        IAccessible accessible,
+        object child)
+    {
+        try
+        {
+            return accessible.get_accName(child);
+        }
+        catch (COMException)
+        {
+            return null;
+        }
+        catch (InvalidCastException)
+        {
+            return null;
+        }
+    }
+
+    private static string? SafeAccessibleValue(
+        IAccessible accessible,
+        object child)
+    {
+        try
+        {
+            return accessible.get_accValue(child);
+        }
+        catch (COMException)
+        {
+            return null;
+        }
+        catch (InvalidCastException)
+        {
+            return null;
+        }
+    }
+
+    private static string? SafeAccessibleDescription(
+        IAccessible accessible,
+        object child)
+    {
+        try
+        {
+            return accessible.get_accDescription(child);
+        }
+        catch (COMException)
+        {
+            return null;
+        }
+        catch (InvalidCastException)
+        {
+            return null;
+        }
+    }
+
+    private static void AddAccessibleValue(
+        ISet<string> values,
+        string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            values.Add(value.Trim());
+        }
+    }
+
     public void Dispose()
     {
-        var winEventHook = Interlocked.Exchange(ref _hook, nint.Zero);
-        if (winEventHook != nint.Zero)
+        var invokedHook = Interlocked.Exchange(
+            ref _invokedHook,
+            nint.Zero);
+        if (invokedHook != nint.Zero)
         {
-            UnhookWinEvent(winEventHook);
+            UnhookWinEvent(invokedHook);
+        }
+
+        var selectionHook = Interlocked.Exchange(
+            ref _selectionHook,
+            nint.Zero);
+        if (selectionHook != nint.Zero)
+        {
+            UnhookWinEvent(selectionHook);
         }
 
         var keyboardHook = Interlocked.Exchange(
@@ -628,7 +1033,7 @@ internal sealed class FileDialogWinEventHook : IDisposable
         public readonly int Y;
     }
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", SetLastError = true)]
     private static extern nint SetWinEventHook(
         uint eventMin,
         uint eventMax,
@@ -664,10 +1069,36 @@ internal sealed class FileDialogWinEventHook : IDisposable
     private static extern nint GetModuleHandle(string? moduleName);
 
     [DllImport("user32.dll")]
-    private static extern nint WindowFromPoint(Point point);
-
-    [DllImport("user32.dll")]
     private static extern nint GetDlgItem(nint dialog, int controlId);
+
+    [DllImport("oleacc.dll")]
+    private static extern int AccessibleObjectFromEvent(
+        nint window,
+        int objectId,
+        int childId,
+        [MarshalAs(UnmanagedType.Interface)] out IAccessible accessible,
+        [MarshalAs(UnmanagedType.Struct)] out object childVariant);
+}
+
+internal static class FileDialogAccessibilityEventPolicy
+{
+    private const uint EventObjectSelection = 0x8006;
+    private const uint EventObjectSelectionAdd = 0x8007;
+    private const uint EventObjectSelectionRemove = 0x8008;
+    private const uint EventObjectSelectionWithin = 0x8009;
+    private const uint EventObjectValueChange = 0x800E;
+
+    public static FileDialogSelectionChange? MapSelectionChange(
+        uint eventType) =>
+        eventType switch
+        {
+            EventObjectSelection => FileDialogSelectionChange.Replace,
+            EventObjectSelectionAdd => FileDialogSelectionChange.Add,
+            EventObjectSelectionRemove => FileDialogSelectionChange.Remove,
+            EventObjectSelectionWithin => FileDialogSelectionChange.Replace,
+            EventObjectValueChange => FileDialogSelectionChange.Replace,
+            _ => null
+        };
 }
 
 internal static class FileDialogInputPolicy
@@ -711,7 +1142,7 @@ internal sealed class WindowsFileDialogSelectionReader
         AutomationElement.AutomationIdProperty,
         "1001");
 
-    public IReadOnlyList<string> ReadSelectedImagePaths(nint dialog)
+    public FileDialogSelectionObservation Read(nint dialog)
     {
         try
         {
@@ -756,21 +1187,23 @@ internal sealed class WindowsFileDialogSelectionReader
                 }
             }
 
-            return FileDialogPathResolver.Resolve(
-                rawSelections,
+            return new FileDialogSelectionObservation(
+                FileDialogPathResolver.Resolve(
+                    rawSelections,
+                    addressValues),
                 addressValues);
         }
         catch (ElementNotAvailableException)
         {
-            return [];
+            return FileDialogSelectionObservation.Empty;
         }
         catch (InvalidOperationException)
         {
-            return [];
+            return FileDialogSelectionObservation.Empty;
         }
         catch (COMException)
         {
-            return [];
+            return FileDialogSelectionObservation.Empty;
         }
     }
 
@@ -802,6 +1235,14 @@ internal sealed class WindowsFileDialogSelectionReader
             values.Add(value.Trim());
         }
     }
+}
+
+internal sealed record FileDialogSelectionObservation(
+    IReadOnlyList<string> SelectedPaths,
+    IReadOnlyList<string> AddressValues)
+{
+    public static FileDialogSelectionObservation Empty { get; } =
+        new([], []);
 }
 
 internal static partial class FileDialogPathResolver
