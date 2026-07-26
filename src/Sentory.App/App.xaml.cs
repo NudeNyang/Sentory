@@ -1887,10 +1887,32 @@ public partial class App : System.Windows.Application
         }
 
         _syncStatusTracker.Update(
-            SyncRuntimeState.Syncing,
+            settings.SyncStorageVersion <
+                    SentorySettings.CurrentSyncStorageVersion ||
+                settings.SyncMigrationDeviceId is not null
+                ? SyncRuntimeState.Migrating
+                : SyncRuntimeState.Syncing,
             DateTimeOffset.UtcNow);
         try
         {
+            var migration = await new SyncStorageMigrationService(
+                _paths,
+                _repository,
+                _settingsStore).MigrateIfNeededAsync(
+                    settings,
+                    cancellationToken);
+            if (migration.Migrated)
+            {
+                settings = _settingsStore.Load();
+                deviceId = migration.DeviceId;
+                _diagnosticsLog?.Write(
+                    "cloud-sync-storage-migrated",
+                    $"version={SentorySettings.CurrentSyncStorageVersion}, legacyProjected={migration.LegacyProjected}");
+                _syncStatusTracker.Update(
+                    SyncRuntimeState.Syncing,
+                    DateTimeOffset.UtcNow);
+            }
+
             var result = await new LocalFolderSyncRuntimeService(
                 _paths,
                 _repository).RunOnceAsync(
@@ -1906,7 +1928,8 @@ public partial class App : System.Windows.Application
                 "cloud-sync-completed",
                 $"exported={result.Export.Exported}, uploaded={result.Cycle.Transfer.Uploaded + result.Publish.Uploaded}, downloaded={result.Cycle.Transfer.Downloaded + result.Publish.Downloaded}, projected={result.Cycle.Projection.Projected}");
 
-            if (result.Cycle.Projection.Projected > 0)
+            if (result.Cycle.Projection.Projected > 0 ||
+                migration.LegacyProjected > 0)
             {
                 Task refreshTask = Task.CompletedTask;
                 await Dispatcher.InvokeAsync(() =>

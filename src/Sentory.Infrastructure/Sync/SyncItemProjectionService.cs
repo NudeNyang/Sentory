@@ -123,12 +123,27 @@ public sealed class SyncItemProjectionService(
                     throw new InvalidDataException(
                         "사진 동기화 본문에 사진 정보가 없습니다.");
         var expectedSha256 = image.ContentSha256.ToLowerInvariant();
-        var key = SyncBlobObjectKey.Create(expectedSha256);
+        var key = objectStore is IReadableSyncObjectStore readableStore
+            ? readableStore.CreateImageObjectKey(
+                expectedSha256,
+                image.FileExtension)
+            : SyncBlobObjectKey.Create(expectedSha256);
         var stored = await objectStore.TryGetAsync(
             key,
-            cancellationToken) ??
-                     throw new InvalidDataException(
-                         "원격 사진 블롭을 찾을 수 없습니다.");
+            cancellationToken);
+        if (stored is null && objectStore is IReadableSyncObjectStore)
+        {
+            key = SyncBlobObjectKey.Create(expectedSha256);
+            stored = await objectStore.TryGetAsync(
+                key,
+                cancellationToken);
+        }
+
+        if (stored is null)
+        {
+            throw new InvalidDataException(
+                "원격 사진 블롭을 찾을 수 없습니다.");
+        }
         if (!string.Equals(stored.Key, key, StringComparison.Ordinal) ||
             stored.Content.LongLength != image.ByteSize)
         {

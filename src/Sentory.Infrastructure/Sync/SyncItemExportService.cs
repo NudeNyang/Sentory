@@ -168,13 +168,17 @@ public sealed class SyncItemExportService(
                 "로컬 사진의 SHA-256이 보관함 정보와 일치하지 않습니다.");
         }
 
-        var blobKey = SyncBlobObjectKey.Create(actualSha256);
+        var extension = Path.GetExtension(absolutePath).ToLowerInvariant();
+        var blobKey = objectStore is IReadableSyncObjectStore readableStore
+            ? readableStore.CreateImageObjectKey(
+                actualSha256,
+                extension)
+            : SyncBlobObjectKey.Create(actualSha256);
         await objectStore.PutIfAbsentAsync(
             blobKey,
             content,
             actualSha256,
             cancellationToken);
-        var extension = Path.GetExtension(absolutePath).ToLowerInvariant();
         return SyncItemPayload.CreateImage(
             new SyncImageContent(
                 actualSha256,

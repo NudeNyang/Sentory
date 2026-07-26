@@ -14,6 +14,7 @@ public enum SentoryThemeMode
 
 public sealed class SentorySettings
 {
+    public const int CurrentSyncStorageVersion = 2;
     public const int DefaultAutoFavoriteCopyThreshold = 3;
     public const int MinimumAutoFavoriteCopyThreshold = 2;
     public const int MaximumAutoFavoriteCopyThreshold = 5;
@@ -68,6 +69,10 @@ public sealed class SentorySettings
     public string? SyncFolderPath { get; set; }
 
     public string? SyncDeviceId { get; set; }
+
+    public int SyncStorageVersion { get; set; } = 1;
+
+    public string? SyncMigrationDeviceId { get; set; }
 
     internal void Normalize()
     {
@@ -140,6 +145,16 @@ public sealed class SentorySettings
         if (!SyncDeviceIdentity.IsValid(SyncDeviceId))
         {
             SyncDeviceId = null;
+        }
+
+        if (SyncStorageVersion is < 1 or > CurrentSyncStorageVersion)
+        {
+            SyncStorageVersion = 1;
+        }
+
+        if (!SyncDeviceIdentity.IsValid(SyncMigrationDeviceId))
+        {
+            SyncMigrationDeviceId = null;
         }
 
         if (SyncDeviceId is null)

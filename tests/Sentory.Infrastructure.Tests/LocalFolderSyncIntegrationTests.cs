@@ -169,6 +169,87 @@ public sealed class LocalFolderSyncIntegrationTests : IDisposable
                 await replicaB.Captures.GetRecentAsync(10)).CaptureCount);
     }
 
+    [Fact]
+    public async Task AutomaticRuntimePublishesReadablePhotoAndLinkFiles()
+    {
+        var replica = await CreateReplicaAsync("readable");
+        var replicaB = await CreateReplicaAsync("readable-b");
+        var sharedFolder = Path.Combine(_root, "shared-readable");
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/mobile-share",
+            out var normalized));
+        await replica.Captures.UpsertUrlAsync(
+            new UrlCaptureRequest(
+                Guid.NewGuid(),
+                normalized.Original,
+                normalized,
+                SourceApp.Discord,
+                CaptureMethod.DiscordConfirmedSend,
+                DeliveryStatus.Confirmed,
+                "context",
+                DateTimeOffset.Parse("2026-07-26T18:00:00+09:00"),
+                ["url-match"]));
+        byte[] imageBytes = [137, 80, 78, 71, 13, 10, 26, 10, 4, 5, 6];
+        var imageSha256 = Convert.ToHexString(
+            SHA256.HashData(imageBytes));
+        await replica.Captures.UpsertImageAsync(
+            new ImageCaptureRequest(
+                Guid.NewGuid(),
+                imageBytes,
+                imageSha256,
+                320,
+                200,
+                "image/png",
+                ".png",
+                SourceApp.KakaoTalk,
+                CaptureMethod.KakaoCtrlVImage,
+                DeliveryStatus.NotObserved,
+                "context",
+                DateTimeOffset.Parse("2026-07-26T18:01:00+09:00"),
+                ["clipboard-image"],
+                "mobile.png"));
+
+        var result = await new LocalFolderSyncRuntimeService(
+            replica.Paths,
+            replica.Captures).RunOnceAsync(
+                replica.Journal.DeviceId,
+                sharedFolder);
+        var received = await new LocalFolderSyncRuntimeService(
+            replicaB.Paths,
+            replicaB.Captures).RunOnceAsync(
+                replicaB.Journal.DeviceId,
+                sharedFolder);
+
+        var photo = Assert.Single(Directory.GetFiles(
+            Path.Combine(sharedFolder, "Photos"),
+            "*.png"));
+        var link = Assert.Single(Directory.GetFiles(
+            Path.Combine(sharedFolder, "Links"),
+            "*.txt",
+            SearchOption.AllDirectories));
+        Assert.Equal(imageBytes, await File.ReadAllBytesAsync(photo));
+        Assert.Contains(
+            normalized.Original,
+            await File.ReadAllTextAsync(link),
+            StringComparison.Ordinal);
+        Assert.Equal(2, result.Export.Exported);
+        Assert.Equal(2, result.Publish.Uploaded);
+        Assert.Equal(2, received.Cycle.Projection.Projected);
+        var remoteItems = await replicaB.Captures.GetRecentAsync(10);
+        Assert.Equal(2, remoteItems.Count);
+        var remoteImage = Assert.Single(
+            remoteItems,
+            item => item.Kind == ContentKind.Image);
+        Assert.Equal(
+            imageBytes,
+            await File.ReadAllBytesAsync(Path.Combine(
+                replicaB.Paths.RootDirectory,
+                remoteImage.ContentPath!)));
+        Assert.Single(Directory.GetFiles(
+            Path.Combine(sharedFolder, "Photos"),
+            "*.png"));
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();

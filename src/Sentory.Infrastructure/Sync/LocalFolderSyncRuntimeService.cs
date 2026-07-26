@@ -18,14 +18,30 @@ public sealed class LocalFolderSyncRuntimeService(
     public async Task<LocalFolderSyncRunResult> RunOnceAsync(
         string deviceId,
         string selectedDirectory,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        await RunOnceAsync(
+            deviceId,
+            new ReadableFolderSyncObjectStore(selectedDirectory),
+            cancellationToken);
+
+    public async Task<LocalFolderSyncRunResult> RunLegacyOnceAsync(
+        string deviceId,
+        string selectedDirectory,
+        CancellationToken cancellationToken = default) =>
+        await RunOnceAsync(
+            deviceId,
+            new LocalFolderSyncObjectStore(selectedDirectory),
+            cancellationToken);
+
+    private async Task<LocalFolderSyncRunResult> RunOnceAsync(
+        string deviceId,
+        ISyncObjectStore objectStore,
+        CancellationToken cancellationToken)
     {
         var journal = new SqliteSyncOperationJournal(
             paths,
             deviceId);
         await journal.InitializeAsync(cancellationToken);
-        var objectStore = new LocalFolderSyncObjectStore(
-            selectedDirectory);
         var exporter = new SyncItemExportService(
             journal,
             objectStore,
@@ -54,6 +70,7 @@ public enum SyncRuntimeState
 {
     Disabled,
     Waiting,
+    Migrating,
     Syncing,
     Succeeded,
     FolderUnavailable,

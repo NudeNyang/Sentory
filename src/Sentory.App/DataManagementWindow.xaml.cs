@@ -529,6 +529,8 @@ public partial class DataManagementWindow : Window
                 dialog.SelectedPath);
             var oldFolderPath = settings.SyncFolderPath;
             var oldDeviceId = settings.SyncDeviceId;
+            var oldStorageVersion = settings.SyncStorageVersion;
+            var oldMigrationDeviceId = settings.SyncMigrationDeviceId;
             var folderChanged =
                 !string.IsNullOrWhiteSpace(oldFolderPath) &&
                 !string.Equals(
@@ -539,6 +541,14 @@ public partial class DataManagementWindow : Window
                         : StringComparison.Ordinal);
             settings.SyncFolderPath = selectedPath;
             settings.SyncEnabled = true;
+            var isNewStore = folderChanged ||
+                             string.IsNullOrWhiteSpace(oldFolderPath);
+            settings.SyncStorageVersion = isNewStore
+                ? SentorySettings.CurrentSyncStorageVersion
+                : oldStorageVersion;
+            settings.SyncMigrationDeviceId = isNewStore
+                ? null
+                : oldMigrationDeviceId;
             if (folderChanged ||
                 !SyncDeviceIdentity.IsValid(settings.SyncDeviceId))
             {
@@ -559,6 +569,8 @@ public partial class DataManagementWindow : Window
                 {
                     settings.SyncFolderPath = oldFolderPath;
                     settings.SyncDeviceId = oldDeviceId;
+                    settings.SyncStorageVersion = oldStorageVersion;
+                    settings.SyncMigrationDeviceId = oldMigrationDeviceId;
                     settings.SyncEnabled = false;
                     _settingsStore.Save(settings);
                     throw;
@@ -936,6 +948,7 @@ public partial class DataManagementWindow : Window
             ? SentoryLocalization.Text(snapshot.State switch
             {
                 SyncRuntimeState.Syncing => "SyncStateSyncing",
+                SyncRuntimeState.Migrating => "SyncStateMigrating",
                 SyncRuntimeState.Succeeded => "SyncStateSucceeded",
                 SyncRuntimeState.FolderUnavailable =>
                     "SyncStateFolderUnavailable",

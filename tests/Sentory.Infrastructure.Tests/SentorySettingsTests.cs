@@ -65,6 +65,7 @@ public sealed class SentorySettingsTests
         Assert.False(settings.SyncEnabled);
         Assert.Null(settings.SyncFolderPath);
         Assert.Null(settings.SyncDeviceId);
+        Assert.Equal(1, settings.SyncStorageVersion);
     }
 
     [Fact]
@@ -86,6 +87,24 @@ public sealed class SentorySettingsTests
         Assert.True(settings.SyncEnabled);
         Assert.Equal(Path.GetFullPath(folder), settings.SyncFolderPath);
         Assert.Equal(deviceId, settings.SyncDeviceId);
+        Assert.Equal(1, settings.SyncStorageVersion);
+    }
+
+    [Fact]
+    public void NormalizePreservesReadableStorageMigrationState()
+    {
+        var settings = new SentorySettings
+        {
+            SyncStorageVersion = SentorySettings.CurrentSyncStorageVersion,
+            SyncMigrationDeviceId = SyncDeviceIdentity.Create()
+        };
+
+        settings.Normalize();
+
+        Assert.Equal(
+            SentorySettings.CurrentSyncStorageVersion,
+            settings.SyncStorageVersion);
+        Assert.NotNull(settings.SyncMigrationDeviceId);
     }
 
     [Theory]

@@ -88,6 +88,20 @@ public sealed class SentoryLocalizationTests
         Assert.NotEqual(
             "ChooseSyncFolder",
             SentoryLocalization.Text("ChooseSyncFolder"));
+        Assert.NotEqual(
+            "SyncStateMigrating",
+            SentoryLocalization.Text("SyncStateMigrating"));
+    }
+
+    [Fact]
+    public void ComputerSyncExplainsPlaintextCloudAccess()
+    {
+        SentoryLocalization.Apply(new ResourceDictionary(), "ko-KR");
+
+        var description = SentoryLocalization.Text(
+            "ComputerSyncDescription");
+        Assert.Contains("일반 파일", description);
+        Assert.Contains("접근할 수 있는 사람", description);
     }
 
     [Theory]

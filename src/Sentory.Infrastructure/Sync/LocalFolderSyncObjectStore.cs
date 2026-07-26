@@ -18,14 +18,35 @@ public sealed class LocalFolderSyncObjectStore : ISyncObjectStore
     private readonly string _temporaryDirectory;
 
     public LocalFolderSyncObjectStore(string selectedDirectory)
+        : this(
+            selectedDirectory,
+            Path.Combine("Sentory Sync", "v1"))
+    {
+    }
+
+    internal LocalFolderSyncObjectStore(
+        string selectedDirectory,
+        string storeRelativePath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(selectedDirectory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(storeRelativePath);
         var selectedRoot = Path.GetFullPath(selectedDirectory);
+        if (Path.IsPathRooted(storeRelativePath) ||
+            storeRelativePath.Split(
+                    [Path.DirectorySeparatorChar,
+                        Path.AltDirectorySeparatorChar],
+                    StringSplitOptions.RemoveEmptyEntries)
+                .Any(segment => segment is "." or ".."))
+        {
+            throw new ArgumentException(
+                "동기화 저장소 상대 경로가 올바르지 않습니다.",
+                nameof(storeRelativePath));
+        }
+
         _selectedDirectory = selectedRoot;
         StoreDirectory = Path.Combine(
             selectedRoot,
-            "Sentory Sync",
-            "v1");
+            storeRelativePath);
         _objectsDirectory = Path.Combine(StoreDirectory, "objects");
         _temporaryDirectory = Path.Combine(StoreDirectory, "temporary");
     }
@@ -320,9 +341,18 @@ public sealed class LocalFolderSyncObjectStore : ISyncObjectStore
     private void EnsureStoreDirectories()
     {
         Directory.CreateDirectory(_selectedDirectory);
-        EnsureManagedDirectory(
-            Path.Combine(_selectedDirectory, "Sentory Sync"));
-        EnsureManagedDirectory(StoreDirectory);
+        var relativeStore = Path.GetRelativePath(
+            _selectedDirectory,
+            StoreDirectory);
+        var current = _selectedDirectory;
+        foreach (var segment in relativeStore.Split(
+                     Path.DirectorySeparatorChar,
+                     StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, segment);
+            EnsureManagedDirectory(current);
+        }
+
         EnsureManagedDirectory(_objectsDirectory);
         EnsureManagedDirectory(_temporaryDirectory);
     }
