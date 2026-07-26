@@ -261,3 +261,11 @@ public interface ICaptureRepository
         LinkPreviewUpdate preview,
         CancellationToken cancellationToken = default);
 }
+
+public interface ISyncItemDeletionRepository
+{
+    Task<bool> ApplySyncedDeletionAsync(
+        string normalizedKey,
+        DateTimeOffset deletedAt,
+        CancellationToken cancellationToken = default);
+}

@@ -1,12 +1,13 @@
 using Microsoft.Data.Sqlite;
 using Sentory.Core;
+using Sentory.Core.Sync;
 using System.IO;
 using System.Security.Cryptography;
 
 namespace Sentory.Infrastructure.Data;
 
 public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
-    : ICaptureRepository, IImageOcrRepository
+    : ICaptureRepository, IImageOcrRepository, ISyncItemDeletionRepository
 {
     private const int CurrentSchemaVersion = 6;
     private static readonly TimeSpan UsageSessionGap = TimeSpan.FromHours(6);
@@ -967,47 +968,126 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
 
     public async Task<bool> DeleteItemAsync(
         Guid itemId,
+        CancellationToken cancellationToken = default) =>
+        await DeleteItemCoreAsync(
+            itemId,
+            normalizedKey: null,
+            deletedAt: DateTimeOffset.UtcNow,
+            appendSyncDeletion: true,
+            cancellationToken);
+
+    public async Task<bool> ApplySyncedDeletionAsync(
+        string normalizedKey,
+        DateTimeOffset deletedAt,
         CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(normalizedKey);
+        return await DeleteItemCoreAsync(
+            itemId: null,
+            normalizedKey,
+            deletedAt,
+            appendSyncDeletion: false,
+            cancellationToken);
+    }
+
+    private async Task<bool> DeleteItemCoreAsync(
+        Guid? itemId,
+        string? normalizedKey,
+        DateTimeOffset deletedAt,
+        bool appendSyncDeletion,
+        CancellationToken cancellationToken)
     {
         await using var connection = await OpenConnectionAsync(cancellationToken);
         await using var transaction =
             await connection.BeginTransactionAsync(cancellationToken);
 
+        Guid resolvedItemId;
+        ContentKind kind;
+        DateTimeOffset lastCapturedAt;
         var storedPaths = new List<string>();
         await using (var lookup = connection.CreateCommand())
         {
             lookup.Transaction = (SqliteTransaction)transaction;
             lookup.CommandText =
                 """
-                SELECT content_path, site_icon_path, preview_image_path
+                SELECT id, kind, normalized_key, last_captured_at,
+                       content_path, site_icon_path, preview_image_path
                 FROM items
-                WHERE id = $itemId
-                UNION ALL
-                SELECT content_path, NULL, NULL
-                FROM collection_members
-                WHERE collection_id = $itemId AND content_path IS NOT NULL;
+                WHERE ($normalizedKey IS NOT NULL AND
+                       normalized_key = $normalizedKey) OR
+                      ($normalizedKey IS NULL AND id = $itemId)
+                LIMIT 1;
                 """;
-            lookup.Parameters.AddWithValue("$itemId", itemId.ToString("D"));
+            lookup.Parameters.AddWithValue(
+                "$itemId",
+                itemId is null
+                    ? DBNull.Value
+                    : itemId.Value.ToString("D"));
+            lookup.Parameters.AddWithValue(
+                "$normalizedKey",
+                (object?)normalizedKey ?? DBNull.Value);
             await using var reader = await lookup.ExecuteReaderAsync(
                 cancellationToken);
-            var found = false;
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                found = true;
-                for (var index = 0; index < 3; index++)
-                {
-                    if (!reader.IsDBNull(index))
-                    {
-                        storedPaths.Add(reader.GetString(index));
-                    }
-                }
-            }
-
-            if (!found)
+            if (!await reader.ReadAsync(cancellationToken))
             {
                 await transaction.CommitAsync(cancellationToken);
                 return false;
             }
+
+            resolvedItemId = Guid.Parse(reader.GetString(0));
+            if (!Enum.TryParse(reader.GetString(1), out kind))
+            {
+                throw new InvalidDataException(
+                    "삭제할 보관함 항목 종류를 읽을 수 없습니다.");
+            }
+
+            lastCapturedAt = DateTimeOffset.Parse(
+                reader.GetString(3),
+                System.Globalization.CultureInfo.InvariantCulture);
+            for (var index = 4; index < 7; index++)
+            {
+                if (!reader.IsDBNull(index))
+                {
+                    storedPaths.Add(reader.GetString(index));
+                }
+            }
+        }
+
+        if (!appendSyncDeletion && lastCapturedAt > deletedAt)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return false;
+        }
+
+        await using (var lookupMembers = connection.CreateCommand())
+        {
+            lookupMembers.Transaction = (SqliteTransaction)transaction;
+            lookupMembers.CommandText =
+                """
+                SELECT content_path
+                FROM collection_members
+                WHERE collection_id = $itemId AND content_path IS NOT NULL;
+                """;
+            lookupMembers.Parameters.AddWithValue(
+                "$itemId",
+                resolvedItemId.ToString("D"));
+            await using var reader = await lookupMembers.ExecuteReaderAsync(
+                cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                storedPaths.Add(reader.GetString(0));
+            }
+        }
+
+        if (appendSyncDeletion &&
+            kind is ContentKind.Url or ContentKind.Image)
+        {
+            await TryAppendSyncDeletionAsync(
+                connection,
+                (SqliteTransaction)transaction,
+                resolvedItemId,
+                deletedAt,
+                cancellationToken);
         }
 
         await using (var deleteEvents = connection.CreateCommand())
@@ -1017,7 +1097,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 "DELETE FROM capture_events WHERE item_id = $itemId;";
             deleteEvents.Parameters.AddWithValue(
                 "$itemId",
-                itemId.ToString("D"));
+                resolvedItemId.ToString("D"));
             await deleteEvents.ExecuteNonQueryAsync(cancellationToken);
         }
 
@@ -1029,7 +1109,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 "DELETE FROM items WHERE id = $itemId;";
             deleteItem.Parameters.AddWithValue(
                 "$itemId",
-                itemId.ToString("D"));
+                resolvedItemId.ToString("D"));
             affected = await deleteItem.ExecuteNonQueryAsync(cancellationToken);
         }
 
@@ -1051,6 +1131,151 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         }
 
         return affected > 0;
+    }
+
+    private static async Task TryAppendSyncDeletionAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid localItemId,
+        DateTimeOffset deletedAt,
+        CancellationToken cancellationToken)
+    {
+        await using (var tables = connection.CreateCommand())
+        {
+            tables.Transaction = transaction;
+            tables.CommandText =
+                """
+                SELECT COUNT(*)
+                FROM sqlite_master
+                WHERE type = 'table' AND name IN (
+                    'sync_replica_state',
+                    'sync_operations',
+                    'sync_item_exports'
+                );
+                """;
+            if (Convert.ToInt32(
+                    await tables.ExecuteScalarAsync(cancellationToken)) != 3)
+            {
+                return;
+            }
+        }
+
+        Guid syncItemId;
+        byte[] payload;
+        await using (var source = connection.CreateCommand())
+        {
+            source.Transaction = transaction;
+            source.CommandText =
+                """
+                SELECT operations.item_id, operations.payload
+                FROM sync_operations AS operations
+                WHERE operations.kind = $upsertKind
+                  AND (
+                      operations.operation_id = (
+                          SELECT operation_id
+                          FROM sync_item_exports
+                          WHERE item_id = $itemId
+                      ) OR
+                      operations.item_id = $itemId OR
+                      operations.operation_id IN (
+                          SELECT event_id
+                          FROM capture_events
+                          WHERE item_id = $itemId
+                      )
+                  )
+                ORDER BY CASE WHEN operations.operation_id = (
+                             SELECT operation_id
+                             FROM sync_item_exports
+                             WHERE item_id = $itemId
+                         ) THEN 0 ELSE 1 END,
+                         julianday(operations.occurred_at) DESC,
+                         operations.sequence DESC
+                LIMIT 1;
+                """;
+            source.Parameters.AddWithValue(
+                "$upsertKind",
+                SyncOperationKind.Upsert.ToString());
+            source.Parameters.AddWithValue(
+                "$itemId",
+                localItemId.ToString("D"));
+            await using var reader = await source.ExecuteReaderAsync(
+                cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                return;
+            }
+
+            syncItemId = Guid.Parse(reader.GetString(0));
+            payload = (byte[])reader[1];
+        }
+
+        string deviceId;
+        long sequence;
+        await using (var nextSequence = connection.CreateCommand())
+        {
+            nextSequence.Transaction = transaction;
+            nextSequence.CommandText =
+                """
+                UPDATE sync_replica_state
+                SET next_sequence = next_sequence + 1
+                WHERE singleton_id = 1
+                RETURNING device_id, next_sequence - 1;
+                """;
+            await using var reader = await nextSequence.ExecuteReaderAsync(
+                cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                return;
+            }
+
+            deviceId = reader.GetString(0);
+            sequence = reader.GetInt64(1);
+        }
+
+        var operation = SyncOperation.Create(
+            deviceId,
+            sequence,
+            syncItemId,
+            SyncOperationKind.Delete,
+            deletedAt,
+            payload);
+        await using var insert = connection.CreateCommand();
+        insert.Transaction = transaction;
+        insert.CommandText =
+            """
+            INSERT INTO sync_operations (
+                operation_id, device_id, sequence, item_id, kind,
+                occurred_at, format_version, encryption_mode,
+                payload_sha256, payload, is_published, received_at
+            ) VALUES (
+                $operationId, $deviceId, $sequence, $itemId, $kind,
+                $occurredAt, $formatVersion, $encryptionMode,
+                $payloadSha256, $payload, 0, NULL
+            );
+            """;
+        insert.Parameters.AddWithValue(
+            "$operationId",
+            operation.OperationId.ToString("D"));
+        insert.Parameters.AddWithValue("$deviceId", operation.DeviceId);
+        insert.Parameters.AddWithValue("$sequence", operation.Sequence);
+        insert.Parameters.AddWithValue(
+            "$itemId",
+            operation.ItemId.ToString("D"));
+        insert.Parameters.AddWithValue("$kind", operation.Kind.ToString());
+        insert.Parameters.AddWithValue(
+            "$occurredAt",
+            operation.OccurredAt.ToString("O"));
+        insert.Parameters.AddWithValue(
+            "$formatVersion",
+            operation.FormatVersion);
+        insert.Parameters.AddWithValue(
+            "$encryptionMode",
+            operation.EncryptionMode);
+        insert.Parameters.AddWithValue(
+            "$payloadSha256",
+            operation.PayloadSha256);
+        insert.Parameters.AddWithValue("$payload", operation.Payload);
+        await insert.ExecuteNonQueryAsync(cancellationToken);
     }
 
     public async Task<BulkDeleteResult> DeleteItemsAsync(
@@ -1294,6 +1519,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             transaction,
             olderThan,
             cancellationToken);
+        var syncDeletionItems = new List<(Guid ItemId, ContentKind Kind)>();
         var imagePaths = new List<string>();
         var previewPaths = new List<string>();
         await using (var select = connection.CreateCommand())
@@ -1301,7 +1527,8 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             select.Transaction = transaction;
             select.CommandText =
                 $"""
-                SELECT content_path, site_icon_path, preview_image_path
+                SELECT id, kind, content_path,
+                       site_icon_path, preview_image_path
                 FROM items
                 WHERE {CleanupPredicate}
                 """;
@@ -1310,12 +1537,23 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
-                if (!reader.IsDBNull(0))
+                if (!Enum.TryParse<ContentKind>(
+                        reader.GetString(1),
+                        out var kind))
                 {
-                    imagePaths.Add(reader.GetString(0));
+                    throw new InvalidDataException(
+                        "정리할 보관함 항목 종류를 읽을 수 없습니다.");
                 }
 
-                for (var index = 1; index < 3; index++)
+                syncDeletionItems.Add((
+                    Guid.Parse(reader.GetString(0)),
+                    kind));
+                if (!reader.IsDBNull(2))
+                {
+                    imagePaths.Add(reader.GetString(2));
+                }
+
+                for (var index = 3; index < 5; index++)
                 {
                     if (!reader.IsDBNull(index))
                     {
@@ -1343,6 +1581,22 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             {
                 imagePaths.Add(reader.GetString(0));
             }
+        }
+
+        var deletedAt = DateTimeOffset.UtcNow;
+        foreach (var (itemId, kind) in syncDeletionItems)
+        {
+            if (kind is not (ContentKind.Url or ContentKind.Image))
+            {
+                continue;
+            }
+
+            await TryAppendSyncDeletionAsync(
+                connection,
+                transaction,
+                itemId,
+                deletedAt,
+                cancellationToken);
         }
 
         await using (var deleteEvents = connection.CreateCommand())

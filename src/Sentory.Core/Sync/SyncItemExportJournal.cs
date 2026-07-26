@@ -34,4 +34,7 @@ public interface ISyncItemExportJournal
         DateTimeOffset lastCapturedAt,
         Guid remoteOperationId,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<SyncOperation>> GetDeletionOperationsAsync(
+        CancellationToken cancellationToken = default);
 }

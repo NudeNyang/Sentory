@@ -428,6 +428,27 @@ public sealed class SqliteSyncOperationJournal :
         return await ReadOperationsAsync(command, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<SyncOperation>> GetDeletionOperationsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(
+            cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT format_version, encryption_mode, operation_id,
+                   device_id, sequence, item_id, kind, occurred_at,
+                   payload_sha256, payload
+            FROM sync_operations
+            WHERE kind = $deleteKind
+            ORDER BY julianday(occurred_at), device_id, sequence;
+            """;
+        command.Parameters.AddWithValue(
+            "$deleteKind",
+            SyncOperationKind.Delete.ToString());
+        return await ReadOperationsAsync(command, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<SyncItemExportCandidate>>
         GetPendingItemExportsAsync(
             int limit,

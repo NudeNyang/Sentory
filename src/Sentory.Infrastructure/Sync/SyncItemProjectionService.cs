@@ -22,10 +22,32 @@ public sealed class SyncItemProjectionService(
         var alreadyProjected = 0;
         var skipped = 0;
         var operations = await journal.GetReceivedAsync(cancellationToken);
+        var deletionTimes = new Dictionary<string, DateTimeOffset>(
+            StringComparer.Ordinal);
+        if (journal is ISyncItemExportJournal deletionJournal)
+        {
+            var deletions = await deletionJournal.GetDeletionOperationsAsync(
+                cancellationToken);
+            foreach (var deletion in deletions)
+            {
+                var payload = SyncItemPayloadSerializer.Deserialize(
+                    deletion.Payload);
+                var normalizedKey = GetNormalizedKey(payload);
+                if (!deletionTimes.TryGetValue(
+                        normalizedKey,
+                        out var existing) ||
+                    deletion.OccurredAt > existing)
+                {
+                    deletionTimes[normalizedKey] = deletion.OccurredAt;
+                }
+            }
+        }
+
         foreach (var operation in operations)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (operation.Kind != SyncOperationKind.Upsert)
+            if (operation.Kind is not (
+                    SyncOperationKind.Upsert or SyncOperationKind.Delete))
             {
                 skipped++;
                 continue;
@@ -33,6 +55,42 @@ public sealed class SyncItemProjectionService(
 
             var payload = SyncItemPayloadSerializer.Deserialize(
                 operation.Payload);
+            var normalizedKey = GetNormalizedKey(payload);
+            if (operation.Kind == SyncOperationKind.Delete)
+            {
+                if (captureRepository is not ISyncItemDeletionRepository
+                    deletionRepository)
+                {
+                    throw new InvalidOperationException(
+                        "보관함 저장소가 동기화 삭제를 지원하지 않습니다.");
+                }
+
+                var deleted = await deletionRepository
+                    .ApplySyncedDeletionAsync(
+                        normalizedKey,
+                        operation.OccurredAt,
+                        cancellationToken);
+                if (deleted)
+                {
+                    projected++;
+                }
+                else
+                {
+                    alreadyProjected++;
+                }
+
+                continue;
+            }
+
+            if (deletionTimes.TryGetValue(
+                    normalizedKey,
+                    out var deletedAt) &&
+                deletedAt >= payload.CapturedAt)
+            {
+                skipped++;
+                continue;
+            }
+
             var result = payload.ContentKind switch
             {
                 SyncItemContentKinds.Url => await ProjectUrlAsync(
@@ -207,4 +265,19 @@ public sealed class SyncItemProjectionService(
 
     private static string ComputeSha256(ReadOnlySpan<byte> content) =>
         Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
+
+    private static string GetNormalizedKey(SyncItemPayload payload) =>
+        payload.ContentKind switch
+        {
+            SyncItemContentKinds.Url => payload.Url?.NormalizedUrl ??
+                throw new InvalidDataException(
+                    "URL 동기화 본문에 URL 정보가 없습니다."),
+            SyncItemContentKinds.Image => string.Concat(
+                "sha256:",
+                payload.Image?.ContentSha256.ToLowerInvariant() ??
+                throw new InvalidDataException(
+                    "사진 동기화 본문에 사진 정보가 없습니다.")),
+            _ => throw new NotSupportedException(
+                "지원하지 않는 동기화 콘텐츠 종류입니다.")
+        };
 }

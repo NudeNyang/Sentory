@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Sentory.Core;
 using Sentory.Core.Sync;
 
 namespace Sentory.Infrastructure.Sync;
@@ -79,15 +80,58 @@ public sealed class ReadableFolderSyncObjectStore : IReadableSyncObjectStore
                 out _,
                 out _))
         {
+            SyncOperation? operation = null;
+            SyncItemPayload? payload = null;
             try
             {
-                await MaterializeReadableLinkAsync(
-                    content,
-                    cancellationToken);
+                operation = SyncOperationSerializer.Deserialize(content.Span);
+                payload = SyncItemPayloadSerializer.Deserialize(
+                    operation.Payload);
             }
-            catch (Exception exception) when (IsStoreUnavailable(exception))
+            catch (Exception exception)
+                when (exception is InvalidDataException or
+                      NotSupportedException)
             {
-                throw CreateUnavailableException(exception);
+            }
+
+            if (operation?.Kind == SyncOperationKind.Delete &&
+                payload is not null)
+            {
+                var result = await _operationStore.PutIfAbsentAsync(
+                    key,
+                    content,
+                    sha256,
+                    cancellationToken);
+                try
+                {
+                    await ApplyReadableOperationAsync(
+                        operation,
+                        payload,
+                        cancellationToken);
+                }
+                catch (Exception exception)
+                    when (IsStoreUnavailable(exception))
+                {
+                    throw CreateUnavailableException(exception);
+                }
+
+                return result;
+            }
+
+            if (operation is not null && payload is not null)
+            {
+                try
+                {
+                    await ApplyReadableOperationAsync(
+                        operation,
+                        payload,
+                        cancellationToken);
+                }
+                catch (Exception exception)
+                    when (IsStoreUnavailable(exception))
+                {
+                    throw CreateUnavailableException(exception);
+                }
             }
 
             return await _operationStore.PutIfAbsentAsync(
@@ -281,23 +325,14 @@ public sealed class ReadableFolderSyncObjectStore : IReadableSyncObjectStore
         }
     }
 
-    private async Task MaterializeReadableLinkAsync(
-        ReadOnlyMemory<byte> operationContent,
+    private async Task ApplyReadableOperationAsync(
+        SyncOperation operation,
+        SyncItemPayload payload,
         CancellationToken cancellationToken)
     {
-        SyncOperation operation;
-        SyncItemPayload payload;
-        try
+        if (operation.Kind == SyncOperationKind.Delete)
         {
-            operation = SyncOperationSerializer.Deserialize(
-                operationContent.Span);
-            payload = SyncItemPayloadSerializer.Deserialize(
-                operation.Payload);
-        }
-        catch (Exception exception)
-            when (exception is InvalidDataException or
-                  NotSupportedException)
-        {
+            await DeleteReadableContentAsync(payload, cancellationToken);
             return;
         }
 
@@ -337,6 +372,60 @@ public sealed class ReadableFolderSyncObjectStore : IReadableSyncObjectStore
             targetPath,
             content,
             cancellationToken);
+    }
+
+    private async Task DeleteReadableContentAsync(
+        SyncItemPayload payload,
+        CancellationToken cancellationToken)
+    {
+        if (payload.Image is { } image)
+        {
+            var photoPath = GetPhotoPath(
+                image.ContentSha256.ToLowerInvariant(),
+                image.FileExtension);
+            EnsureNotSymbolicLinkIfPresent(photoPath);
+            if (File.Exists(photoPath))
+            {
+                File.Delete(photoPath);
+            }
+
+            return;
+        }
+
+        if (payload.Url is not { } url ||
+            !Directory.Exists(_linksDirectory))
+        {
+            return;
+        }
+
+        foreach (var path in Directory.EnumerateFiles(
+                     _linksDirectory,
+                     "*.txt",
+                     SearchOption.AllDirectories))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            EnsureNotSymbolicLinkIfPresent(path);
+            var text = await File.ReadAllTextAsync(path, cancellationToken);
+            using var reader = new StringReader(text);
+            var firstLine = reader.ReadLine();
+            const string addressPrefix = "주소: ";
+            if (firstLine is null ||
+                !firstLine.StartsWith(
+                    addressPrefix,
+                    StringComparison.Ordinal) ||
+                !UrlNormalizer.TryNormalize(
+                    firstLine[addressPrefix.Length..],
+                    out var normalized) ||
+                !string.Equals(
+                    normalized.Value,
+                    url.NormalizedUrl,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            File.Delete(path);
+        }
     }
 
     private async Task PutReadableFileIfAbsentAsync(

@@ -250,6 +250,151 @@ public sealed class LocalFolderSyncIntegrationTests : IDisposable
             "*.png"));
     }
 
+    [Fact]
+    public async Task SourceDeletionRemovesReadableFilesAndRemoteGalleryItems()
+    {
+        var replicaA = await CreateReplicaAsync("delete-source-a");
+        var replicaB = await CreateReplicaAsync("delete-source-b");
+        var sharedFolder = Path.Combine(_root, "shared-delete-source");
+        var capturedImage = await CaptureImageAsync(replicaA, 41);
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/delete-from-source",
+            out var normalized));
+        var capturedUrl = await replicaA.Captures.UpsertUrlAsync(
+            new UrlCaptureRequest(
+                Guid.NewGuid(),
+                normalized.Original,
+                normalized,
+                SourceApp.Discord,
+                CaptureMethod.DiscordConfirmedSend,
+                DeliveryStatus.Confirmed,
+                "delete-sync-test",
+                DateTimeOffset.Parse("2026-07-26T18:31:00+09:00"),
+                ["url-match"]));
+        var runtimeA = new LocalFolderSyncRuntimeService(
+            replicaA.Paths,
+            replicaA.Captures);
+        var runtimeB = new LocalFolderSyncRuntimeService(
+            replicaB.Paths,
+            replicaB.Captures);
+
+        await runtimeA.RunOnceAsync(
+            replicaA.Journal.DeviceId,
+            sharedFolder);
+        await runtimeB.RunOnceAsync(
+            replicaB.Journal.DeviceId,
+            sharedFolder);
+        Assert.Equal(2, (await replicaB.Captures.GetRecentAsync(10)).Count);
+        Assert.Single(Directory.GetFiles(
+            Path.Combine(sharedFolder, "Photos")));
+        Assert.Single(Directory.GetFiles(
+            Path.Combine(sharedFolder, "Links"),
+            "*.txt",
+            SearchOption.AllDirectories));
+
+        Assert.True(await replicaA.Captures.DeleteItemAsync(
+            capturedImage.ItemId));
+        Assert.True(await replicaA.Captures.DeleteItemAsync(
+            capturedUrl.ItemId));
+        await runtimeA.RunOnceAsync(
+            replicaA.Journal.DeviceId,
+            sharedFolder);
+        await runtimeB.RunOnceAsync(
+            replicaB.Journal.DeviceId,
+            sharedFolder);
+        await runtimeB.RunOnceAsync(
+            replicaB.Journal.DeviceId,
+            sharedFolder);
+
+        Assert.Empty(Directory.GetFiles(
+            Path.Combine(sharedFolder, "Photos")));
+        Assert.Empty(Directory.GetFiles(
+            Path.Combine(sharedFolder, "Links"),
+            "*.txt",
+            SearchOption.AllDirectories));
+        Assert.Empty(await replicaA.Captures.GetRecentAsync(10));
+        Assert.Empty(await replicaB.Captures.GetRecentAsync(10));
+    }
+
+    [Fact]
+    public async Task DestinationDeletionDoesNotReappearAndDeletesSourceItem()
+    {
+        var replicaA = await CreateReplicaAsync("delete-destination-a");
+        var replicaB = await CreateReplicaAsync("delete-destination-b");
+        var sharedFolder = Path.Combine(
+            _root,
+            "shared-delete-destination");
+        var sourceItem = await CaptureImageAsync(replicaA, 73);
+        var existingDestinationItem = await CaptureImageAsync(replicaB, 73);
+        Assert.NotEqual(sourceItem.ItemId, existingDestinationItem.ItemId);
+        var runtimeA = new LocalFolderSyncRuntimeService(
+            replicaA.Paths,
+            replicaA.Captures);
+        var runtimeB = new LocalFolderSyncRuntimeService(
+            replicaB.Paths,
+            replicaB.Captures);
+
+        await runtimeA.RunOnceAsync(
+            replicaA.Journal.DeviceId,
+            sharedFolder);
+        await runtimeB.RunOnceAsync(
+            replicaB.Journal.DeviceId,
+            sharedFolder);
+        var destinationItem = Assert.Single(
+            await replicaB.Captures.GetRecentAsync(10));
+        Assert.Equal(existingDestinationItem.ItemId, destinationItem.ItemId);
+
+        Assert.True(await replicaB.Captures.DeleteItemAsync(
+            destinationItem.ItemId));
+        await runtimeB.RunOnceAsync(
+            replicaB.Journal.DeviceId,
+            sharedFolder);
+        await runtimeB.RunOnceAsync(
+            replicaB.Journal.DeviceId,
+            sharedFolder);
+        await runtimeA.RunOnceAsync(
+            replicaA.Journal.DeviceId,
+            sharedFolder);
+
+        Assert.Empty(await replicaB.Captures.GetRecentAsync(10));
+        Assert.Empty(await replicaA.Captures.GetRecentAsync(10));
+        Assert.Empty(Directory.GetFiles(
+            Path.Combine(sharedFolder, "Photos")));
+    }
+
+    [Fact]
+    public async Task AutomaticCleanupAlsoPublishesDeletion()
+    {
+        var replicaA = await CreateReplicaAsync("cleanup-delete-a");
+        var replicaB = await CreateReplicaAsync("cleanup-delete-b");
+        var sharedFolder = Path.Combine(_root, "shared-cleanup-delete");
+        await CaptureImageAsync(replicaA, 92);
+        var runtimeA = new LocalFolderSyncRuntimeService(
+            replicaA.Paths,
+            replicaA.Captures);
+        var runtimeB = new LocalFolderSyncRuntimeService(
+            replicaB.Paths,
+            replicaB.Captures);
+        await runtimeA.RunOnceAsync(
+            replicaA.Journal.DeviceId,
+            sharedFolder);
+        await runtimeB.RunOnceAsync(
+            replicaB.Journal.DeviceId,
+            sharedFolder);
+
+        var cleanup = await replicaA.Captures.CleanupAsync(olderThan: null);
+        Assert.Equal(1, cleanup.Deleted.TotalItems);
+        await runtimeA.RunOnceAsync(
+            replicaA.Journal.DeviceId,
+            sharedFolder);
+        await runtimeB.RunOnceAsync(
+            replicaB.Journal.DeviceId,
+            sharedFolder);
+
+        Assert.Empty(await replicaA.Captures.GetRecentAsync(10));
+        Assert.Empty(await replicaB.Captures.GetRecentAsync(10));
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
@@ -280,6 +425,30 @@ public sealed class LocalFolderSyncIntegrationTests : IDisposable
             SyncDeviceIdentity.Create());
         await journal.InitializeAsync();
         return new Replica(paths, captures, journal);
+    }
+
+    private static async Task<CaptureResult> CaptureImageAsync(
+        Replica replica,
+        byte marker)
+    {
+        byte[] imageBytes = [137, 80, 78, 71, marker, 10, 26, 10];
+        var sha256 = Convert.ToHexString(SHA256.HashData(imageBytes));
+        return await replica.Captures.UpsertImageAsync(
+            new ImageCaptureRequest(
+                Guid.NewGuid(),
+                imageBytes,
+                sha256,
+                320,
+                200,
+                "image/png",
+                ".png",
+                SourceApp.KakaoTalk,
+                CaptureMethod.KakaoCtrlVImage,
+                DeliveryStatus.NotObserved,
+                "delete-sync-test",
+                DateTimeOffset.Parse("2026-07-26T18:30:00+09:00"),
+                ["clipboard-image"],
+                "delete-test.png"));
     }
 
     private sealed record Replica(
