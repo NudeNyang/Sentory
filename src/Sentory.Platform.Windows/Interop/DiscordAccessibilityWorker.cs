@@ -534,6 +534,19 @@ public static class DiscordAccessibilityWorker
                     null,
                     ["manual-upload-draft-removed"]);
             }
+
+            if (DiscordManualUploadConfirmationPolicy
+                .ShouldCancelUnobservedDraft(
+                    trackDraft,
+                    observedDraft,
+                    startedAt,
+                    now))
+            {
+                return new DiscordConfirmationResponse(
+                    DiscordConfirmationOutcome.Cancelled,
+                    null,
+                    ["manual-upload-draft-not-observed"]);
+            }
         }
 
         return new DiscordConfirmationResponse(

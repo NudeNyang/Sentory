@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
@@ -110,6 +111,7 @@ public sealed class MessengerFileUploadRuntime : IDisposable
                     continue;
                 }
 
+                _decisions.Track(dialog);
                 _sessions.Add(dialog, session);
                 _diagnostic?.Invoke(
                     "manual-file-dialog-opened",
@@ -136,6 +138,7 @@ public sealed class MessengerFileUploadRuntime : IDisposable
             if (decision != FileDialogDecision.Unknown)
             {
                 _sessions.Remove(session.DialogWindow);
+                _decisions.Untrack(session.DialogWindow);
                 if (decision == FileDialogDecision.Accepted &&
                     session.SelectedPaths.Count > 0)
                 {
@@ -158,6 +161,7 @@ public sealed class MessengerFileUploadRuntime : IDisposable
             }
 
             _sessions.Remove(session.DialogWindow);
+            _decisions.Untrack(session.DialogWindow);
             _diagnostic?.Invoke(
                 "manual-file-dialog-ignored",
                 $"source={session.SourceApp} decision={FileDialogDecision.Unknown} selected={session.SelectedPaths.Count}");
@@ -271,6 +275,11 @@ public sealed class MessengerFileUploadRuntime : IDisposable
         _disposed = true;
         _timer.Stop();
         _eventHook.Dispose();
+        foreach (var dialog in _sessions.Keys)
+        {
+            _decisions.Untrack(dialog);
+        }
+
         _sessions.Clear();
     }
 
@@ -299,12 +308,35 @@ internal enum FileDialogDecision
 internal sealed class FileDialogDecisionTracker
 {
     private readonly object _gate = new();
+    private readonly HashSet<nint> _trackedDialogs = [];
     private readonly Dictionary<nint, FileDialogDecision> _decisions = [];
+
+    public void Track(nint dialog)
+    {
+        lock (_gate)
+        {
+            _trackedDialogs.Add(dialog);
+        }
+    }
+
+    public void Untrack(nint dialog)
+    {
+        lock (_gate)
+        {
+            _trackedDialogs.Remove(dialog);
+            _decisions.Remove(dialog);
+        }
+    }
 
     public void Record(nint dialog, FileDialogDecision decision)
     {
         lock (_gate)
         {
+            if (!_trackedDialogs.Contains(dialog))
+            {
+                return;
+            }
+
             _decisions[dialog] = decision;
         }
     }
@@ -328,13 +360,22 @@ internal sealed class FileDialogWinEventHook : IDisposable
     internal const string DialogClassName = "#32770";
     private const uint EventObjectInvoked = 0x8013;
     private const uint WineventOutOfContext = 0x0000;
+    private const int WhKeyboardLl = 13;
+    private const int WhMouseLl = 14;
+    private const int WmKeyDown = 0x0100;
+    private const int WmSysKeyDown = 0x0104;
+    private const int WmLButtonUp = 0x0202;
     private const int OpenButtonControlId = 1;
     private const int CancelButtonControlId = 2;
 
     private readonly INativeWindowApi _native;
     private readonly FileDialogDecisionTracker _decisions;
     private readonly WinEventDelegate _callback;
+    private readonly LowLevelHookDelegate _keyboardCallback;
+    private readonly LowLevelHookDelegate _mouseCallback;
     private nint _hook;
+    private nint _keyboardHook;
+    private nint _mouseHook;
 
     public FileDialogWinEventHook(
         INativeWindowApi native,
@@ -343,6 +384,8 @@ internal sealed class FileDialogWinEventHook : IDisposable
         _native = native;
         _decisions = decisions;
         _callback = OnWinEvent;
+        _keyboardCallback = OnKeyboardInput;
+        _mouseCallback = OnMouseInput;
     }
 
     public void Start()
@@ -360,7 +403,131 @@ internal sealed class FileDialogWinEventHook : IDisposable
             0,
             0,
             WineventOutOfContext);
+        _keyboardHook = SetWindowsHookEx(
+            WhKeyboardLl,
+            _keyboardCallback,
+            GetModuleHandle(null),
+            0);
+        _mouseHook = SetWindowsHookEx(
+            WhMouseLl,
+            _mouseCallback,
+            GetModuleHandle(null),
+            0);
+        if (_keyboardHook == nint.Zero || _mouseHook == nint.Zero)
+        {
+            var error = Marshal.GetLastWin32Error();
+            Dispose();
+            throw new Win32Exception(
+                error,
+                "파일 선택 확인 훅을 설치하지 못했습니다.");
+        }
     }
+
+    private nint OnKeyboardInput(
+        int code,
+        nint message,
+        nint keyboardData)
+    {
+        try
+        {
+            if (code >= 0 &&
+                (message == WmKeyDown || message == WmSysKeyDown))
+            {
+                var dialog = _native.GetForegroundWindow();
+                if (IsFileDialog(dialog))
+                {
+                    var data = Marshal.PtrToStructure<KeyboardHookData>(
+                        keyboardData);
+                    var focused = _native.GetFocusedWindow(dialog);
+                    var decision = FileDialogInputPolicy.ClassifyKeyboard(
+                        checked((int)data.VirtualKeyCode),
+                        _native.GetControlId(focused));
+                    if (decision != FileDialogDecision.Unknown)
+                    {
+                        _decisions.Record(dialog, decision);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // 예외가 네이티브 훅 경계를 넘어가면 프로세스가 종료될 수 있다.
+        }
+
+        return CallNextHookEx(
+            _keyboardHook,
+            code,
+            message,
+            keyboardData);
+    }
+
+    private nint OnMouseInput(
+        int code,
+        nint message,
+        nint mouseData)
+    {
+        try
+        {
+            if (code >= 0 && message == WmLButtonUp)
+            {
+                var data = Marshal.PtrToStructure<MouseHookData>(mouseData);
+                var windowAtPoint = WindowFromPoint(data.Point);
+                var dialog = _native.GetRootWindow(windowAtPoint);
+                if (IsFileDialog(dialog))
+                {
+                    var decision = FileDialogDecision.Unknown;
+                    foreach (var controlId in new[]
+                             {
+                                 OpenButtonControlId,
+                                 CancelButtonControlId
+                             })
+                    {
+                        var control = GetDlgItem(dialog, controlId);
+                        if (control == nint.Zero ||
+                            !Contains(
+                                _native.GetWindowBounds(control),
+                                data.Point.X,
+                                data.Point.Y))
+                        {
+                            continue;
+                        }
+
+                        decision = FileDialogInputPolicy.ClassifyControl(
+                            controlId);
+                        break;
+                    }
+
+                    if (decision != FileDialogDecision.Unknown)
+                    {
+                        _decisions.Record(dialog, decision);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // 예외가 네이티브 훅 경계를 넘어가면 프로세스가 종료될 수 있다.
+        }
+
+        return CallNextHookEx(_mouseHook, code, message, mouseData);
+    }
+
+    private bool IsFileDialog(nint window) =>
+        window != nint.Zero &&
+        _native.GetRootWindow(window) == window &&
+        string.Equals(
+            _native.GetClassName(window),
+            DialogClassName,
+            StringComparison.Ordinal);
+
+    private static bool Contains(
+        WindowBounds bounds,
+        int x,
+        int y) =>
+        x >= bounds.Left &&
+        x < bounds.Right &&
+        y >= bounds.Top &&
+        y < bounds.Bottom;
 
     private void OnWinEvent(
         nint hook,
@@ -399,13 +566,25 @@ internal sealed class FileDialogWinEventHook : IDisposable
 
     public void Dispose()
     {
-        if (_hook == nint.Zero)
+        var winEventHook = Interlocked.Exchange(ref _hook, nint.Zero);
+        if (winEventHook != nint.Zero)
         {
-            return;
+            UnhookWinEvent(winEventHook);
         }
 
-        UnhookWinEvent(_hook);
-        _hook = nint.Zero;
+        var keyboardHook = Interlocked.Exchange(
+            ref _keyboardHook,
+            nint.Zero);
+        if (keyboardHook != nint.Zero)
+        {
+            UnhookWindowsHookEx(keyboardHook);
+        }
+
+        var mouseHook = Interlocked.Exchange(ref _mouseHook, nint.Zero);
+        if (mouseHook != nint.Zero)
+        {
+            UnhookWindowsHookEx(mouseHook);
+        }
     }
 
     private delegate void WinEventDelegate(
@@ -416,6 +595,38 @@ internal sealed class FileDialogWinEventHook : IDisposable
         int childId,
         uint eventThread,
         uint eventTime);
+
+    private delegate nint LowLevelHookDelegate(
+        int code,
+        nint message,
+        nint data);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly struct KeyboardHookData
+    {
+        public readonly uint VirtualKeyCode;
+        public readonly uint ScanCode;
+        public readonly uint Flags;
+        public readonly uint Time;
+        public readonly nuint ExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly struct MouseHookData
+    {
+        public readonly Point Point;
+        public readonly uint MouseData;
+        public readonly uint Flags;
+        public readonly uint Time;
+        public readonly nuint ExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly struct Point
+    {
+        public readonly int X;
+        public readonly int Y;
+    }
 
     [DllImport("user32.dll")]
     private static extern nint SetWinEventHook(
@@ -430,6 +641,65 @@ internal sealed class FileDialogWinEventHook : IDisposable
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool UnhookWinEvent(nint hook);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern nint SetWindowsHookEx(
+        int hookId,
+        LowLevelHookDelegate callback,
+        nint module,
+        uint threadId);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool UnhookWindowsHookEx(nint hook);
+
+    [DllImport("user32.dll")]
+    private static extern nint CallNextHookEx(
+        nint hook,
+        int code,
+        nint message,
+        nint data);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    private static extern nint GetModuleHandle(string? moduleName);
+
+    [DllImport("user32.dll")]
+    private static extern nint WindowFromPoint(Point point);
+
+    [DllImport("user32.dll")]
+    private static extern nint GetDlgItem(nint dialog, int controlId);
+}
+
+internal static class FileDialogInputPolicy
+{
+    private const int VkReturn = 0x0D;
+    private const int VkEscape = 0x1B;
+    private const int OpenButtonControlId = 1;
+    private const int CancelButtonControlId = 2;
+
+    public static FileDialogDecision ClassifyKeyboard(
+        int virtualKey,
+        int focusedControlId)
+    {
+        if (virtualKey == VkEscape ||
+            (virtualKey == VkReturn &&
+             focusedControlId == CancelButtonControlId))
+        {
+            return FileDialogDecision.Cancelled;
+        }
+
+        return virtualKey == VkReturn
+            ? FileDialogDecision.Accepted
+            : FileDialogDecision.Unknown;
+    }
+
+    public static FileDialogDecision ClassifyControl(int controlId) =>
+        controlId switch
+        {
+            OpenButtonControlId => FileDialogDecision.Accepted,
+            CancelButtonControlId => FileDialogDecision.Cancelled,
+            _ => FileDialogDecision.Unknown
+        };
 }
 
 internal sealed class WindowsFileDialogSelectionReader
@@ -594,6 +864,25 @@ internal static partial class FileDialogPathResolver
                 fileExists(path))
             {
                 result.Add(path);
+                return;
+            }
+
+            if (folder is null || Path.HasExtension(trimmed))
+            {
+                return;
+            }
+
+            var hiddenExtensionMatches = ClipboardImageCodec
+                .EnumerateSupportedExtensions()
+                .Select(extension => Path.Combine(
+                    folder,
+                    trimmed + extension))
+                .Where(fileExists)
+                .Take(2)
+                .ToArray();
+            if (hiddenExtensionMatches.Length == 1)
+            {
+                result.Add(Path.GetFullPath(hiddenExtensionMatches[0]));
             }
         }
     }

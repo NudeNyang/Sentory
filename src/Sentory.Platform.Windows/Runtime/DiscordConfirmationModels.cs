@@ -140,6 +140,9 @@ internal static class DiscordImageConfirmationEvaluator
 
 internal static class DiscordManualUploadConfirmationPolicy
 {
+    private static readonly TimeSpan DraftAppearanceTimeout =
+        TimeSpan.FromSeconds(5);
+
     public static bool CanConfirm(
         bool trackDraft,
         bool observedDraft,
@@ -157,4 +160,13 @@ internal static class DiscordManualUploadConfirmationPolicy
         draftImageCount == 0 &&
         draftMissingSince is not null &&
         now - draftMissingSince >= TimeSpan.FromSeconds(2);
+
+    public static bool ShouldCancelUnobservedDraft(
+        bool trackDraft,
+        bool observedDraft,
+        DateTimeOffset startedAt,
+        DateTimeOffset now) =>
+        trackDraft &&
+        !observedDraft &&
+        now - startedAt >= DraftAppearanceTimeout;
 }

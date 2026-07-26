@@ -66,15 +66,55 @@ public sealed class MessengerFileUploadRuntimeTests
     }
 
     [Fact]
+    public void Resolve_FindsActualImageWhenExplorerHidesItsExtension()
+    {
+        var folder = Path.Combine(
+            Path.GetTempPath(),
+            $"sentory-hidden-extension-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var expected = Path.Combine(folder, "photo.png");
+            File.WriteAllBytes(expected, [1]);
+
+            var result = FileDialogPathResolver.Resolve(
+                ["photo"],
+                [$"Address: {folder}"]);
+
+            Assert.Equal([expected], result);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [Fact]
     public void DecisionTracker_LastOpenOrCancelDecisionWinsAndIsConsumed()
     {
         var tracker = new FileDialogDecisionTracker();
         var dialog = new nint(1234);
 
+        tracker.Track(dialog);
         tracker.Record(dialog, FileDialogDecision.Accepted);
         tracker.Record(dialog, FileDialogDecision.Cancelled);
 
         Assert.Equal(FileDialogDecision.Cancelled, tracker.Take(dialog));
+        Assert.Equal(FileDialogDecision.Unknown, tracker.Take(dialog));
+    }
+
+    [Fact]
+    public void DecisionTracker_IgnoresDialogsThatAreNotTracked()
+    {
+        var tracker = new FileDialogDecisionTracker();
+        var dialog = new nint(1234);
+
+        tracker.Record(dialog, FileDialogDecision.Accepted);
+        Assert.Equal(FileDialogDecision.Unknown, tracker.Take(dialog));
+
+        tracker.Track(dialog);
+        tracker.Record(dialog, FileDialogDecision.Accepted);
+        tracker.Untrack(dialog);
         Assert.Equal(FileDialogDecision.Unknown, tracker.Take(dialog));
     }
 
@@ -108,5 +148,56 @@ public sealed class MessengerFileUploadRuntimeTests
             draftImageCount: 0,
             missingSince,
             missingSince.AddSeconds(2)));
+    }
+
+    [Fact]
+    public void DiscordManualUpload_CancelsWhenDraftNeverAppears()
+    {
+        var startedAt = DateTimeOffset.UtcNow;
+
+        Assert.False(
+            DiscordManualUploadConfirmationPolicy
+                .ShouldCancelUnobservedDraft(
+                    trackDraft: true,
+                    observedDraft: false,
+                    startedAt,
+                    startedAt.AddSeconds(4)));
+        Assert.True(
+            DiscordManualUploadConfirmationPolicy
+                .ShouldCancelUnobservedDraft(
+                    trackDraft: true,
+                    observedDraft: false,
+                    startedAt,
+                    startedAt.AddSeconds(5)));
+    }
+
+    [Theory]
+    [InlineData(0x0D, 0, (int)FileDialogDecision.Accepted)]
+    [InlineData(0x1B, 0, (int)FileDialogDecision.Cancelled)]
+    [InlineData(0x0D, 2, (int)FileDialogDecision.Cancelled)]
+    [InlineData(0x41, 0, (int)FileDialogDecision.Unknown)]
+    public void FileDialogInput_ClassifiesKeyboardDecision(
+        int virtualKey,
+        int focusedControlId,
+        int expected)
+    {
+        Assert.Equal(
+            (FileDialogDecision)expected,
+            FileDialogInputPolicy.ClassifyKeyboard(
+                virtualKey,
+                focusedControlId));
+    }
+
+    [Theory]
+    [InlineData(1, (int)FileDialogDecision.Accepted)]
+    [InlineData(2, (int)FileDialogDecision.Cancelled)]
+    [InlineData(1148, (int)FileDialogDecision.Unknown)]
+    public void FileDialogInput_ClassifiesMouseControl(
+        int controlId,
+        int expected)
+    {
+        Assert.Equal(
+            (FileDialogDecision)expected,
+            FileDialogInputPolicy.ClassifyControl(controlId));
     }
 }

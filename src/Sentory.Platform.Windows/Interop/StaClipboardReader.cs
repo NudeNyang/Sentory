@@ -197,6 +197,9 @@ internal static class ClipboardImageCodec
     public static bool HasSupportedImageExtension(string path) =>
         SupportedExtensions.Contains(Path.GetExtension(path));
 
+    public static IEnumerable<string> EnumerateSupportedExtensions() =>
+        SupportedExtensions;
+
     public static ClipboardImageSnapshot? TryReadFile(string path)
     {
         try
