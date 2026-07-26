@@ -102,6 +102,14 @@ public sealed class SentoryLocalizationTests
             "ComputerSyncDescription");
         Assert.Contains("일반 파일", description);
         Assert.Contains("접근할 수 있는 사람", description);
+        Assert.Equal(
+            "동기화 시작",
+            SentoryLocalization.Text("StartSync"));
+        Assert.Contains(
+            "자동으로 만듭니다",
+            SentoryLocalization.Format(
+                "SyncAutomaticLocationFormat",
+                "Google Drive"));
     }
 
     [Theory]

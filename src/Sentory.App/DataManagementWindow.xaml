@@ -346,6 +346,15 @@
                                    TextWrapping="Wrap"
                                    FontSize="11"
                                    Foreground="{DynamicResource MutedTextBrush}" />
+                        <TextBlock x:Name="SyncSetupDescriptionText"
+                                   Margin="0,12,0,0"
+                                   TextWrapping="Wrap"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource TextBrush}" />
+                        <ComboBox x:Name="SyncProviderComboBox"
+                                  Margin="0,10,0,0"
+                                  DisplayMemberPath="ProviderName"
+                                  Visibility="Collapsed" />
                         <TextBlock x:Name="SyncFolderPathText"
                                    Margin="0,12,0,0"
                                    TextTrimming="CharacterEllipsis"

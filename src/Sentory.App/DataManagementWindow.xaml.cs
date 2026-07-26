@@ -10,6 +10,7 @@ using Sentory.Core;
 using Sentory.Core.Sync;
 using Sentory.Infrastructure.Data;
 using Sentory.Infrastructure.Sync;
+using Sentory.Platform.Windows.Runtime;
 using Forms = System.Windows.Forms;
 
 namespace Sentory.App;
@@ -21,6 +22,11 @@ public partial class DataManagementWindow : Window
     private readonly SentoryDataPaths _paths;
     private readonly SyncRuntimeStatusTracker _syncStatusTracker;
     private readonly WindowsStartupManager _startupManager = new();
+    private readonly Task<IReadOnlyList<CloudSyncFolderCandidate>>
+        _cloudSyncFolderDiscoveryTask = Task.Run(
+            WindowsCloudSyncFolderDiscovery.Discover);
+    private IReadOnlyList<CloudSyncFolderCandidate> _cloudSyncFolders = [];
+    private bool _cloudSyncFolderDiscoveryCompleted;
     private CaptureRuntimeState _discordState;
     private bool _discordRepairNeeded;
     private bool _detectionPaused;
@@ -82,7 +88,12 @@ public partial class DataManagementWindow : Window
         UpdateSyncControls(settings, _syncStatusTracker.Current);
         _initializing = false;
 
-        Loaded += async (_, _) => await RefreshStatisticsAsync();
+        Loaded += async (_, _) =>
+        {
+            await Task.WhenAll(
+                RefreshStatisticsAsync(),
+                LoadCloudSyncFoldersAsync());
+        };
         SourceInitialized += (_, _) => ApplyTitleBarTheme();
         OwnedPopupDismissBehavior.Enable(
             this,
@@ -471,7 +482,7 @@ public partial class DataManagementWindow : Window
         if (!settings.SyncEnabled &&
             string.IsNullOrWhiteSpace(settings.SyncFolderPath))
         {
-            await ChooseAndEnableSyncFolderAsync();
+            await StartSyncWithAutomaticFolderAsync();
             return;
         }
 
@@ -500,6 +511,55 @@ public partial class DataManagementWindow : Window
         }
     }
 
+    private async Task StartSyncWithAutomaticFolderAsync()
+    {
+        await LoadCloudSyncFoldersAsync();
+        var candidate = _cloudSyncFolders.Count switch
+        {
+            0 => null,
+            1 => _cloudSyncFolders[0],
+            _ => SyncProviderComboBox.SelectedItem as
+                CloudSyncFolderCandidate
+        };
+        if (candidate is null)
+        {
+            await ChooseAndEnableSyncFolderAsync();
+            return;
+        }
+
+        await EnableSyncFolderAsync(
+            candidate.FolderPath,
+            candidate.ProviderName);
+    }
+
+    private async Task LoadCloudSyncFoldersAsync()
+    {
+        if (_cloudSyncFolderDiscoveryCompleted)
+        {
+            return;
+        }
+
+        try
+        {
+            _cloudSyncFolders = await _cloudSyncFolderDiscoveryTask;
+        }
+        catch (Exception)
+        {
+            _cloudSyncFolders = [];
+        }
+
+        _cloudSyncFolderDiscoveryCompleted = true;
+        SyncProviderComboBox.ItemsSource = _cloudSyncFolders;
+        if (_cloudSyncFolders.Count > 0)
+        {
+            SyncProviderComboBox.SelectedIndex = 0;
+        }
+
+        UpdateSyncControls(
+            _settingsStore.Load(),
+            _syncStatusTracker.Current);
+    }
+
     private async Task ChooseAndEnableSyncFolderAsync()
     {
         if (_busy)
@@ -525,8 +585,23 @@ public partial class DataManagementWindow : Window
                 return;
             }
 
-            var selectedPath = Path.GetFullPath(
-                dialog.SelectedPath);
+            await EnableSyncFolderAsync(dialog.SelectedPath);
+        }
+        finally
+        {
+            _suppressBackgroundDismiss = false;
+        }
+    }
+
+    private async Task EnableSyncFolderAsync(
+        string folderPath,
+        string? automaticProviderName = null)
+    {
+        var settings = _settingsStore.Load();
+        try
+        {
+            var selectedPath = Path.GetFullPath(folderPath);
+            Directory.CreateDirectory(selectedPath);
             var oldFolderPath = settings.SyncFolderPath;
             var oldDeviceId = settings.SyncDeviceId;
             var oldStorageVersion = settings.SyncStorageVersion;
@@ -579,8 +654,11 @@ public partial class DataManagementWindow : Window
 
             UpdateSyncControls(settings, _syncStatusTracker.Current);
             SyncConfigurationChanged?.Invoke();
-            StatusText.Text =
-                SentoryLocalization.Text("SyncFolderSaved");
+            StatusText.Text = automaticProviderName is null
+                ? SentoryLocalization.Text("SyncFolderSaved")
+                : SentoryLocalization.Format(
+                    "SyncAutomaticFolderSavedFormat",
+                    automaticProviderName);
         }
         catch (Exception exception)
             when (exception is IOException or
@@ -592,10 +670,6 @@ public partial class DataManagementWindow : Window
         {
             StatusText.Text =
                 SentoryLocalization.Text("SyncSettingFailed");
-        }
-        finally
-        {
-            _suppressBackgroundDismiss = false;
         }
     }
 
@@ -819,6 +893,7 @@ public partial class DataManagementWindow : Window
         AutoCleanupComboBox.IsEnabled = !busy;
         OpenDataFolderButton.IsEnabled = !busy;
         ChooseSyncFolderButton.IsEnabled = !busy;
+        SyncProviderComboBox.IsEnabled = !busy;
         SyncToggleButton.IsEnabled = !busy;
         UpdateCheckButton.IsEnabled = !busy && !_updateCheckBusy;
         if (busy)
@@ -939,16 +1014,46 @@ public partial class DataManagementWindow : Window
         SentorySettings settings,
         SyncRuntimeSnapshot snapshot)
     {
-        SyncFolderPathText.Text =
-            string.IsNullOrWhiteSpace(settings.SyncFolderPath)
-                ? SentoryLocalization.Text("SyncFolderNotSelected")
-                : settings.SyncFolderPath;
+        var hasFolder = !string.IsNullOrWhiteSpace(
+            settings.SyncFolderPath);
+        SyncFolderPathText.Text = hasFolder
+            ? settings.SyncFolderPath
+            : string.Empty;
+        SyncFolderPathText.Visibility = hasFolder
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        SyncSetupDescriptionText.Visibility = hasFolder
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        SyncProviderComboBox.Visibility = !hasFolder &&
+                                          _cloudSyncFolderDiscoveryCompleted &&
+                                          _cloudSyncFolders.Count > 1
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        SyncSetupDescriptionText.Text = !_cloudSyncFolderDiscoveryCompleted
+            ? SentoryLocalization.Text("SyncLocationDetecting")
+            : _cloudSyncFolders.Count switch
+            {
+                0 => SentoryLocalization.Text(
+                    "SyncAutomaticLocationUnavailable"),
+                1 => SentoryLocalization.Format(
+                    "SyncAutomaticLocationFormat",
+                    _cloudSyncFolders[0].ProviderName),
+                _ => SentoryLocalization.Text(
+                    "SyncProviderSelectionDescription")
+            };
+        ChooseSyncFolderButton.Visibility = hasFolder
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         ChooseSyncFolderButton.Content = SentoryLocalization.Text(
-            string.IsNullOrWhiteSpace(settings.SyncFolderPath)
-                ? "ChooseSyncFolder"
-                : "ChangeSyncFolder");
+            "ChangeSyncFolder");
         SyncToggleButton.Content = SentoryLocalization.Text(
-            settings.SyncEnabled ? "TurnOff" : "TurnOn");
+            hasFolder
+                ? settings.SyncEnabled ? "TurnOff" : "TurnOn"
+                : "StartSync");
+        Grid.SetColumn(SyncToggleButton, hasFolder ? 2 : 0);
+        Grid.SetColumnSpan(SyncToggleButton, hasFolder ? 1 : 3);
+        SyncToggleButton.Width = hasFolder ? 82 : double.NaN;
         SyncRuntimeStatusText.Text = settings.SyncEnabled
             ? SentoryLocalization.Text(snapshot.State switch
             {
