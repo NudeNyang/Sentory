@@ -94,14 +94,18 @@ public sealed class StaClipboardReader : IDisposable
 
             try
             {
-                var imagePaths = WpfClipboard.ContainsFileDropList()
+                var sentoryImage = ClipboardImageDataComposer.TryReadOriginal(
+                    WpfClipboard.GetDataObject());
+                var imagePaths = sentoryImage is null &&
+                                 WpfClipboard.ContainsFileDropList()
                     ? WpfClipboard.GetFileDropList()
                         .Cast<string>()
                         .Where(ClipboardImageCodec.IsSupportedImagePath)
                         .ToArray()
                     : [];
                 BitmapSource? bitmap = null;
-                if (imagePaths.Length == 0 && WpfClipboard.ContainsImage())
+                if (sentoryImage is null && imagePaths.Length == 0 &&
+                    WpfClipboard.ContainsImage())
                 {
                     bitmap = WpfClipboard.GetImage();
                     bitmap?.Freeze();
@@ -121,13 +125,17 @@ public sealed class StaClipboardReader : IDisposable
                 // encoding can be slow for large images, so do them only after
                 // the sequence-stability check instead of turning that work into
                 // a race against the messenger.
-                IReadOnlyList<ClipboardImageSnapshot> images = imagePaths.Length > 0
-                    ? ClipboardImageCodec.TryReadFiles(imagePaths)
-                    : bitmap is { PixelWidth: > 0, PixelHeight: > 0 }
-                        ? ClipboardImageCodec.TryEncode(bitmap) is { } encoded
-                            ? [encoded]
-                            : []
-                        : [];
+                IReadOnlyList<ClipboardImageSnapshot> images =
+                    sentoryImage is not null
+                        ? [sentoryImage]
+                        : imagePaths.Length > 0
+                            ? ClipboardImageCodec.TryReadFiles(imagePaths)
+                            : bitmap is { PixelWidth: > 0, PixelHeight: > 0 }
+                                ? ClipboardImageCodec.TryEncode(bitmap) is
+                                { } encoded
+                                    ? [encoded]
+                                    : []
+                                : [];
                 if (images.Count == 0 && string.IsNullOrWhiteSpace(text))
                 {
                     return null;

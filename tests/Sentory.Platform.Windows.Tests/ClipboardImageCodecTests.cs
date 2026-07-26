@@ -8,6 +8,70 @@ namespace Sentory.Platform.Windows.Tests;
 public sealed class ClipboardImageCodecTests
 {
     [Fact]
+    public void SentoryClipboardDataKeepsOriginalImageBytesAlongsideBitmap()
+    {
+        var path = Path.Combine(
+            Path.GetTempPath(),
+            $"sentory-clipboard-original-{Guid.NewGuid():N}.png");
+        try
+        {
+            var bitmap = BitmapSource.Create(
+                2,
+                1,
+                144,
+                144,
+                PixelFormats.Bgra32,
+                null,
+                new byte[]
+                {
+                    255, 0, 0, 255,
+                    0, 255, 0, 255
+                },
+                8);
+            var metadata = new BitmapMetadata("png");
+            metadata.SetQuery("/tEXt/{str=Description}", "Sentory original metadata");
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap, null, metadata, null));
+            using (var stream = File.Create(path))
+            {
+                encoder.Save(stream);
+            }
+
+            var originalBytes = File.ReadAllBytes(path);
+            var data = ClipboardImageDataComposer.TryCreate(path);
+            var restored = ClipboardImageDataComposer.TryReadOriginal(data);
+
+            Assert.NotNull(data);
+            Assert.NotNull(data.GetImage());
+            Assert.NotNull(restored);
+            Assert.Equal(originalBytes, restored.ContentBytes);
+            Assert.Equal(
+                Convert.ToHexString(SHA256.HashData(originalBytes)),
+                restored.Sha256);
+            Assert.Equal(Path.GetFileName(path), restored.OriginalFileName);
+            Assert.Equal(".png", restored.FileExtension);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void RejectsMalformedSentoryClipboardImageData()
+    {
+        var data = new System.Windows.DataObject();
+        data.SetData(
+            ClipboardImageDataComposer.OriginalImageDataFormat,
+            new byte[] { 1, 2, 3 },
+            autoConvert: false);
+
+        var restored = ClipboardImageDataComposer.TryReadOriginal(data);
+
+        Assert.Null(restored);
+    }
+
+    [Fact]
     public void EncodesImageLargerThanEightMegabytes()
     {
         const int width = 2048;

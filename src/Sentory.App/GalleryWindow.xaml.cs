@@ -2356,8 +2356,15 @@ public partial class GalleryWindow : Window
                     return;
                 }
 
-                var image = LoadClipboardImage(path);
-                await SetClipboardWithRetryAsync(() => WpfClipboard.SetImage(image));
+                var data = ClipboardImageDataComposer.TryCreate(path);
+                if (data is null)
+                {
+                    ShowFeedback(SentoryLocalization.Text("PhotoFileNotFound"));
+                    return;
+                }
+
+                await SetClipboardWithRetryAsync(
+                    () => WpfClipboard.SetDataObject(data, true));
                 successMessage = SentoryLocalization.Text("PhotoCopied");
             }
             else
@@ -2392,17 +2399,6 @@ public partial class GalleryWindow : Window
         ApplyFilter();
     }
 
-    private static BitmapSource LoadClipboardImage(string path)
-    {
-        var image = new BitmapImage();
-        image.BeginInit();
-        image.CacheOption = BitmapCacheOption.OnLoad;
-        image.UriSource = new Uri(path, UriKind.Absolute);
-        image.EndInit();
-        image.Freeze();
-        return image;
-    }
-
     private async Task<DetailImageCopyResult> CopyDetailImageAsync(
         Guid itemId,
         bool recordCopyUsage,
@@ -2416,8 +2412,14 @@ public partial class GalleryWindow : Window
 
         try
         {
-            var image = LoadClipboardImage(path);
-            await SetClipboardWithRetryAsync(() => WpfClipboard.SetImage(image));
+            var data = ClipboardImageDataComposer.TryCreate(path);
+            if (data is null)
+            {
+                return new DetailImageCopyResult(false);
+            }
+
+            await SetClipboardWithRetryAsync(
+                () => WpfClipboard.SetDataObject(data, true));
         }
         catch (Exception exception)
             when (exception is COMException or ExternalException or
