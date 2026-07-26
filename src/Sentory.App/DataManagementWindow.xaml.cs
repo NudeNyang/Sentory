@@ -893,6 +893,7 @@ public partial class DataManagementWindow : Window
         AutoCleanupComboBox.IsEnabled = !busy;
         OpenDataFolderButton.IsEnabled = !busy;
         ChooseSyncFolderButton.IsEnabled = !busy;
+        ManualSyncFolderButton.IsEnabled = !busy;
         SyncProviderComboBox.IsEnabled = !busy;
         SyncToggleButton.IsEnabled = !busy;
         UpdateCheckButton.IsEnabled = !busy && !_updateCheckBusy;
@@ -1047,6 +1048,9 @@ public partial class DataManagementWindow : Window
             : Visibility.Collapsed;
         ChooseSyncFolderButton.Content = SentoryLocalization.Text(
             "ChangeSyncFolder");
+        ManualSyncFolderButton.Visibility = hasFolder
+            ? Visibility.Collapsed
+            : Visibility.Visible;
         SyncToggleButton.Content = SentoryLocalization.Text(
             hasFolder
                 ? settings.SyncEnabled ? "TurnOff" : "TurnOn"
@@ -1054,6 +1058,11 @@ public partial class DataManagementWindow : Window
         Grid.SetColumn(SyncToggleButton, hasFolder ? 2 : 0);
         Grid.SetColumnSpan(SyncToggleButton, hasFolder ? 1 : 3);
         SyncToggleButton.Width = hasFolder ? 82 : double.NaN;
+        SyncToggleButton.Visibility = hasFolder ||
+                                      !_cloudSyncFolderDiscoveryCompleted ||
+                                      _cloudSyncFolders.Count > 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         SyncRuntimeStatusText.Text = settings.SyncEnabled
             ? SentoryLocalization.Text(snapshot.State switch
             {

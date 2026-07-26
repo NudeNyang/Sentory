@@ -68,13 +68,14 @@ public sealed class SentoryLocalizationTests
     }
 
     [Theory]
-    [InlineData("ko-KR", "컴퓨터 간 동기화", "동기화 중")]
-    [InlineData("en-US", "Computer sync", "Syncing")]
-    [InlineData("ja-JP", "コンピューター間同期", "同期中")]
-    [InlineData("zh-CN", "电脑间同步", "正在同步")]
+    [InlineData("ko-KR", "컴퓨터 · 모바일 간 동기화", "클라우드 공유", "동기화 중")]
+    [InlineData("en-US", "Computer and mobile sync", "Cloud sharing", "Syncing")]
+    [InlineData("ja-JP", "パソコン・モバイル間同期", "クラウド共有", "同期中")]
+    [InlineData("zh-CN", "电脑与手机同步", "云端共享", "正在同步")]
     public void ComputerSyncSettingsAreLocalized(
         string language,
         string expectedHeading,
+        string expectedCloudHeading,
         string expectedState)
     {
         SentoryLocalization.Apply(new ResourceDictionary(), language);
@@ -82,6 +83,9 @@ public sealed class SentoryLocalizationTests
         Assert.Equal(
             expectedHeading,
             SentoryLocalization.Text("ComputerSync"));
+        Assert.Equal(
+            expectedCloudHeading,
+            SentoryLocalization.Text("ComputerSyncHeading"));
         Assert.Equal(
             expectedState,
             SentoryLocalization.Text("SyncStateSyncing"));
@@ -105,6 +109,9 @@ public sealed class SentoryLocalizationTests
         Assert.Equal(
             "동기화 시작",
             SentoryLocalization.Text("StartSync"));
+        Assert.Equal(
+            "폴더 선택",
+            SentoryLocalization.Text("SelectSyncFolder"));
         Assert.Contains(
             "자동으로 만듭니다",
             SentoryLocalization.Format(

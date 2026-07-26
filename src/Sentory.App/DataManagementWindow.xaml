@@ -380,6 +380,11 @@
                                     Style="{StaticResource ActionButtonStyle}"
                                     Click="SyncToggleButton_Click" />
                         </Grid>
+                        <Button x:Name="ManualSyncFolderButton"
+                                Margin="0,10,0,0"
+                                Content="{DynamicResource Loc.SelectSyncFolder}"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Click="ChooseSyncFolderButton_Click" />
                     </StackPanel>
                 </Border>
 

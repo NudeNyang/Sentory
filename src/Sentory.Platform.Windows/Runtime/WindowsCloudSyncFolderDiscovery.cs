@@ -1,5 +1,6 @@
 using System.IO;
 using System.Management;
+using System.Text.Json;
 
 namespace Sentory.Platform.Windows.Runtime;
 
@@ -18,6 +19,8 @@ public static class WindowsCloudSyncFolderDiscovery
     private static readonly string[] GoogleMyDriveNames =
         ["My Drive", "내 드라이브", "マイドライブ", "我的云端硬盘", "我的雲端硬碟"];
 
+    private static readonly string[] MegaFolderNames = ["MEGA", "MEGAsync"];
+
     public static IReadOnlyList<CloudSyncFolderCandidate> Discover()
     {
         var oneDriveRoots = OneDriveEnvironmentVariables
@@ -27,12 +30,16 @@ public static class WindowsCloudSyncFolderDiscovery
 
         return Resolve(
             oneDriveRoots,
-            DiscoverGoogleDriveRoots());
+            DiscoverGoogleDriveRoots(),
+            DiscoverDropboxRoots(),
+            DiscoverMegaRoots());
     }
 
     internal static IReadOnlyList<CloudSyncFolderCandidate> Resolve(
         IEnumerable<string> oneDriveRoots,
-        IEnumerable<string> googleDriveRoots)
+        IEnumerable<string> googleDriveRoots,
+        IEnumerable<string>? dropboxRoots = null,
+        IEnumerable<string>? megaRoots = null)
     {
         ArgumentNullException.ThrowIfNull(oneDriveRoots);
         ArgumentNullException.ThrowIfNull(googleDriveRoots);
@@ -44,6 +51,16 @@ public static class WindowsCloudSyncFolderDiscovery
             "google-drive",
             "Google Drive",
             googleDriveRoots);
+        AddCandidates(
+            candidates,
+            "dropbox",
+            "Dropbox",
+            dropboxRoots ?? []);
+        AddCandidates(
+            candidates,
+            "mega",
+            "MEGA",
+            megaRoots ?? []);
 
         return candidates
             .DistinctBy(
@@ -70,6 +87,40 @@ public static class WindowsCloudSyncFolderDiscovery
         return matchingName is null
             ? null
             : Path.GetFullPath(Path.Combine(driveRoot, matchingName));
+    }
+
+    internal static IReadOnlyList<string> ResolveDropboxRootsFromInfoJson(
+        string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return [];
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return [];
+            }
+
+            return document.RootElement
+                .EnumerateObject()
+                .Where(property =>
+                    property.Value.ValueKind == JsonValueKind.Object &&
+                    property.Value.TryGetProperty("path", out var path) &&
+                    path.ValueKind == JsonValueKind.String)
+                .Select(property =>
+                    property.Value.GetProperty("path").GetString())
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .Cast<string>()
+                .ToArray();
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     private static IReadOnlyList<string> DiscoverGoogleDriveRoots()
@@ -123,6 +174,77 @@ public static class WindowsCloudSyncFolderDiscovery
         }
 
         return roots;
+    }
+
+    private static IReadOnlyList<string> DiscoverDropboxRoots()
+    {
+        var roots = new List<string>();
+        var applicationDataFolders = new[]
+        {
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.ApplicationData),
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.LocalApplicationData)
+        };
+
+        foreach (var applicationDataFolder in applicationDataFolders)
+        {
+            if (string.IsNullOrWhiteSpace(applicationDataFolder))
+            {
+                continue;
+            }
+
+            var infoPath = Path.Combine(
+                applicationDataFolder,
+                "Dropbox",
+                "info.json");
+            try
+            {
+                if (File.Exists(infoPath))
+                {
+                    roots.AddRange(ResolveDropboxRootsFromInfoJson(
+                        File.ReadAllText(infoPath)));
+                }
+            }
+            catch (Exception exception)
+                when (exception is IOException or
+                      UnauthorizedAccessException or
+                      NotSupportedException)
+            {
+                // Try the other official info.json location.
+            }
+        }
+
+        if (roots.Count > 0)
+        {
+            return roots;
+        }
+
+        var userProfile = Environment.GetFolderPath(
+            Environment.SpecialFolder.UserProfile);
+        return DiscoverKnownFolders(userProfile, ["Dropbox"]);
+    }
+
+    private static IReadOnlyList<string> DiscoverMegaRoots()
+    {
+        var userProfile = Environment.GetFolderPath(
+            Environment.SpecialFolder.UserProfile);
+        return DiscoverKnownFolders(userProfile, MegaFolderNames);
+    }
+
+    private static IReadOnlyList<string> DiscoverKnownFolders(
+        string parentFolder,
+        IEnumerable<string> folderNames)
+    {
+        if (string.IsNullOrWhiteSpace(parentFolder))
+        {
+            return [];
+        }
+
+        return folderNames
+            .Select(name => Path.Combine(parentFolder, name))
+            .Where(Directory.Exists)
+            .ToArray();
     }
 
     private static void AddCandidates(

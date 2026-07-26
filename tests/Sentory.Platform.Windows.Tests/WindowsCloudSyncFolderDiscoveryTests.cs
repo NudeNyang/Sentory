@@ -16,13 +16,26 @@ public sealed class WindowsCloudSyncFolderDiscoveryTests : IDisposable
             Path.Combine(_testRoot, "OneDrive")).FullName;
         var googleDrive = Directory.CreateDirectory(
             Path.Combine(_testRoot, "Google Drive", "My Drive")).FullName;
+        var dropbox = Directory.CreateDirectory(
+            Path.Combine(_testRoot, "Dropbox")).FullName;
+        var mega = Directory.CreateDirectory(
+            Path.Combine(_testRoot, "MEGA")).FullName;
 
         var candidates = WindowsCloudSyncFolderDiscovery.Resolve(
             [oneDrive, oneDrive],
-            [googleDrive]);
+            [googleDrive],
+            [dropbox],
+            [mega]);
 
         Assert.Collection(
             candidates,
+            candidate =>
+            {
+                Assert.Equal("Dropbox", candidate.ProviderName);
+                Assert.Equal(
+                    Path.Combine(dropbox, "Sentory"),
+                    candidate.FolderPath);
+            },
             candidate =>
             {
                 Assert.Equal("Google Drive", candidate.ProviderName);
@@ -32,11 +45,48 @@ public sealed class WindowsCloudSyncFolderDiscoveryTests : IDisposable
             },
             candidate =>
             {
+                Assert.Equal("MEGA", candidate.ProviderName);
+                Assert.Equal(
+                    Path.Combine(mega, "Sentory"),
+                    candidate.FolderPath);
+            },
+            candidate =>
+            {
                 Assert.Equal("OneDrive", candidate.ProviderName);
                 Assert.Equal(
                     Path.Combine(oneDrive, "Sentory"),
                     candidate.FolderPath);
             });
+    }
+
+    [Fact]
+    public void DropboxInfoJsonSupportsPersonalAndBusinessFolders()
+    {
+        const string json = """
+            {
+              "personal": { "path": "C:\\Users\\test\\Dropbox" },
+              "business": { "path": "D:\\Dropbox (Team)" }
+            }
+            """;
+
+        var roots = WindowsCloudSyncFolderDiscovery
+            .ResolveDropboxRootsFromInfoJson(json);
+
+        Assert.Equal(
+            ["C:\\Users\\test\\Dropbox", "D:\\Dropbox (Team)"],
+            roots);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("[]")]
+    [InlineData("{ not-json }")]
+    public void DropboxInfoJsonRejectsUnavailableAccountData(string json)
+    {
+        var roots = WindowsCloudSyncFolderDiscovery
+            .ResolveDropboxRootsFromInfoJson(json);
+
+        Assert.Empty(roots);
     }
 
     [Theory]
