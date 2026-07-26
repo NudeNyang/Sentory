@@ -454,6 +454,10 @@ public static class DiscordAccessibilityWorker
         var latestMessageCount = baselineMessageCount;
         var latestNewMessageCount = 0;
         var matchingOwnedImageFound = false;
+        var trackDraft = !request.ExplicitSendObserved &&
+                         request.ExpectedDraftImageCount is > 0;
+        var observedDraft = false;
+        DateTimeOffset? draftMissingSince = null;
 
         while (DateTimeOffset.UtcNow - startedAt < timeout)
         {
@@ -471,13 +475,32 @@ public static class DiscordAccessibilityWorker
             latestNewMessageCount = newMessages.Count;
             matchingOwnedImageFound = newMessages.Any(
                 IsVisibleOwnedImageMessage);
+            var draftImageCount = trackDraft
+                ? CountDraftImageAttachments(
+                    accessibleRoot,
+                    request.ExpectedDraftImageCount!.Value)
+                : 0;
+            if (draftImageCount > 0)
+            {
+                observedDraft = true;
+                draftMissingSince = null;
+            }
+            else if (observedDraft)
+            {
+                draftMissingSince ??= now;
+            }
+
+            var canConfirm = DiscordManualUploadConfirmationPolicy.CanConfirm(
+                trackDraft,
+                observedDraft,
+                matchingOwnedImageFound);
             var decision = DiscordImageConfirmationEvaluator.Evaluate(
                 baselineMessageCount,
                 new DiscordImageCandidateObservation(
                     contextValid,
                     newMessages.Count,
                     messages.Count,
-                    matchingOwnedImageFound));
+                    canConfirm));
 
             if (decision == DiscordCandidateDecision.Confirmed)
             {
@@ -497,6 +520,19 @@ public static class DiscordAccessibilityWorker
                         latestMessageCount,
                         latestNewMessageCount,
                         matchingOwnedImageFound));
+            }
+
+            if (DiscordManualUploadConfirmationPolicy.ShouldCancel(
+                    trackDraft,
+                    observedDraft,
+                    draftImageCount,
+                    draftMissingSince,
+                    now))
+            {
+                return new DiscordConfirmationResponse(
+                    DiscordConfirmationOutcome.Cancelled,
+                    null,
+                    ["manual-upload-draft-removed"]);
             }
         }
 

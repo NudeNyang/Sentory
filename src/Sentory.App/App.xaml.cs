@@ -43,6 +43,7 @@ public partial class App : System.Windows.Application
     private ICaptureRuntime? _runtime;
     private KakaoDropOverlayRuntime? _kakaoDropOverlay;
     private DiscordDropOverlayRuntime? _discordDropOverlay;
+    private MessengerFileUploadRuntime? _messengerFileUploadRuntime;
     private GalleryWindow? _galleryWindow;
     private readonly CancellationTokenSource _maintenanceCancellation = new();
     private Task? _maintenanceTask;
@@ -277,6 +278,11 @@ public partial class App : System.Windows.Application
                 discordRuntime,
                 (category, message) =>
                     _diagnosticsLog?.Write(category, message));
+            _messengerFileUploadRuntime = new MessengerFileUploadRuntime(
+                discordRuntime,
+                kakaoRuntime,
+                (category, message) =>
+                    _diagnosticsLog?.Write(category, message));
             _runtime.Captured += OnCaptured;
             _runtime.IssueDetected += OnCaptureIssueDetected;
             if (_runtime is ICaptureRuntimeStatusSource statusSource)
@@ -319,6 +325,7 @@ public partial class App : System.Windows.Application
                     _maintenanceCancellation.Token);
             _kakaoDropOverlay.Start();
             _discordDropOverlay.Start();
+            _messengerFileUploadRuntime.Start();
             UpdatePauseUi();
             OpenGallery();
             _ = CheckForUpdatesAsync(_maintenanceCancellation.Token);
@@ -2146,6 +2153,8 @@ public partial class App : System.Windows.Application
         _kakaoDropOverlay = null;
         _discordDropOverlay?.Dispose();
         _discordDropOverlay = null;
+        _messengerFileUploadRuntime?.Dispose();
+        _messengerFileUploadRuntime = null;
         if (_runtime is not null)
         {
             _runtime.Captured -= OnCaptured;

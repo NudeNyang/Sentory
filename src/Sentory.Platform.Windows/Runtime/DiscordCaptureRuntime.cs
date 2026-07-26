@@ -16,6 +16,17 @@ public enum DiscordNativeDropRegistrationResult
     Failed
 }
 
+public enum DiscordManualUploadRegistrationResult
+{
+    Registered,
+    Paused,
+    TargetInvalid,
+    UnsupportedFiles,
+    ImageReadFailed,
+    Duplicate,
+    Failed
+}
+
 internal readonly record struct DiscordUnavailableRecoveryPlan(
     CaptureRuntimeState State,
     bool BeginWarmup,
@@ -223,6 +234,82 @@ public sealed class DiscordCaptureRuntime :
                 "native-drop-candidate-failed",
                 $"type={exception.GetType().Name}");
             return DiscordNativeDropRegistrationResult.Failed;
+        }
+    }
+
+    public async Task<DiscordManualUploadRegistrationResult>
+        RegisterManualFileUploadAsync(
+            DiscordDropTarget target,
+            IReadOnlyList<string> paths)
+    {
+        if (_paused)
+        {
+            return DiscordManualUploadRegistrationResult.Paused;
+        }
+
+        var occurredAt = DateTimeOffset.UtcNow;
+        var trigger = new PasteTrigger(
+            Guid.NewGuid(),
+            target.MainWindow,
+            target.RendererWindow,
+            target.ProcessId,
+            _native.GetClipboardSequenceNumber(),
+            occurredAt,
+            false);
+        if (!_validator.TryValidate(trigger, out var context))
+        {
+            return DiscordManualUploadRegistrationResult.TargetInvalid;
+        }
+
+        var imagePaths = paths
+            .Where(ClipboardImageCodec.IsSupportedImagePath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (imagePaths.Length == 0)
+        {
+            return DiscordManualUploadRegistrationResult.UnsupportedFiles;
+        }
+
+        try
+        {
+            var images = await Task.Run(() =>
+                ClipboardImageCodec.TryReadFiles(imagePaths));
+            if (images.Count == 0)
+            {
+                return DiscordManualUploadRegistrationResult.ImageReadFailed;
+            }
+
+            if (_paused)
+            {
+                return DiscordManualUploadRegistrationResult.Paused;
+            }
+
+            var registered = StartCandidate(
+                context,
+                [],
+                images,
+                requiresSendSignal: false,
+                originSignals:
+                [
+                    "native-file-dialog",
+                    "file-selection-confirmed"
+                ]);
+            DiscordCaptureTrace.Write(
+                "manual-upload-candidate",
+                $"registered={registered} files={imagePaths.Length} images={images.Count} bytes={images.Sum(image => image.ContentBytes.LongLength)}");
+            return registered
+                ? DiscordManualUploadRegistrationResult.Registered
+                : DiscordManualUploadRegistrationResult.Duplicate;
+        }
+        catch (Exception exception)
+            when (exception is System.IO.IOException or
+                  UnauthorizedAccessException or
+                  NotSupportedException)
+        {
+            DiscordCaptureTrace.Write(
+                "manual-upload-candidate-failed",
+                $"type={exception.GetType().Name}");
+            return DiscordManualUploadRegistrationResult.Failed;
         }
     }
 
@@ -454,7 +541,9 @@ public sealed class DiscordCaptureRuntime :
     private bool StartCandidate(
         ValidatedDiscordContext context,
         IReadOnlyList<NormalizedUrl> urls,
-        IReadOnlyList<ClipboardImageSnapshot> images)
+        IReadOnlyList<ClipboardImageSnapshot> images,
+        bool requiresSendSignal = true,
+        IReadOnlyList<string>? originSignals = null)
     {
         CandidateRegistration registration;
         lock (_candidateGate)
@@ -489,16 +578,21 @@ public sealed class DiscordCaptureRuntime :
                 context.EventId,
                 candidateUrls,
                 candidateImages,
-                cancellation);
+                cancellation,
+                requiresSendSignal,
+                originSignals ?? ["ctrl-v", "clipboard-sequence-stable"]);
             registration.Task = Task.Run(() => RunCandidateAsync(registration));
             _candidates.Add(registration);
-            ApplyRecentSendSignal(registration);
+            if (registration.RequiresSendSignal)
+            {
+                ApplyRecentSendSignal(registration);
+            }
             DiscordCaptureTrace.Write(
                 "batch-candidate-started",
                 $"urls={candidateUrls.Count} images={candidateImages.Count} active={_candidates.Count}");
         }
 
-        if (registration.HasImages)
+        if (registration.HasImages && registration.RequiresSendSignal)
         {
             EnsureDraftImageMonitor(registration.Context.ContextHash);
         }
@@ -510,12 +604,15 @@ public sealed class DiscordCaptureRuntime :
     {
         try
         {
-            var sendTimeout = registration.HasImages
-                ? TimeSpan.FromMinutes(2)
-                : TimeSpan.FromMinutes(5);
-            _ = await registration.SendObserved.Task.WaitAsync(
-                sendTimeout,
-                registration.Cancellation.Token);
+            if (registration.RequiresSendSignal)
+            {
+                var sendTimeout = registration.HasImages
+                    ? TimeSpan.FromMinutes(2)
+                    : TimeSpan.FromMinutes(5);
+                _ = await registration.SendObserved.Task.WaitAsync(
+                    sendTimeout,
+                    registration.Cancellation.Token);
+            }
             var urlSendBatch = registration.UrlSendBatch;
             if (urlSendBatch is not null &&
                 !urlSendBatch.IsLeader(registration.EventId))
@@ -530,7 +627,10 @@ public sealed class DiscordCaptureRuntime :
                 return;
             }
 
-            await Task.Delay(350, registration.Cancellation.Token);
+            if (registration.RequiresSendSignal)
+            {
+                await Task.Delay(350, registration.Cancellation.Token);
+            }
             var confirmedUrls = imageSendBatch?.SnapshotUrls() ??
                                 urlSendBatch?.SnapshotUrls() ??
                                 registration.Urls;
@@ -539,7 +639,7 @@ public sealed class DiscordCaptureRuntime :
             var response = await ConfirmAsync(
                 registration,
                 confirmedUrls,
-                explicitSendObserved: true,
+                explicitSendObserved: registration.RequiresSendSignal,
                 registration.Cancellation.Token);
 
             DiscordCaptureTrace.Write(
@@ -597,11 +697,10 @@ public sealed class DiscordCaptureRuntime :
                 }
             }
 
-            var signals = new List<string>(response.ConfirmationSignals.Count + 2)
-            {
-                "ctrl-v",
-                "clipboard-sequence-stable"
-            };
+            var signals = new List<string>(
+                response.ConfirmationSignals.Count +
+                registration.OriginSignals.Count);
+            signals.AddRange(registration.OriginSignals);
             signals.AddRange(response.ConfirmationSignals);
             await CaptureConfirmedBatchAsync(
                 registration,
@@ -977,7 +1076,12 @@ public sealed class DiscordCaptureRuntime :
                     : DiscordConfirmationContentKind.Image,
                 urls.Select(url => url.Value).ToList(),
                 registration.HasImages ? 120_000 : 300_000,
-                explicitSendObserved),
+                explicitSendObserved,
+                ExpectedDraftImageCount:
+                    registration.HasImages &&
+                    !registration.RequiresSendSignal
+                        ? registration.Images.Count
+                        : null),
             cancellationToken);
     }
 
@@ -1480,7 +1584,9 @@ public sealed class DiscordCaptureRuntime :
         Guid eventId,
         IReadOnlyList<NormalizedUrl> urls,
         IReadOnlyList<ClipboardImageSnapshot> images,
-        CancellationTokenSource cancellation)
+        CancellationTokenSource cancellation,
+        bool requiresSendSignal,
+        IReadOnlyList<string> originSignals)
     {
         public ValidatedDiscordContext Context { get; } = context;
 
@@ -1497,6 +1603,10 @@ public sealed class DiscordCaptureRuntime :
         public DiscordImageSendBatch? ImageSendBatch { get; set; }
 
         public CancellationTokenSource Cancellation { get; } = cancellation;
+
+        public bool RequiresSendSignal { get; } = requiresSendSignal;
+
+        public IReadOnlyList<string> OriginSignals { get; } = originSignals;
 
         public Task Task { get; set; } =
             System.Threading.Tasks.Task.CompletedTask;

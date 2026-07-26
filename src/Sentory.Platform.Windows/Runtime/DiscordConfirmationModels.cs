@@ -137,3 +137,24 @@ internal static class DiscordImageConfirmationEvaluator
         return DiscordCandidateDecision.Pending;
     }
 }
+
+internal static class DiscordManualUploadConfirmationPolicy
+{
+    public static bool CanConfirm(
+        bool trackDraft,
+        bool observedDraft,
+        bool matchingOwnedImageFound) =>
+        matchingOwnedImageFound && (!trackDraft || observedDraft);
+
+    public static bool ShouldCancel(
+        bool trackDraft,
+        bool observedDraft,
+        int draftImageCount,
+        DateTimeOffset? draftMissingSince,
+        DateTimeOffset now) =>
+        trackDraft &&
+        observedDraft &&
+        draftImageCount == 0 &&
+        draftMissingSince is not null &&
+        now - draftMissingSince >= TimeSpan.FromSeconds(2);
+}

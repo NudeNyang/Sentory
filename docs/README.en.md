@@ -17,8 +17,8 @@ planned.
 
 | Messenger | When Sentory saves | What Sentory ignores |
 | --- | --- | --- |
-| Discord | After a pasted link or image is actually sent | Paste without sending, `Shift+Enter`, canceled attachments |
-| KakaoTalk | When a link or image is pasted into an individual chat, or local images are dropped into that chat | Manually typed URLs, search input, anything outside a chat input |
+| Discord | After a pasted link or image, or an image chosen with `+`, is actually sent | Paste without sending, `Shift+Enter`, canceled attachments |
+| KakaoTalk | When a link or image is pasted into an individual chat, or local images are dropped or chosen with `+` for that chat | Manually typed URLs, search input, anything outside a chat input |
 
 Clipboard activity in other apps does not create library items. Detection for Discord
 and KakaoTalk can be enabled or disabled separately in settings.
@@ -76,8 +76,9 @@ Release, and compare its SHA-256 value with the accompanying `.sha256` file if n
 ## Getting started
 
 1. Run Sentory. The library window and taskbar icon appear together.
-2. Paste a link or image into an individual KakaoTalk chat. In Discord, send the pasted
-   content before Sentory saves it.
+2. Paste a link or image into an individual KakaoTalk chat, or choose an image with
+   the `+` file picker. In Discord, actually send pasted or manually selected content
+   before Sentory saves it.
 3. Open a card in the library to review, open, or copy its contents.
 
 New installations enable Start with Windows by default. You can turn it off from
