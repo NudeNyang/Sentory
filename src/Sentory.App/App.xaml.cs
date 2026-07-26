@@ -220,24 +220,36 @@ public partial class App : System.Windows.Application
                 return;
             }
 
-            var ocrRecognizer = new PaddleOcrImageTextRecognizer(
-                Path.Combine(_paths.RootDirectory, "ocr-models"),
-                new WindowsImageTextRecognizer());
-            _ocrRecognizer = ocrRecognizer;
-            _ocrService = new OcrEnrichmentService(
-                (IImageOcrRepository)_repository,
-                ocrRecognizer,
-                _paths,
-                (sha256, exception) => _diagnosticsLog?.Write(
-                    "image-ocr-item-failed",
-                    $"Image OCR failed for {sha256[..Math.Min(12, sha256.Length)]}",
-                    exception),
-                new WindowsImageMetadataTitleReader());
-            if (!ocrRecognizer.IsAvailable)
+            var ocrDisabled = OcrRuntimePolicy.IsDisabled(
+                Environment.GetEnvironmentVariable(
+                    OcrRuntimePolicy.DisableEnvironmentVariable));
+            if (ocrDisabled)
             {
                 _diagnosticsLog.Write(
-                    "image-ocr-unavailable",
-                    "No local OCR engine is available");
+                    "image-ocr-disabled",
+                    $"OCR was disabled by {OcrRuntimePolicy.DisableEnvironmentVariable}");
+            }
+            else
+            {
+                var ocrRecognizer = new PaddleOcrImageTextRecognizer(
+                    Path.Combine(_paths.RootDirectory, "ocr-models"),
+                    new WindowsImageTextRecognizer());
+                _ocrRecognizer = ocrRecognizer;
+                _ocrService = new OcrEnrichmentService(
+                    (IImageOcrRepository)_repository,
+                    ocrRecognizer,
+                    _paths,
+                    (sha256, exception) => _diagnosticsLog?.Write(
+                        "image-ocr-item-failed",
+                        $"Image OCR failed for {sha256[..Math.Min(12, sha256.Length)]}",
+                        exception),
+                    new WindowsImageMetadataTitleReader());
+                if (!ocrRecognizer.IsAvailable)
+                {
+                    _diagnosticsLog.Write(
+                        "image-ocr-unavailable",
+                        "No local OCR engine is available");
+                }
             }
 
             var acceptInjectedInput = string.Equals(
@@ -293,8 +305,11 @@ public partial class App : System.Windows.Application
                 _maintenanceCancellation.Token);
             _linkPreviewTask = RunLinkPreviewLoopAsync(
                 _maintenanceCancellation.Token);
-            _ocrTask = Task.Run(() => RunOcrLoopAsync(
-                _maintenanceCancellation.Token));
+            if (_ocrService is not null)
+            {
+                _ocrTask = Task.Run(() => RunOcrLoopAsync(
+                    _maintenanceCancellation.Token));
+            }
             _syncTask = Task.Run(() => RunSyncLoopAsync(
                 _maintenanceCancellation.Token));
             ApplyRuntimeSourceSettings();
