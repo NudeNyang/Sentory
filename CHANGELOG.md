@@ -2,6 +2,14 @@
 
 ## 개발 중
 
+- WhatsApp 탐색기 드롭 감지를 전체 창 투명 오버레이에서 Explorer 선택 파일과
+  마우스 해제 위치를 수동 관찰하는 방식으로 바꿔, WhatsApp이 처음부터 원래
+  OLE 드래그를 직접 받고 Sentory가 추가하던 약 0.2초의 대상 전환 지연을 제거
+- 서로 겹친 Discord·카카오톡·Slack 창은 현재 포인터 아래에 실제로 보이는
+  최상위 메신저만 투명 드롭 영역을 열도록 제한해, 뒤쪽 메신저 감지창들이
+  WhatsApp 드래그를 동시에 가로채던 경쟁을 차단
+- Release 전체 검증은 Core 60개, Diagnostics 15개, Platform Windows 258개,
+  Infrastructure 160개, App 132개로 총 625개가 통과
 - WhatsApp 데스크톱 앱에서 붙여넣은 URL·사진과 Explorer에서 드롭한 사진을
   후보로 만들고, 초록색 전송 버튼·명시적 전송 입력·발신 영역 변화를 모두
   확인한 뒤에만 저장하도록 지원

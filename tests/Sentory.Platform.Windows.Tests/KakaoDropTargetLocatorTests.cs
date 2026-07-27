@@ -40,6 +40,15 @@ public sealed class KakaoDropTargetLocatorTests
     }
 
     [Fact]
+    public void RejectsOccludedKakaoWindowWhenTopmostIsRequired()
+    {
+        var native = new FakeNative { WindowAtPoint = new nint(999) };
+        var locator = new KakaoDropTargetLocator(native, native);
+
+        Assert.Null(locator.FindAt(450, 300, requireTopmost: true));
+    }
+
+    [Fact]
     public void ConfirmsReleaseOnlyWithinOriginalChatBounds()
     {
         var native = new FakeNative();

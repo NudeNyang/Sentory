@@ -11,7 +11,10 @@ public sealed class DiscordDropTargetLocator(
     IDiscordWindowApi discordWindows,
     IKakaoDropWindowApi dropWindows)
 {
-    public DiscordDropTarget? FindAt(int cursorX, int cursorY)
+    public DiscordDropTarget? FindAt(
+        int cursorX,
+        int cursorY,
+        bool requireTopmost = false)
     {
         foreach (var root in dropWindows.EnumerateTopLevelWindows())
         {
@@ -40,6 +43,13 @@ public sealed class DiscordDropTargetLocator(
             if (!Contains(bounds, cursorX, cursorY) ||
                 bounds.Width < 320 ||
                 bounds.Height < 320)
+            {
+                continue;
+            }
+
+            if (requireTopmost &&
+                native.GetRootWindow(
+                    dropWindows.GetWindowAtPoint(cursorX, cursorY)) != root)
             {
                 continue;
             }

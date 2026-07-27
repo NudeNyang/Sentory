@@ -41,6 +41,15 @@ public sealed class DiscordDropTargetLocatorTests
     }
 
     [Fact]
+    public void RejectsOccludedDiscordWindowWhenTopmostIsRequired()
+    {
+        var native = new FakeNative { IsOccluded = true };
+        var locator = new DiscordDropTargetLocator(native, native, native);
+
+        Assert.Null(locator.FindAt(450, 300, requireTopmost: true));
+    }
+
+    [Fact]
     public void ConfirmsReleaseOnlyWithinOriginalDiscordBounds()
     {
         var native = new FakeNative();
@@ -60,10 +69,12 @@ public sealed class DiscordDropTargetLocatorTests
         public nint Renderer { get; } = new(21);
         public uint ProcessId { get; } = 84;
         public bool HasRenderer { get; set; } = true;
+        public bool IsOccluded { get; set; }
 
         public nint GetForegroundWindow() => Main;
         public nint GetFocusedWindow(nint foregroundWindow) => Renderer;
-        public nint GetRootWindow(nint window) => Main;
+        public nint GetRootWindow(nint window) =>
+            window == new nint(99) ? window : Main;
         public uint GetProcessId(nint window) => ProcessId;
         public string? GetProcessName(uint processId) => "Discord";
         public string GetClassName(nint window) =>
@@ -92,7 +103,8 @@ public sealed class DiscordDropTargetLocatorTests
         public bool IsWindowVisible(nint window) => true;
         public bool IsWindowMinimized(nint window) => false;
         public (int X, int Y) GetCursorPosition() => (450, 300);
-        public nint GetWindowAtPoint(int x, int y) => Renderer;
+        public nint GetWindowAtPoint(int x, int y) =>
+            IsOccluded ? new nint(99) : Renderer;
         public bool IsLeftMouseButtonDown() => false;
         public bool IsEscapeKeyDown() => false;
         public bool PositionTopmostWindow(

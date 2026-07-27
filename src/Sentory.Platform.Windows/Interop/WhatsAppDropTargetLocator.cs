@@ -5,7 +5,10 @@ public sealed class WhatsAppDropTargetLocator(
     IDiscordWindowApi chromiumWindows,
     IKakaoDropWindowApi dropWindows)
 {
-    public WhatsAppDropTarget? FindAt(int cursorX, int cursorY)
+    public WhatsAppDropTarget? FindAt(
+        int cursorX,
+        int cursorY,
+        bool requireTopmost = false)
     {
         foreach (var root in dropWindows.EnumerateTopLevelWindows())
         {
@@ -34,6 +37,13 @@ public sealed class WhatsAppDropTargetLocator(
             if (!Contains(bounds, cursorX, cursorY) ||
                 bounds.Width < 320 ||
                 bounds.Height < 320)
+            {
+                continue;
+            }
+
+            if (requireTopmost &&
+                native.GetRootWindow(
+                    dropWindows.GetWindowAtPoint(cursorX, cursorY)) != root)
             {
                 continue;
             }

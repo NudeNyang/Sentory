@@ -1,69 +1,51 @@
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Interop;
-using System.Windows.Media;
 using System.Windows.Threading;
 using Sentory.Platform.Windows.Interop;
-using WpfBrushes = System.Windows.Media.Brushes;
-using WpfColor = System.Windows.Media.Color;
-using WpfDragDropEffects = System.Windows.DragDropEffects;
-using WpfDragEventArgs = System.Windows.DragEventArgs;
 
 namespace Sentory.Platform.Windows.Runtime;
 
 public sealed class WhatsAppDropOverlayRuntime : IDisposable
 {
+    private const double CachedExplorerMaximumDistance = 64;
     private static readonly TimeSpan PollInterval =
         TimeSpan.FromMilliseconds(16);
 
     private readonly INativeWindowApi _native;
     private readonly IKakaoDropWindowApi _dropWindows;
     private readonly WhatsAppDropTargetLocator _locator;
+    private readonly IExplorerSelectionReader _selectionReader;
     private readonly WhatsAppCaptureRuntime _captureRuntime;
     private readonly Action<string, string>? _diagnostic;
     private readonly DispatcherTimer _timer;
-    private readonly Window _window;
-    private readonly WhatsAppDropPassThroughState _passThrough = new();
-    private readonly ExplorerFileDragActivationState _dragActivation = new();
+    private readonly WhatsAppPassiveDropState _dropState = new();
     private bool _started;
-    private bool _oleDragOver;
-    private WhatsAppDropTarget? _currentTarget;
+    private bool _leftWasDown;
+    private bool _hasPointerUpSample;
+    private (int X, int Y) _lastPointerUpPosition;
+    private nint _lastPointerUpExplorer;
 
     public WhatsAppDropOverlayRuntime(
         WhatsAppCaptureRuntime captureRuntime,
         Action<string, string>? diagnostic = null)
+        : this(
+            captureRuntime,
+            new NativeWindowApi(),
+            new ExplorerSelectionReader(),
+            diagnostic)
     {
-        var native = new NativeWindowApi();
+    }
+
+    internal WhatsAppDropOverlayRuntime(
+        WhatsAppCaptureRuntime captureRuntime,
+        NativeWindowApi native,
+        IExplorerSelectionReader selectionReader,
+        Action<string, string>? diagnostic = null)
+    {
         _native = native;
         _dropWindows = native;
         _locator = new WhatsAppDropTargetLocator(native, native, native);
+        _selectionReader = selectionReader;
         _captureRuntime = captureRuntime;
         _diagnostic = diagnostic;
-
-        _window = new Window
-        {
-            WindowStyle = WindowStyle.None,
-            ResizeMode = ResizeMode.NoResize,
-            AllowsTransparency = true,
-            Background = WpfBrushes.Transparent,
-            ShowInTaskbar = false,
-            ShowActivated = false,
-            Topmost = true,
-            Focusable = false,
-            AllowDrop = true,
-            Content = new Border
-            {
-                Background = new SolidColorBrush(
-                    WpfColor.FromArgb(1, 255, 255, 255)),
-                BorderThickness = new Thickness(0)
-            },
-            SizeToContent = SizeToContent.Manual
-        };
-        _window.DragEnter += OnDragEnter;
-        _window.DragOver += OnDragOver;
-        _window.DragLeave += OnDragLeave;
-        _window.Drop += OnDrop;
-
         _timer = new DispatcherTimer(
             PollInterval,
             DispatcherPriority.Input,
@@ -87,17 +69,14 @@ public sealed class WhatsAppDropOverlayRuntime : IDisposable
     {
         if (_captureRuntime.IsPaused)
         {
-            _passThrough.Cancel();
             ResetDrag();
-            HideOverlay();
             return;
         }
 
         var leftDown = _dropWindows.IsLeftMouseButtonDown();
         var cursor = _dropWindows.GetCursorPosition();
-        if (_passThrough.IsActive && _dropWindows.IsEscapeKeyDown())
+        if (_leftWasDown && _dropWindows.IsEscapeKeyDown())
         {
-            _passThrough.Cancel();
             ResetDrag();
             _diagnostic?.Invoke(
                 "whatsapp-drop-cancelled",
@@ -105,175 +84,143 @@ public sealed class WhatsAppDropOverlayRuntime : IDisposable
             return;
         }
 
-        if (_passThrough.TryTakeCompleted(
-                leftDown,
-                out var completedTarget,
-                out var completedPaths))
-        {
-            ResetDrag();
-            _ = RegisterPassedThroughDropAsync(
-                completedTarget,
-                completedPaths);
-            return;
-        }
-
-        if (_passThrough.IsActive)
-        {
-            return;
-        }
-
-        var shouldInspectTarget = _dragActivation.Observe(
-            leftDown,
-            cursor,
-            () => IsExplorerAt(cursor));
         if (!leftDown)
         {
-            if (_oleDragOver)
-            {
-                return;
-            }
-
-            ResetDrag();
-            HideOverlay();
+            CompleteDrag(cursor);
+            RememberPointerUp(cursor);
             return;
         }
 
-        if (!shouldInspectTarget)
+        if (!_leftWasDown)
         {
-            HideOverlay();
-            return;
+            _leftWasDown = true;
+            BeginPossibleExplorerDrag(cursor);
         }
 
-        var target = _locator.FindAt(cursor.X, cursor.Y);
-        if (target is null)
+        if (_dropState.IsTracking)
         {
-            HideOverlay();
-            return;
+            _dropState.Observe(
+                cursor,
+                _locator.FindAt(
+                    cursor.X,
+                    cursor.Y,
+                    requireTopmost: true));
         }
-
-        ShowOverlay(target);
     }
 
-    private bool IsExplorerAt((int X, int Y) cursor)
+    private void BeginPossibleExplorerDrag((int X, int Y) cursor)
+    {
+        var explorer = FindExplorerAt(cursor);
+        var start = cursor;
+        if (explorer == nint.Zero &&
+            _hasPointerUpSample &&
+            Distance(_lastPointerUpPosition, cursor) <=
+            CachedExplorerMaximumDistance)
+        {
+            explorer = _lastPointerUpExplorer;
+            start = _lastPointerUpPosition;
+        }
+
+        if (explorer == nint.Zero)
+        {
+            return;
+        }
+
+        var paths = _selectionReader
+            .ReadSelectedFiles(explorer)
+            .Where(ClipboardImageCodec.IsSupportedImagePath)
+            .ToArray();
+        if (paths.Length == 0)
+        {
+            return;
+        }
+
+        _dropState.Begin(start, paths);
+        _diagnostic?.Invoke(
+            "whatsapp-drop-selection-observed",
+            $"files={paths.Length}");
+    }
+
+    private void CompleteDrag((int X, int Y) cursor)
+    {
+        if (!_leftWasDown)
+        {
+            return;
+        }
+
+        _leftWasDown = false;
+        if (!_dropState.IsTracking)
+        {
+            return;
+        }
+
+        _dropState.Observe(
+            cursor,
+            _locator.FindAt(
+                cursor.X,
+                cursor.Y,
+                requireTopmost: true));
+        if (_dropState.TryTakeCompleted(
+                out var target,
+                out var paths))
+        {
+            _ = RegisterPassiveDropAsync(target, paths);
+        }
+    }
+
+    private void RememberPointerUp((int X, int Y) cursor)
+    {
+        _hasPointerUpSample = true;
+        _lastPointerUpPosition = cursor;
+        _lastPointerUpExplorer = FindExplorerAt(cursor);
+    }
+
+    private nint FindExplorerAt((int X, int Y) cursor)
     {
         var window = _dropWindows.GetWindowAtPoint(cursor.X, cursor.Y);
+        var root = _native.GetRootWindow(window);
         return string.Equals(
-            _native.GetProcessName(_native.GetProcessId(window)),
+            _native.GetProcessName(_native.GetProcessId(root)),
             "explorer",
-            StringComparison.OrdinalIgnoreCase);
+            StringComparison.OrdinalIgnoreCase)
+            ? root
+            : nint.Zero;
     }
 
-    private void ShowOverlay(WhatsAppDropTarget target)
+    private static double Distance(
+        (int X, int Y) left,
+        (int X, int Y) right)
     {
-        _currentTarget = target;
-        if (!_window.IsVisible)
-        {
-            _window.Show();
-        }
-
-        var handle = new WindowInteropHelper(_window).Handle;
-        _dropWindows.PositionTopmostWindow(handle, target.Bounds);
+        var x = left.X - right.X;
+        var y = left.Y - right.Y;
+        return Math.Sqrt((x * x) + (y * y));
     }
 
-    private void OnDragEnter(object sender, WpfDragEventArgs e)
-    {
-        _oleDragOver = true;
-        ObserveAndPassThrough(e);
-    }
-
-    private void OnDragOver(object sender, WpfDragEventArgs e)
-    {
-        if (_passThrough.IsActive)
-        {
-            return;
-        }
-
-        _oleDragOver = true;
-        ObserveAndPassThrough(e);
-    }
-
-    private void OnDragLeave(object sender, WpfDragEventArgs e) =>
-        _oleDragOver = false;
-
-    private void ObserveAndPassThrough(WpfDragEventArgs e)
-    {
-        var inspection = FileDropCapturePolicy.Inspect(e.Data);
-        var target = _currentTarget;
-        if (!inspection.ShouldObserve)
-        {
-            _dragActivation.RejectActiveDragUntilRelease();
-            _oleDragOver = false;
-            HideOverlay();
-            e.Handled = false;
-            return;
-        }
-
-        if (target is null)
-        {
-            _oleDragOver = false;
-            HideOverlay();
-            e.Handled = false;
-            return;
-        }
-
-        e.Effects = WpfDragDropEffects.Copy;
-        e.Handled = true;
-        _passThrough.Observe(target, inspection.ImagePaths);
-        _diagnostic?.Invoke(
-            "whatsapp-drop-observed",
-            $"files={inspection.ImagePaths.Count}, window=0x{target.MainWindow.ToInt64():X}");
-        _oleDragOver = false;
-        _currentTarget = null;
-        _window.Hide();
-    }
-
-    private void OnDrop(object sender, WpfDragEventArgs e)
-    {
-        e.Effects = WpfDragDropEffects.None;
-        e.Handled = false;
-        ResetDrag();
-        HideOverlay();
-    }
-
-    private async Task RegisterPassedThroughDropAsync(
+    private async Task RegisterPassiveDropAsync(
         WhatsAppDropTarget target,
         IReadOnlyList<string> paths)
     {
         _diagnostic?.Invoke(
             "whatsapp-drop-released",
-            $"files={paths.Count}, window=0x{target.MainWindow.ToInt64():X}");
+            $"files={paths.Count}, window=0x{target.MainWindow.ToInt64():X}, mode=passive");
         var result = await _captureRuntime.RegisterNativeDroppedFilesAsync(
             target,
             paths);
         _diagnostic?.Invoke(
             "whatsapp-drop-result",
-            $"result={result}, files={paths.Count}");
+            $"result={result}, files={paths.Count}, mode=passive");
     }
 
     private void ResetDrag()
     {
-        _dragActivation.ResetActiveDrag();
-        _oleDragOver = false;
-    }
-
-    private void HideOverlay()
-    {
-        _currentTarget = null;
-        if (_window.IsVisible)
-        {
-            _window.Hide();
-        }
+        _leftWasDown = false;
+        _dropState.Reset();
     }
 
     public void Dispose()
     {
         _timer.Stop();
-        _passThrough.Reset();
-        _window.DragEnter -= OnDragEnter;
-        _window.DragOver -= OnDragOver;
-        _window.DragLeave -= OnDragLeave;
-        _window.Drop -= OnDrop;
-        _window.Close();
+        _dropState.Reset();
         GC.SuppressFinalize(this);
     }
 }

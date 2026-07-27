@@ -11,7 +11,10 @@ public sealed class KakaoDropTargetLocator(
     INativeWindowApi native,
     IKakaoDropWindowApi dropWindows)
 {
-    public KakaoDropTarget? FindAt(int cursorX, int cursorY)
+    public KakaoDropTarget? FindAt(
+        int cursorX,
+        int cursorY,
+        bool requireTopmost = false)
     {
         foreach (var root in dropWindows.EnumerateTopLevelWindows())
         {
@@ -36,6 +39,13 @@ public sealed class KakaoDropTargetLocator(
             if (!Contains(chatBounds, cursorX, cursorY) ||
                 chatBounds.Width < 320 ||
                 chatBounds.Height < 320)
+            {
+                continue;
+            }
+
+            if (requireTopmost &&
+                native.GetRootWindow(
+                    dropWindows.GetWindowAtPoint(cursorX, cursorY)) != root)
             {
                 continue;
             }

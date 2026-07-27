@@ -186,7 +186,10 @@ public sealed class KakaoDropOverlayRuntime : IDisposable
             return;
         }
 
-        var target = _locator.FindAt(cursor.X, cursor.Y);
+        var target = _locator.FindAt(
+            cursor.X,
+            cursor.Y,
+            requireTopmost: !_window.IsVisible);
         if (target is null)
         {
             HideOverlay();
