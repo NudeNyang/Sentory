@@ -43,6 +43,8 @@ public sealed class SentorySettings
 
     public bool WhatsAppSupportEnabled { get; set; } = true;
 
+    public bool LineSupportEnabled { get; set; } = true;
+
     public bool? StartWithWindows { get; set; }
 
     public bool DiscordAccessibilityPrepared { get; set; }

@@ -2,6 +2,22 @@
 
 ## 개발 중
 
+- Windows LINE 26.3 데스크톱 앱에서 붙여넣은 URL·사진과 Explorer에서
+  드롭한 사진을 후보로 만들고, 같은 대화의 새 메시지 항목과 사용자의 명시적
+  전송 입력이 함께 확인된 뒤에만 `Confirmed`로 저장하도록 지원
+- LINE의 `AllInOneWindow`, `MainChatPanel`, `LcListView`, `LcTextField` 접근성
+  구조를 검증하고 대화 이동·다른 프로세스·다른 창 클래스·불일치 URL을
+  fail-closed로 거부하는 자동 테스트 추가
+- LINE의 마우스 전송은 활성 후보가 있을 때 클릭 지점의 실제 Qt 접근성 요소가
+  `LcButton`인 경우만 인정해 대화 목록이나 메시지 클릭을 전송으로 오인하지 않음
+- 보관함 필터의 메신저·기간을 가로 2열로 재배치하고, 설정의 메신저 감지도
+  Discord/KakaoTalk와 Slack/WhatsApp을 나란히 배치한 2열 카드로 정리
+- 메신저 이름 `KakaoTalk`을 모든 언어에서 공식 영문 표기로 통일하고 LINE
+  출처 필터·상세 표시·독립 감지 토글을 추가
+- 개발 버전을 `1.5.0+developers`, 파일 버전을 `1.5.0.0`으로 갱신하되 공개
+  Release는 생성하지 않음
+- Release 구성 전체 검증은 Core 60개, Diagnostics 15개, Platform Windows
+  266개, Infrastructure 160개, App 132개로 총 633개가 통과
 - WhatsApp 탐색기 드롭 감지를 전체 창 투명 오버레이에서 Explorer 선택 파일과
   마우스 해제 위치를 수동 관찰하는 방식으로 바꿔, WhatsApp이 처음부터 원래
   OLE 드래그를 직접 받고 Sentory가 추가하던 약 0.2초의 대상 전환 지연을 제거

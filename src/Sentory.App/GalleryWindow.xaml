@@ -677,7 +677,7 @@
                            AllowsTransparency="True"
                            PopupAnimation="Fade"
                            StaysOpen="False">
-                        <Border Width="236"
+                        <Border Width="430"
                                 Padding="10"
                                 Background="{DynamicResource SurfaceBrush}"
                                 BorderBrush="{DynamicResource LineBrush}"
@@ -699,42 +699,55 @@
                                             Click="FilterResetButton_Click" />
                                 </Grid>
 
-                                <TextBlock Margin="11,6,0,3"
-                                           Text="{DynamicResource Loc.Messenger}"
-                                           FontSize="11"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource SoftTextBrush}" />
-                                <StackPanel x:Name="SourceOptionsPanel" />
+                                <Grid Margin="0,2,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="1" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
 
-                                <Border Height="1"
-                                        Margin="8,8,8,7"
-                                        Background="{DynamicResource LineBrush}" />
+                                    <StackPanel Margin="0,0,10,0">
+                                        <TextBlock Margin="11,6,0,3"
+                                                   Text="{DynamicResource Loc.Messenger}"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource SoftTextBrush}" />
+                                        <StackPanel x:Name="SourceOptionsPanel" />
+                                    </StackPanel>
 
-                                <TextBlock Margin="11,0,0,3"
-                                           Text="{DynamicResource Loc.Period}"
-                                           FontSize="11"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource SoftTextBrush}" />
-                                <Button x:Name="DateAllButton"
-                                        Content="{DynamicResource Loc.AllPeriod}"
-                                        Tag="All"
-                                        Style="{StaticResource MenuOptionButtonStyle}"
-                                        Click="DateOptionButton_Click" />
-                                <Button x:Name="DateTodayButton"
-                                        Content="{DynamicResource Loc.Today}"
-                                        Tag="Today"
-                                        Style="{StaticResource MenuOptionButtonStyle}"
-                                        Click="DateOptionButton_Click" />
-                                <Button x:Name="Date7DaysButton"
-                                        Content="{DynamicResource Loc.Last7Days}"
-                                        Tag="Last7Days"
-                                        Style="{StaticResource MenuOptionButtonStyle}"
-                                        Click="DateOptionButton_Click" />
-                                <Button x:Name="Date30DaysButton"
-                                        Content="{DynamicResource Loc.Last30Days}"
-                                        Tag="Last30Days"
-                                        Style="{StaticResource MenuOptionButtonStyle}"
-                                        Click="DateOptionButton_Click" />
+                                    <Border Grid.Column="1"
+                                            Margin="0,5"
+                                            Background="{DynamicResource LineBrush}" />
+
+                                    <StackPanel Grid.Column="2"
+                                                Margin="10,0,0,0">
+                                        <TextBlock Margin="11,6,0,3"
+                                                   Text="{DynamicResource Loc.Period}"
+                                                   FontSize="11"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource SoftTextBrush}" />
+                                        <Button x:Name="DateAllButton"
+                                                Content="{DynamicResource Loc.AllPeriod}"
+                                                Tag="All"
+                                                Style="{StaticResource MenuOptionButtonStyle}"
+                                                Click="DateOptionButton_Click" />
+                                        <Button x:Name="DateTodayButton"
+                                                Content="{DynamicResource Loc.Today}"
+                                                Tag="Today"
+                                                Style="{StaticResource MenuOptionButtonStyle}"
+                                                Click="DateOptionButton_Click" />
+                                        <Button x:Name="Date7DaysButton"
+                                                Content="{DynamicResource Loc.Last7Days}"
+                                                Tag="Last7Days"
+                                                Style="{StaticResource MenuOptionButtonStyle}"
+                                                Click="DateOptionButton_Click" />
+                                        <Button x:Name="Date30DaysButton"
+                                                Content="{DynamicResource Loc.Last30Days}"
+                                                Tag="Last30Days"
+                                                Style="{StaticResource MenuOptionButtonStyle}"
+                                                Click="DateOptionButton_Click" />
+                                    </StackPanel>
+                                </Grid>
                             </StackPanel>
                         </Border>
                     </Popup>

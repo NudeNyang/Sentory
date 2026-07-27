@@ -489,7 +489,8 @@ state=Connecting`을 남기고 끝났다. 이후 채팅방을 열어도 준비 �
 - 키 입력 전체를 기록하지 않는다.
 - 필요한 조합만 관찰하고 훅 콜백은 즉시 반환한다.
 - 메시지 입력과 전송을 가로채지 않는다.
-- 클립보드는 검증된 Discord, Slack 또는 KakaoTalk 입력 이벤트 직후에만 읽는다.
+- 클립보드는 검증된 Discord, Slack, WhatsApp, KakaoTalk 또는 LINE 입력 이벤트
+  직후에만 읽는다.
 - URL과 이미지 이외의 일반 텍스트는 폐기한다.
 - 입력값 원문은 로그에 기록하지 않는다.
 - 앱 UI 구조가 달라지면 해당 어댑터를 `DetectionUnavailable`로 바꾼다.

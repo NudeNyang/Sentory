@@ -45,6 +45,7 @@ public partial class App : System.Windows.Application
     private DiscordDropOverlayRuntime? _discordDropOverlay;
     private SlackDropOverlayRuntime? _slackDropOverlay;
     private WhatsAppDropOverlayRuntime? _whatsAppDropOverlay;
+    private LineDropOverlayRuntime? _lineDropOverlay;
     private GalleryWindow? _galleryWindow;
     private readonly CancellationTokenSource _maintenanceCancellation = new();
     private Task? _maintenanceTask;
@@ -67,6 +68,7 @@ public partial class App : System.Windows.Application
     private bool _kakaoSupportEnabled = true;
     private bool _slackSupportEnabled = true;
     private bool _whatsAppSupportEnabled = true;
+    private bool _lineSupportEnabled = true;
     private bool _discordRepairNeeded;
     private bool _discordRepairBusy;
     private bool _discordRestartPromptActive;
@@ -277,11 +279,17 @@ public partial class App : System.Windows.Application
                 acceptInjectedInput,
                 (category, message) =>
                     _diagnosticsLog?.Write(category, message));
+            var lineRuntime = new LineCaptureRuntime(
+                _repository,
+                acceptInjectedInput,
+                (category, message) =>
+                    _diagnosticsLog?.Write(category, message));
             _runtime = new CompositeCaptureRuntime(
                 (SourceApp.KakaoTalk, kakaoRuntime),
                 (SourceApp.Discord, discordRuntime),
                 (SourceApp.Slack, slackRuntime),
-                (SourceApp.WhatsApp, whatsAppRuntime));
+                (SourceApp.WhatsApp, whatsAppRuntime),
+                (SourceApp.Line, lineRuntime));
             _kakaoDropOverlay = new KakaoDropOverlayRuntime(
                 kakaoRuntime,
                 GetSavedDarkTheme,
@@ -299,6 +307,10 @@ public partial class App : System.Windows.Application
                     _diagnosticsLog?.Write(category, message));
             _whatsAppDropOverlay = new WhatsAppDropOverlayRuntime(
                 whatsAppRuntime,
+                (category, message) =>
+                    _diagnosticsLog?.Write(category, message));
+            _lineDropOverlay = new LineDropOverlayRuntime(
+                lineRuntime,
                 (category, message) =>
                     _diagnosticsLog?.Write(category, message));
             _runtime.Captured += OnCaptured;
@@ -345,6 +357,7 @@ public partial class App : System.Windows.Application
             _discordDropOverlay.Start();
             _slackDropOverlay.Start();
             _whatsAppDropOverlay.Start();
+            _lineDropOverlay.Start();
             UpdatePauseUi();
             OpenGallery();
             _ = CheckForUpdatesAsync(_maintenanceCancellation.Token);
@@ -825,6 +838,7 @@ public partial class App : System.Windows.Application
         _kakaoSupportEnabled = settings.KakaoTalkSupportEnabled;
         _slackSupportEnabled = settings.SlackSupportEnabled;
         _whatsAppSupportEnabled = settings.WhatsAppSupportEnabled;
+        _lineSupportEnabled = settings.LineSupportEnabled;
         if (!_discordSupportEnabled || !_discordLauncher.IsInstalled)
         {
             return;
@@ -891,7 +905,8 @@ public partial class App : System.Windows.Application
                 _discordSupportEnabled,
                 _kakaoSupportEnabled,
                 _slackSupportEnabled,
-                _whatsAppSupportEnabled);
+                _whatsAppSupportEnabled,
+                _lineSupportEnabled);
             QueueDiscordStartupRegistrationSync(
                 discordSupportEnabled: false,
                 GetStartupEnabled());
@@ -935,7 +950,8 @@ public partial class App : System.Windows.Application
             _discordSupportEnabled,
             _kakaoSupportEnabled,
             _slackSupportEnabled,
-            _whatsAppSupportEnabled);
+            _whatsAppSupportEnabled,
+            _lineSupportEnabled);
         QueueDiscordStartupRegistrationSync(
             _discordSupportEnabled,
             GetStartupEnabled());
@@ -970,6 +986,10 @@ public partial class App : System.Windows.Application
         {
             _whatsAppSupportEnabled = enabled;
         }
+        else if (sourceApp == SourceApp.Line)
+        {
+            _lineSupportEnabled = enabled;
+        }
         else
         {
             return;
@@ -979,7 +999,8 @@ public partial class App : System.Windows.Application
             _discordSupportEnabled,
             _kakaoSupportEnabled,
             _slackSupportEnabled,
-            _whatsAppSupportEnabled);
+            _whatsAppSupportEnabled,
+            _lineSupportEnabled);
         UpdatePauseUi();
     }
 
@@ -1002,6 +1023,9 @@ public partial class App : System.Windows.Application
         controller.SetSourceEnabled(
             SourceApp.WhatsApp,
             _whatsAppSupportEnabled);
+        controller.SetSourceEnabled(
+            SourceApp.Line,
+            _lineSupportEnabled);
     }
 
     private void ApplyPauseState()
@@ -1031,7 +1055,17 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        var statusKey = (_discordSupportEnabled, _kakaoSupportEnabled) switch
+        var additionalMessengerEnabled =
+            _slackSupportEnabled ||
+            _whatsAppSupportEnabled ||
+            _lineSupportEnabled;
+        var anyMessengerEnabled =
+            _discordSupportEnabled ||
+            _kakaoSupportEnabled ||
+            additionalMessengerEnabled;
+        var statusKey = additionalMessengerEnabled
+            ? "StatusDetectingMessengers"
+            : (_discordSupportEnabled, _kakaoSupportEnabled) switch
         {
             (true, true) => "StatusDetecting",
             (true, false) => "StatusDetectingDiscord",
@@ -1041,7 +1075,7 @@ public partial class App : System.Windows.Application
         SetStatus(
             SentoryLocalization.Text(statusKey),
             SentoryLocalization.Text(
-                _discordSupportEnabled || _kakaoSupportEnabled
+                anyMessengerEnabled
                     ? "TrayDetecting"
                     : "TrayDetectionDisabled"));
     }
@@ -1588,7 +1622,8 @@ public partial class App : System.Windows.Application
                 _discordSupportEnabled,
                 _kakaoSupportEnabled,
                 _slackSupportEnabled,
-                _whatsAppSupportEnabled);
+                _whatsAppSupportEnabled,
+                _lineSupportEnabled);
             _galleryWindow.SetDetectionPaused(
                 _runtime?.IsPaused == true);
             _galleryWindow.SetRuntimeIssue(_lastRuntimeIssue);
@@ -2202,6 +2237,8 @@ public partial class App : System.Windows.Application
         _slackDropOverlay = null;
         _whatsAppDropOverlay?.Dispose();
         _whatsAppDropOverlay = null;
+        _lineDropOverlay?.Dispose();
+        _lineDropOverlay = null;
         if (_runtime is not null)
         {
             _runtime.Captured -= OnCaptured;

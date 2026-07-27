@@ -5,7 +5,8 @@ public enum SourceApp
     Discord,
     KakaoTalk,
     Slack,
-    WhatsApp
+    WhatsApp,
+    Line
 }
 
 public enum ContentKind
@@ -37,7 +38,10 @@ public enum CaptureMethod
     SlackConfirmedDrop,
     WhatsAppConfirmedSend,
     WhatsAppConfirmedImage,
-    WhatsAppConfirmedDrop
+    WhatsAppConfirmedDrop,
+    LineConfirmedSend,
+    LineConfirmedImage,
+    LineConfirmedDrop
 }
 
 public enum LinkPreviewStatus

@@ -470,3 +470,20 @@ WhatsApp 경로는 Explorer Shell에서 선택 파일을 읽고 마우스 이동
 OLE 드래그를 직접 받으며, Sentory는 실제 전송 확인 절차에 사용할 파일 후보만
 별도로 보관한다. 다른 메신저의 가려진 감지창도 현재 포인터 아래 최상위 창이
 일치하지 않으면 열지 않도록 제한했다.
+
+## 2026-07-27 LINE 데스크톱 앱 조사
+
+현재 설치된 LINE 26.3.0.3916은 `LINE.exe`의 Qt 최상위 창과 채팅 영역을
+Windows UI Automation으로 노출한다.
+
+- 최상위 창: `LINE.exe`, `AllInOneWindow`
+- 현재 대화: `MainChatPanel`
+- 메시지 목록: `LcListView`와 자식 `ListItem`
+- 메시지 입력: `LcTextField` (`TextPattern`, `ValuePattern`)
+- 대화 목록과 메시지 목록의 항목은 안정된 Runtime ID를 제공
+
+실행 중인 실제 LINE 창에서 읽기 전용 기준점을 두 번 연속 수집해 선택 대화
+식별자와 메시지 Runtime ID가 유지되는 것을 확인했다. 붙여넣기·Explorer 드롭
+직전에 기준점을 만들고, 같은 대화에서 새 Runtime ID와 명시적 Enter·마우스
+입력이 함께 확인된 경우만 확정한다. URL은 새 항목의 값과 정규화 주소를 추가로
+대조한다. 실제 메시지 전송 검수는 사용자가 개발자판에서 수행할 대상으로 남긴다.

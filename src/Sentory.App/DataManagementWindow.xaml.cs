@@ -128,6 +128,8 @@ public partial class DataManagementWindow : Window
 
     public bool WhatsAppSupportChanged { get; private set; }
 
+    public bool LineSupportChanged { get; private set; }
+
     public event Action<SourceApp, bool>? MessengerSupportSelectionChanged;
 
     public event Action<bool, int>? AutoFavoriteSettingsChanged;
@@ -564,6 +566,31 @@ public partial class DataManagementWindow : Window
         {
             StatusText.Text =
                 SentoryLocalization.Text("WhatsAppSettingFailed");
+        }
+    }
+
+    private void LineSupportToggleButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        try
+        {
+            var settings = _settingsStore.Load();
+            settings.LineSupportEnabled = !settings.LineSupportEnabled;
+            _settingsStore.Save(settings);
+            LineSupportChanged = true;
+            UpdateLineControls(settings.LineSupportEnabled);
+            MessengerSupportSelectionChanged?.Invoke(
+                SourceApp.Line,
+                settings.LineSupportEnabled);
+            StatusText.Text = settings.LineSupportEnabled
+                ? SentoryLocalization.Text("LineDetectionEnabled")
+                : SentoryLocalization.Text("LineDetectionDisabled");
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException)
+        {
+            StatusText.Text = SentoryLocalization.Text("LineSettingFailed");
         }
     }
 
@@ -1084,12 +1111,31 @@ public partial class DataManagementWindow : Window
         };
     }
 
+    private void UpdateLineControls(bool enabled)
+    {
+        var settingsState = MessengerDetectionSettingsUiPolicy.Resolve(
+            enabled,
+            _detectionPaused);
+        LineSupportToggleButton.Content = enabled
+            ? SentoryLocalization.Text("InUse")
+            : SentoryLocalization.Text("NotInUse");
+        LineStatusText.Text = settingsState switch
+        {
+            MessengerDetectionSettingsState.Disabled =>
+                SentoryLocalization.Text("LineNotInUse"),
+            MessengerDetectionSettingsState.Paused =>
+                SentoryLocalization.Text("DetectionPaused"),
+            _ => SentoryLocalization.Text("DetectionReady")
+        };
+    }
+
     private void UpdateMessengerControls(SentorySettings settings)
     {
         UpdateDiscordControls(settings.DiscordSupportEnabled);
         UpdateKakaoControls(settings.KakaoTalkSupportEnabled);
         UpdateSlackControls(settings.SlackSupportEnabled);
         UpdateWhatsAppControls(settings.WhatsAppSupportEnabled);
+        UpdateLineControls(settings.LineSupportEnabled);
     }
 
     private void SyncStatusTracker_Changed(
