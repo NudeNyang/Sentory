@@ -321,5 +321,7 @@ DPI와 색상 형식이 달라질 수 있다. 기존 중복 키는 저장 파일
 - 사용자 승인 뒤 실제 Slack 채널에 고유 URL과 비트맵 사진을 각각 붙여넣고
   전송했다. 둘 다 같은 대화의 새 본인 메시지와 내용이 일치한 뒤
   `slack-send-confirmed`, `slack-capture-applied drop=False` 순서로 저장됐다.
-- 탐색기에서 Slack으로 보내는 실제 교차 창 드롭은 Computer Use의 창 경계
-  제한 때문에 사용자가 직접 수행하는 마지막 검수로 남겨 뒀다.
+- 사용자가 다른 사진을 탐색기에서 Slack 입력창으로 직접 드롭해 전송했다.
+  실제 로그는 `slack-drop-observed` → `slack-drop-candidate` →
+  `slack-send-confirmed` → `slack-capture-applied drop=True` 순서였고, 사용자도
+  Sentory 보관함에 사진이 정상 등록된 것을 확인했다.
