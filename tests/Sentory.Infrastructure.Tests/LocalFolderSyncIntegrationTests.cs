@@ -441,6 +441,7 @@ public sealed class LocalFolderSyncIntegrationTests : IDisposable
         await runtimeB.RunOnceAsync(replicaB.Journal.DeviceId, sharedFolder);
         Assert.Empty(await replicaB.Captures.GetRecentAsync(10));
 
+        var secondCapturedAt = DateTimeOffset.UtcNow.AddMinutes(1);
         var second = await replicaA.Captures.UpsertUrlAsync(
             new UrlCaptureRequest(
                 Guid.NewGuid(),
@@ -450,11 +451,11 @@ public sealed class LocalFolderSyncIntegrationTests : IDisposable
                 CaptureMethod.DiscordConfirmedSend,
                 DeliveryStatus.Confirmed,
                 "second-generation",
-                DateTimeOffset.Parse("2026-07-27T09:00:00+09:00"),
+                secondCapturedAt,
                 ["url-match"]));
         Assert.True(await replicaA.Captures.RecordCopyAsync(
             second.ItemId,
-            DateTimeOffset.Parse("2026-07-27T10:00:00+09:00")));
+            secondCapturedAt.AddMinutes(1)));
         Assert.True(await replicaA.Captures.SetFavoriteAsync(
             second.ItemId,
             true));
