@@ -7,7 +7,8 @@ namespace Sentory.Infrastructure.Sync;
 public sealed record SyncItemProjectionResult(
     int Projected,
     int AlreadyProjected,
-    int Skipped);
+    int Skipped,
+    int Pending);
 
 public sealed class SyncItemProjectionService(
     ICaptureRepository captureRepository,
@@ -21,6 +22,7 @@ public sealed class SyncItemProjectionService(
         var projected = 0;
         var alreadyProjected = 0;
         var skipped = 0;
+        var pending = 0;
         var operations = await journal.GetReceivedAsync(cancellationToken);
         var deletionTimes = new Dictionary<string, DateTimeOffset>(
             StringComparer.Ordinal);
@@ -91,7 +93,7 @@ public sealed class SyncItemProjectionService(
                 continue;
             }
 
-            var result = payload.ContentKind switch
+            CaptureResult? result = payload.ContentKind switch
             {
                 SyncItemContentKinds.Url => await ProjectUrlAsync(
                     operation,
@@ -104,6 +106,12 @@ public sealed class SyncItemProjectionService(
                 _ => throw new NotSupportedException(
                     "지원하지 않는 동기화 콘텐츠 종류입니다.")
             };
+            if (result is null)
+            {
+                pending++;
+                continue;
+            }
+
             if (result.EventApplied)
             {
                 projected++;
@@ -126,7 +134,8 @@ public sealed class SyncItemProjectionService(
         return new SyncItemProjectionResult(
             projected,
             alreadyProjected,
-            skipped);
+            skipped,
+            pending);
     }
 
     private async Task<CaptureResult> ProjectUrlAsync(
@@ -172,7 +181,7 @@ public sealed class SyncItemProjectionService(
             cancellationToken);
     }
 
-    private async Task<CaptureResult> ProjectImageAsync(
+    private async Task<CaptureResult?> ProjectImageAsync(
         SyncOperation operation,
         SyncItemPayload payload,
         CancellationToken cancellationToken)
@@ -199,8 +208,7 @@ public sealed class SyncItemProjectionService(
 
         if (stored is null)
         {
-            throw new InvalidDataException(
-                "원격 사진 블롭을 찾을 수 없습니다.");
+            return null;
         }
         if (!string.Equals(stored.Key, key, StringComparison.Ordinal) ||
             stored.Content.LongLength != image.ByteSize)

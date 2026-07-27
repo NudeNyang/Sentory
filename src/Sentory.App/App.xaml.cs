@@ -2033,7 +2033,7 @@ public partial class App : System.Windows.Application
                 succeededAt);
             _diagnosticsLog?.Write(
                 "cloud-sync-completed",
-                $"exported={result.Export.Exported}, metadataExported={result.Metadata.Exported}, uploaded={result.Cycle.Transfer.Uploaded + result.Publish.Uploaded}, downloaded={result.Cycle.Transfer.Downloaded + result.Publish.Downloaded}, projected={result.Cycle.Projection.Projected}, metadataProjected={result.Metadata.Projected}");
+                $"exported={result.Export.Exported}, metadataExported={result.Metadata.Exported}, uploaded={result.Cycle.Transfer.Uploaded + result.Publish.Uploaded}, downloaded={result.Cycle.Transfer.Downloaded + result.Publish.Downloaded}, projected={result.Cycle.Projection.Projected}, pending={result.Cycle.Projection.Pending}, metadataProjected={result.Metadata.Projected}");
 
             if (result.Metadata.SettingsChanged)
             {

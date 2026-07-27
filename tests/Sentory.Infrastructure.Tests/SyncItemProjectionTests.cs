@@ -120,7 +120,7 @@ public sealed class SyncItemProjectionTests : IDisposable
     }
 
     [Fact]
-    public async Task MissingImageBlobCanBeRetriedWithoutLosingOperation()
+    public async Task MissingImageBlobRemainsPendingUntilAvailable()
     {
         var replicaB = await CreateReplicaAsync("b");
         var objectStore = new InMemorySyncObjectStore();
@@ -157,8 +157,11 @@ public sealed class SyncItemProjectionTests : IDisposable
             replicaB.Captures,
             objectStore);
 
-        await Assert.ThrowsAsync<InvalidDataException>(() =>
-            projector.ProjectReceivedAsync(replicaB.Journal));
+        var pending = await projector.ProjectReceivedAsync(
+            replicaB.Journal);
+
+        Assert.Equal(1, pending.Pending);
+        Assert.Equal(0, pending.Projected);
         Assert.Empty(await replicaB.Captures.GetRecentAsync(10));
 
         await objectStore.PutIfAbsentAsync(
@@ -169,6 +172,7 @@ public sealed class SyncItemProjectionTests : IDisposable
             replicaB.Journal);
 
         Assert.Equal(1, retried.Projected);
+        Assert.Equal(0, retried.Pending);
         Assert.Single(await replicaB.Captures.GetRecentAsync(10));
     }
 
