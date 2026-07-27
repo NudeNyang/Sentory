@@ -7,7 +7,8 @@ namespace Sentory.Infrastructure.Sync;
 public sealed record SyncStorageMigrationResult(
     bool Migrated,
     int LegacyProjected,
-    string DeviceId);
+    string DeviceId,
+    bool DeviceBindingReset = false);
 
 public sealed class SyncStorageMigrationService(
     SentoryDataPaths paths,
@@ -32,6 +33,25 @@ public sealed class SyncStorageMigrationService(
                 SentorySettings.CurrentSyncStorageVersion &&
             settings.SyncMigrationDeviceId is null)
         {
+            var boundDeviceId = await SqliteSyncOperationJournal
+                .GetBoundDeviceIdAsync(paths, cancellationToken);
+            if (boundDeviceId is not null &&
+                !string.Equals(
+                    boundDeviceId,
+                    currentDeviceId,
+                    StringComparison.Ordinal))
+            {
+                await SqliteSyncOperationJournal.ResetForNewStoreAsync(
+                    paths,
+                    currentDeviceId,
+                    cancellationToken);
+                return new SyncStorageMigrationResult(
+                    false,
+                    0,
+                    currentDeviceId,
+                    true);
+            }
+
             return new SyncStorageMigrationResult(
                 false,
                 0,

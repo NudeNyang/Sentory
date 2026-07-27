@@ -318,7 +318,7 @@ public sealed class SqliteSyncOperationJournalTests : IDisposable
             replica.Paths,
             SyncDeviceIdentity.Create());
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+        var exception = await Assert.ThrowsAsync<SyncDeviceBindingMismatchException>(
             () => mismatched.InitializeAsync());
 
         Assert.Contains("다른 동기화 기기 ID", exception.Message);

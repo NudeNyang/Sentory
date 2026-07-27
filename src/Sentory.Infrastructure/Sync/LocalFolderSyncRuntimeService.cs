@@ -8,7 +8,8 @@ public sealed record LocalFolderSyncRunResult(
     SyncItemExportBatchResult Export,
     SyncMetadataRunResult Metadata,
     SyncCycleResult Cycle,
-    SyncRunResult Publish);
+    SyncRunResult Publish,
+    bool DeviceBindingReset = false);
 
 public sealed class LocalFolderSyncRuntimeService(
     SentoryDataPaths paths,
@@ -40,10 +41,26 @@ public sealed class LocalFolderSyncRuntimeService(
         ISyncObjectStore objectStore,
         CancellationToken cancellationToken)
     {
+        var deviceBindingReset = false;
         var journal = new SqliteSyncOperationJournal(
             paths,
             deviceId);
-        await journal.InitializeAsync(cancellationToken);
+        try
+        {
+            await journal.InitializeAsync(cancellationToken);
+        }
+        catch (SyncDeviceBindingMismatchException)
+        {
+            await SqliteSyncOperationJournal.ResetForNewStoreAsync(
+                paths,
+                deviceId,
+                cancellationToken);
+            journal = new SqliteSyncOperationJournal(
+                paths,
+                deviceId);
+            await journal.InitializeAsync(cancellationToken);
+            deviceBindingReset = true;
+        }
         var metadataService = captureRepository is
             SqliteCaptureRepository sqliteRepository
             ? new SyncMetadataService(
@@ -84,7 +101,8 @@ public sealed class LocalFolderSyncRuntimeService(
             export,
             metadata,
             cycle,
-            publish);
+            publish,
+            deviceBindingReset);
     }
 }
 

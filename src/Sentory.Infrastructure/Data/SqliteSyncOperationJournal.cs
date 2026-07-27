@@ -4,6 +4,10 @@ using Sentory.Core.Sync;
 
 namespace Sentory.Infrastructure.Data;
 
+public sealed class SyncDeviceBindingMismatchException()
+    : InvalidOperationException(
+        "이 데이터베이스는 다른 동기화 기기 ID에 연결되어 있습니다.");
+
 public sealed class SqliteSyncOperationJournal :
     ISyncOperationJournal,
     ISyncItemExportJournal
@@ -36,6 +40,49 @@ public sealed class SqliteSyncOperationJournal :
     public SentoryDataPaths Paths { get; }
 
     public string DeviceId { get; }
+
+    public static async Task<string?> GetBoundDeviceIdAsync(
+        SentoryDataPaths paths,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+        if (!File.Exists(paths.DatabasePath))
+        {
+            return null;
+        }
+
+        var connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = paths.DatabasePath,
+            Mode = SqliteOpenMode.ReadWriteCreate,
+            Cache = SqliteCacheMode.Shared,
+            Pooling = true
+        }.ToString();
+        await using var connection = new SqliteConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var table = connection.CreateCommand();
+        table.CommandText =
+            """
+            SELECT 1
+            FROM sqlite_master
+            WHERE type = 'table'
+              AND name = 'sync_replica_state';
+            """;
+        if (await table.ExecuteScalarAsync(cancellationToken) is null)
+        {
+            return null;
+        }
+
+        await using var state = connection.CreateCommand();
+        state.CommandText =
+            """
+            SELECT device_id
+            FROM sync_replica_state
+            WHERE singleton_id = 1;
+            """;
+        return Convert.ToString(
+            await state.ExecuteScalarAsync(cancellationToken));
+    }
 
     public static async Task ResetForNewStoreAsync(
         SentoryDataPaths paths,
@@ -209,8 +256,7 @@ public sealed class SqliteSyncOperationJournal :
                 DeviceId,
                 StringComparison.Ordinal))
         {
-            throw new InvalidOperationException(
-                "이 데이터베이스는 다른 동기화 기기 ID에 연결되어 있습니다.");
+            throw new SyncDeviceBindingMismatchException();
         }
     }
 

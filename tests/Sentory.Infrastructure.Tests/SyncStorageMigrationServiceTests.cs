@@ -140,6 +140,63 @@ public sealed class SyncStorageMigrationServiceTests : IDisposable
         await resetJournal.InitializeAsync();
     }
 
+    [Fact]
+    public async Task CurrentStoreRepairsMismatchedDeviceBinding()
+    {
+        var paths = SentoryDataPaths.ForRoot(Path.Combine(_root, "repair"));
+        var captures = new SqliteCaptureRepository(paths);
+        await captures.InitializeAsync();
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/repair",
+            out var normalized));
+        await captures.UpsertUrlAsync(new UrlCaptureRequest(
+            Guid.NewGuid(),
+            normalized.Original,
+            normalized,
+            SourceApp.Discord,
+            CaptureMethod.DiscordConfirmedSend,
+            DeliveryStatus.Confirmed,
+            "context",
+            DateTimeOffset.Parse("2026-07-28T00:30:00+09:00"),
+            ["url-match"]));
+        var previousDeviceId = SyncDeviceIdentity.Create();
+        var previousJournal = new SqliteSyncOperationJournal(
+            paths,
+            previousDeviceId);
+        await previousJournal.InitializeAsync();
+        Assert.Equal(
+            1,
+            (await new SyncItemExportService(
+                previousJournal,
+                new InMemorySyncObjectStore(),
+                paths).ExportPendingAsync(10)).Exported);
+        var currentDeviceId = SyncDeviceIdentity.Create();
+        var settingsStore = new SentorySettingsStore(paths);
+        settingsStore.Save(new SentorySettings
+        {
+            SyncEnabled = true,
+            SyncFolderPath = Path.Combine(_root, "repair-cloud"),
+            SyncDeviceId = currentDeviceId,
+            SyncStorageVersion = SentorySettings.CurrentSyncStorageVersion
+        });
+
+        var result = await new SyncStorageMigrationService(
+            paths,
+            captures,
+            settingsStore).MigrateIfNeededAsync(settingsStore.Load());
+
+        Assert.False(result.Migrated);
+        Assert.True(result.DeviceBindingReset);
+        Assert.Equal(currentDeviceId, result.DeviceId);
+        var repairedJournal = new SqliteSyncOperationJournal(
+            paths,
+            currentDeviceId);
+        await repairedJournal.InitializeAsync();
+        Assert.Empty(await repairedJournal.GetUnpublishedAsync(10));
+        Assert.Single(await repairedJournal.GetPendingItemExportsAsync(10));
+        Assert.Single(await captures.GetRecentAsync(10));
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();

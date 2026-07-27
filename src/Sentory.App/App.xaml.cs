@@ -2018,14 +2018,27 @@ public partial class App : System.Windows.Application
                     SyncRuntimeState.Syncing,
                     DateTimeOffset.UtcNow);
             }
+            if (migration.DeviceBindingReset)
+            {
+                _diagnosticsLog?.Write(
+                    "cloud-sync-device-binding-reset",
+                    "Requeued local items after repairing a mismatched sync device binding");
+            }
 
             var result = await new LocalFolderSyncRuntimeService(
                 _paths,
                 _repository,
                 _settingsStore).RunOnceAsync(
-                deviceId,
-                selectedDirectory,
-                cancellationToken);
+                    deviceId,
+                    selectedDirectory,
+                    cancellationToken);
+            if (result.DeviceBindingReset &&
+                !migration.DeviceBindingReset)
+            {
+                _diagnosticsLog?.Write(
+                    "cloud-sync-device-binding-reset",
+                    "Requeued local items after repairing a mismatched sync device binding during runtime initialization");
+            }
             var succeededAt = DateTimeOffset.UtcNow;
             _syncStatusTracker.Update(
                 SyncRuntimeState.Succeeded,

@@ -170,6 +170,44 @@ public sealed class LocalFolderSyncIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task AutomaticRuntimeRepairsMismatchedDeviceBinding()
+    {
+        var replica = await CreateReplicaAsync("runtime-binding-repair");
+        var sharedFolder = Path.Combine(
+            _root,
+            "shared-runtime-binding-repair");
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/runtime-binding-repair",
+            out var normalized));
+        await replica.Captures.UpsertUrlAsync(
+            new UrlCaptureRequest(
+                Guid.NewGuid(),
+                normalized.Original,
+                normalized,
+                SourceApp.Discord,
+                CaptureMethod.DiscordConfirmedSend,
+                DeliveryStatus.Confirmed,
+                "context",
+                DateTimeOffset.Parse("2026-07-28T01:10:00+09:00"),
+                ["url-match"]));
+        var replacementDeviceId = SyncDeviceIdentity.Create();
+
+        var result = await new LocalFolderSyncRuntimeService(
+            replica.Paths,
+            replica.Captures).RunOnceAsync(
+                replacementDeviceId,
+                sharedFolder);
+
+        Assert.True(result.DeviceBindingReset);
+        Assert.Equal(1, result.Export.Exported);
+        var repairedJournal = new SqliteSyncOperationJournal(
+            replica.Paths,
+            replacementDeviceId);
+        await repairedJournal.InitializeAsync();
+        Assert.Single(await replica.Captures.GetRecentAsync(10));
+    }
+
+    [Fact]
     public async Task AutomaticRuntimePublishesReadablePhotoAndLinkFiles()
     {
         var replica = await CreateReplicaAsync("readable");
