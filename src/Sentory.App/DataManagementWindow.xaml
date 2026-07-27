@@ -347,6 +347,26 @@
                                     Style="{StaticResource ActionButtonStyle}"
                                     Click="SlackSupportToggleButton_Click" />
                         </Grid>
+                        <Border Height="1"
+                                Margin="0,16"
+                                Background="{DynamicResource LineBrush}" />
+                        <Grid>
+                            <StackPanel>
+                                <TextBlock Text="WhatsApp"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextBrush}" />
+                                <TextBlock x:Name="WhatsAppStatusText"
+                                           Margin="0,4,0,0"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource MutedTextBrush}" />
+                            </StackPanel>
+                            <Button x:Name="WhatsAppSupportToggleButton"
+                                    Width="92"
+                                    HorizontalAlignment="Right"
+                                    Style="{StaticResource ActionButtonStyle}"
+                                    Click="WhatsAppSupportToggleButton_Click" />
+                        </Grid>
                     </StackPanel>
                 </Border>
 

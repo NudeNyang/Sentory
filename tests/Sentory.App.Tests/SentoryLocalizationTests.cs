@@ -87,6 +87,25 @@ public sealed class SentoryLocalizationTests
     }
 
     [Theory]
+    [InlineData("ko-KR", "WhatsApp 감지를 켰습니다.")]
+    [InlineData("en-US", "WhatsApp detection is on.")]
+    [InlineData("ja-JP", "WhatsApp 検出をオンにしました。")]
+    [InlineData("zh-CN", "已开启 WhatsApp 检测。")]
+    public void WhatsAppDetectionStatusIsLocalized(
+        string language,
+        string expected)
+    {
+        SentoryLocalization.Apply(new ResourceDictionary(), language);
+
+        Assert.Equal(
+            expected,
+            SentoryLocalization.Text("WhatsAppDetectionEnabled"));
+        Assert.NotEqual(
+            "WhatsAppNotInUse",
+            SentoryLocalization.Text("WhatsAppNotInUse"));
+    }
+
+    [Theory]
     [InlineData("ko-KR", "컴퓨터 · 모바일 간 동기화", "클라우드 공유", "동기화 중")]
     [InlineData("en-US", "Computer and mobile sync", "Cloud sharing", "Syncing")]
     [InlineData("ja-JP", "パソコン・モバイル間同期", "クラウド共有", "同期中")]

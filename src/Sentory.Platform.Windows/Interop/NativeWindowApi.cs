@@ -311,8 +311,10 @@ internal static class NativeMethods
     internal const uint GetAncestorRoot = 2;
     internal const uint GetWindowOwner = 4;
     internal const int WhKeyboardLl = 13;
+    internal const int WhMouseLl = 14;
     internal const int WmKeyDown = 0x0100;
     internal const int WmSysKeyDown = 0x0104;
+    internal const int WmLButtonDown = 0x0201;
     internal const int VkControl = 0x11;
     internal const int VkLButton = 0x01;
     internal const int VkEscape = 0x1B;
@@ -320,6 +322,7 @@ internal static class NativeMethods
     internal const int VkReturn = 0x0D;
     internal const int VkV = 0x56;
     internal const uint LlkhfInjected = 0x10;
+    internal const uint LlmhfInjected = 0x01;
     internal const uint KeyEventFKeyUp = 0x0002;
     internal const uint InputKeyboard = 1;
     internal static readonly nint HwndTopmost = new(-1);
@@ -331,6 +334,10 @@ internal static class NativeMethods
         int code,
         nint message,
         nint keyboardData);
+    internal delegate nint LowLevelMouseProc(
+        int code,
+        nint message,
+        nint mouseData);
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct GuiThreadInfo
@@ -360,6 +367,16 @@ internal static class NativeMethods
     {
         public uint VirtualKeyCode;
         public uint ScanCode;
+        public uint Flags;
+        public uint Time;
+        public nuint ExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct MouseHookData
+    {
+        public Point Point;
+        public uint MouseData;
         public uint Flags;
         public uint Time;
         public nuint ExtraInfo;
@@ -536,6 +553,13 @@ internal static class NativeMethods
     internal static extern nint SetWindowsHookEx(
         int hookId,
         LowLevelKeyboardProc callback,
+        nint module,
+        uint threadId);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern nint SetWindowsHookEx(
+        int hookId,
+        LowLevelMouseProc callback,
         nint module,
         uint threadId);
 

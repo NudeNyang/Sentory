@@ -4,7 +4,8 @@ public enum SourceApp
 {
     Discord,
     KakaoTalk,
-    Slack
+    Slack,
+    WhatsApp
 }
 
 public enum ContentKind
@@ -33,7 +34,10 @@ public enum CaptureMethod
     KakaoDragDrop,
     SlackConfirmedSend,
     SlackConfirmedImage,
-    SlackConfirmedDrop
+    SlackConfirmedDrop,
+    WhatsAppConfirmedSend,
+    WhatsAppConfirmedImage,
+    WhatsAppConfirmedDrop
 }
 
 public enum LinkPreviewStatus

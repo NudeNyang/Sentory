@@ -1,0 +1,87 @@
+using Sentory.Platform.Windows.Interop;
+
+namespace Sentory.Platform.Windows.Tests;
+
+public sealed class WhatsAppDropTargetLocatorTests
+{
+    [Fact]
+    public void FindsVisibleWhatsAppWindowContainingCursor()
+    {
+        var native = new FakeNative();
+        var locator = new WhatsAppDropTargetLocator(native, native, native);
+
+        var target = locator.FindAt(450, 300);
+
+        Assert.NotNull(target);
+        Assert.Equal(native.Main, target.MainWindow);
+        Assert.Equal(native.Renderer, target.RendererWindow);
+    }
+
+    [Fact]
+    public void RejectsCursorOutsideWindow()
+    {
+        var native = new FakeNative();
+        var locator = new WhatsAppDropTargetLocator(native, native, native);
+
+        Assert.Null(locator.FindAt(100, 100));
+    }
+
+    [Fact]
+    public void RejectsWindowWithoutWebViewRenderer()
+    {
+        var native = new FakeNative { HasRenderer = false };
+        var locator = new WhatsAppDropTargetLocator(native, native, native);
+
+        Assert.Null(locator.FindAt(450, 300));
+    }
+
+    private sealed class FakeNative :
+        INativeWindowApi,
+        IDiscordWindowApi,
+        IKakaoDropWindowApi
+    {
+        public nint Main { get; } = new(20);
+        public nint Renderer { get; } = new(21);
+        public uint ProcessId { get; } = 84;
+        public bool HasRenderer { get; set; } = true;
+
+        public nint GetForegroundWindow() => Main;
+        public nint GetFocusedWindow(nint foregroundWindow) => Renderer;
+        public nint GetRootWindow(nint window) => Main;
+        public uint GetProcessId(nint window) => ProcessId;
+        public string? GetProcessName(uint processId) => "WhatsApp.Root";
+        public string GetClassName(nint window) =>
+            window == Renderer
+                ? WhatsAppContextValidator.RendererClassName
+                : WhatsAppContextValidator.MainWindowClassName;
+        public int GetControlId(nint window) => 0;
+        public nint GetOwnerWindow(nint window) => nint.Zero;
+        public WindowBounds GetWindowBounds(nint window) =>
+            new(300, 120, 940, 820);
+        public bool HasDescendant(
+            nint root,
+            string className,
+            int controlId) => false;
+        public uint GetClipboardSequenceNumber() => 1;
+        public IReadOnlyList<nint> EnumerateTopLevelWindows() => [Main];
+        public nint FindDescendant(nint root, string className) =>
+            HasRenderer &&
+            className == WhatsAppContextValidator.RendererClassName
+                ? Renderer
+                : nint.Zero;
+        public nint FindDescendant(
+            nint root,
+            string className,
+            int controlId) => nint.Zero;
+        public bool IsWindowVisible(nint window) => true;
+        public bool IsWindowMinimized(nint window) => false;
+        public (int X, int Y) GetCursorPosition() => (450, 300);
+        public nint GetWindowAtPoint(int x, int y) => Renderer;
+        public bool IsLeftMouseButtonDown() => false;
+        public bool IsEscapeKeyDown() => false;
+        public bool PositionTopmostWindow(
+            nint window,
+            WindowBounds bounds) => true;
+        public bool FocusWindowAndSendPaste(nint root, nint input) => true;
+    }
+}

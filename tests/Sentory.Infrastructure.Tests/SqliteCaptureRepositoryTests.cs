@@ -865,6 +865,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         Assert.True(settings.DiscordSupportEnabled);
         Assert.True(settings.KakaoTalkSupportEnabled);
         Assert.True(settings.SlackSupportEnabled);
+        Assert.True(settings.WhatsAppSupportEnabled);
         Assert.False(settings.DiscordAccessibilityPrepared);
         Assert.Null(settings.StartWithWindows);
         settings.IsDarkTheme = true;
@@ -884,6 +885,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         Assert.True(restored.DiscordSupportEnabled);
         Assert.True(restored.KakaoTalkSupportEnabled);
         Assert.True(restored.SlackSupportEnabled);
+        Assert.True(restored.WhatsAppSupportEnabled);
         Assert.True(restored.DiscordAccessibilityPrepared);
         Assert.False(restored.StartWithWindows);
         Assert.Equal(120, restored.WindowLeft);
@@ -934,7 +936,8 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         {
             DiscordSupportEnabled = false,
             KakaoTalkSupportEnabled = true,
-            SlackSupportEnabled = false
+            SlackSupportEnabled = false,
+            WhatsAppSupportEnabled = false
         });
 
         var restored = store.Load();
@@ -942,6 +945,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         Assert.False(restored.DiscordSupportEnabled);
         Assert.True(restored.KakaoTalkSupportEnabled);
         Assert.False(restored.SlackSupportEnabled);
+        Assert.False(restored.WhatsAppSupportEnabled);
     }
 
     [Fact]

@@ -325,3 +325,26 @@ DPI와 색상 형식이 달라질 수 있다. 기존 중복 키는 저장 파일
   실제 로그는 `slack-drop-observed` → `slack-drop-candidate` →
   `slack-send-confirmed` → `slack-capture-applied drop=True` 순서였고, 사용자도
   Sentory 보관함에 사진이 정상 등록된 것을 확인했다.
+
+## 2026-07-27 WhatsApp 붙여넣기·드롭 지원
+
+- Store판 WhatsApp 2.2628.101.0의 `WhatsApp.Root.exe`, WinUI 최상위 창과
+  같은 프로세스의 WebView2 렌더러를 모두 확인한 경우만 후보를 만든다.
+- URL·사진 Ctrl+V와 Explorer에서 WhatsApp으로 드롭한 실제 OLE 이미지 파일을
+  지원한다. 파일 선택창 업로드는 다른 메신저와 동일하게 지원 범위에 넣지 않는다.
+- 접근성 트리에 작성기와 메시지 본문이 없어 화면 원문을 OCR하거나 저장하지
+  않는다. 작성기·발신 영역의 축소 픽셀 지문과 초록색 전송 버튼 존재 여부만
+  프로세스 메모리에서 비교한다.
+- 초록색 전송 버튼 출현, Enter 또는 전송 버튼 클릭, 전송 버튼 소멸, 오른쪽
+  발신 영역 변화가 모두 확인돼야 `WhatsAppConfirmedSend/Image/Drop`으로 저장한다.
+- 창 변경, 초안 취소, 전송 입력 부재, 화면 획득 실패는 모두 미확정으로 버린다.
+  설정에서 WhatsApp 감지만 독립적으로 끄고 켤 수 있다.
+- 창 검증, 전송 버튼 영역, 시각 상태 전이, Explorer 드롭 통과와 설정 저장을
+  자동 테스트로 고정했다.
+- 전송하지 않은 URL·사진 초안은 각각 제거한 뒤 10초 유예 후 후보가 폐기되고
+  저장되지 않는 것을 실제 앱에서 확인했다. 배경의 작은 시각 변화가 있어도
+  명시적 전송 입력이 없다면 취소하도록 회귀 테스트를 보강했다.
+- 실제 URL 붙여넣기, 사진 붙여넣기, Explorer 사진 드롭을 모두 전송했다.
+  `whatsapp-send-confirmed` 뒤 URL 1건, 사진 1건이 각각 `drop=False`로 저장됐고,
+  Explorer 사진은 `drop=True`로 저장됐다. Enter와 마우스 전송 버튼 양쪽을
+  확인했으며 반복 드롭의 중복 후보는 거부됐다.

@@ -114,6 +114,7 @@ public partial class ItemDetailWindow : Window
             SourceApp.Discord => "Discord",
             SourceApp.KakaoTalk => SentoryLocalization.Text("KakaoTalk"),
             SourceApp.Slack => "Slack",
+            SourceApp.WhatsApp => "WhatsApp",
             _ => item.Item.LastSourceApp.ToString()
         };
         SavedAtText.Text = item.Item.LastCapturedAt.LocalDateTime

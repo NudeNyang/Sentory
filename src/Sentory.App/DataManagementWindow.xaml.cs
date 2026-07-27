@@ -126,6 +126,8 @@ public partial class DataManagementWindow : Window
 
     public bool SlackSupportChanged { get; private set; }
 
+    public bool WhatsAppSupportChanged { get; private set; }
+
     public event Action<SourceApp, bool>? MessengerSupportSelectionChanged;
 
     public event Action<bool, int>? AutoFavoriteSettingsChanged;
@@ -535,6 +537,33 @@ public partial class DataManagementWindow : Window
             when (exception is IOException or UnauthorizedAccessException)
         {
             StatusText.Text = SentoryLocalization.Text("SlackSettingFailed");
+        }
+    }
+
+    private void WhatsAppSupportToggleButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        try
+        {
+            var settings = _settingsStore.Load();
+            settings.WhatsAppSupportEnabled =
+                !settings.WhatsAppSupportEnabled;
+            _settingsStore.Save(settings);
+            WhatsAppSupportChanged = true;
+            UpdateWhatsAppControls(settings.WhatsAppSupportEnabled);
+            MessengerSupportSelectionChanged?.Invoke(
+                SourceApp.WhatsApp,
+                settings.WhatsAppSupportEnabled);
+            StatusText.Text = settings.WhatsAppSupportEnabled
+                ? SentoryLocalization.Text("WhatsAppDetectionEnabled")
+                : SentoryLocalization.Text("WhatsAppDetectionDisabled");
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException)
+        {
+            StatusText.Text =
+                SentoryLocalization.Text("WhatsAppSettingFailed");
         }
     }
 
@@ -1037,11 +1066,30 @@ public partial class DataManagementWindow : Window
         };
     }
 
+    private void UpdateWhatsAppControls(bool enabled)
+    {
+        var settingsState = MessengerDetectionSettingsUiPolicy.Resolve(
+            enabled,
+            _detectionPaused);
+        WhatsAppSupportToggleButton.Content = enabled
+            ? SentoryLocalization.Text("InUse")
+            : SentoryLocalization.Text("NotInUse");
+        WhatsAppStatusText.Text = settingsState switch
+        {
+            MessengerDetectionSettingsState.Disabled =>
+                SentoryLocalization.Text("WhatsAppNotInUse"),
+            MessengerDetectionSettingsState.Paused =>
+                SentoryLocalization.Text("DetectionPaused"),
+            _ => SentoryLocalization.Text("DetectionReady")
+        };
+    }
+
     private void UpdateMessengerControls(SentorySettings settings)
     {
         UpdateDiscordControls(settings.DiscordSupportEnabled);
         UpdateKakaoControls(settings.KakaoTalkSupportEnabled);
         UpdateSlackControls(settings.SlackSupportEnabled);
+        UpdateWhatsAppControls(settings.WhatsAppSupportEnabled);
     }
 
     private void SyncStatusTracker_Changed(
