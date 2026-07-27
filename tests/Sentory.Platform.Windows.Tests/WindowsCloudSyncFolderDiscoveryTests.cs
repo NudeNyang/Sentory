@@ -32,6 +32,7 @@ public sealed class WindowsCloudSyncFolderDiscoveryTests : IDisposable
             candidate =>
             {
                 Assert.Equal("Dropbox", candidate.ProviderName);
+                Assert.Contains(dropbox, candidate.DisplayName);
                 Assert.Equal(
                     Path.Combine(dropbox, "Sentory"),
                     candidate.FolderPath);
@@ -39,6 +40,7 @@ public sealed class WindowsCloudSyncFolderDiscoveryTests : IDisposable
             candidate =>
             {
                 Assert.Equal("Google Drive", candidate.ProviderName);
+                Assert.Contains(googleDrive, candidate.DisplayName);
                 Assert.Equal(
                     Path.Combine(googleDrive, "Sentory"),
                     candidate.FolderPath);
@@ -46,6 +48,7 @@ public sealed class WindowsCloudSyncFolderDiscoveryTests : IDisposable
             candidate =>
             {
                 Assert.Equal("MEGA", candidate.ProviderName);
+                Assert.Contains(mega, candidate.DisplayName);
                 Assert.Equal(
                     Path.Combine(mega, "Sentory"),
                     candidate.FolderPath);
@@ -53,6 +56,7 @@ public sealed class WindowsCloudSyncFolderDiscoveryTests : IDisposable
             candidate =>
             {
                 Assert.Equal("OneDrive", candidate.ProviderName);
+                Assert.Contains(oneDrive, candidate.DisplayName);
                 Assert.Equal(
                     Path.Combine(oneDrive, "Sentory"),
                     candidate.FolderPath);

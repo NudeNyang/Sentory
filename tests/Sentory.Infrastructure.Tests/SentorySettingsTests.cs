@@ -107,6 +107,37 @@ public sealed class SentorySettingsTests
         Assert.NotNull(settings.SyncMigrationDeviceId);
     }
 
+    [Fact]
+    public void NormalizePreservesValidSyncStoreIdentity()
+    {
+        var settings = new SentorySettings
+        {
+            SyncStoreId = "0123456789abcdef0123456789abcdef"
+        };
+
+        settings.Normalize();
+
+        Assert.Equal(
+            "0123456789abcdef0123456789abcdef",
+            settings.SyncStoreId);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("not-a-store-id")]
+    [InlineData("0123456789ABCDEF0123456789ABCDEF")]
+    public void NormalizeRejectsInvalidSyncStoreIdentity(string storeId)
+    {
+        var settings = new SentorySettings
+        {
+            SyncStoreId = storeId
+        };
+
+        settings.Normalize();
+
+        Assert.Null(settings.SyncStoreId);
+    }
+
     [Theory]
     [InlineData(null, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]
     [InlineData("relative-folder", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")]

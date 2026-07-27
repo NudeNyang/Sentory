@@ -438,7 +438,7 @@
                                    Foreground="{DynamicResource TextBrush}" />
                         <ComboBox x:Name="SyncProviderComboBox"
                                   Margin="0,10,0,0"
-                                  DisplayMemberPath="ProviderName"
+                                  DisplayMemberPath="DisplayName"
                                   Visibility="Collapsed" />
                         <TextBlock x:Name="SyncFolderPathText"
                                    Margin="0,12,0,0"

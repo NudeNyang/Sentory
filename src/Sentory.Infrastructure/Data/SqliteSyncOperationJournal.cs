@@ -84,6 +84,53 @@ public sealed class SqliteSyncOperationJournal :
             await state.ExecuteScalarAsync(cancellationToken));
     }
 
+    public static async Task<bool> HasPublishedLocalHistoryAsync(
+        SentoryDataPaths paths,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+        if (!File.Exists(paths.DatabasePath))
+        {
+            return false;
+        }
+
+        var connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = paths.DatabasePath,
+            Mode = SqliteOpenMode.ReadWriteCreate,
+            Cache = SqliteCacheMode.Shared,
+            Pooling = true
+        }.ToString();
+        await using var connection = new SqliteConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var table = connection.CreateCommand();
+        table.CommandText =
+            """
+            SELECT 1
+            FROM sqlite_master
+            WHERE type = 'table'
+              AND name = 'sync_operations';
+            """;
+        if (await table.ExecuteScalarAsync(cancellationToken) is null)
+        {
+            return false;
+        }
+
+        await using var history = connection.CreateCommand();
+        history.CommandText =
+            """
+            SELECT EXISTS(
+                SELECT 1
+                FROM sync_operations
+                WHERE is_published = 1
+                  AND received_at IS NULL
+                LIMIT 1
+            );
+            """;
+        return Convert.ToInt32(
+            await history.ExecuteScalarAsync(cancellationToken)) != 0;
+    }
+
     public static async Task ResetForNewStoreAsync(
         SentoryDataPaths paths,
         string newDeviceId,
@@ -535,6 +582,35 @@ public sealed class SqliteSyncOperationJournal :
         command.Parameters.AddWithValue(
             "$deleteKind",
             SyncOperationKind.Delete.ToString());
+        return await ReadOperationsAsync(command, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<SyncOperation>>
+        GetPublishedLocalOperationsAsync(
+            int limit,
+            CancellationToken cancellationToken = default)
+    {
+        if (limit <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(limit));
+        }
+
+        await using var connection = await OpenConnectionAsync(
+            cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT format_version, encryption_mode, operation_id,
+                   device_id, sequence, item_id, kind, occurred_at,
+                   payload_sha256, payload
+            FROM sync_operations
+            WHERE device_id = $deviceId
+              AND is_published = 1
+            ORDER BY sequence
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$deviceId", DeviceId);
+        command.Parameters.AddWithValue("$limit", limit);
         return await ReadOperationsAsync(command, cancellationToken);
     }
 

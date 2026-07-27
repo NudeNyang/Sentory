@@ -9,6 +9,10 @@ public sealed record SyncItemExportBatchResult(
     int Exported,
     int ChangedDuringExport);
 
+public sealed record SyncPublishedAssetRepairResult(
+    int Repaired,
+    int MissingLocal);
+
 public sealed class SyncItemExportService(
     ISyncOperationJournal journal,
     ISyncObjectStore objectStore,
@@ -70,6 +74,110 @@ public sealed class SyncItemExportService(
         return new SyncItemExportBatchResult(
             exported,
             changedDuringExport);
+    }
+
+    public async Task<SyncPublishedAssetRepairResult>
+        RepairPublishedImageBlobsAsync(
+            int limit,
+            CancellationToken cancellationToken = default)
+    {
+        if (journal is not ISyncItemExportJournal exportJournal)
+        {
+            return new SyncPublishedAssetRepairResult(0, 0);
+        }
+
+        var repaired = 0;
+        var missingLocal = 0;
+        var deletionTimes = new Dictionary<string, DateTimeOffset>(
+            StringComparer.Ordinal);
+        foreach (var deletion in await exportJournal
+                     .GetDeletionOperationsAsync(cancellationToken))
+        {
+            var deletionPayload = SyncItemPayloadSerializer.Deserialize(
+                deletion.Payload);
+            var deletionKey = deletionPayload.ContentKind switch
+            {
+                SyncItemContentKinds.Image when
+                    deletionPayload.Image is { } deletedImage =>
+                    deletedImage.ContentSha256.ToLowerInvariant(),
+                _ => null
+            };
+            if (deletionKey is not null &&
+                (!deletionTimes.TryGetValue(deletionKey, out var deletedAt) ||
+                 deletion.OccurredAt > deletedAt))
+            {
+                deletionTimes[deletionKey] = deletion.OccurredAt;
+            }
+        }
+
+        var operations = await exportJournal
+            .GetPublishedLocalOperationsAsync(limit, cancellationToken);
+        foreach (var operation in operations)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (operation.Kind != SyncOperationKind.Upsert)
+            {
+                continue;
+            }
+
+            var payload = SyncItemPayloadSerializer.Deserialize(
+                operation.Payload);
+            if (payload.ContentKind != SyncItemContentKinds.Image ||
+                payload.Image is not { } image)
+            {
+                continue;
+            }
+            if (deletionTimes.TryGetValue(
+                    image.ContentSha256.ToLowerInvariant(),
+                    out var deletedAt) &&
+                deletedAt >= payload.CapturedAt)
+            {
+                continue;
+            }
+
+            var extension = SyncBlobObjectKey.NormalizeReadableExtension(
+                image.FileExtension);
+            var key = objectStore is IReadableSyncObjectStore readableStore
+                ? readableStore.CreateImageObjectKey(
+                    image.ContentSha256,
+                    extension)
+                : SyncBlobObjectKey.Create(image.ContentSha256);
+            if (await objectStore.ExistsAsync(key, cancellationToken))
+            {
+                continue;
+            }
+
+            var localPath = Path.Combine(
+                paths.ImagesDirectory,
+                $"{image.ContentSha256.ToLowerInvariant()}{extension}");
+            if (!File.Exists(localPath))
+            {
+                missingLocal++;
+                continue;
+            }
+
+            var content = await File.ReadAllBytesAsync(
+                localPath,
+                cancellationToken);
+            if (content.LongLength != image.ByteSize ||
+                !string.Equals(
+                    ComputeSha256(content),
+                    image.ContentSha256,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                missingLocal++;
+                continue;
+            }
+
+            await objectStore.PutIfAbsentAsync(
+                key,
+                content,
+                image.ContentSha256,
+                cancellationToken);
+            repaired++;
+        }
+
+        return new SyncPublishedAssetRepairResult(repaired, missingLocal);
     }
 
     private async Task<SyncItemPayload> CreatePayloadAsync(

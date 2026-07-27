@@ -9,23 +9,50 @@ public sealed record LocalFolderSyncRunResult(
     SyncMetadataRunResult Metadata,
     SyncCycleResult Cycle,
     SyncRunResult Publish,
-    bool DeviceBindingReset = false);
+    bool DeviceBindingReset = false,
+    bool StoreReset = false,
+    SyncPublishedAssetRepairResult? PublishedAssetRepair = null)
+{
+    public SyncPublishedAssetRepairResult AssetRepair =>
+        PublishedAssetRepair ?? new SyncPublishedAssetRepairResult(0, 0);
+}
 
 public sealed class LocalFolderSyncRuntimeService(
     SentoryDataPaths paths,
     ICaptureRepository captureRepository,
-    SentorySettingsStore? settingsStore = null)
+    SentorySettingsStore? settingsStore = null,
+    Action? storeRecoveryStarted = null)
 {
     private const int ExportBatchSize = 200;
 
     public async Task<LocalFolderSyncRunResult> RunOnceAsync(
         string deviceId,
         string selectedDirectory,
-        CancellationToken cancellationToken = default) =>
-        await RunOnceAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var storeReset = false;
+        if (settingsStore is not null)
+        {
+            var store = await new SyncStoreIdentityService(
+                paths,
+                settingsStore).PrepareAsync(
+                    deviceId,
+                    selectedDirectory,
+                    cancellationToken);
+            storeReset = store.StoreReset;
+            deviceId = store.DeviceId;
+            if (storeReset)
+            {
+                storeRecoveryStarted?.Invoke();
+            }
+        }
+
+        return await RunOnceAsync(
             deviceId,
             new ReadableFolderSyncObjectStore(selectedDirectory),
-            cancellationToken);
+            cancellationToken,
+            storeReset);
+    }
 
     public async Task<LocalFolderSyncRunResult> RunLegacyOnceAsync(
         string deviceId,
@@ -34,12 +61,14 @@ public sealed class LocalFolderSyncRuntimeService(
         await RunOnceAsync(
             deviceId,
             new LocalFolderSyncObjectStore(selectedDirectory),
-            cancellationToken);
+            cancellationToken,
+            storeReset: false);
 
     private async Task<LocalFolderSyncRunResult> RunOnceAsync(
         string deviceId,
         ISyncObjectStore objectStore,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool storeReset)
     {
         var deviceBindingReset = false;
         var journal = new SqliteSyncOperationJournal(
@@ -91,6 +120,9 @@ public sealed class LocalFolderSyncRuntimeService(
             {
                 Exported = metadataExported
             };
+        var assetRepair = await exporter.RepairPublishedImageBlobsAsync(
+            ExportBatchSize,
+            cancellationToken);
         var export = await exporter.ExportPendingAsync(
             ExportBatchSize,
             cancellationToken);
@@ -102,7 +134,9 @@ public sealed class LocalFolderSyncRuntimeService(
             metadata,
             cycle,
             publish,
-            deviceBindingReset);
+            deviceBindingReset,
+            storeReset,
+            assetRepair);
     }
 }
 
@@ -111,6 +145,7 @@ public enum SyncRuntimeState
     Disabled,
     Waiting,
     Migrating,
+    Recovering,
     Syncing,
     Succeeded,
     FolderUnavailable,

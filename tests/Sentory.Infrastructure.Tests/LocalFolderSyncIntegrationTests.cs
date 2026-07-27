@@ -208,6 +208,146 @@ public sealed class LocalFolderSyncIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task AutomaticRuntimeRebuildsDeletedStoreFromLocalGallery()
+    {
+        var replica = await CreateReplicaAsync("deleted-store-source");
+        var destination = await CreateReplicaAsync("deleted-store-destination");
+        var sharedFolder = Path.Combine(_root, "shared-deleted-store");
+        var settingsStore = new SentorySettingsStore(replica.Paths);
+        var destinationSettingsStore = new SentorySettingsStore(
+            destination.Paths);
+        settingsStore.Save(new SentorySettings
+        {
+            SyncEnabled = true,
+            SyncFolderPath = sharedFolder,
+            SyncDeviceId = replica.Journal.DeviceId,
+            SyncStorageVersion = SentorySettings.CurrentSyncStorageVersion
+        });
+        destinationSettingsStore.Save(new SentorySettings
+        {
+            SyncEnabled = true,
+            SyncFolderPath = sharedFolder,
+            SyncDeviceId = destination.Journal.DeviceId,
+            SyncStorageVersion = SentorySettings.CurrentSyncStorageVersion
+        });
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/rebuild-deleted-store",
+            out var normalized));
+        await replica.Captures.UpsertUrlAsync(
+            new UrlCaptureRequest(
+                Guid.NewGuid(),
+                normalized.Original,
+                normalized,
+                SourceApp.Discord,
+                CaptureMethod.DiscordConfirmedSend,
+                DeliveryStatus.Confirmed,
+                "deleted-store",
+                DateTimeOffset.Parse("2026-07-28T03:00:00+09:00"),
+                ["url-match"]));
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/legacy-destination-only",
+            out var destinationOnly));
+        await destination.Captures.UpsertUrlAsync(
+            new UrlCaptureRequest(
+                Guid.NewGuid(),
+                destinationOnly.Original,
+                destinationOnly,
+                SourceApp.KakaoTalk,
+                CaptureMethod.KakaoCtrlVUrl,
+                DeliveryStatus.NotObserved,
+                "legacy-destination-only",
+                DateTimeOffset.Parse("2026-07-28T03:00:30+09:00"),
+                ["clipboard-url"]));
+        var runtime = new LocalFolderSyncRuntimeService(
+            replica.Paths,
+            replica.Captures,
+            settingsStore);
+        var destinationRuntime = new LocalFolderSyncRuntimeService(
+            destination.Paths,
+            destination.Captures,
+            destinationSettingsStore);
+
+        await runtime.RunOnceAsync(replica.Journal.DeviceId, sharedFolder);
+        await destinationRuntime.RunOnceAsync(
+            destination.Journal.DeviceId,
+            sharedFolder);
+        var originalStoreId = settingsStore.Load().SyncStoreId;
+        var originalDeviceId = settingsStore.Load().SyncDeviceId;
+        var destinationOriginalDeviceId =
+            destinationSettingsStore.Load().SyncDeviceId;
+        var legacyDestinationSettings = destinationSettingsStore.Load();
+        legacyDestinationSettings.SyncStoreId = null;
+        destinationSettingsStore.Save(legacyDestinationSettings);
+        var legacySettings = settingsStore.Load();
+        legacySettings.SyncStoreId = null;
+        settingsStore.Save(legacySettings);
+        Directory.Delete(sharedFolder, recursive: true);
+
+        var rebuilt = await runtime.RunOnceAsync(
+            replica.Journal.DeviceId,
+            sharedFolder);
+        var received = await destinationRuntime.RunOnceAsync(
+            destinationOriginalDeviceId!,
+            sharedFolder);
+
+        Assert.True(rebuilt.StoreReset);
+        Assert.NotNull(originalStoreId);
+        Assert.NotEqual(originalStoreId, settingsStore.Load().SyncStoreId);
+        Assert.NotEqual(originalDeviceId, settingsStore.Load().SyncDeviceId);
+        Assert.True(received.StoreReset);
+        Assert.NotEqual(
+            destinationOriginalDeviceId,
+            destinationSettingsStore.Load().SyncDeviceId);
+        Assert.Equal(1, rebuilt.Export.Exported);
+        Assert.Equal(1, rebuilt.Publish.Uploaded);
+        Assert.Equal(1, received.Export.Exported);
+        await runtime.RunOnceAsync(
+            settingsStore.Load().SyncDeviceId!,
+            sharedFolder);
+        Assert.Equal(2, (await replica.Captures.GetRecentAsync(10)).Count);
+        Assert.Equal(2, (await destination.Captures.GetRecentAsync(10)).Count);
+    }
+
+    [Fact]
+    public async Task AutomaticRuntimeRepairsDeletedPublishedPhoto()
+    {
+        var replica = await CreateReplicaAsync("deleted-photo-source");
+        var destination = await CreateReplicaAsync("deleted-photo-destination");
+        var sharedFolder = Path.Combine(_root, "shared-deleted-photo");
+        var settingsStore = new SentorySettingsStore(replica.Paths);
+        settingsStore.Save(new SentorySettings
+        {
+            SyncEnabled = true,
+            SyncFolderPath = sharedFolder,
+            SyncDeviceId = replica.Journal.DeviceId,
+            SyncStorageVersion = SentorySettings.CurrentSyncStorageVersion
+        });
+        await CaptureImageAsync(replica, 91);
+        var runtime = new LocalFolderSyncRuntimeService(
+            replica.Paths,
+            replica.Captures,
+            settingsStore);
+        await runtime.RunOnceAsync(replica.Journal.DeviceId, sharedFolder);
+        var photo = Assert.Single(Directory.GetFiles(
+            Path.Combine(sharedFolder, "Photos")));
+        File.Delete(photo);
+
+        var repaired = await runtime.RunOnceAsync(
+            replica.Journal.DeviceId,
+            sharedFolder);
+        var received = await new LocalFolderSyncRuntimeService(
+            destination.Paths,
+            destination.Captures).RunOnceAsync(
+                destination.Journal.DeviceId,
+                sharedFolder);
+
+        Assert.Equal(1, repaired.AssetRepair.Repaired);
+        Assert.True(File.Exists(photo));
+        Assert.Equal(1, received.Cycle.Projection.Projected);
+        Assert.Single(await destination.Captures.GetRecentAsync(10));
+    }
+
+    [Fact]
     public async Task AutomaticRuntimePublishesReadablePhotoAndLinkFiles()
     {
         var replica = await CreateReplicaAsync("readable");

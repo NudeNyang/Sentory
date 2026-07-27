@@ -7,7 +7,10 @@ namespace Sentory.Platform.Windows.Runtime;
 public sealed record CloudSyncFolderCandidate(
     string ProviderId,
     string ProviderName,
-    string FolderPath);
+    string FolderPath)
+{
+    public string DisplayName => $"{ProviderName} — {FolderPath}";
+}
 
 public static class WindowsCloudSyncFolderDiscovery
 {

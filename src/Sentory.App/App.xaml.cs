@@ -2028,7 +2028,10 @@ public partial class App : System.Windows.Application
             var result = await new LocalFolderSyncRuntimeService(
                 _paths,
                 _repository,
-                _settingsStore).RunOnceAsync(
+                _settingsStore,
+                () => _syncStatusTracker.Update(
+                    SyncRuntimeState.Recovering,
+                    DateTimeOffset.UtcNow)).RunOnceAsync(
                     deviceId,
                     selectedDirectory,
                     cancellationToken);
@@ -2039,6 +2042,19 @@ public partial class App : System.Windows.Application
                     "cloud-sync-device-binding-reset",
                     "Requeued local items after repairing a mismatched sync device binding during runtime initialization");
             }
+            if (result.StoreReset)
+            {
+                _diagnosticsLog?.Write(
+                    "cloud-sync-store-rebuilt",
+                    "Rebuilt a deleted or replaced cloud sync store from the local gallery");
+            }
+            if (result.AssetRepair.Repaired > 0 ||
+                result.AssetRepair.MissingLocal > 0)
+            {
+                _diagnosticsLog?.Write(
+                    "cloud-sync-assets-repaired",
+                    $"repaired={result.AssetRepair.Repaired}, missingLocal={result.AssetRepair.MissingLocal}");
+            }
             var succeededAt = DateTimeOffset.UtcNow;
             _syncStatusTracker.Update(
                 SyncRuntimeState.Succeeded,
@@ -2046,7 +2062,7 @@ public partial class App : System.Windows.Application
                 succeededAt);
             _diagnosticsLog?.Write(
                 "cloud-sync-completed",
-                $"exported={result.Export.Exported}, metadataExported={result.Metadata.Exported}, uploaded={result.Cycle.Transfer.Uploaded + result.Publish.Uploaded}, downloaded={result.Cycle.Transfer.Downloaded + result.Publish.Downloaded}, projected={result.Cycle.Projection.Projected}, pending={result.Cycle.Projection.Pending}, metadataProjected={result.Metadata.Projected}");
+                $"storeReset={result.StoreReset}, repairedAssets={result.AssetRepair.Repaired}, exported={result.Export.Exported}, metadataExported={result.Metadata.Exported}, uploaded={result.Cycle.Transfer.Uploaded + result.Publish.Uploaded}, downloaded={result.Cycle.Transfer.Downloaded + result.Publish.Downloaded}, projected={result.Cycle.Projection.Projected}, pending={result.Cycle.Projection.Pending}, metadataProjected={result.Metadata.Projected}");
 
             if (result.Metadata.SettingsChanged)
             {

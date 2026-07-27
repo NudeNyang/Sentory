@@ -82,6 +82,8 @@ public sealed class SentorySettings
 
     public string? SyncMigrationDeviceId { get; set; }
 
+    public string? SyncStoreId { get; set; }
+
     internal void Normalize()
     {
         ThemeMode = ResolveThemeMode(ThemeMode, IsDarkTheme).ToString();
@@ -165,6 +167,11 @@ public sealed class SentorySettings
             SyncMigrationDeviceId = null;
         }
 
+        if (!IsValidSyncStoreId(SyncStoreId))
+        {
+            SyncStoreId = null;
+        }
+
         if (SyncDeviceId is null)
         {
             SyncEnabled = false;
@@ -185,6 +192,12 @@ public sealed class SentorySettings
             : legacyIsDarkTheme
                 ? SentoryThemeMode.Dark
                 : SentoryThemeMode.Light;
+
+    private static bool IsValidSyncStoreId(string? value) =>
+        value is not null &&
+        value.Length == 32 &&
+        string.Equals(value, value.ToLowerInvariant(), StringComparison.Ordinal) &&
+        Guid.TryParseExact(value, "N", out _);
 }
 
 public sealed class SentorySettingsStore(SentoryDataPaths paths)

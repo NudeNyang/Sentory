@@ -689,6 +689,24 @@ public partial class DataManagementWindow : Window
             var oldDeviceId = settings.SyncDeviceId;
             var oldStorageVersion = settings.SyncStorageVersion;
             var oldMigrationDeviceId = settings.SyncMigrationDeviceId;
+            var oldStoreId = settings.SyncStoreId;
+            var capability = await SyncFolderCapabilityProbe.CheckAsync(
+                selectedPath);
+            if (!capability.IsSupported)
+            {
+                StatusText.Text = SentoryLocalization.Text(
+                    capability.FailureReason switch
+                    {
+                        SyncFolderCapabilityFailure.NotDirectory =>
+                            "SyncFolderNotDirectory",
+                        SyncFolderCapabilityFailure.RenameUnavailable =>
+                            "SyncFolderRenameUnavailable",
+                        SyncFolderCapabilityFailure.ContentMismatch =>
+                            "SyncFolderContentMismatch",
+                        _ => "SyncFolderReadWriteUnavailable"
+                    });
+                return;
+            }
             var folderChanged =
                 !string.IsNullOrWhiteSpace(oldFolderPath) &&
                 !string.Equals(
@@ -707,6 +725,9 @@ public partial class DataManagementWindow : Window
             settings.SyncMigrationDeviceId = isNewStore
                 ? null
                 : oldMigrationDeviceId;
+            settings.SyncStoreId = isNewStore
+                ? null
+                : oldStoreId;
             if (folderChanged ||
                 !SyncDeviceIdentity.IsValid(settings.SyncDeviceId))
             {
@@ -729,6 +750,7 @@ public partial class DataManagementWindow : Window
                     settings.SyncDeviceId = oldDeviceId;
                     settings.SyncStorageVersion = oldStorageVersion;
                     settings.SyncMigrationDeviceId = oldMigrationDeviceId;
+                    settings.SyncStoreId = oldStoreId;
                     settings.SyncEnabled = false;
                     _settingsStore.Save(settings);
                     throw;
@@ -1168,7 +1190,7 @@ public partial class DataManagementWindow : Window
             : Visibility.Visible;
         SyncProviderComboBox.Visibility = !hasFolder &&
                                           _cloudSyncFolderDiscoveryCompleted &&
-                                          _cloudSyncFolders.Count > 1
+                                          _cloudSyncFolders.Count > 0
             ? Visibility.Visible
             : Visibility.Collapsed;
         SyncSetupDescriptionText.Text = !_cloudSyncFolderDiscoveryCompleted
@@ -1198,16 +1220,13 @@ public partial class DataManagementWindow : Window
         Grid.SetColumn(SyncToggleButton, hasFolder ? 2 : 0);
         Grid.SetColumnSpan(SyncToggleButton, hasFolder ? 1 : 3);
         SyncToggleButton.Width = hasFolder ? 82 : double.NaN;
-        SyncToggleButton.Visibility = hasFolder ||
-                                      !_cloudSyncFolderDiscoveryCompleted ||
-                                      _cloudSyncFolders.Count > 0
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        SyncToggleButton.Visibility = Visibility.Visible;
         SyncRuntimeStatusText.Text = settings.SyncEnabled
             ? SentoryLocalization.Text(snapshot.State switch
             {
                 SyncRuntimeState.Syncing => "SyncStateSyncing",
                 SyncRuntimeState.Migrating => "SyncStateMigrating",
+                SyncRuntimeState.Recovering => "SyncStateRecovering",
                 SyncRuntimeState.Succeeded => "SyncStateSucceeded",
                 SyncRuntimeState.FolderUnavailable =>
                     "SyncStateFolderUnavailable",

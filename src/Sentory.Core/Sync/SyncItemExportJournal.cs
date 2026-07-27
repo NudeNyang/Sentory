@@ -37,4 +37,8 @@ public interface ISyncItemExportJournal
 
     Task<IReadOnlyList<SyncOperation>> GetDeletionOperationsAsync(
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<SyncOperation>> GetPublishedLocalOperationsAsync(
+        int limit,
+        CancellationToken cancellationToken = default);
 }

@@ -148,10 +148,10 @@ public sealed class SentoryLocalizationTests
             "동기화 시작",
             SentoryLocalization.Text("StartSync"));
         Assert.Equal(
-            "폴더 선택",
+            "다른 폴더 직접 선택",
             SentoryLocalization.Text("SelectSyncFolder"));
         Assert.Contains(
-            "자동으로 만듭니다",
+            "직접 선택",
             SentoryLocalization.Format(
                 "SyncAutomaticLocationFormat",
                 "Google Drive"));
