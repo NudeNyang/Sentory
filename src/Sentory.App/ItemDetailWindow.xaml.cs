@@ -117,6 +117,7 @@ public partial class ItemDetailWindow : Window
             SourceApp.WhatsApp => "WhatsApp",
             SourceApp.Telegram => "Telegram",
             SourceApp.Line => "LINE",
+            SourceApp.WeChat => "WeChat",
             _ => item.Item.LastSourceApp.ToString()
         };
         SavedAtText.Text = item.Item.LastCapturedAt.LocalDateTime

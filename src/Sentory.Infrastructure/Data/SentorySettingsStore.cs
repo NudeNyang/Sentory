@@ -52,6 +52,8 @@ public sealed class SentorySettings
 
     public bool LineSupportEnabled { get; set; } = true;
 
+    public bool WeChatSupportEnabled { get; set; } = true;
+
     public bool? StartWithWindows { get; set; }
 
     public bool DiscordAccessibilityPrepared { get; set; }

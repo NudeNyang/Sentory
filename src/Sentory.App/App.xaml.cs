@@ -71,6 +71,7 @@ public partial class App : System.Windows.Application
     private bool _whatsAppSupportEnabled = true;
     private bool _telegramSupportEnabled = true;
     private bool _lineSupportEnabled = true;
+    private bool _weChatSupportEnabled = true;
     private bool _discordRepairNeeded;
     private bool _discordRepairBusy;
     private bool _discordRestartPromptActive;
@@ -291,13 +292,19 @@ public partial class App : System.Windows.Application
                 acceptInjectedInput,
                 (category, message) =>
                     _diagnosticsLog?.Write(category, message));
+            var weChatRuntime = new WeChatCaptureRuntime(
+                _repository,
+                acceptInjectedInput,
+                (category, message) =>
+                    _diagnosticsLog?.Write(category, message));
             _runtime = new CompositeCaptureRuntime(
                 (SourceApp.KakaoTalk, kakaoRuntime),
                 (SourceApp.Discord, discordRuntime),
                 (SourceApp.Slack, slackRuntime),
                 (SourceApp.WhatsApp, whatsAppRuntime),
                 (SourceApp.Telegram, telegramRuntime),
-                (SourceApp.Line, lineRuntime));
+                (SourceApp.Line, lineRuntime),
+                (SourceApp.WeChat, weChatRuntime));
             _kakaoDropOverlay = new KakaoDropOverlayRuntime(
                 kakaoRuntime,
                 GetSavedDarkTheme,
@@ -854,6 +861,7 @@ public partial class App : System.Windows.Application
         _whatsAppSupportEnabled = settings.WhatsAppSupportEnabled;
         _telegramSupportEnabled = settings.TelegramSupportEnabled;
         _lineSupportEnabled = settings.LineSupportEnabled;
+        _weChatSupportEnabled = settings.WeChatSupportEnabled;
         if (!_discordSupportEnabled || !_discordLauncher.IsInstalled)
         {
             return;
@@ -922,7 +930,8 @@ public partial class App : System.Windows.Application
                 _slackSupportEnabled,
                 _whatsAppSupportEnabled,
                 _telegramSupportEnabled,
-                _lineSupportEnabled);
+                _lineSupportEnabled,
+                _weChatSupportEnabled);
             QueueDiscordStartupRegistrationSync(
                 discordSupportEnabled: false,
                 GetStartupEnabled());
@@ -968,7 +977,8 @@ public partial class App : System.Windows.Application
             _slackSupportEnabled,
             _whatsAppSupportEnabled,
             _telegramSupportEnabled,
-            _lineSupportEnabled);
+            _lineSupportEnabled,
+            _weChatSupportEnabled);
         QueueDiscordStartupRegistrationSync(
             _discordSupportEnabled,
             GetStartupEnabled());
@@ -1011,6 +1021,10 @@ public partial class App : System.Windows.Application
         {
             _lineSupportEnabled = enabled;
         }
+        else if (sourceApp == SourceApp.WeChat)
+        {
+            _weChatSupportEnabled = enabled;
+        }
         else
         {
             return;
@@ -1022,7 +1036,8 @@ public partial class App : System.Windows.Application
             _slackSupportEnabled,
             _whatsAppSupportEnabled,
             _telegramSupportEnabled,
-            _lineSupportEnabled);
+            _lineSupportEnabled,
+            _weChatSupportEnabled);
         UpdatePauseUi();
     }
 
@@ -1051,6 +1066,9 @@ public partial class App : System.Windows.Application
         controller.SetSourceEnabled(
             SourceApp.Line,
             _lineSupportEnabled);
+        controller.SetSourceEnabled(
+            SourceApp.WeChat,
+            _weChatSupportEnabled);
     }
 
     private void ApplyPauseState()
@@ -1083,7 +1101,9 @@ public partial class App : System.Windows.Application
         var additionalMessengerEnabled =
             _slackSupportEnabled ||
             _whatsAppSupportEnabled ||
-            _lineSupportEnabled;
+            _telegramSupportEnabled ||
+            _lineSupportEnabled ||
+            _weChatSupportEnabled;
         var anyMessengerEnabled =
             _discordSupportEnabled ||
             _kakaoSupportEnabled ||
@@ -1652,7 +1672,8 @@ public partial class App : System.Windows.Application
                 _slackSupportEnabled,
                 _whatsAppSupportEnabled,
                 _telegramSupportEnabled,
-                _lineSupportEnabled);
+                _lineSupportEnabled,
+                _weChatSupportEnabled);
             _galleryWindow.SetDetectionPaused(
                 _runtime?.IsPaused == true);
             _galleryWindow.SetRuntimeIssue(_lastRuntimeIssue);

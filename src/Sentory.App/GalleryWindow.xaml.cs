@@ -234,7 +234,8 @@ public partial class GalleryWindow : Window
         bool slackEnabled,
         bool whatsAppEnabled,
         bool telegramEnabled,
-        bool lineEnabled)
+        bool lineEnabled,
+        bool weChatEnabled)
     {
         _settings.DiscordSupportEnabled = discordEnabled;
         _settings.KakaoTalkSupportEnabled = kakaoEnabled;
@@ -242,6 +243,7 @@ public partial class GalleryWindow : Window
         _settings.WhatsAppSupportEnabled = whatsAppEnabled;
         _settings.TelegramSupportEnabled = telegramEnabled;
         _settings.LineSupportEnabled = lineEnabled;
+        _settings.WeChatSupportEnabled = weChatEnabled;
         UpdateDiscordDetectionVisibility();
     }
 
@@ -820,6 +822,10 @@ public partial class GalleryWindow : Window
         else if (sourceApp == SourceApp.Line)
         {
             _settings.LineSupportEnabled = enabled;
+        }
+        else if (sourceApp == SourceApp.WeChat)
+        {
+            _settings.WeChatSupportEnabled = enabled;
         }
 
         MessengerSupportChanged?.Invoke(sourceApp, enabled);
@@ -2058,6 +2064,7 @@ public partial class GalleryWindow : Window
             SourceApp.WhatsApp => "WhatsApp",
             SourceApp.Telegram => "Telegram",
             SourceApp.Line => "LINE",
+            SourceApp.WeChat => "WeChat",
             _ => sourceApp.ToString()
         };
 

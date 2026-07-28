@@ -8,7 +8,7 @@ Sentory is a desktop app for keeping links and images from your messenger chats 
 separate, searchable library. Instead of scrolling through an old conversation, you
 can find an item, open the original, or copy it back to the clipboard.
 
-Discord, Slack, WhatsApp, Telegram, KakaoTalk, and LINE are currently supported. Sentory is not a system-wide clipboard
+Discord, Slack, WhatsApp, Telegram, KakaoTalk, LINE, and WeChat are currently supported. Sentory is not a system-wide clipboard
 logger. It checks the chat input area of a supported messenger and saves only the
 content that meets that messenger's detection rules. Support for more messengers is
 planned.
@@ -23,6 +23,7 @@ planned.
 | Telegram | After a pasted or Explorer-dropped link or image is actually sent from the desktop app | Paste or drop without sending, canceled drafts, other apps |
 | KakaoTalk | When a link or image is pasted into an individual chat, or local images are dropped into that chat | Manually typed URLs, search input, anything outside a chat input |
 | LINE | After a pasted or Explorer-dropped link or image is actually sent from the desktop app | Paste or drop without sending, other input fields, sends in another chat |
+| WeChat | After a link or image pasted into the desktop chat composer is actually sent | Paste without sending, removed links, other input fields, sends in another chat |
 
 Clipboard activity in other apps does not create library items. Detection for each
 supported messenger can be enabled or disabled separately in settings.

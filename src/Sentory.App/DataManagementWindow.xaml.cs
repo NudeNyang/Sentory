@@ -135,6 +135,8 @@ public partial class DataManagementWindow : Window
 
     public bool LineSupportChanged { get; private set; }
 
+    public bool WeChatSupportChanged { get; private set; }
+
     public event Action<SourceApp, bool>? MessengerSupportSelectionChanged;
 
     public event Action<bool, int>? AutoFavoriteSettingsChanged;
@@ -630,6 +632,32 @@ public partial class DataManagementWindow : Window
         {
             StatusText.Text =
                 SentoryLocalization.Text("TelegramSettingFailed");
+        }
+    }
+
+    private void WeChatSupportToggleButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        try
+        {
+            var settings = _settingsStore.Load();
+            settings.WeChatSupportEnabled = !settings.WeChatSupportEnabled;
+            _settingsStore.Save(settings);
+            WeChatSupportChanged = true;
+            UpdateWeChatControls(settings.WeChatSupportEnabled);
+            MessengerSupportSelectionChanged?.Invoke(
+                SourceApp.WeChat,
+                settings.WeChatSupportEnabled);
+            StatusText.Text = settings.WeChatSupportEnabled
+                ? SentoryLocalization.Text("WeChatDetectionEnabled")
+                : SentoryLocalization.Text("WeChatDetectionDisabled");
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException)
+        {
+            StatusText.Text =
+                SentoryLocalization.Text("WeChatSettingFailed");
         }
     }
 
@@ -1211,6 +1239,24 @@ public partial class DataManagementWindow : Window
         };
     }
 
+    private void UpdateWeChatControls(bool enabled)
+    {
+        var settingsState = MessengerDetectionSettingsUiPolicy.Resolve(
+            enabled,
+            _detectionPaused);
+        WeChatSupportToggleButton.Content = enabled
+            ? SentoryLocalization.Text("InUse")
+            : SentoryLocalization.Text("NotInUse");
+        WeChatStatusText.Text = settingsState switch
+        {
+            MessengerDetectionSettingsState.Disabled =>
+                SentoryLocalization.Text("WeChatNotInUse"),
+            MessengerDetectionSettingsState.Paused =>
+                SentoryLocalization.Text("DetectionPaused"),
+            _ => SentoryLocalization.Text("DetectionReady")
+        };
+    }
+
     private void UpdateMessengerControls(SentorySettings settings)
     {
         UpdateDiscordControls(settings.DiscordSupportEnabled);
@@ -1219,6 +1265,7 @@ public partial class DataManagementWindow : Window
         UpdateWhatsAppControls(settings.WhatsAppSupportEnabled);
         UpdateTelegramControls(settings.TelegramSupportEnabled);
         UpdateLineControls(settings.LineSupportEnabled);
+        UpdateWeChatControls(settings.WeChatSupportEnabled);
     }
 
     private void SyncStatusTracker_Changed(

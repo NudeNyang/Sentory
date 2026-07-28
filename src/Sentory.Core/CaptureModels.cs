@@ -7,7 +7,8 @@ public enum SourceApp
     Slack,
     WhatsApp,
     Line,
-    Telegram
+    Telegram,
+    WeChat
 }
 
 public enum ContentKind
@@ -45,7 +46,9 @@ public enum CaptureMethod
     LineConfirmedDrop,
     TelegramConfirmedSend,
     TelegramConfirmedImage,
-    TelegramConfirmedDrop
+    TelegramConfirmedDrop,
+    WeChatConfirmedSend,
+    WeChatConfirmedImage
 }
 
 public enum LinkPreviewStatus

@@ -5,6 +5,22 @@ namespace Sentory.App.Tests;
 
 public sealed class SentoryLocalizationTests
 {
+    [Theory]
+    [InlineData("ko-KR", "WeChat 감지를 켰습니다.")]
+    [InlineData("en-US", "WeChat detection is on.")]
+    [InlineData("ja-JP", "WeChat 検出をオンにしました。")]
+    [InlineData("zh-CN", "已开启微信检测。")]
+    public void WeChatDetectionStatusIsLocalized(
+        string language,
+        string expected)
+    {
+        SentoryLocalization.SetLanguage(language);
+
+        Assert.Equal(
+            expected,
+            SentoryLocalization.Text("WeChatDetectionEnabled"));
+    }
+
     [Fact]
     public void AutomaticFavoriteUsesConciseRepeatedUsageDescription()
     {
