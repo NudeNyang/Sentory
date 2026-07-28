@@ -3,52 +3,61 @@ using Sentory.Platform.Windows.Interop;
 
 namespace Sentory.Platform.Windows.Runtime;
 
-public sealed class LineDropOverlayRuntime : IDisposable
+internal sealed class PassiveMessengerDropRuntime<TTarget> : IDisposable
+    where TTarget : class
 {
     private static readonly TimeSpan PollInterval =
         TimeSpan.FromMilliseconds(16);
     private static readonly TimeSpan ExplorerOriginMaximumAge =
         TimeSpan.FromMilliseconds(150);
-    private const int ReleaseTargetGraceFrames = 16;
 
     private readonly INativeWindowApi _native;
     private readonly IKakaoDropWindowApi _dropWindows;
-    private readonly LineDropTargetLocator _locator;
     private readonly IExplorerSelectionReader _selectionReader;
-    private readonly LineCaptureRuntime _captureRuntime;
+    private readonly Func<bool> _isPaused;
+    private readonly Func<string?, bool> _isTargetProcess;
+    private readonly Func<int, int, TTarget?> _findTarget;
+    private readonly Func<
+        TTarget,
+        IReadOnlyList<string>,
+        Task<string>> _registerDrop;
+    private readonly Func<TTarget, string> _targetDescription;
     private readonly Action<string, string>? _diagnostic;
+    private readonly string _diagnosticPrefix;
     private readonly DispatcherTimer _timer;
-    private readonly LinePassiveDropState _dropState = new();
+    private readonly PassiveMessengerDropState<TTarget> _dropState;
     private readonly RecentExplorerDragOrigin _dragOrigin =
         new(ExplorerOriginMaximumAge);
     private bool _started;
     private bool _leftWasDown;
-    private int _releaseTargetGraceFrames;
-    private DateTimeOffset _releasedAt;
 
-    public LineDropOverlayRuntime(
-        LineCaptureRuntime captureRuntime,
-        Action<string, string>? diagnostic = null)
-        : this(
-            captureRuntime,
-            new NativeWindowApi(),
-            new ExplorerSelectionReader(),
-            diagnostic)
-    {
-    }
-
-    internal LineDropOverlayRuntime(
-        LineCaptureRuntime captureRuntime,
-        NativeWindowApi native,
+    public PassiveMessengerDropRuntime(
+        INativeWindowApi native,
+        IKakaoDropWindowApi dropWindows,
         IExplorerSelectionReader selectionReader,
-        Action<string, string>? diagnostic = null)
+        Func<bool> isPaused,
+        Func<string?, bool> isTargetProcess,
+        Func<int, int, TTarget?> findTarget,
+        Func<
+            TTarget,
+            IReadOnlyList<string>,
+            Task<string>> registerDrop,
+        Func<TTarget, WindowBounds> boundsSelector,
+        Func<TTarget, string> targetDescription,
+        string diagnosticPrefix,
+        Action<string, string>? diagnostic)
     {
         _native = native;
-        _dropWindows = native;
-        _locator = new LineDropTargetLocator(native, native);
+        _dropWindows = dropWindows;
         _selectionReader = selectionReader;
-        _captureRuntime = captureRuntime;
+        _isPaused = isPaused;
+        _isTargetProcess = isTargetProcess;
+        _findTarget = findTarget;
+        _registerDrop = registerDrop;
+        _targetDescription = targetDescription;
+        _diagnosticPrefix = diagnosticPrefix;
         _diagnostic = diagnostic;
+        _dropState = new PassiveMessengerDropState<TTarget>(boundsSelector);
         _timer = new DispatcherTimer(
             PollInterval,
             DispatcherPriority.Input,
@@ -66,11 +75,14 @@ public sealed class LineDropOverlayRuntime : IDisposable
 
         _started = true;
         _timer.Start();
+        _diagnostic?.Invoke(
+            $"{_diagnosticPrefix}-drop-runtime-started",
+            $"paused={_isPaused()}, timerEnabled={_timer.IsEnabled}");
     }
 
     private void OnTick(object? sender, EventArgs e)
     {
-        if (_captureRuntime.IsPaused)
+        if (_isPaused())
         {
             ResetDrag();
             return;
@@ -80,8 +92,11 @@ public sealed class LineDropOverlayRuntime : IDisposable
         var cursor = _dropWindows.GetCursorPosition();
         if (_leftWasDown && _dropWindows.IsEscapeKeyDown())
         {
+            SharedExplorerImageDragSession.Current.Clear();
             ResetDrag();
-            _diagnostic?.Invoke("line-drop-cancelled", "reason=escape");
+            _diagnostic?.Invoke(
+                $"{_diagnosticPrefix}-drop-cancelled",
+                "reason=escape");
             return;
         }
 
@@ -92,37 +107,28 @@ public sealed class LineDropOverlayRuntime : IDisposable
             return;
         }
 
-        if (!_leftWasDown && _releaseTargetGraceFrames > 0)
-        {
-            ResetDrag();
-        }
-
         if (!_leftWasDown)
         {
             _leftWasDown = true;
             BeginPossibleExplorerDrag(cursor);
         }
 
+        if (!_dropState.IsTracking)
+        {
+            JoinSharedExplorerDrag();
+        }
+
         if (_dropState.IsTracking)
         {
             _dropState.Observe(
                 cursor,
-                MessengerDropTargetProbe.IsProcessAt(
-                    _native,
-                    _dropWindows,
-                    cursor,
-                    LineContextValidator.ProcessName)
-                    ? _locator.FindAt(
-                        cursor.X,
-                        cursor.Y,
-                        requireTopmost: true)
-                    : null);
+                FindTargetAt(cursor));
         }
     }
 
     private void BeginPossibleExplorerDrag((int X, int Y) cursor)
     {
-        if (TryJoinSharedExplorerDrag())
+        if (JoinSharedExplorerDrag())
         {
             return;
         }
@@ -147,6 +153,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
         var paths = _selectionReader
             .ReadSelectedFiles(explorer)
             .Where(ClipboardImageCodec.IsSupportedImagePath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         if (paths.Length == 0)
         {
@@ -159,11 +166,36 @@ public sealed class LineDropOverlayRuntime : IDisposable
             DateTimeOffset.UtcNow);
         _dropState.Begin(start, paths);
         _diagnostic?.Invoke(
-            "line-drop-selection-observed",
+            $"{_diagnosticPrefix}-drop-selection-observed",
             $"files={paths.Length}");
     }
 
-    private bool TryJoinSharedExplorerDrag()
+    private void CompleteDrag((int X, int Y) cursor)
+    {
+        if (!_leftWasDown)
+        {
+            return;
+        }
+
+        _leftWasDown = false;
+        SharedExplorerImageDragSession.Current.Clear();
+        if (!_dropState.IsTracking)
+        {
+            return;
+        }
+
+        _dropState.Observe(
+            cursor,
+            FindTargetAt(cursor));
+        if (_dropState.TryTakeCompleted(
+                out var target,
+                out var paths))
+        {
+            _ = RegisterPassiveDropAsync(target, paths);
+        }
+    }
+
+    private bool JoinSharedExplorerDrag()
     {
         if (!SharedExplorerImageDragSession.Current.TryGet(
                 DateTimeOffset.UtcNow,
@@ -175,54 +207,20 @@ public sealed class LineDropOverlayRuntime : IDisposable
 
         _dropState.Begin(start, paths);
         _diagnostic?.Invoke(
-            "line-drop-selection-observed",
+            $"{_diagnosticPrefix}-drop-selection-observed",
             $"files={paths.Count}, source=shared");
         return true;
     }
 
-    private void CompleteDrag((int X, int Y) cursor)
+    private TTarget? FindTargetAt((int X, int Y) cursor)
     {
-        if (_leftWasDown)
-        {
-            _leftWasDown = false;
-            _releaseTargetGraceFrames = ReleaseTargetGraceFrames;
-            _releasedAt = DateTimeOffset.UtcNow;
-        }
-
-        if (_releaseTargetGraceFrames <= 0)
-        {
-            return;
-        }
-
-        if (!_dropState.IsTracking)
-        {
-            _releaseTargetGraceFrames = 0;
-            return;
-        }
-
-        _dropState.Observe(
-            cursor,
-            _locator.FindAt(
-                cursor.X,
-                cursor.Y,
-                requireTopmost: true));
-        if (_dropState.TryTakeCompleted(out var target, out var paths))
-        {
-            var releasedAt = _releasedAt;
-            _releaseTargetGraceFrames = 0;
-            _releasedAt = default;
-            _ = RegisterPassiveDropAsync(target, paths, releasedAt);
-            return;
-        }
-
-        _releaseTargetGraceFrames--;
-        if (_releaseTargetGraceFrames == 0)
-        {
-            _dropState.Reset();
-            _diagnostic?.Invoke(
-                "line-drop-cancelled",
-                "reason=release-target-unavailable");
-        }
+        var window = _dropWindows.GetWindowAtPoint(cursor.X, cursor.Y);
+        var root = _native.GetRootWindow(window);
+        var processName = _native.GetProcessName(
+            _native.GetProcessId(root));
+        return _isTargetProcess(processName)
+            ? _findTarget(cursor.X, cursor.Y)
+            : null;
     }
 
     private void RememberPointerUp((int X, int Y) cursor)
@@ -246,27 +244,22 @@ public sealed class LineDropOverlayRuntime : IDisposable
     }
 
     private async Task RegisterPassiveDropAsync(
-        LineDropTarget target,
-        IReadOnlyList<string> paths,
-        DateTimeOffset releasedAt)
+        TTarget target,
+        IReadOnlyList<string> paths)
     {
+        var description = _targetDescription(target);
         _diagnostic?.Invoke(
-            "line-drop-released",
-            $"files={paths.Count}, window=0x{target.MainWindow.ToInt64():X}, mode=passive");
-        var result = await _captureRuntime.RegisterNativeDroppedFilesAsync(
-            target,
-            paths,
-            releasedAt);
+            $"{_diagnosticPrefix}-drop-released",
+            $"files={paths.Count}, {description}, mode=passive");
+        var result = await _registerDrop(target, paths);
         _diagnostic?.Invoke(
-            "line-drop-result",
+            $"{_diagnosticPrefix}-drop-result",
             $"result={result}, files={paths.Count}, mode=passive");
     }
 
     private void ResetDrag()
     {
         _leftWasDown = false;
-        _releaseTargetGraceFrames = 0;
-        _releasedAt = default;
         _dropState.Reset();
     }
 
@@ -274,6 +267,5 @@ public sealed class LineDropOverlayRuntime : IDisposable
     {
         _timer.Stop();
         _dropState.Reset();
-        GC.SuppressFinalize(this);
     }
 }

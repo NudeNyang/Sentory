@@ -110,12 +110,26 @@ public sealed class WeChatDropOverlayRuntime : IDisposable
         {
             _dropState.Observe(
                 cursor,
-                _locator.FindAt(cursor.X, cursor.Y, requireTopmost: true));
+                MessengerDropTargetProbe.IsProcessAt(
+                    _native,
+                    _dropWindows,
+                    cursor,
+                    WeChatContextValidator.IsSupportedProcessName)
+                    ? _locator.FindAt(
+                        cursor.X,
+                        cursor.Y,
+                        requireTopmost: true)
+                    : null);
         }
     }
 
     private void BeginPossibleExplorerDrag((int X, int Y) cursor)
     {
+        if (TryJoinSharedExplorerDrag())
+        {
+            return;
+        }
+
         var explorer = FindExplorerAt(cursor);
         var start = cursor;
         if (explorer == nint.Zero &&
@@ -142,10 +156,31 @@ public sealed class WeChatDropOverlayRuntime : IDisposable
             return;
         }
 
+        SharedExplorerImageDragSession.Current.Publish(
+            start,
+            paths,
+            DateTimeOffset.UtcNow);
         _dropState.Begin(start, paths);
         _diagnostic?.Invoke(
             "wechat-drop-selection-observed",
             $"files={paths.Length}");
+    }
+
+    private bool TryJoinSharedExplorerDrag()
+    {
+        if (!SharedExplorerImageDragSession.Current.TryGet(
+                DateTimeOffset.UtcNow,
+                out var start,
+                out var paths))
+        {
+            return false;
+        }
+
+        _dropState.Begin(start, paths);
+        _diagnostic?.Invoke(
+            "wechat-drop-selection-observed",
+            $"files={paths.Count}, source=shared");
+        return true;
     }
 
     private void CompleteDrag((int X, int Y) cursor)

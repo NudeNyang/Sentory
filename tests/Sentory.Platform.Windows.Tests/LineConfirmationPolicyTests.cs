@@ -128,6 +128,19 @@ public sealed class LineConfirmationPolicyTests
     }
 
     [Fact]
+    public void ImageDropStillRequiresExplicitSendEvidence()
+    {
+        Assert.False(LineMessageMatchPolicy.HasMatchingSendEvidence(
+            string.Empty,
+            [],
+            preSendComposerMatched: false));
+        Assert.True(LineMessageMatchPolicy.HasMatchingSendEvidence(
+            string.Empty,
+            [],
+            preSendComposerMatched: true));
+    }
+
+    [Fact]
     public void ComposerEvidenceRequiresOriginalUrlToRemainBeforeSend()
     {
         Assert.True(UrlNormalizer.TryNormalize(

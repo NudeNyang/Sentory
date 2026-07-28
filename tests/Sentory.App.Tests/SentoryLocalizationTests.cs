@@ -6,7 +6,7 @@ namespace Sentory.App.Tests;
 public sealed class SentoryLocalizationTests
 {
     [Theory]
-    [InlineData("ko-KR", "대화 속, 흩어진 순간들을 한 곳에")]
+    [InlineData("ko-KR", "이야기 속, 흩어진 순간들을 한 곳에")]
     [InlineData("en-US", "Moments scattered across your conversations, all in one place")]
     [InlineData("ja-JP", "会話に散らばる瞬間を、一か所に")]
     [InlineData("zh-CN", "将散落在对话中的瞬间汇聚一处")]

@@ -327,6 +327,16 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
 
         try
         {
+            var baseline = await _visual.TryCaptureAsync(
+                context,
+                requireForeground: false,
+                _cancellation.Token);
+            if (baseline is null)
+            {
+                return TelegramNativeDropRegistrationResult
+                    .VisualBaselineUnavailable;
+            }
+
             var images = await Task.Run(
                 () => ClipboardImageCodec.TryReadFiles(imagePaths),
                 _cancellation.Token);
@@ -335,50 +345,19 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
                 return TelegramNativeDropRegistrationResult.ImageReadFailed;
             }
 
-            var result = await _coordinator.CaptureBatchAsync(
-                context.EventId,
+            var registered = StartCandidate(
+                context,
+                baseline,
                 null,
-                images.Select(image => new ImageCapturePayload(
-                    image.ContentBytes,
-                    image.Sha256,
-                    image.PixelWidth,
-                    image.PixelHeight,
-                    image.MimeType,
-                    image.FileExtension,
-                    image.OriginalFileName)).ToList(),
-                SourceApp.Telegram,
-                CaptureMethod.TelegramConfirmedDrop,
-                DeliveryStatus.Confirmed,
-                context.ContextHash,
-                occurredAt,
-                [
-                    "native-explorer-file-drop",
-                    "telegram-drop-release-send"
-                ],
-                _cancellation.Token);
-            var applied = result?.EventApplied == true;
+                [],
+                images,
+                nativeDrop: true);
             _diagnostic?.Invoke(
                 "telegram-drop-candidate",
-                $"registered={applied} files={imagePaths.Length} images={images.Count} confirmation=drop-release");
-            if (!applied)
-            {
-                return TelegramNativeDropRegistrationResult.Duplicate;
-            }
-
-            Captured?.Invoke(
-                this,
-                new CaptureNotification(
-                    images.Count > 1
-                        ? ContentKind.Collection
-                        : ContentKind.Image,
-                    1,
-                    occurredAt,
-                    SourceApp.Telegram,
-                    DeliveryStatus.Confirmed));
-            _diagnostic?.Invoke(
-                "telegram-capture-applied",
-                $"urls=0 images={images.Count} drop=True confirmation=drop-release");
-            return TelegramNativeDropRegistrationResult.Registered;
+                $"registered={registered} files={imagePaths.Length} images={images.Count} confirmation=explicit-send-and-visual-change");
+            return registered
+                ? TelegramNativeDropRegistrationResult.Registered
+                : TelegramNativeDropRegistrationResult.Duplicate;
         }
         catch (OperationCanceledException)
             when (_cancellation.IsCancellationRequested)

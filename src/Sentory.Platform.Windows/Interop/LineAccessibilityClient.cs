@@ -103,10 +103,10 @@ internal static class LineMessageMatchPolicy
         string messageText,
         IReadOnlyList<NormalizedUrl> urls,
         bool preSendComposerMatched) =>
-        urls.Count == 0 ||
-        (string.IsNullOrWhiteSpace(messageText)
-            ? preSendComposerMatched
-            : ContainsEveryUrl(messageText, urls));
+        preSendComposerMatched &&
+        (urls.Count == 0 ||
+         (string.IsNullOrWhiteSpace(messageText) ||
+          ContainsEveryUrl(messageText, urls)));
 
     public static bool HasMatchingComposerEvidence(
         string composerText,

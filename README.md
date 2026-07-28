@@ -4,7 +4,7 @@
 
 <img width="2166" height="1547" alt="image" src="https://github.com/user-attachments/assets/989ecb23-eb72-43cf-8165-c43b2e2ba9dc" />
 
-> 대화 속, 흩어진 순간들을 한 곳에
+> 이야기 속, 흩어진 순간들을 한 곳에
 
 Sentory는 메신저에서 주고받은 링크와 사진을 따로 모아 두는 데스크톱 앱입니다.
 나중에 다시 찾을 때 대화방을 거슬러 올라갈 필요 없이 검색하고, 원본을 열거나

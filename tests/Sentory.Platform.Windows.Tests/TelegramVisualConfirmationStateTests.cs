@@ -44,6 +44,20 @@ public sealed class TelegramVisualConfirmationStateTests
         Assert.False(state.SendObserved);
     }
 
+    [Fact]
+    public void DropReleaseAndPreviewChangeDoNotConfirmWithoutSendInput()
+    {
+        var state = new TelegramVisualConfirmationState(Frame(changed: false));
+
+        Assert.Equal(
+            TelegramVisualDecision.Pending,
+            state.Observe(Frame(changed: true), false));
+        Assert.Equal(
+            TelegramVisualDecision.Pending,
+            state.Observe(Frame(changed: true), false));
+        Assert.False(state.SendObserved);
+    }
+
     private static TelegramVisualFrame Frame(bool changed) =>
         new(
             Bounds,
