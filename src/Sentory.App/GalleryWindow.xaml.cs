@@ -2149,25 +2149,8 @@ public partial class GalleryWindow : Window
         try
         {
             var current = _settingsStore.Load();
-            _settings.AutoCleanupDays = current.AutoCleanupDays;
-            _settings.LastAutoCleanupAt = current.LastAutoCleanupAt;
-            _settings.DiscordSupportEnabled =
-                current.DiscordSupportEnabled;
-            _settings.KakaoTalkSupportEnabled =
-                current.KakaoTalkSupportEnabled;
-            _settings.SlackSupportEnabled =
-                current.SlackSupportEnabled;
-            _settings.WhatsAppSupportEnabled =
-                current.WhatsAppSupportEnabled;
-            _settings.LineSupportEnabled =
-                current.LineSupportEnabled;
-            _settings.DiscordAccessibilityPrepared =
-                current.DiscordAccessibilityPrepared;
-            _settings.AutoFavoriteEnabled =
-                current.AutoFavoriteEnabled;
-            _settings.AutoFavoriteCopyThreshold =
-                current.AutoFavoriteCopyThreshold;
-            _settingsStore.Save(_settings);
+            _settingsStore.Save(
+                GallerySettingsSavePolicy.Merge(current, _settings));
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException)
