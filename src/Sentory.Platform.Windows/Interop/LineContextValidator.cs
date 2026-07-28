@@ -36,14 +36,19 @@ public sealed class LineContextValidator(INativeWindowApi native)
             return false;
         }
 
-        var mainWindow = native.GetRootWindow(trigger.ForegroundWindow);
-        if (mainWindow == nint.Zero ||
-            native.GetProcessId(mainWindow) != trigger.ForegroundProcessId ||
+        var foregroundRoot = native.GetRootWindow(trigger.ForegroundWindow);
+        if (foregroundRoot == nint.Zero ||
+            native.GetProcessId(foregroundRoot) !=
+            trigger.ForegroundProcessId ||
             !IsSupportedMainWindowClass(
-                native.GetClassName(mainWindow)))
+                native.GetClassName(foregroundRoot)))
         {
             return false;
         }
+
+        var mainWindow = ResolveOwnedMainWindow(
+            foregroundRoot,
+            trigger.ForegroundProcessId);
 
         context = new ValidatedLineContext(
             trigger.EventId,
@@ -53,6 +58,35 @@ public sealed class LineContextValidator(INativeWindowApi native)
             trigger.OccurredAt,
             CreateContextHash(trigger.ForegroundProcessId, mainWindow));
         return true;
+    }
+
+    private nint ResolveOwnedMainWindow(
+        nint foregroundRoot,
+        uint processId)
+    {
+        var current = foregroundRoot;
+        for (var depth = 0; depth < 4; depth++)
+        {
+            var owner = native.GetOwnerWindow(current);
+            if (owner == nint.Zero)
+            {
+                break;
+            }
+
+            var ownerRoot = native.GetRootWindow(owner);
+            if (ownerRoot == nint.Zero ||
+                ownerRoot == current ||
+                native.GetProcessId(ownerRoot) != processId ||
+                !IsSupportedMainWindowClass(
+                    native.GetClassName(ownerRoot)))
+            {
+                break;
+            }
+
+            current = ownerRoot;
+        }
+
+        return current;
     }
 
     public static bool IsSupportedMainWindowClass(string className)

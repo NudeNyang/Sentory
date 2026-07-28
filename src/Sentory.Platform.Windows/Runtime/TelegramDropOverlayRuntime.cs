@@ -5,9 +5,10 @@ namespace Sentory.Platform.Windows.Runtime;
 
 public sealed class TelegramDropOverlayRuntime : IDisposable
 {
-    private const double CachedExplorerMaximumDistance = 64;
     private static readonly TimeSpan PollInterval =
         TimeSpan.FromMilliseconds(16);
+    private static readonly TimeSpan ExplorerOriginMaximumAge =
+        TimeSpan.FromMilliseconds(150);
 
     private readonly INativeWindowApi _native;
     private readonly IKakaoDropWindowApi _dropWindows;
@@ -17,11 +18,10 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
     private readonly Action<string, string>? _diagnostic;
     private readonly DispatcherTimer _timer;
     private readonly TelegramPassiveDropState _dropState = new();
+    private readonly RecentExplorerDragOrigin _dragOrigin =
+        new(ExplorerOriginMaximumAge);
     private bool _started;
     private bool _leftWasDown;
-    private bool _hasPointerUpSample;
-    private (int X, int Y) _lastPointerUpPosition;
-    private nint _lastPointerUpExplorer;
 
     public TelegramDropOverlayRuntime(
         TelegramCaptureRuntime captureRuntime,
@@ -108,12 +108,13 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
         var explorer = FindExplorerAt(cursor);
         var start = cursor;
         if (explorer == nint.Zero &&
-            _hasPointerUpSample &&
-            Distance(_lastPointerUpPosition, cursor) <=
-            CachedExplorerMaximumDistance)
+            _dragOrigin.TryGet(
+                DateTimeOffset.UtcNow,
+                out var recentExplorer,
+                out var recentPosition))
         {
-            explorer = _lastPointerUpExplorer;
-            start = _lastPointerUpPosition;
+            explorer = recentExplorer;
+            start = recentPosition;
         }
 
         if (explorer == nint.Zero)
@@ -160,9 +161,10 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
 
     private void RememberPointerUp((int X, int Y) cursor)
     {
-        _hasPointerUpSample = true;
-        _lastPointerUpPosition = cursor;
-        _lastPointerUpExplorer = FindExplorerAt(cursor);
+        _dragOrigin.Observe(
+            cursor,
+            FindExplorerAt(cursor),
+            DateTimeOffset.UtcNow);
     }
 
     private nint FindExplorerAt((int X, int Y) cursor)
@@ -175,15 +177,6 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
             StringComparison.OrdinalIgnoreCase)
             ? root
             : nint.Zero;
-    }
-
-    private static double Distance(
-        (int X, int Y) left,
-        (int X, int Y) right)
-    {
-        var x = left.X - right.X;
-        var y = left.Y - right.Y;
-        return Math.Sqrt((x * x) + (y * y));
     }
 
     private async Task RegisterPassiveDropAsync(
