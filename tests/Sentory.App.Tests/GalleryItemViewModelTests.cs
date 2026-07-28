@@ -10,7 +10,13 @@ public sealed class GalleryItemViewModelTests
     public void AppliesLocalizedTextWithoutReplacingArtworkOrSelectionState()
     {
         var selectionState = new GalleryItemSelectionState(false, false);
-        ImageSource? thumbnail = null;
+        ImageSource thumbnailImage = new DrawingImage();
+        var loads = 0;
+        var thumbnail = new GalleryArtworkReference(() =>
+        {
+            loads++;
+            return thumbnailImage;
+        });
         var viewModel = new GalleryItemViewModel(
             null!,
             false,
@@ -22,6 +28,7 @@ public sealed class GalleryItemViewModelTests
             "old status",
             "O",
             thumbnail,
+            null,
             null,
             false,
             false,
@@ -51,9 +58,23 @@ public sealed class GalleryItemViewModelTests
         Assert.Equal("new status", viewModel.StatusLabel);
         Assert.Equal("N", viewModel.Initial);
         Assert.Equal("new badge", viewModel.CollectionBadgeText);
-        Assert.Same(thumbnail, viewModel.Thumbnail);
+        Assert.Null(viewModel.Thumbnail);
+        Assert.Equal(0, loads);
+
+        var artwork = viewModel.LoadCardArtwork();
+        viewModel.ApplyCardArtwork(artwork);
+
+        Assert.Same(thumbnailImage, viewModel.Thumbnail);
+        Assert.Equal(1, loads);
+        Assert.False(viewModel.NeedsCardArtwork);
+
+        viewModel.ReleaseCardArtwork();
+
+        Assert.Null(viewModel.Thumbnail);
+        Assert.True(viewModel.NeedsCardArtwork);
         Assert.Same(selectionState, viewModel.SelectionState);
         Assert.Contains(nameof(GalleryItemViewModel.Title), changedProperties);
+        Assert.Contains(nameof(GalleryItemViewModel.Thumbnail), changedProperties);
         Assert.Contains(
             nameof(GalleryItemViewModel.AutomationName),
             changedProperties);
