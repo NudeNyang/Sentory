@@ -476,7 +476,8 @@ OLE 드래그를 직접 받으며, Sentory는 실제 전송 확인 절차에 사
 현재 설치된 LINE 26.3.0.3916은 `LINE.exe`의 Qt 최상위 창과 채팅 영역을
 Windows UI Automation으로 노출한다.
 
-- 최상위 창: `LINE.exe`, `AllInOneWindow`
+- 최상위 창: `LINE.exe`; Win32 네이티브 클래스 `Qt663QWindowIcon`, UIA 클래스
+  `AllInOneWindow`
 - 현재 대화: `MainChatPanel`
 - 메시지 목록: `LcListView`와 자식 `ListItem`
 - 메시지 입력: `LcTextField` (`TextPattern`, `ValuePattern`)
@@ -485,5 +486,8 @@ Windows UI Automation으로 노출한다.
 실행 중인 실제 LINE 창에서 읽기 전용 기준점을 두 번 연속 수집해 선택 대화
 식별자와 메시지 Runtime ID가 유지되는 것을 확인했다. 붙여넣기·Explorer 드롭
 직전에 기준점을 만들고, 같은 대화에서 새 Runtime ID와 명시적 Enter·마우스
-입력이 함께 확인된 경우만 확정한다. URL은 새 항목의 값과 정규화 주소를 추가로
-대조한다. 실제 메시지 전송 검수는 사용자가 개발자판에서 수행할 대상으로 남긴다.
+입력이 함께 확인된 경우만 확정한다. LINE 26.3은 메시지 항목의 Runtime ID는
+제공하지만 Name/Value 본문은 비워 둔다. 본문이 제공되면 정규화 URL까지
+대조하고, 제공되지 않으면 같은 대화·명시적 전송·새 Runtime ID의 결합을 사진과
+같은 수준의 전송 증거로 사용한다. 실제 메시지 전송 검수는 사용자가
+개발자판에서 수행할 대상으로 남긴다.

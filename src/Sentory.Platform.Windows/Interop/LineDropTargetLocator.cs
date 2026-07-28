@@ -24,10 +24,8 @@ public sealed class LineDropTargetLocator(
                     native.GetProcessName(processId),
                     LineContextValidator.ProcessName,
                     StringComparison.OrdinalIgnoreCase) ||
-                !string.Equals(
-                    native.GetClassName(root),
-                    LineContextValidator.MainWindowClassName,
-                    StringComparison.Ordinal))
+                !LineContextValidator.IsSupportedMainWindowClass(
+                    native.GetClassName(root)))
             {
                 continue;
             }

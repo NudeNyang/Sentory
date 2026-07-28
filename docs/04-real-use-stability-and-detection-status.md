@@ -391,13 +391,15 @@ DPI와 색상 형식이 달라질 수 있다. 기존 중복 키는 저장 파일
 
 ## 2026-07-27 LINE 붙여넣기·드롭 지원
 
-- LINE 26.3.0.3916의 `LINE.exe`, `AllInOneWindow`와 UIA
-  `MainChatPanel`이 모두 확인된 창만 후보를 만든다.
+- LINE 26.3.0.3916의 `LINE.exe`, Win32 `Qt<숫자>QWindowIcon` 또는 호환
+  `AllInOneWindow`, UIA `MainChatPanel`이 모두 확인된 창만 후보를 만든다.
 - 포커스된 `LcTextField`에서 URL·사진 Ctrl+V를 관찰하고, Explorer에서 실제로
   보이는 LINE 창에 놓은 로컬 사진 경로를 비간섭 방식으로 읽는다.
 - 후보 이전 메시지 Runtime ID, 선택 대화 식별자, 새 메시지 Runtime ID와
   명시적 Enter·마우스 전송 입력이 모두 맞아야
-  `LineConfirmedSend/Image/Drop`으로 저장한다. 링크는 정규화 URL도 대조한다.
+  `LineConfirmedSend/Image/Drop`으로 저장한다. 메시지 본문이 UIA에 노출되면
+  링크의 정규화 URL도 대조한다. LINE처럼 Name/Value가 모두 비어 있으면 같은
+  대화·명시적 전송·새 Runtime ID 결합을 사진과 같은 확인 증거로 사용한다.
 - 다른 프로세스·창 클래스, 대화 이동, URL 불일치, 클릭만 하고 새 메시지가
   없는 경우와 2분 만료는 저장하지 않는다.
 - 마우스 입력은 활성 후보가 있고 클릭 지점의 같은 LINE 프로세스 접근성 조상이
@@ -405,3 +407,14 @@ DPI와 색상 형식이 달라질 수 있다. 기존 중복 키는 저장 파일
 - 실제 실행 중인 LINE에서 기준점 생성과 대화·메시지 ID 안정성은 읽기 전용으로
   확인했다. URL·사진 붙여넣기 전송과 Explorer 사진 드롭 전송은 1.5.0
   개발자판의 사용자 검수 대상으로 남긴다.
+
+### 2026-07-28 네이티브 창 클래스 판별 수정
+
+- 최초 조사에서 UIA가 보고한 최상위 클래스 `AllInOneWindow`를 Win32
+  `GetClassName` 결과로 잘못 간주했다. 실제 LINE 창의 네이티브 클래스는
+  `Qt663QWindowIcon`이어서 기존 코드는 붙여넣기 후보 생성과 드롭 대상 판별
+  전에 모두 거부됐다.
+- 숫자 버전부가 있는 `Qt<숫자>QWindowIcon`만 허용하고, `LINE.exe`, 최상위
+  루트, 창 크기와 `MainChatPanel` 접근성 검증은 그대로 유지한다.
+- 실제 실행 창에서 새 판별 결과 `Accepted=True`, 대화 식별자와 메시지 Runtime
+  ID 2개 수집을 읽기 전용으로 확인했다. 본문 Name/Value 길이는 모두 0이었다.

@@ -132,10 +132,8 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
         var root = _native.GetRootWindow(trigger.ForegroundWindow);
         if (root == nint.Zero ||
             _native.GetProcessId(root) != trigger.ForegroundProcessId ||
-            !string.Equals(
-                _native.GetClassName(root),
-                LineContextValidator.MainWindowClassName,
-                StringComparison.Ordinal))
+            !LineContextValidator.IsSupportedMainWindowClass(
+                _native.GetClassName(root)))
         {
             return;
         }

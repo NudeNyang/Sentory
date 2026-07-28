@@ -30,6 +30,30 @@ public sealed class LineConfirmationPolicyTests
     }
 
     [Fact]
+    public void AcceptsNewMessageWhenLineHidesItsTextValue()
+    {
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/path",
+            out var url));
+
+        Assert.True(LineMessageMatchPolicy.HasMatchingSendEvidence(
+            string.Empty,
+            [url]));
+    }
+
+    [Fact]
+    public void RejectsDifferentVisibleUrlAsSendEvidence()
+    {
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/path",
+            out var url));
+
+        Assert.False(LineMessageMatchPolicy.HasMatchingSendEvidence(
+            "https://example.net/path",
+            [url]));
+    }
+
+    [Fact]
     public void ConversationRequiresIdentityAndMessageOverlap()
     {
         var baseline = new LineAccessibilitySnapshot(

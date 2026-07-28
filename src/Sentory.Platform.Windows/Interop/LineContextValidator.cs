@@ -39,10 +39,8 @@ public sealed class LineContextValidator(INativeWindowApi native)
         var mainWindow = native.GetRootWindow(trigger.ForegroundWindow);
         if (mainWindow == nint.Zero ||
             native.GetProcessId(mainWindow) != trigger.ForegroundProcessId ||
-            !string.Equals(
-                native.GetClassName(mainWindow),
-                MainWindowClassName,
-                StringComparison.Ordinal))
+            !IsSupportedMainWindowClass(
+                native.GetClassName(mainWindow)))
         {
             return false;
         }
@@ -55,6 +53,31 @@ public sealed class LineContextValidator(INativeWindowApi native)
             trigger.OccurredAt,
             CreateContextHash(trigger.ForegroundProcessId, mainWindow));
         return true;
+    }
+
+    public static bool IsSupportedMainWindowClass(string className)
+    {
+        if (string.Equals(
+                className,
+                MainWindowClassName,
+                StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        const string qtPrefix = "Qt";
+        const string qtSuffix = "QWindowIcon";
+        if (!className.StartsWith(qtPrefix, StringComparison.Ordinal) ||
+            !className.EndsWith(qtSuffix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var version = className.AsSpan(
+            qtPrefix.Length,
+            className.Length - qtPrefix.Length - qtSuffix.Length);
+        return version.Length > 0 &&
+               version.IndexOfAnyExceptInRange('0', '9') < 0;
     }
 
     public bool TryValidate(

@@ -97,6 +97,13 @@ internal interface ILineAccessibilityClient
 
 internal static class LineMessageMatchPolicy
 {
+    public static bool HasMatchingSendEvidence(
+        string messageText,
+        IReadOnlyList<NormalizedUrl> urls) =>
+        urls.Count == 0 ||
+        string.IsNullOrWhiteSpace(messageText) ||
+        ContainsEveryUrl(messageText, urls);
+
     public static bool ContainsEveryUrl(
         string messageText,
         IReadOnlyList<NormalizedUrl> urls)
@@ -216,7 +223,7 @@ internal sealed class LineAccessibilityClient(
                                          message.Id)))
                         {
                             if (!explicitSendObserved() ||
-                                !LineMessageMatchPolicy.ContainsEveryUrl(
+                                !LineMessageMatchPolicy.HasMatchingSendEvidence(
                                     message.Text,
                                     request.Urls))
                             {

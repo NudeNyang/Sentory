@@ -2,6 +2,16 @@
 
 ## 개발 중
 
+- LINE 26.3의 UI Automation 창 클래스 `AllInOneWindow`를 Win32 창 클래스와
+  동일한 값으로 오인해, 실제 `Qt663QWindowIcon` 창에서 붙여넣기·드롭 후보가
+  모두 거부되던 문제 수정
+- `Qt<숫자>QWindowIcon` 형식을 LINE 프로세스·최상위 창·채팅 접근성 구조와
+  함께 검증해 Qt 패치 버전이 바뀌어도 실제 대화창을 안전하게 식별하도록 개선
+- LINE이 메시지 Runtime ID는 제공하지만 본문 Name/Value를 비워 두는 환경에서는
+  같은 대화, 명시적 전송 입력과 새 메시지 ID를 모두 확인해 링크 전송을 확정하고,
+  본문이 노출되는 환경의 불일치 URL은 계속 거부
+- Release 전체 회귀 테스트 661개 통과(Core 60, Diagnostics 15,
+  Platform Windows 280, Infrastructure 172, App 134)
 - WhatsApp에서 Ctrl+V 직후 Enter를 매우 빠르게 누르면 비동기 후보 등록 전에
   전송 입력과 초록색 초안 버튼이 모두 지나가 감지를 놓치던 타이밍 경합 수정
 - 후보보다 먼저 관찰된 Enter를 같은 WhatsApp 창의 붙여넣기에 재결합하고,

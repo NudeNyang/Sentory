@@ -20,6 +20,18 @@ public sealed class LineContextValidatorTests
     }
 
     [Fact]
+    public void AcceptsCurrentLineNativeQtWindowClass()
+    {
+        var native = new FakeNative
+        {
+            MainClass = "Qt663QWindowIcon"
+        };
+        var validator = new LineContextValidator(native);
+
+        Assert.True(validator.TryValidate(CreateTrigger(native), out _));
+    }
+
+    [Fact]
     public void RejectsAnotherProcess()
     {
         var native = new FakeNative { ProcessName = "notepad" };
@@ -32,6 +44,18 @@ public sealed class LineContextValidatorTests
     public void RejectsAnotherTopLevelWindowClass()
     {
         var native = new FakeNative { MainClass = "QtWindow" };
+        var validator = new LineContextValidator(native);
+
+        Assert.False(validator.TryValidate(CreateTrigger(native), out _));
+    }
+
+    [Theory]
+    [InlineData("QtWindow")]
+    [InlineData("Qt663QWindow")]
+    [InlineData("OtherQWindowIcon")]
+    public void RejectsUnrelatedQtWindowClasses(string className)
+    {
+        var native = new FakeNative { MainClass = className };
         var validator = new LineContextValidator(native);
 
         Assert.False(validator.TryValidate(CreateTrigger(native), out _));
