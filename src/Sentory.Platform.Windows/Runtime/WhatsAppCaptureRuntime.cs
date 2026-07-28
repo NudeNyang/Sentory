@@ -43,6 +43,7 @@ public sealed class WhatsAppCaptureRuntime : ICaptureRuntime
         new(StringComparer.Ordinal);
     private readonly HashSet<string> _activeImageHashes =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly WhatsAppRecentSendSignals _recentSendSignals = new();
     private Task? _worker;
     private volatile bool _paused;
     private DateTimeOffset _lastIssueReportedAt = DateTimeOffset.MinValue;
@@ -110,6 +111,13 @@ public sealed class WhatsAppCaptureRuntime : ICaptureRuntime
         if (_paused || !_validator.TryValidate(trigger, out var context))
         {
             return;
+        }
+
+        lock (_candidateGate)
+        {
+            _recentSendSignals.Observe(
+                context.ContextHash,
+                context.OccurredAt);
         }
 
         MarkSendObserved(
@@ -371,6 +379,17 @@ public sealed class WhatsAppCaptureRuntime : ICaptureRuntime
                 nativeDrop,
                 cancellation);
             _candidates.Add(registration);
+            if (_recentSendSignals.CanApply(
+                    context.ContextHash,
+                    context.OccurredAt,
+                    DateTimeOffset.UtcNow))
+            {
+                registration.MarkSendObserved();
+                _diagnostic?.Invoke(
+                    "whatsapp-send-input-replayed",
+                    "kind=keyboard candidates=1");
+            }
+
             registration.Task = Task.Run(() => RunCandidateAsync(registration));
             return true;
         }

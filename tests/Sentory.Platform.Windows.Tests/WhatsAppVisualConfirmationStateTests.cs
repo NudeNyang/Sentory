@@ -58,6 +58,45 @@ public sealed class WhatsAppVisualConfirmationStateTests
     }
 
     [Fact]
+    public void ConfirmsRapidPasteAndEnterWhenDraftFrameWasMissed()
+    {
+        var state = new WhatsAppVisualConfirmationState(
+            Frame(send: false, outgoingChanged: false),
+            TimeSpan.FromSeconds(10));
+        var now = DateTimeOffset.UtcNow;
+
+        Assert.Equal(
+            WhatsAppVisualDecision.Pending,
+            state.Observe(
+                Frame(send: false, outgoingChanged: true),
+                true,
+                now));
+        Assert.False(state.DraftObserved);
+        Assert.Equal(
+            WhatsAppVisualDecision.Confirmed,
+            state.Observe(
+                Frame(send: false, outgoingChanged: true),
+                true,
+                now.AddMilliseconds(200)));
+    }
+
+    [Fact]
+    public void DoesNotConfirmMissedDraftWithoutExplicitSendInput()
+    {
+        var state = new WhatsAppVisualConfirmationState(
+            Frame(send: false, outgoingChanged: false),
+            TimeSpan.FromSeconds(10));
+
+        Assert.Equal(
+            WhatsAppVisualDecision.Pending,
+            state.Observe(
+                Frame(send: false, outgoingChanged: true),
+                false,
+                DateTimeOffset.UtcNow));
+        Assert.False(state.DraftObserved);
+    }
+
+    [Fact]
     public void CancelsRemovedDraftWithoutSendOrOutgoingChange()
     {
         var state = new WhatsAppVisualConfirmationState(

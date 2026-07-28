@@ -108,8 +108,23 @@ internal sealed class WhatsAppVisualConfirmationState(
             if (current.HasSendAffordance)
             {
                 _draft = current;
+                _confirmationFrames = 0;
+                return WhatsAppVisualDecision.Pending;
             }
 
+            var rapidSendOutgoingChanged =
+                WhatsAppVisualDifference.Calculate(
+                    baseline.OutgoingPixels,
+                    current.OutgoingPixels) >= OutgoingChangedThreshold;
+            if (explicitSendObserved && rapidSendOutgoingChanged)
+            {
+                _confirmationFrames++;
+                return _confirmationFrames >= 2
+                    ? WhatsAppVisualDecision.Confirmed
+                    : WhatsAppVisualDecision.Pending;
+            }
+
+            _confirmationFrames = 0;
             return WhatsAppVisualDecision.Pending;
         }
 
@@ -361,14 +376,23 @@ internal sealed class WhatsAppVisualConfirmationClient(
                     diagnostic?.Invoke(
                         "whatsapp-send-confirmed",
                         $"sendKey={explicitSendObserved()}");
-                    return new WhatsAppVisualConfirmationResponse(
-                        true,
-                        DateTimeOffset.UtcNow,
-                        [
+                    var evidence = state.DraftObserved
+                        ? new[]
+                        {
                             "whatsapp-visual-draft",
                             "whatsapp-draft-removed",
                             "whatsapp-outgoing-region-changed"
-                        ]);
+                        }
+                        :
+                        [
+                            "whatsapp-rapid-send-draft-frame-missed",
+                            "whatsapp-explicit-send-input",
+                            "whatsapp-outgoing-region-changed"
+                        ];
+                    return new WhatsAppVisualConfirmationResponse(
+                        true,
+                        DateTimeOffset.UtcNow,
+                        evidence);
                 }
 
                 if (decision == WhatsAppVisualDecision.Cancelled)
