@@ -874,7 +874,7 @@
                             <local:VirtualizingCenteredWrapPanel
                                 ItemWidth="268"
                                 ItemHeight="336"
-                                CacheRows="4" />
+                                CacheRows="2" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>

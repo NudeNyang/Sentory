@@ -26,8 +26,6 @@ public partial class GalleryWindow : Window
     private const string SelectionCheckGlyph = "\uE73E";
     private const double ScrollIndicatorRevealDistance = 44;
     private const int ScrollIndicatorActiveMilliseconds = 1200;
-    private const int ArtworkLoadIdleDelayMilliseconds = 500;
-    private const int RetainedArtworkItemLimit = 32;
 
     private readonly ICaptureRepository _repository;
     private readonly CopyUsageRecorder _copyUsageRecorder;
@@ -45,25 +43,13 @@ public partial class GalleryWindow : Window
         _sourceOptionButtons = [];
     private readonly Dictionary<string, System.Windows.Controls.TextBlock>
         _sourceOptionChecks = [];
-    private readonly FileBackedWeakLruCache<ImageSource>
-        _cardArtworkCache = new(256);
-    private readonly FileBackedWeakLruCache<ImageSource>
-        _siteIconCache = new(256);
-    private readonly FileBackedWeakLruCache<ImageSource>
-        _detailArtworkCache = new(128);
+    private readonly FileBackedWeakLruCache<ImageSource> _thumbnailCache =
+        new(1024);
     private GalleryFilter _filter = GalleryFilter.All;
     private GalleryDateRange _dateRange = GalleryDateRange.All;
     private GallerySortMode _sortMode = GallerySortMode.Newest;
     private CancellationTokenSource? _feedbackCancellation;
     private CancellationTokenSource? _languageRefreshCancellation;
-    private CancellationTokenSource? _artworkLoadCancellation;
-    private readonly SemaphoreSlim _artworkLoadGate = new(1, 1);
-    private readonly LinkedList<GalleryItemViewModel> _retainedArtwork = [];
-    private readonly Dictionary<
-        GalleryItemViewModel,
-        LinkedListNode<GalleryItemViewModel>> _retainedArtworkNodes = new(
-            (IEqualityComparer<GalleryItemViewModel>)
-            ReferenceEqualityComparer.Instance);
     private bool _loaded;
     private bool _isDarkTheme;
     private SentoryThemeMode _themeMode;
@@ -183,12 +169,10 @@ public partial class GalleryWindow : Window
             return;
         }
 
-        _artworkLoadCancellation?.Cancel();
         SetViewState(ViewState.Loading);
         try
         {
             var items = await _repository.GetRecentAsync(500);
-            ClearRetainedCardArtwork();
             _allItems.Clear();
             _allItems.AddRange(items.Select(CreateViewModel));
             ApplyFilter();
@@ -333,33 +317,21 @@ public partial class GalleryWindow : Window
                 .Where(member => member.Kind == ContentKind.Image)
                 .Select(member => new GalleryImageViewModel(
                     member.ContentPath,
-                    CreateArtworkReference(
-                        member.ContentPath,
-                        _detailArtworkCache,
-                        GalleryArtworkDecodePolicy.DetailWidth),
+                    LoadThumbnail(member.ContentPath),
                     GetPhotoName(
                         member.ContentPath,
                         member.OcrDisplayName,
                         member.OriginalUrl),
                     member.Sha256))
-                .Where(image => image.ArtworkReference is not null)
+                .Where(image => image.Thumbnail is not null)
                 .ToArray()
             : [];
-        var collectionArtwork = CreateArtworkReference(
-            collectionImages.FirstOrDefault()?.ContentPath,
-            _cardArtworkCache,
-            GalleryArtworkDecodePolicy.CardWidth);
+        var collectionArtwork = collectionImages.FirstOrDefault()?.Thumbnail;
         var collectionLinkPreview = isCollection
-            ? CreateArtworkReference(
-                item.PreviewImagePath,
-                _cardArtworkCache,
-                GalleryArtworkDecodePolicy.CardWidth)
+            ? LoadThumbnail(item.PreviewImagePath)
             : null;
         var collectionLinkIcon = isCollection
-            ? CreateArtworkReference(
-                item.SiteIconPath,
-                _siteIconCache,
-                GalleryArtworkDecodePolicy.SiteIconWidth)
+            ? LoadThumbnail(item.SiteIconPath)
             : null;
         var collectionPreview = collectionArtwork ??
             collectionLinkPreview ??
@@ -371,26 +343,11 @@ public partial class GalleryWindow : Window
         var thumbnail = isCollection
             ? collectionPreview
             : isImage
-                ? CreateArtworkReference(
-                    item.ContentPath,
-                    _cardArtworkCache,
-                    GalleryArtworkDecodePolicy.CardWidth)
-                : CreateArtworkReference(
-                    item.PreviewImagePath,
-                    _cardArtworkCache,
-                    GalleryArtworkDecodePolicy.CardWidth);
-        var detailThumbnail = isImage
-            ? CreateArtworkReference(
-                item.ContentPath,
-                _detailArtworkCache,
-                GalleryArtworkDecodePolicy.DetailWidth)
-            : null;
+                ? LoadThumbnail(item.ContentPath)
+                : LoadThumbnail(item.PreviewImagePath);
         var siteIcon = isImage || isCollection
             ? null
-            : CreateArtworkReference(
-                item.SiteIconPath,
-                _siteIconCache,
-                GalleryArtworkDecodePolicy.SiteIconWidth);
+            : LoadThumbnail(item.SiteIconPath);
         return new GalleryItemViewModel(
             item,
             isImage,
@@ -403,7 +360,6 @@ public partial class GalleryWindow : Window
             localizedText.Initial,
             thumbnail,
             siteIcon,
-            detailThumbnail,
             thumbnail is not null,
             siteIcon is not null,
             isImage || collectionArtwork is not null || collectionUsesSiteIcon
@@ -480,23 +436,6 @@ public partial class GalleryWindow : Window
                 : string.Empty);
     }
 
-    private GalleryArtworkReference? CreateArtworkReference(
-        string? relativePath,
-        FileBackedWeakLruCache<ImageSource> cache,
-        int decodePixelWidth)
-    {
-        var absolutePath = ResolveContentPath(relativePath);
-        if (absolutePath is null || !File.Exists(absolutePath))
-        {
-            return null;
-        }
-
-        return new GalleryArtworkReference(() =>
-            cache.GetOrAdd(
-                absolutePath,
-                path => LoadThumbnailFromFile(path, decodePixelWidth)));
-    }
-
     private ImageSource? LoadThumbnail(string? relativePath)
     {
         var absolutePath = ResolveContentPath(relativePath);
@@ -505,16 +444,12 @@ public partial class GalleryWindow : Window
             return null;
         }
 
-        return _detailArtworkCache.GetOrAdd(
+        return _thumbnailCache.GetOrAdd(
             absolutePath,
-            path => LoadThumbnailFromFile(
-                path,
-                GalleryArtworkDecodePolicy.DetailWidth));
+            LoadThumbnailFromFile);
     }
 
-    private static ImageSource? LoadThumbnailFromFile(
-        string absolutePath,
-        int decodePixelWidth)
+    private static ImageSource? LoadThumbnailFromFile(string absolutePath)
     {
         try
         {
@@ -522,7 +457,7 @@ public partial class GalleryWindow : Window
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
             image.UriSource = new Uri(absolutePath, UriKind.Absolute);
-            image.DecodePixelWidth = decodePixelWidth;
+            image.DecodePixelWidth = 480;
             image.EndInit();
             image.Freeze();
             return image;
@@ -608,114 +543,6 @@ public partial class GalleryWindow : Window
             _visibleItems.Count == 0
                 ? ViewState.Empty
                 : ViewState.Content);
-        ScheduleVisibleArtworkLoad();
-    }
-
-    private void ScheduleVisibleArtworkLoad()
-    {
-        _artworkLoadCancellation?.Cancel();
-        _artworkLoadCancellation?.Dispose();
-        _artworkLoadCancellation = null;
-        if (_visibleItems.Count == 0)
-        {
-            return;
-        }
-
-        var cancellation = new CancellationTokenSource();
-        _artworkLoadCancellation = cancellation;
-        _ = LoadVisibleArtworkAfterIdleAsync(cancellation.Token);
-    }
-
-    private async Task LoadVisibleArtworkAfterIdleAsync(
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            await Task.Delay(
-                ArtworkLoadIdleDelayMilliseconds,
-                cancellationToken);
-            await Dispatcher.Yield(DispatcherPriority.Loaded);
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var panel = FindVisualDescendant<
-                VirtualizingCenteredWrapPanel>(GalleryItems);
-            var visibleItems = panel?
-                .GetVisibleDataItems()
-                .OfType<GalleryItemViewModel>()
-                .Where(item => item.NeedsCardArtwork)
-                .ToArray() ?? [];
-            if (visibleItems.Length == 0)
-            {
-                return;
-            }
-
-            await _artworkLoadGate.WaitAsync(cancellationToken);
-            try
-            {
-                foreach (var item in visibleItems)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var artwork = await LoadCardArtworkAtLowPriorityAsync(item);
-                    cancellationToken.ThrowIfCancellationRequested();
-                    item.ApplyCardArtwork(artwork);
-                    RetainCardArtwork(item);
-                    await Dispatcher.Yield(DispatcherPriority.Background);
-                }
-            }
-            finally
-            {
-                _artworkLoadGate.Release();
-            }
-        }
-        catch (OperationCanceledException)
-        {
-        }
-    }
-
-    private static Task<GalleryCardArtwork>
-        LoadCardArtworkAtLowPriorityAsync(GalleryItemViewModel item) =>
-        Task.Run(() =>
-        {
-            var thread = Thread.CurrentThread;
-            var originalPriority = thread.Priority;
-            try
-            {
-                thread.Priority = ThreadPriority.Lowest;
-                return item.LoadCardArtwork();
-            }
-            finally
-            {
-                thread.Priority = originalPriority;
-            }
-        });
-
-    private void RetainCardArtwork(GalleryItemViewModel item)
-    {
-        if (_retainedArtworkNodes.Remove(item, out var existing))
-        {
-            _retainedArtwork.Remove(existing);
-        }
-
-        var node = _retainedArtwork.AddLast(item);
-        _retainedArtworkNodes[item] = node;
-        while (_retainedArtwork.Count > RetainedArtworkItemLimit &&
-               _retainedArtwork.First is { } oldest)
-        {
-            _retainedArtwork.RemoveFirst();
-            _retainedArtworkNodes.Remove(oldest.Value);
-            oldest.Value.ReleaseCardArtwork();
-        }
-    }
-
-    private void ClearRetainedCardArtwork()
-    {
-        foreach (var item in _retainedArtwork)
-        {
-            item.ReleaseCardArtwork();
-        }
-
-        _retainedArtwork.Clear();
-        _retainedArtworkNodes.Clear();
     }
 
     private void UpdateEmptyStateText()
@@ -1314,7 +1141,6 @@ public partial class GalleryWindow : Window
         if (Math.Abs(e.VerticalChange) > double.Epsilon)
         {
             ShowGalleryScrollIndicatorAfterScroll();
-            ScheduleVisibleArtworkLoad();
         }
     }
 
@@ -3073,8 +2899,6 @@ public partial class GalleryWindow : Window
         SaveSettings();
         _feedbackCancellation?.Cancel();
         _feedbackCancellation?.Dispose();
-        _artworkLoadCancellation?.Cancel();
-        _artworkLoadCancellation?.Dispose();
         _scrollIndicatorHideTimer.Stop();
         base.OnClosing(e);
     }
@@ -3134,9 +2958,8 @@ public sealed record GalleryItemViewModel(
     string DateLabel,
     string StatusLabel,
     string Initial,
-    GalleryArtworkReference? ThumbnailReference,
-    GalleryArtworkReference? SiteIconReference,
-    GalleryArtworkReference? DetailThumbnailReference,
+    ImageSource? Thumbnail,
+    ImageSource? SiteIcon,
     bool HasPrimaryArtwork,
     bool HasSiteIcon,
     Stretch ThumbnailStretch,
@@ -3153,10 +2976,6 @@ public sealed record GalleryItemViewModel(
     private string _statusLabel = StatusLabel;
     private string _initial = Initial;
     private string _collectionBadgeText = CollectionBadgeText;
-    private ImageSource? _thumbnail;
-    private ImageSource? _siteIcon;
-    private bool _thumbnailLoadCompleted = ThumbnailReference is null;
-    private bool _siteIconLoadCompleted = SiteIconReference is null;
 
     public string Title => _title;
 
@@ -3171,13 +2990,6 @@ public sealed record GalleryItemViewModel(
     public string Initial => _initial;
 
     public string CollectionBadgeText => _collectionBadgeText;
-
-    public ImageSource? Thumbnail => _thumbnail;
-
-    public ImageSource? SiteIcon => _siteIcon;
-
-    public ImageSource? DetailThumbnail =>
-        DetailThumbnailReference?.Value ?? Thumbnail;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -3214,47 +3026,6 @@ public sealed record GalleryItemViewModel(
             DateLabel,
             Item.CaptureCount,
             Item.CopyCount);
-
-    public bool NeedsCardArtwork =>
-        !_thumbnailLoadCompleted || !_siteIconLoadCompleted;
-
-    public GalleryCardArtwork LoadCardArtwork() => new(
-        ThumbnailReference?.Value,
-        SiteIconReference?.Value);
-
-    public void ApplyCardArtwork(GalleryCardArtwork artwork)
-    {
-        if (!_thumbnailLoadCompleted)
-        {
-            _thumbnail = artwork.Thumbnail;
-            _thumbnailLoadCompleted = true;
-            OnPropertyChanged(nameof(Thumbnail));
-        }
-
-        if (!_siteIconLoadCompleted)
-        {
-            _siteIcon = artwork.SiteIcon;
-            _siteIconLoadCompleted = true;
-            OnPropertyChanged(nameof(SiteIcon));
-        }
-    }
-
-    public void ReleaseCardArtwork()
-    {
-        if (_thumbnailLoadCompleted && ThumbnailReference is not null)
-        {
-            _thumbnail = null;
-            _thumbnailLoadCompleted = false;
-            OnPropertyChanged(nameof(Thumbnail));
-        }
-
-        if (_siteIconLoadCompleted && SiteIconReference is not null)
-        {
-            _siteIcon = null;
-            _siteIconLoadCompleted = false;
-            OnPropertyChanged(nameof(SiteIcon));
-        }
-    }
 
     internal void ApplyLocalizedText(GalleryItemLocalizedText text)
     {
@@ -3368,18 +3139,11 @@ public sealed class GalleryItemSelectionState : INotifyPropertyChanged
 
 public sealed record GalleryImageViewModel(
     string? ContentPath,
-    GalleryArtworkReference? ArtworkReference,
+    ImageSource? Thumbnail,
     string DisplayName,
-    string? Sha256)
-{
-    public ImageSource? Thumbnail => ArtworkReference?.Value;
-}
+    string? Sha256);
 
 public sealed record GalleryLinkArtwork(
     ImageSource Image,
     Stretch Stretch,
     Thickness Margin);
-
-public sealed record GalleryCardArtwork(
-    ImageSource? Thumbnail,
-    ImageSource? SiteIcon);
