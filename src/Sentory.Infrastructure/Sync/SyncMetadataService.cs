@@ -175,7 +175,8 @@ public sealed class SyncMetadataService(
         var settings = settingsStore.Load();
         if (settings.AutoFavoriteChangedAt is null)
         {
-            if (!settings.AutoFavoriteEnabled &&
+            if (settings.AutoFavoriteEnabled ==
+                    SentorySettings.DefaultAutoFavoriteEnabled &&
                 settings.AutoFavoriteCopyThreshold ==
                 SentorySettings.DefaultAutoFavoriteCopyThreshold)
             {

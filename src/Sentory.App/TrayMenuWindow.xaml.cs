@@ -28,6 +28,7 @@ public partial class TrayMenuWindow : Window
         bool paused,
         bool startupEnabled,
         bool discordSupportEnabled,
+        bool discordProcessRunning,
         CaptureRuntimeState discordDetectionState,
         bool discordRepairNeeded,
         bool isDarkTheme)
@@ -40,6 +41,7 @@ public partial class TrayMenuWindow : Window
         StatusText.Text = status;
         var discordPresentation = DiscordDetectionUiPolicy.Resolve(
             discordSupportEnabled,
+            discordProcessRunning,
             discordDetectionState,
             discordRepairNeeded);
         DiscordDetectionStatusText.Text = discordPresentation.ShowRepairAction

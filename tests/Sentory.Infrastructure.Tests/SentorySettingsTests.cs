@@ -6,11 +6,11 @@ namespace Sentory.Infrastructure.Tests;
 public sealed class SentorySettingsTests
 {
     [Fact]
-    public void AutoFavoriteDefaultsToDisabledAtThreeCopies()
+    public void AutoFavoriteDefaultsToEnabledAtThreeCopies()
     {
         var settings = new SentorySettings();
 
-        Assert.False(settings.AutoFavoriteEnabled);
+        Assert.True(settings.AutoFavoriteEnabled);
         Assert.Equal(
             SentorySettings.DefaultAutoFavoriteCopyThreshold,
             settings.AutoFavoriteCopyThreshold);
@@ -53,6 +53,41 @@ public sealed class SentorySettingsTests
         Assert.Equal(
             copyThreshold,
             settings.AutoFavoriteCopyThreshold);
+    }
+
+    [Fact]
+    public void MigratesUntouchedDisabledAutoFavoriteDefaultToEnabled()
+    {
+        var settings = new SentorySettings
+        {
+            AutoFavoriteEnabled = false,
+            AutoFavoriteCopyThreshold =
+                SentorySettings.DefaultAutoFavoriteCopyThreshold,
+            AutoFavoriteChangedAt = null
+        };
+
+        settings.Normalize();
+
+        Assert.True(settings.AutoFavoriteEnabled);
+        Assert.Null(settings.AutoFavoriteChangedAt);
+    }
+
+    [Fact]
+    public void PreservesExplicitlyDisabledAutoFavoriteSetting()
+    {
+        var changedAt = DateTimeOffset.Parse("2026-07-28T06:00:00Z");
+        var settings = new SentorySettings
+        {
+            AutoFavoriteEnabled = false,
+            AutoFavoriteCopyThreshold =
+                SentorySettings.DefaultAutoFavoriteCopyThreshold,
+            AutoFavoriteChangedAt = changedAt
+        };
+
+        settings.Normalize();
+
+        Assert.False(settings.AutoFavoriteEnabled);
+        Assert.Equal(changedAt, settings.AutoFavoriteChangedAt);
     }
 
     [Fact]

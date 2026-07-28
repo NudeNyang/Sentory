@@ -68,6 +68,7 @@ public partial class GalleryWindow : Window
     private bool _scrollIndicatorThumbEmphasized;
     private bool _discordRepairNeeded;
     private bool _discordRepairBannerDismissed;
+    private bool _discordProcessRunning;
     private bool _detectionPaused;
     private DataManagementWindow? _dataManagementWindow;
     private bool _allowCloseWithOwnedWindows;
@@ -198,7 +199,9 @@ public partial class GalleryWindow : Window
 
         _discordRepairNeeded = needed;
         DiscordConnectionBanner.Visibility =
-            needed && !_discordRepairBannerDismissed
+            _discordProcessRunning &&
+            needed &&
+            !_discordRepairBannerDismissed
             ? Visibility.Visible
             : Visibility.Collapsed;
         UpdateDiscordDetectionVisibility();
@@ -210,6 +213,19 @@ public partial class GalleryWindow : Window
         _discordDetectionState = state;
         UpdateDiscordDetectionVisibility();
         _dataManagementWindow?.SetDiscordDetectionState(state);
+    }
+
+    public void SetDiscordProcessRunning(bool running)
+    {
+        _discordProcessRunning = running;
+        DiscordConnectionBanner.Visibility =
+            running &&
+            _discordRepairNeeded &&
+            !_discordRepairBannerDismissed
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        UpdateDiscordDetectionVisibility();
+        _dataManagementWindow?.SetDiscordProcessRunning(running);
     }
 
     public void SetMessengerSupportState(
@@ -237,6 +253,7 @@ public partial class GalleryWindow : Window
     {
         var presentation = DiscordDetectionUiPolicy.Resolve(
             _settings.DiscordSupportEnabled,
+            _discordProcessRunning,
             _discordDetectionState,
             _discordRepairNeeded,
             _discordRepairBannerDismissed);
@@ -628,6 +645,7 @@ public partial class GalleryWindow : Window
             _settingsStore,
             _paths,
             _discordDetectionState,
+            _discordProcessRunning,
             _discordRepairNeeded,
             _detectionPaused,
             _syncStatusTracker)

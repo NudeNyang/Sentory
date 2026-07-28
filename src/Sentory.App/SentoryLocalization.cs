@@ -190,6 +190,7 @@ internal static class SentoryLocalization
             L("SortLabelFormat", "정렬 {0}", "Sort: {0}", "並べ替え: {0}", "排序：{0}"),
             L("DiscordPrepareHeading", "Discord 재시작이 필요합니다", "Discord needs to restart", "Discord の再起動が必要です", "需要重启 Discord"),
             L("DiscordPrepareDescription", "전송 감지를 다시 사용하려면 Discord를 접근성 모드로 재시작해야 합니다.", "Restart Discord in accessibility mode to resume sent-item detection.", "送信検出を再開するには、Discord をアクセシビリティモードで再起動する必要があります。", "要恢复发送检测，需要以无障碍模式重启 Discord。"),
+            L("DiscordNotRunning", "Discord 미실행", "Discord is not running", "Discord は実行されていません", "Discord 未运行"),
             L("Later", "나중에", "Later", "後で", "稍后"),
             L("ApplyNow", "지금 적용", "Apply now", "今すぐ適用", "立即应用"),
             L("Copy", "복사", "Copy", "コピー", "复制"),

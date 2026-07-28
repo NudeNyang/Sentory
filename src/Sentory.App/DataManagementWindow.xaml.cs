@@ -28,6 +28,7 @@ public partial class DataManagementWindow : Window
     private IReadOnlyList<CloudSyncFolderCandidate> _cloudSyncFolders = [];
     private bool _cloudSyncFolderDiscoveryCompleted;
     private CaptureRuntimeState _discordState;
+    private bool _discordProcessRunning;
     private bool _discordRepairNeeded;
     private bool _detectionPaused;
     private SentoryThemeMode _themeMode;
@@ -46,6 +47,7 @@ public partial class DataManagementWindow : Window
         SentorySettingsStore settingsStore,
         SentoryDataPaths paths,
         CaptureRuntimeState discordState,
+        bool discordProcessRunning,
         bool discordRepairNeeded,
         bool detectionPaused,
         SyncRuntimeStatusTracker syncStatusTracker)
@@ -56,6 +58,7 @@ public partial class DataManagementWindow : Window
         _paths = paths;
         _syncStatusTracker = syncStatusTracker;
         _discordState = discordState;
+        _discordProcessRunning = discordProcessRunning;
         _discordRepairNeeded = discordRepairNeeded;
         _detectionPaused = detectionPaused;
         var settings = _settingsStore.Load();
@@ -182,6 +185,13 @@ public partial class DataManagementWindow : Window
     public void SetDiscordDetectionState(CaptureRuntimeState state)
     {
         _discordState = state;
+        var settings = _settingsStore.Load();
+        UpdateDiscordControls(settings.DiscordSupportEnabled);
+    }
+
+    public void SetDiscordProcessRunning(bool running)
+    {
+        _discordProcessRunning = running;
         var settings = _settingsStore.Load();
         UpdateDiscordControls(settings.DiscordSupportEnabled);
     }
@@ -1057,6 +1067,7 @@ public partial class DataManagementWindow : Window
             _detectionPaused);
         var presentation = DiscordDetectionUiPolicy.Resolve(
             enabled,
+            _discordProcessRunning,
             _discordState,
             _discordRepairNeeded);
         DiscordSupportToggleButton.Content = enabled
@@ -1073,6 +1084,8 @@ public partial class DataManagementWindow : Window
                 SentoryLocalization.Text("DiscordNotInUse"),
             MessengerDetectionSettingsState.Paused =>
                 SentoryLocalization.Text("DetectionPaused"),
+            _ when !_discordProcessRunning =>
+                SentoryLocalization.Text("DiscordNotRunning"),
             _ when presentation.ShowRepairAction =>
                 SentoryLocalization.Text("StateReconnect"),
             _ => DiscordDetectionPresentation.GetLabel(_discordState)

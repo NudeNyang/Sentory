@@ -4,6 +4,20 @@ namespace Sentory.App.Tests;
 
 public sealed class DiscordDetectionUiPolicyTests
 {
+    [Fact]
+    public void HidesWaitingStatusWhenDiscordIsNotRunning()
+    {
+        var presentation = DiscordDetectionUiPolicy.Resolve(
+            enabled: true,
+            processRunning: false,
+            CaptureRuntimeState.Connecting,
+            repairNeeded: false);
+
+        Assert.False(presentation.ShowPassiveStatus);
+        Assert.False(presentation.ShowTrayStatus);
+        Assert.False(presentation.ShowRepairAction);
+    }
+
     [Theory]
     [InlineData(CaptureRuntimeState.Connecting, true, true, false)]
     [InlineData(CaptureRuntimeState.Ready, false, false, false)]
@@ -17,6 +31,7 @@ public sealed class DiscordDetectionUiPolicyTests
     {
         var presentation = DiscordDetectionUiPolicy.Resolve(
             enabled: true,
+            processRunning: true,
             state,
             repairNeeded: false);
 
@@ -30,6 +45,7 @@ public sealed class DiscordDetectionUiPolicyTests
     {
         var presentation = DiscordDetectionUiPolicy.Resolve(
             enabled: true,
+            processRunning: true,
             CaptureRuntimeState.Connecting,
             repairNeeded: true);
 
@@ -43,6 +59,7 @@ public sealed class DiscordDetectionUiPolicyTests
     {
         var presentation = DiscordDetectionUiPolicy.Resolve(
             enabled: true,
+            processRunning: true,
             CaptureRuntimeState.Connecting,
             repairNeeded: true,
             repairBannerDismissed: true);
@@ -60,6 +77,7 @@ public sealed class DiscordDetectionUiPolicyTests
     {
         var presentation = DiscordDetectionUiPolicy.Resolve(
             enabled: false,
+            processRunning: true,
             CaptureRuntimeState.ReconnectRequired,
             repairNeeded: true);
 

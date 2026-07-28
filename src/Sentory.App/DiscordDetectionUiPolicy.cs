@@ -12,11 +12,12 @@ internal static class DiscordDetectionUiPolicy
 {
     public static DiscordDetectionUiPresentation Resolve(
         bool enabled,
+        bool processRunning,
         CaptureRuntimeState state,
         bool repairNeeded,
         bool repairBannerDismissed = false)
     {
-        if (!enabled)
+        if (!enabled || !processRunning)
         {
             return new DiscordDetectionUiPresentation(
                 false,

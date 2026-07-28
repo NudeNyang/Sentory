@@ -94,6 +94,7 @@ public sealed class DiscordStartupPreparationPolicyTests
         var state = DiscordStartupPreparationPolicy.RestartStarted;
         var presentation = DiscordDetectionUiPolicy.Resolve(
             enabled: true,
+            processRunning: true,
             state.DetectionState,
             state.RepairNeeded);
 

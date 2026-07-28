@@ -771,6 +771,7 @@ public partial class App : System.Windows.Application
             _runtime?.IsPaused == true,
             GetStartupEnabled(),
             _discordSupportEnabled,
+            _observedDiscordProcessId.HasValue,
             _discordDetectionState,
             _discordRepairNeeded,
             GetSavedDarkTheme());
@@ -1366,7 +1367,8 @@ public partial class App : System.Windows.Application
                 _ = PromptAutomaticDiscordRestartAsync();
             }
 
-            if (_runtime?.IsPaused != true)
+            if (_runtime?.IsPaused != true &&
+                _observedDiscordProcessId.HasValue)
             {
                 SetStatus(
                     SentoryLocalization.Format(
@@ -1618,6 +1620,8 @@ public partial class App : System.Windows.Application
                 _discordSupportEnabled && _discordRepairNeeded);
             _galleryWindow.SetDiscordDetectionState(
                 _discordDetectionState);
+            _galleryWindow.SetDiscordProcessRunning(
+                _observedDiscordProcessId.HasValue);
             _galleryWindow.SetMessengerSupportState(
                 _discordSupportEnabled,
                 _kakaoSupportEnabled,
@@ -1715,6 +1719,12 @@ public partial class App : System.Windows.Application
                 {
                     var previousProcessId = _observedDiscordProcessId;
                     _observedDiscordProcessId = processId;
+                    _galleryWindow?.SetDiscordProcessRunning(
+                        processId.HasValue);
+                    if (!processId.HasValue)
+                    {
+                        UpdatePauseUi();
+                    }
                     if (_automaticRestartPromptedProcessId != processId)
                     {
                         _automaticRestartPromptedProcessId = null;
