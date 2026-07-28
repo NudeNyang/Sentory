@@ -41,10 +41,11 @@ public sealed class SyncStorageMigrationService(
                     currentDeviceId,
                     StringComparison.Ordinal))
             {
-                await SqliteSyncOperationJournal.ResetForNewStoreAsync(
-                    paths,
-                    currentDeviceId,
-                    cancellationToken);
+                await SqliteSyncOperationJournal
+                    .ResetForDeviceBindingChangeAsync(
+                        paths,
+                        currentDeviceId,
+                        cancellationToken);
                 return new SyncStorageMigrationResult(
                     false,
                     0,

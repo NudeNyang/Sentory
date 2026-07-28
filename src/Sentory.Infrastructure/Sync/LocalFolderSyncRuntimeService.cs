@@ -80,7 +80,7 @@ public sealed class LocalFolderSyncRuntimeService(
         }
         catch (SyncDeviceBindingMismatchException)
         {
-            await SqliteSyncOperationJournal.ResetForNewStoreAsync(
+            await SqliteSyncOperationJournal.ResetForDeviceBindingChangeAsync(
                 paths,
                 deviceId,
                 cancellationToken);

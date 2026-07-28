@@ -796,6 +796,83 @@ public sealed class LocalFolderSyncIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task DeviceBindingRepairDoesNotRecountConvergedCopies()
+    {
+        var replicaA = await CreateReplicaAsync("copy-repair-a");
+        var replicaB = await CreateReplicaAsync("copy-repair-b");
+        var sharedFolder = Path.Combine(_root, "shared-copy-repair");
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/copy-repair",
+            out var normalized));
+        await replicaA.Captures.UpsertUrlAsync(
+            new UrlCaptureRequest(
+                Guid.NewGuid(),
+                normalized.Original,
+                normalized,
+                SourceApp.Discord,
+                CaptureMethod.KakaoCtrlVUrl,
+                DeliveryStatus.NotObserved,
+                "copy-repair-a",
+                DateTimeOffset.Parse("2026-07-28T09:00:00+09:00"),
+                []));
+        var runtimeA = new LocalFolderSyncRuntimeService(
+            replicaA.Paths,
+            replicaA.Captures);
+        var runtimeB = new LocalFolderSyncRuntimeService(
+            replicaB.Paths,
+            replicaB.Captures);
+        await runtimeA.RunOnceAsync(replicaA.Journal.DeviceId, sharedFolder);
+        await runtimeB.RunOnceAsync(replicaB.Journal.DeviceId, sharedFolder);
+
+        var itemA = Assert.Single(await replicaA.Captures.GetRecentAsync(10));
+        var itemB = Assert.Single(await replicaB.Captures.GetRecentAsync(10));
+        Assert.True(await replicaA.Captures.RecordCopyAsync(
+            itemA.ItemId,
+            DateTimeOffset.Parse("2026-07-28T10:00:00+09:00")));
+        Assert.True(await replicaA.Captures.RecordCopyAsync(
+            itemA.ItemId,
+            DateTimeOffset.Parse("2026-07-28T10:01:00+09:00")));
+        Assert.True(await replicaB.Captures.RecordCopyAsync(
+            itemB.ItemId,
+            DateTimeOffset.Parse("2026-07-28T10:02:00+09:00")));
+        await runtimeA.RunOnceAsync(replicaA.Journal.DeviceId, sharedFolder);
+        await runtimeB.RunOnceAsync(replicaB.Journal.DeviceId, sharedFolder);
+        await runtimeA.RunOnceAsync(replicaA.Journal.DeviceId, sharedFolder);
+        Assert.Equal(
+            3,
+            Assert.Single(await replicaB.Captures.GetRecentAsync(10)).CopyCount);
+
+        var replacementDeviceId = SyncDeviceIdentity.Create();
+        var repaired = await runtimeB.RunOnceAsync(
+            replacementDeviceId,
+            sharedFolder);
+        Assert.True(repaired.DeviceBindingReset);
+        await runtimeB.RunOnceAsync(replacementDeviceId, sharedFolder);
+        await runtimeA.RunOnceAsync(replicaA.Journal.DeviceId, sharedFolder);
+
+        Assert.Equal(
+            3,
+            Assert.Single(await replicaA.Captures.GetRecentAsync(10)).CopyCount);
+        Assert.Equal(
+            3,
+            Assert.Single(await replicaB.Captures.GetRecentAsync(10)).CopyCount);
+
+        itemB = Assert.Single(await replicaB.Captures.GetRecentAsync(10));
+        Assert.True(await replicaB.Captures.RecordCopyAsync(
+            itemB.ItemId,
+            DateTimeOffset.Parse("2026-07-28T11:00:00+09:00")));
+        await runtimeB.RunOnceAsync(replacementDeviceId, sharedFolder);
+        await runtimeA.RunOnceAsync(replicaA.Journal.DeviceId, sharedFolder);
+
+        Assert.Equal(
+            4,
+            Assert.Single(await replicaA.Captures.GetRecentAsync(10)).CopyCount);
+        Assert.Equal(
+            4,
+            Assert.Single(await replicaB.Captures.GetRecentAsync(10)).CopyCount);
+    }
+
+    [Fact]
     public async Task AutoFavoriteSettingsAndExternalUsageSessionsSynchronize()
     {
         var replicaA = await CreateReplicaAsync("auto-favorite-a");

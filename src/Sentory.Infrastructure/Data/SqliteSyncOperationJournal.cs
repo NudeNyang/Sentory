@@ -131,10 +131,31 @@ public sealed class SqliteSyncOperationJournal :
             await history.ExecuteScalarAsync(cancellationToken)) != 0;
     }
 
-    public static async Task ResetForNewStoreAsync(
+    public static Task ResetForNewStoreAsync(
         SentoryDataPaths paths,
         string newDeviceId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        ResetSyncStateAsync(
+            paths,
+            newDeviceId,
+            preserveCopyComponents: false,
+            cancellationToken);
+
+    public static Task ResetForDeviceBindingChangeAsync(
+        SentoryDataPaths paths,
+        string newDeviceId,
+        CancellationToken cancellationToken = default) =>
+        ResetSyncStateAsync(
+            paths,
+            newDeviceId,
+            preserveCopyComponents: true,
+            cancellationToken);
+
+    private static async Task ResetSyncStateAsync(
+        SentoryDataPaths paths,
+        string newDeviceId,
+        bool preserveCopyComponents,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(paths);
         if (!SyncDeviceIdentity.IsValid(newDeviceId))
@@ -200,6 +221,15 @@ public sealed class SqliteSyncOperationJournal :
             .ThenBy(operation => operation.ItemId)
             .ToArray();
 
+        if (!preserveCopyComponents)
+        {
+            await using var clearCopyComponents = connection.CreateCommand();
+            clearCopyComponents.Transaction = (SqliteTransaction)transaction;
+            clearCopyComponents.CommandText =
+                "DELETE FROM sync_item_copy_components;";
+            await clearCopyComponents.ExecuteNonQueryAsync(cancellationToken);
+        }
+
         await using (var clearState = connection.CreateCommand())
         {
             clearState.Transaction = (SqliteTransaction)transaction;
@@ -207,7 +237,6 @@ public sealed class SqliteSyncOperationJournal :
                 """
                 DELETE FROM sync_item_exports;
                 DELETE FROM sync_item_metadata_exports;
-                DELETE FROM sync_item_copy_components;
                 DELETE FROM sync_item_favorite_clock;
                 DELETE FROM sync_metadata_applied;
                 DELETE FROM sync_auto_favorite_clock;
