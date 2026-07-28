@@ -139,22 +139,25 @@ public sealed class GalleryQueryTests
     }
 
     [Fact]
-    public void FiltersByAnyMessengerInCaptureHistory()
+    public void FiltersByDisplayedLatestMessengerInsteadOfOlderCaptureHistory()
     {
-        var bothMessengers = Create(
-            "both.example",
+        var latestKakao = Create(
+            "latest-kakao.example",
             Now,
             sourceApp: SourceApp.KakaoTalk) with
         {
             SourceApps = [SourceApp.Discord, SourceApp.KakaoTalk]
         };
-        var kakaoOnly = Create(
-            "kakao.example",
+        var latestDiscord = Create(
+            "latest-discord.example",
             Now.AddMinutes(-1),
-            sourceApp: SourceApp.KakaoTalk);
+            sourceApp: SourceApp.Discord) with
+        {
+            SourceApps = [SourceApp.Discord, SourceApp.KakaoTalk]
+        };
 
-        var results = GalleryQuery.Apply(
-            [kakaoOnly, bothMessengers],
+        var discordResults = GalleryQuery.Apply(
+            [latestKakao, latestDiscord],
             new GalleryQueryOptions(
                 null,
                 string.Empty,
@@ -165,10 +168,21 @@ public sealed class GalleryQueryTests
                     SourceApp.Discord
                 }),
             Now);
+        var kakaoResults = GalleryQuery.Apply(
+            [latestKakao, latestDiscord],
+            new GalleryQueryOptions(
+                null,
+                string.Empty,
+                GalleryDateRange.All,
+                GallerySortMode.Newest,
+                SourceApps: new HashSet<SourceApp>
+                {
+                    SourceApp.KakaoTalk
+                }),
+            Now);
 
-        Assert.Equal(
-            bothMessengers.ItemId,
-            Assert.Single(results).ItemId);
+        Assert.Equal(latestDiscord.ItemId, Assert.Single(discordResults).ItemId);
+        Assert.Equal(latestKakao.ItemId, Assert.Single(kakaoResults).ItemId);
     }
 
     [Fact]

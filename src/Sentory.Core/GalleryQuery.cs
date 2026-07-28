@@ -138,10 +138,7 @@ public static class GalleryQuery
             return true;
         }
 
-        var itemSources = item.SourceApps is { Count: > 0 }
-            ? item.SourceApps
-            : [item.LastSourceApp];
-        return itemSources.Any(selectedSources.Contains);
+        return selectedSources.Contains(item.LastSourceApp);
     }
 
     private static bool IsInDateRange(
