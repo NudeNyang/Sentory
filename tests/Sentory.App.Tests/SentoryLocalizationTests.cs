@@ -107,6 +107,25 @@ public sealed class SentoryLocalizationTests
     }
 
     [Theory]
+    [InlineData("ko-KR", "Telegram 감지를 켰습니다.")]
+    [InlineData("en-US", "Telegram detection is on.")]
+    [InlineData("ja-JP", "Telegram 検出をオンにしました。")]
+    [InlineData("zh-CN", "已开启 Telegram 检测。")]
+    public void TelegramDetectionStatusIsLocalized(
+        string language,
+        string expected)
+    {
+        SentoryLocalization.Apply(new ResourceDictionary(), language);
+
+        Assert.Equal(
+            expected,
+            SentoryLocalization.Text("TelegramDetectionEnabled"));
+        Assert.NotEqual(
+            "TelegramNotInUse",
+            SentoryLocalization.Text("TelegramNotInUse"));
+    }
+
+    [Theory]
     [InlineData("ko-KR", "컴퓨터 · 모바일 간 동기화", "클라우드 공유", "동기화 중")]
     [InlineData("en-US", "Computer and mobile sync", "Cloud sharing", "Syncing")]
     [InlineData("ja-JP", "パソコン・モバイル間同期", "クラウド共有", "同期中")]

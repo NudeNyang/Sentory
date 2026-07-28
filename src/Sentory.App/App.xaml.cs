@@ -45,6 +45,7 @@ public partial class App : System.Windows.Application
     private DiscordDropOverlayRuntime? _discordDropOverlay;
     private SlackDropOverlayRuntime? _slackDropOverlay;
     private WhatsAppDropOverlayRuntime? _whatsAppDropOverlay;
+    private TelegramDropOverlayRuntime? _telegramDropOverlay;
     private LineDropOverlayRuntime? _lineDropOverlay;
     private GalleryWindow? _galleryWindow;
     private readonly CancellationTokenSource _maintenanceCancellation = new();
@@ -68,6 +69,7 @@ public partial class App : System.Windows.Application
     private bool _kakaoSupportEnabled = true;
     private bool _slackSupportEnabled = true;
     private bool _whatsAppSupportEnabled = true;
+    private bool _telegramSupportEnabled = true;
     private bool _lineSupportEnabled = true;
     private bool _discordRepairNeeded;
     private bool _discordRepairBusy;
@@ -279,6 +281,11 @@ public partial class App : System.Windows.Application
                 acceptInjectedInput,
                 (category, message) =>
                     _diagnosticsLog?.Write(category, message));
+            var telegramRuntime = new TelegramCaptureRuntime(
+                _repository,
+                acceptInjectedInput,
+                (category, message) =>
+                    _diagnosticsLog?.Write(category, message));
             var lineRuntime = new LineCaptureRuntime(
                 _repository,
                 acceptInjectedInput,
@@ -289,6 +296,7 @@ public partial class App : System.Windows.Application
                 (SourceApp.Discord, discordRuntime),
                 (SourceApp.Slack, slackRuntime),
                 (SourceApp.WhatsApp, whatsAppRuntime),
+                (SourceApp.Telegram, telegramRuntime),
                 (SourceApp.Line, lineRuntime));
             _kakaoDropOverlay = new KakaoDropOverlayRuntime(
                 kakaoRuntime,
@@ -307,6 +315,10 @@ public partial class App : System.Windows.Application
                     _diagnosticsLog?.Write(category, message));
             _whatsAppDropOverlay = new WhatsAppDropOverlayRuntime(
                 whatsAppRuntime,
+                (category, message) =>
+                    _diagnosticsLog?.Write(category, message));
+            _telegramDropOverlay = new TelegramDropOverlayRuntime(
+                telegramRuntime,
                 (category, message) =>
                     _diagnosticsLog?.Write(category, message));
             _lineDropOverlay = new LineDropOverlayRuntime(
@@ -357,6 +369,7 @@ public partial class App : System.Windows.Application
             _discordDropOverlay.Start();
             _slackDropOverlay.Start();
             _whatsAppDropOverlay.Start();
+            _telegramDropOverlay.Start();
             _lineDropOverlay.Start();
             UpdatePauseUi();
             OpenGallery();
@@ -839,6 +852,7 @@ public partial class App : System.Windows.Application
         _kakaoSupportEnabled = settings.KakaoTalkSupportEnabled;
         _slackSupportEnabled = settings.SlackSupportEnabled;
         _whatsAppSupportEnabled = settings.WhatsAppSupportEnabled;
+        _telegramSupportEnabled = settings.TelegramSupportEnabled;
         _lineSupportEnabled = settings.LineSupportEnabled;
         if (!_discordSupportEnabled || !_discordLauncher.IsInstalled)
         {
@@ -907,6 +921,7 @@ public partial class App : System.Windows.Application
                 _kakaoSupportEnabled,
                 _slackSupportEnabled,
                 _whatsAppSupportEnabled,
+                _telegramSupportEnabled,
                 _lineSupportEnabled);
             QueueDiscordStartupRegistrationSync(
                 discordSupportEnabled: false,
@@ -952,6 +967,7 @@ public partial class App : System.Windows.Application
             _kakaoSupportEnabled,
             _slackSupportEnabled,
             _whatsAppSupportEnabled,
+            _telegramSupportEnabled,
             _lineSupportEnabled);
         QueueDiscordStartupRegistrationSync(
             _discordSupportEnabled,
@@ -987,6 +1003,10 @@ public partial class App : System.Windows.Application
         {
             _whatsAppSupportEnabled = enabled;
         }
+        else if (sourceApp == SourceApp.Telegram)
+        {
+            _telegramSupportEnabled = enabled;
+        }
         else if (sourceApp == SourceApp.Line)
         {
             _lineSupportEnabled = enabled;
@@ -1001,6 +1021,7 @@ public partial class App : System.Windows.Application
             _kakaoSupportEnabled,
             _slackSupportEnabled,
             _whatsAppSupportEnabled,
+            _telegramSupportEnabled,
             _lineSupportEnabled);
         UpdatePauseUi();
     }
@@ -1024,6 +1045,9 @@ public partial class App : System.Windows.Application
         controller.SetSourceEnabled(
             SourceApp.WhatsApp,
             _whatsAppSupportEnabled);
+        controller.SetSourceEnabled(
+            SourceApp.Telegram,
+            _telegramSupportEnabled);
         controller.SetSourceEnabled(
             SourceApp.Line,
             _lineSupportEnabled);
@@ -1627,6 +1651,7 @@ public partial class App : System.Windows.Application
                 _kakaoSupportEnabled,
                 _slackSupportEnabled,
                 _whatsAppSupportEnabled,
+                _telegramSupportEnabled,
                 _lineSupportEnabled);
             _galleryWindow.SetDetectionPaused(
                 _runtime?.IsPaused == true);
@@ -2276,6 +2301,8 @@ public partial class App : System.Windows.Application
         _slackDropOverlay = null;
         _whatsAppDropOverlay?.Dispose();
         _whatsAppDropOverlay = null;
+        _telegramDropOverlay?.Dispose();
+        _telegramDropOverlay = null;
         _lineDropOverlay?.Dispose();
         _lineDropOverlay = null;
         if (_runtime is not null)

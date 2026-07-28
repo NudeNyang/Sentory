@@ -492,3 +492,25 @@ Windows UI Automation으로 노출한다.
 대조하고, 제공되지 않으면 같은 대화·명시적 전송·새 Runtime ID의 결합을 사진과
 같은 수준의 전송 증거로 사용한다. 실제 메시지 전송 검수는 사용자가
 개발자판에서 수행할 대상으로 남긴다.
+
+## 2026-07-28 Telegram Desktop 조사
+
+현재 설치된 Telegram Desktop 7.0.2 x64는 `Telegram.exe`의 Qt 최상위 창으로
+동작한다.
+
+- 실행 파일: `%APPDATA%\Telegram Desktop\Telegram.exe`
+- 최상위 Win32 클래스: `Qt51519QWindowIcon`
+- 포커스 자식 창: 제공하지 않음
+- Windows UI Automation: 메시지 목록·작성기·버튼 트리를 노출하지 않음
+
+따라서 LINE처럼 메시지 Runtime ID나 본문을 확인하는 방식은 적용할 수 없다.
+Telegram 경로는 프로세스 이름과 `Qt<버전>QWindowIcon` 최상위 창을 먼저
+검증하고, 붙여넣기 또는 Explorer 사진 드롭 후보가 있을 때만 대화 영역의
+저해상도 픽셀 지문을 메모리에서 비교한다. 같은 창의 Enter 또는 하단 전송 영역
+클릭과 전송 뒤 화면 변화가 연속 두 프레임 함께 확인돼야 저장한다. 메시지 원문,
+대화 상대, 전체 화면 캡처는 파일이나 로그에 남기지 않는다.
+
+Qt 버전 숫자는 업데이트에 따라 달라질 수 있어 숫자 자체를 고정하지 않되,
+`Telegram.exe`, 최상위 창과 `Qt...QWindowIcon` 형식을 모두 요구한다. 접근성
+원문 대조가 불가능한 만큼 정상 전송 미탐을 허용하고 오탐 저장을 막는
+fail-closed 정책으로 분류한다.

@@ -115,6 +115,7 @@ public partial class ItemDetailWindow : Window
             SourceApp.KakaoTalk => SentoryLocalization.Text("KakaoTalk"),
             SourceApp.Slack => "Slack",
             SourceApp.WhatsApp => "WhatsApp",
+            SourceApp.Telegram => "Telegram",
             SourceApp.Line => "LINE",
             _ => item.Item.LastSourceApp.ToString()
         };

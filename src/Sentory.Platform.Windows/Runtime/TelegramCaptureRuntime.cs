@@ -4,29 +4,28 @@ using Sentory.Platform.Windows.Interop;
 
 namespace Sentory.Platform.Windows.Runtime;
 
-public enum LineNativeDropRegistrationResult
+public enum TelegramNativeDropRegistrationResult
 {
     Registered,
     Paused,
     TargetInvalid,
-    ConversationUnavailable,
+    VisualBaselineUnavailable,
     UnsupportedFiles,
     ImageReadFailed,
     Duplicate,
     Failed
 }
 
-public sealed class LineCaptureRuntime : ICaptureRuntime
+public sealed class TelegramCaptureRuntime : ICaptureRuntime
 {
     private const int MaximumActiveCandidates = 8;
 
     private readonly INativeWindowApi _native;
-    private readonly LineContextValidator _validator;
+    private readonly TelegramContextValidator _validator;
     private readonly LowLevelPasteHook _keyboardHook;
     private readonly LowLevelMouseHook _mouseHook;
     private readonly StaClipboardReader _clipboardReader;
-    private readonly ILineAccessibilityClient _accessibility;
-    private readonly ILinePointerSendVerifier _pointerSendVerifier;
+    private readonly ITelegramVisualConfirmationClient _visual;
     private readonly CaptureCoordinator _coordinator;
     private readonly Action<string, string>? _diagnostic;
     private readonly Channel<PasteTrigger> _triggers =
@@ -44,24 +43,25 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
         new(StringComparer.Ordinal);
     private readonly HashSet<string> _activeImageHashes =
         new(StringComparer.OrdinalIgnoreCase);
-    private readonly LineRecentSendSignals _recentSendSignals = new();
+    private readonly TelegramRecentSendSignals _recentSendSignals = new();
     private Task? _worker;
     private volatile bool _paused;
     private DateTimeOffset _lastIssueReportedAt = DateTimeOffset.MinValue;
 
-    public LineCaptureRuntime(
+    public TelegramCaptureRuntime(
         ICaptureRepository repository,
         bool acceptInjectedInput = false,
         Action<string, string>? diagnostic = null)
     {
         var native = new NativeWindowApi();
         _native = native;
-        _validator = new LineContextValidator(native);
+        _validator = new TelegramContextValidator(native);
         _keyboardHook = new LowLevelPasteHook(native, acceptInjectedInput);
         _mouseHook = new LowLevelMouseHook(native, acceptInjectedInput);
         _clipboardReader = new StaClipboardReader(native);
-        _accessibility = new LineAccessibilityClient(diagnostic);
-        _pointerSendVerifier = new LinePointerSendVerifier();
+        _visual = new TelegramVisualConfirmationClient(
+            new TelegramScreenFrameSource(native),
+            diagnostic);
         _coordinator = new CaptureCoordinator(repository);
         _diagnostic = diagnostic;
     }
@@ -131,7 +131,7 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
         if (_paused || trigger.ForegroundProcessId == 0 ||
             !string.Equals(
                 _native.GetProcessName(trigger.ForegroundProcessId),
-                LineContextValidator.ProcessName,
+                TelegramContextValidator.ProcessName,
                 StringComparison.OrdinalIgnoreCase))
         {
             return;
@@ -140,7 +140,7 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
         var root = _native.GetRootWindow(trigger.ForegroundWindow);
         if (root == nint.Zero ||
             _native.GetProcessId(root) != trigger.ForegroundProcessId ||
-            !LineContextValidator.IsSupportedMainWindowClass(
+            !TelegramContextValidator.IsSupportedMainWindowClass(
                 _native.GetClassName(root)))
         {
             return;
@@ -156,11 +156,10 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
             }
         }
 
-        if (!_pointerSendVerifier.IsPotentialSendControl(
+        if (!TelegramSendButtonPolicy.IsWithin(
+                _native.GetWindowBounds(root),
                 trigger.ScreenX,
-                trigger.ScreenY,
-                trigger.ForegroundProcessId,
-                root))
+                trigger.ScreenY))
         {
             return;
         }
@@ -191,19 +190,19 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
         if (observed > 0)
         {
             _diagnostic?.Invoke(
-                "line-send-input-observed",
+                "telegram-send-input-observed",
                 $"kind={inputKind} candidates={observed}");
         }
     }
 
-    public async Task<LineNativeDropRegistrationResult>
+    public async Task<TelegramNativeDropRegistrationResult>
         RegisterNativeDroppedFilesAsync(
-            LineDropTarget target,
+            TelegramDropTarget target,
             IReadOnlyList<string> paths)
     {
         if (_paused)
         {
-            return LineNativeDropRegistrationResult.Paused;
+            return TelegramNativeDropRegistrationResult.Paused;
         }
 
         if (!_validator.TryValidate(
@@ -212,7 +211,7 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
                 DateTimeOffset.UtcNow,
                 out var context))
         {
-            return LineNativeDropRegistrationResult.TargetInvalid;
+            return TelegramNativeDropRegistrationResult.TargetInvalid;
         }
 
         var imagePaths = paths
@@ -221,20 +220,19 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
             .ToArray();
         if (imagePaths.Length == 0)
         {
-            return LineNativeDropRegistrationResult.UnsupportedFiles;
+            return TelegramNativeDropRegistrationResult.UnsupportedFiles;
         }
 
         try
         {
-            var baseline = await _accessibility.TryCaptureAsync(
+            var baseline = await _visual.TryCaptureAsync(
                 context,
-                requireFocusedComposer: false,
-                allowImageSendDialog: false,
+                requireForeground: false,
                 _cancellation.Token);
             if (baseline is null)
             {
-                return LineNativeDropRegistrationResult
-                    .ConversationUnavailable;
+                return TelegramNativeDropRegistrationResult
+                    .VisualBaselineUnavailable;
             }
 
             var images = await Task.Run(
@@ -242,7 +240,7 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
                 _cancellation.Token);
             if (images.Count == 0)
             {
-                return LineNativeDropRegistrationResult.ImageReadFailed;
+                return TelegramNativeDropRegistrationResult.ImageReadFailed;
             }
 
             var registered = StartCandidate(
@@ -253,21 +251,21 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
                 images,
                 nativeDrop: true);
             _diagnostic?.Invoke(
-                "line-drop-candidate",
+                "telegram-drop-candidate",
                 $"registered={registered} files={imagePaths.Length} images={images.Count}");
             return registered
-                ? LineNativeDropRegistrationResult.Registered
-                : LineNativeDropRegistrationResult.Duplicate;
+                ? TelegramNativeDropRegistrationResult.Registered
+                : TelegramNativeDropRegistrationResult.Duplicate;
         }
         catch (OperationCanceledException)
             when (_cancellation.IsCancellationRequested)
         {
-            return LineNativeDropRegistrationResult.Paused;
+            return TelegramNativeDropRegistrationResult.Paused;
         }
         catch (Exception exception)
         {
             ReportIssue(exception);
-            return LineNativeDropRegistrationResult.Failed;
+            return TelegramNativeDropRegistrationResult.Failed;
         }
     }
 
@@ -296,10 +294,9 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
             return;
         }
 
-        var baseline = await _accessibility.TryCaptureAsync(
+        var baseline = await _visual.TryCaptureAsync(
             context,
-            requireFocusedComposer: true,
-            allowImageSendDialog: true,
+            requireForeground: true,
             cancellationToken);
         if (baseline is null)
         {
@@ -327,14 +324,6 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
             return;
         }
 
-        if (baseline.ImageSendDialogFocused && images.Count == 0)
-        {
-            _diagnostic?.Invoke(
-                "line-context-rejected",
-                "reason=image-send-dialog-without-image");
-            return;
-        }
-
         var registered = StartCandidate(
             context,
             baseline,
@@ -343,13 +332,13 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
             images,
             nativeDrop: false);
         _diagnostic?.Invoke(
-            "line-paste-candidate",
+            "telegram-paste-candidate",
             $"registered={registered} urls={urls.Count} images={images.Count}");
     }
 
     private bool StartCandidate(
-        ValidatedLineContext context,
-        LineAccessibilitySnapshot baseline,
+        ValidatedTelegramContext context,
+        TelegramVisualSnapshot baseline,
         string? clipboardText,
         IReadOnlyList<NormalizedUrl> urls,
         IReadOnlyList<ClipboardImageSnapshot> images,
@@ -398,7 +387,7 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
             {
                 registration.MarkSendObserved();
                 _diagnostic?.Invoke(
-                    "line-send-input-replayed",
+                    "telegram-send-input-replayed",
                     "kind=keyboard candidates=1");
             }
 
@@ -411,12 +400,10 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
     {
         try
         {
-            var response = await _accessibility.WaitForConfirmationAsync(
-                new LineConfirmationRequest(
+            var response = await _visual.WaitForConfirmationAsync(
+                new TelegramVisualConfirmationRequest(
                     registration.Context,
                     registration.Baseline,
-                    registration.Urls,
-                    registration.Images.Count > 0,
                     TimeSpan.FromMinutes(2)),
                 registration.IsSendObserved,
                 registration.Cancellation.Token);
@@ -443,12 +430,12 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
                     image.MimeType,
                     image.FileExtension,
                     image.OriginalFileName)).ToList(),
-                SourceApp.Line,
+                SourceApp.Telegram,
                 registration.NativeDrop
-                    ? CaptureMethod.LineConfirmedDrop
+                    ? CaptureMethod.TelegramConfirmedDrop
                     : registration.Images.Count > 0
-                        ? CaptureMethod.LineConfirmedImage
-                        : CaptureMethod.LineConfirmedSend,
+                        ? CaptureMethod.TelegramConfirmedImage
+                        : CaptureMethod.TelegramConfirmedSend,
                 DeliveryStatus.Confirmed,
                 registration.Context.ContextHash,
                 capturedAt,
@@ -471,10 +458,10 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
                             : ContentKind.Url,
                     1,
                     capturedAt,
-                    SourceApp.Line,
+                    SourceApp.Telegram,
                     DeliveryStatus.Confirmed));
             _diagnostic?.Invoke(
-                "line-capture-applied",
+                "telegram-capture-applied",
                 $"urls={registration.Urls.Count} images={registration.Images.Count} drop={registration.NativeDrop}");
         }
         catch (OperationCanceledException)
@@ -522,7 +509,7 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
     private void ReportIssue(Exception exception)
     {
         _diagnostic?.Invoke(
-            "line-capture-failed",
+            "telegram-capture-failed",
             $"type={exception.GetType().Name}");
         var now = DateTimeOffset.UtcNow;
         if (now - _lastIssueReportedAt < TimeSpan.FromSeconds(30))
@@ -534,8 +521,8 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
         IssueDetected?.Invoke(
             this,
             new CaptureRuntimeIssue(
-                "line-capture-item-failed",
-                "LINE 입력 일부를 처리하지 못했지만 감지는 계속됩니다.",
+                "telegram-capture-item-failed",
+                "Telegram 입력 일부를 처리하지 못했지만 감지는 계속됩니다.",
                 now));
     }
 
@@ -575,8 +562,8 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
     }
 
     private sealed class CandidateRegistration(
-        ValidatedLineContext context,
-        LineAccessibilitySnapshot baseline,
+        ValidatedTelegramContext context,
+        TelegramVisualSnapshot baseline,
         string? clipboardText,
         IReadOnlyList<NormalizedUrl> urls,
         IReadOnlyList<ClipboardImageSnapshot> images,
@@ -585,8 +572,8 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
     {
         private int _sendObserved;
 
-        public ValidatedLineContext Context { get; } = context;
-        public LineAccessibilitySnapshot Baseline { get; } = baseline;
+        public ValidatedTelegramContext Context { get; } = context;
+        public TelegramVisualSnapshot Baseline { get; } = baseline;
         public string? ClipboardText { get; } = clipboardText;
         public IReadOnlyList<NormalizedUrl> Urls { get; } = urls;
         public IReadOnlyList<ClipboardImageSnapshot> Images { get; } = images;

@@ -131,6 +131,8 @@ public partial class DataManagementWindow : Window
 
     public bool WhatsAppSupportChanged { get; private set; }
 
+    public bool TelegramSupportChanged { get; private set; }
+
     public bool LineSupportChanged { get; private set; }
 
     public event Action<SourceApp, bool>? MessengerSupportSelectionChanged;
@@ -601,6 +603,33 @@ public partial class DataManagementWindow : Window
             when (exception is IOException or UnauthorizedAccessException)
         {
             StatusText.Text = SentoryLocalization.Text("LineSettingFailed");
+        }
+    }
+
+    private void TelegramSupportToggleButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        try
+        {
+            var settings = _settingsStore.Load();
+            settings.TelegramSupportEnabled =
+                !settings.TelegramSupportEnabled;
+            _settingsStore.Save(settings);
+            TelegramSupportChanged = true;
+            UpdateTelegramControls(settings.TelegramSupportEnabled);
+            MessengerSupportSelectionChanged?.Invoke(
+                SourceApp.Telegram,
+                settings.TelegramSupportEnabled);
+            StatusText.Text = settings.TelegramSupportEnabled
+                ? SentoryLocalization.Text("TelegramDetectionEnabled")
+                : SentoryLocalization.Text("TelegramDetectionDisabled");
+        }
+        catch (Exception exception)
+            when (exception is IOException or UnauthorizedAccessException)
+        {
+            StatusText.Text =
+                SentoryLocalization.Text("TelegramSettingFailed");
         }
     }
 
@@ -1164,12 +1193,31 @@ public partial class DataManagementWindow : Window
         };
     }
 
+    private void UpdateTelegramControls(bool enabled)
+    {
+        var settingsState = MessengerDetectionSettingsUiPolicy.Resolve(
+            enabled,
+            _detectionPaused);
+        TelegramSupportToggleButton.Content = enabled
+            ? SentoryLocalization.Text("InUse")
+            : SentoryLocalization.Text("NotInUse");
+        TelegramStatusText.Text = settingsState switch
+        {
+            MessengerDetectionSettingsState.Disabled =>
+                SentoryLocalization.Text("TelegramNotInUse"),
+            MessengerDetectionSettingsState.Paused =>
+                SentoryLocalization.Text("DetectionPaused"),
+            _ => SentoryLocalization.Text("DetectionReady")
+        };
+    }
+
     private void UpdateMessengerControls(SentorySettings settings)
     {
         UpdateDiscordControls(settings.DiscordSupportEnabled);
         UpdateKakaoControls(settings.KakaoTalkSupportEnabled);
         UpdateSlackControls(settings.SlackSupportEnabled);
         UpdateWhatsAppControls(settings.WhatsAppSupportEnabled);
+        UpdateTelegramControls(settings.TelegramSupportEnabled);
         UpdateLineControls(settings.LineSupportEnabled);
     }
 

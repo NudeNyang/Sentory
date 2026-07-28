@@ -14,6 +14,7 @@ public sealed class GallerySettingsSavePolicyTests
             KakaoTalkSupportEnabled = false,
             SlackSupportEnabled = false,
             WhatsAppSupportEnabled = false,
+            TelegramSupportEnabled = false,
             LineSupportEnabled = false,
             AutoCleanupDays = 90,
             AutoFavoriteEnabled = true,
@@ -45,6 +46,7 @@ public sealed class GallerySettingsSavePolicyTests
         Assert.False(merged.KakaoTalkSupportEnabled);
         Assert.False(merged.SlackSupportEnabled);
         Assert.False(merged.WhatsAppSupportEnabled);
+        Assert.False(merged.TelegramSupportEnabled);
         Assert.False(merged.LineSupportEnabled);
         Assert.Equal(90, merged.AutoCleanupDays);
         Assert.True(merged.AutoFavoriteEnabled);

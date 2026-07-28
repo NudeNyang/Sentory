@@ -20,6 +20,7 @@ Sentory는 개인 프로젝트로 운영되므로 정해진 답변 시간이나 
 - Discord 데스크톱 앱
 - Slack 데스크톱 앱
 - WhatsApp 데스크톱 앱
+- Telegram Desktop 7.x
 - KakaoTalk 데스크톱 앱
 - LINE 데스크톱 앱
 
@@ -40,7 +41,7 @@ Sentory는 개인 프로젝트로 운영되므로 정해진 답변 시간이나 
 ```
 
 설정의 `데이터 폴더 열기`를 누른 뒤 `logs` 폴더에서 `sentory.log`를 찾을 수
-있습니다. 이 파일에는 앱 동작과 Discord·Slack·LINE 접근성 확인 단계가 함께
+있습니다. 이 파일에는 앱 동작과 Discord·Slack·LINE·Telegram 감지 확인 단계가 함께
 기록됩니다. URL 원문, 사진 내용, 메시지 본문과 상대 이름은 기록하지 않습니다.
 
 이전 버전의 `sentory.previous.log`와 `diagnostics\discord-capture.log`가 남아

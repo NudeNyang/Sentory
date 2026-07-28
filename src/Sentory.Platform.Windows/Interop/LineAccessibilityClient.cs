@@ -64,7 +64,8 @@ internal sealed class LinePointerSendVerifier : ILinePointerSendVerifier
 
 internal sealed record LineAccessibilitySnapshot(
     string ConversationIdentity,
-    IReadOnlySet<string> MessageIds);
+    IReadOnlySet<string> MessageIds,
+    bool ImageSendDialogFocused = false);
 
 internal sealed record LineConfirmationRequest(
     ValidatedLineContext Context,
@@ -87,6 +88,7 @@ internal interface ILineAccessibilityClient
     Task<LineAccessibilitySnapshot?> TryCaptureAsync(
         ValidatedLineContext context,
         bool requireFocusedComposer,
+        bool allowImageSendDialog,
         CancellationToken cancellationToken);
 
     Task<LineConfirmationResponse> WaitForConfirmationAsync(
@@ -149,6 +151,17 @@ internal static class LineComposerFocusPolicy
         composerVisible &&
         focusedMatchesComposer &&
         sameProcess;
+
+    public static bool IsImageSendDialogUsable(
+        bool composerVisible,
+        string focusedClassName,
+        bool sameProcess) =>
+        composerVisible &&
+        sameProcess &&
+        string.Equals(
+            focusedClassName,
+            "AlertWindow",
+            StringComparison.Ordinal);
 }
 
 internal sealed record LineComposerFocusSnapshot(
@@ -158,7 +171,8 @@ internal sealed record LineComposerFocusSnapshot(
     string FocusedControlKind,
     bool FocusedMatchesComposer,
     bool SameProcess,
-    bool IsUsable);
+    bool IsUsable,
+    bool IsImageSendDialogUsable);
 
 internal static class LineConversationIdentityPolicy
 {
@@ -226,11 +240,13 @@ internal sealed class LineAccessibilityClient(
     public Task<LineAccessibilitySnapshot?> TryCaptureAsync(
         ValidatedLineContext context,
         bool requireFocusedComposer,
+        bool allowImageSendDialog,
         CancellationToken cancellationToken) =>
         Task.Run(
             () => TryCapture(
                 context,
                 requireFocusedComposer,
+                allowImageSendDialog,
                 cancellationToken),
             cancellationToken);
 
@@ -330,6 +346,7 @@ internal sealed class LineAccessibilityClient(
     private LineAccessibilitySnapshot? TryCapture(
         ValidatedLineContext context,
         bool requireFocusedComposer,
+        bool allowImageSendDialog,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -345,7 +362,9 @@ internal sealed class LineAccessibilityClient(
             if (conversationPanel is null ||
                 messageView is null ||
                 composer is null ||
-                focus is { IsUsable: false })
+                (focus is { IsUsable: false } &&
+                 (!allowImageSendDialog ||
+                  !focus.IsImageSendDialogUsable)))
             {
                 diagnostic?.Invoke(
                     "line-context-rejected",
@@ -382,7 +401,8 @@ internal sealed class LineAccessibilityClient(
             var snapshot = new LineAccessibilitySnapshot(
                 conversationIdentity,
                 messages.Select(message => message.Id)
-                    .ToHashSet(StringComparer.Ordinal));
+                    .ToHashSet(StringComparer.Ordinal),
+                focus?.IsImageSendDialogUsable == true);
             diagnostic?.Invoke(
                 "line-context-ready",
                 $"messages={snapshot.MessageIds.Count}");
@@ -431,6 +451,10 @@ internal sealed class LineAccessibilityClient(
             LineComposerFocusPolicy.IsUsable(
                 composerVisible,
                 focusedMatchesComposer,
+                sameProcess),
+            LineComposerFocusPolicy.IsImageSendDialogUsable(
+                composerVisible,
+                focusedClassName,
                 sameProcess));
     }
 

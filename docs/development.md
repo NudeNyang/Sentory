@@ -498,7 +498,7 @@ state=Connecting`을 남기고 끝났다. 이후 채팅방을 열어도 준비 �
 ## 설정 메신저 1열 배치와 자동 화면 언어
 
 - 설정의 메신저 감지는 화면 폭을 반으로 나누지 않고 Discord, KakaoTalk,
-  Slack, WhatsApp, LINE 순서로 각 항목이 한 줄 전체를 사용한다. 상태 문구와
+  Slack, WhatsApp, Telegram, LINE 순서로 각 항목이 한 줄 전체를 사용한다. 상태 문구와
   토글, Discord 재연결 버튼은 기존 동작을 유지한다.
 - 저장 언어값 `auto`는 `CultureInfo.CurrentUICulture`의 두 글자 언어 코드를
   기준으로 `ko-KR`, `en-US`, `ja-JP`, `zh-CN`에 매핑한다. 지원하지 않는 시스템
@@ -515,7 +515,7 @@ state=Connecting`을 남기고 끝났다. 이후 채팅방을 열어도 준비 �
 - 키 입력 전체를 기록하지 않는다.
 - 필요한 조합만 관찰하고 훅 콜백은 즉시 반환한다.
 - 메시지 입력과 전송을 가로채지 않는다.
-- 클립보드는 검증된 Discord, Slack, WhatsApp, KakaoTalk 또는 LINE 입력 이벤트
+- 클립보드는 검증된 Discord, Slack, WhatsApp, Telegram, KakaoTalk 또는 LINE 입력 이벤트
   직후에만 읽는다.
 - URL과 이미지 이외의 일반 텍스트는 폐기한다.
 - 입력값 원문은 로그에 기록하지 않는다.

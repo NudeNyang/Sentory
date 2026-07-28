@@ -6,6 +6,14 @@ namespace Sentory.Infrastructure.Tests;
 public sealed class SentorySettingsTests
 {
     [Fact]
+    public void TelegramDetectionDefaultsToEnabled()
+    {
+        var settings = new SentorySettings();
+
+        Assert.True(settings.TelegramSupportEnabled);
+    }
+
+    [Fact]
     public void LanguageDefaultsToAutomatic()
     {
         var settings = new SentorySettings();

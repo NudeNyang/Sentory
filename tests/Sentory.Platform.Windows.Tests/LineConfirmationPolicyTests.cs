@@ -24,6 +24,30 @@ public sealed class LineConfirmationPolicyTests
     }
 
     [Fact]
+    public void AcceptsSameProcessImageSendDialogFocus()
+    {
+        Assert.True(LineComposerFocusPolicy.IsImageSendDialogUsable(
+            composerVisible: true,
+            focusedClassName: "AlertWindow",
+            sameProcess: true));
+    }
+
+    [Theory]
+    [InlineData(false, "AlertWindow", true)]
+    [InlineData(true, "LcTextField", true)]
+    [InlineData(true, "AlertWindow", false)]
+    public void RejectsUntrustedImageSendDialogFocus(
+        bool composerVisible,
+        string focusedClassName,
+        bool sameProcess)
+    {
+        Assert.False(LineComposerFocusPolicy.IsImageSendDialogUsable(
+            composerVisible,
+            focusedClassName,
+            sameProcess));
+    }
+
+    [Fact]
     public void CreatesIdentityFromSingleSelectedConversation()
     {
         Assert.True(LineConversationIdentityPolicy.TryCreate(

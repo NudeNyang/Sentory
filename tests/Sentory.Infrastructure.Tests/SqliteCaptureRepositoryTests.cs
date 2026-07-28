@@ -866,6 +866,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         Assert.True(settings.KakaoTalkSupportEnabled);
         Assert.True(settings.SlackSupportEnabled);
         Assert.True(settings.WhatsAppSupportEnabled);
+        Assert.True(settings.TelegramSupportEnabled);
         Assert.True(settings.LineSupportEnabled);
         Assert.False(settings.DiscordAccessibilityPrepared);
         Assert.Null(settings.StartWithWindows);
@@ -887,6 +888,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         Assert.True(restored.KakaoTalkSupportEnabled);
         Assert.True(restored.SlackSupportEnabled);
         Assert.True(restored.WhatsAppSupportEnabled);
+        Assert.True(restored.TelegramSupportEnabled);
         Assert.True(restored.LineSupportEnabled);
         Assert.True(restored.DiscordAccessibilityPrepared);
         Assert.False(restored.StartWithWindows);
@@ -940,6 +942,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
             KakaoTalkSupportEnabled = true,
             SlackSupportEnabled = false,
             WhatsAppSupportEnabled = false,
+            TelegramSupportEnabled = false,
             LineSupportEnabled = false
         });
 
@@ -949,6 +952,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         Assert.True(restored.KakaoTalkSupportEnabled);
         Assert.False(restored.SlackSupportEnabled);
         Assert.False(restored.WhatsAppSupportEnabled);
+        Assert.False(restored.TelegramSupportEnabled);
         Assert.False(restored.LineSupportEnabled);
     }
 
@@ -960,13 +964,14 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         store.Save(new SentorySettings
         {
             FilterDateRange = "Last7Days",
-            FilterSourceApps = ["Discord", "Discord", "Unknown"]
+            FilterSourceApps =
+                ["Discord", "Telegram", "Discord", "Unknown"]
         });
 
         var restored = store.Load();
 
         Assert.Equal("Last7Days", restored.FilterDateRange);
-        Assert.Equal(["Discord"], restored.FilterSourceApps);
+        Assert.Equal(["Discord", "Telegram"], restored.FilterSourceApps);
     }
 
     [Theory]
