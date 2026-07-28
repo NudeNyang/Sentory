@@ -349,6 +349,8 @@ public static class DiscordAccessibilityWorker
             Math.Clamp(request.TimeoutMilliseconds, 1_000, 300_000));
         var startedAt = DateTimeOffset.UtcNow;
         DateTimeOffset? inputEmptySince = null;
+        var delayedTargetRefreshAttempted = false;
+        var delayedTargetRefreshSucceeded = false;
 
         while (DateTimeOffset.UtcNow - startedAt < timeout)
         {
@@ -404,7 +406,8 @@ public static class DiscordAccessibilityWorker
                     "new-message-set-url-match",
                     request.ExplicitSendObserved,
                     resolved.CacheHit,
-                    matchingUrls);
+                    matchingUrls,
+                    delayedTargetRefreshSucceeded);
             }
 
             if (decision == DiscordCandidateDecision.Cancelled)
@@ -418,13 +421,39 @@ public static class DiscordAccessibilityWorker
             if (inputIsEmpty)
             {
                 inputEmptySince ??= DateTimeOffset.UtcNow;
-                if (DateTimeOffset.UtcNow - inputEmptySince >=
-                    TimeSpan.FromSeconds(5))
+                var delayedAction = DiscordDelayedUrlConfirmationPolicy.Decide(
+                    DateTimeOffset.UtcNow - inputEmptySince.Value,
+                    delayedTargetRefreshAttempted);
+                if (delayedAction ==
+                    DiscordDelayedUrlConfirmationAction.RefreshTargets)
+                {
+                    delayedTargetRefreshAttempted = true;
+                    if (TryRefreshMessageTargets(
+                            request,
+                            targetCache,
+                            out var refreshedAccessibleRoot,
+                            out var refreshedMessageList))
+                    {
+                        accessibleRoot = refreshedAccessibleRoot;
+                        messageList = refreshedMessageList;
+                        delayedTargetRefreshSucceeded = true;
+                    }
+
+                    continue;
+                }
+
+                if (delayedAction ==
+                    DiscordDelayedUrlConfirmationAction.Cancelled)
                 {
                     return new DiscordConfirmationResponse(
                         DiscordConfirmationOutcome.Cancelled,
                         null,
-                        []);
+                        [
+                            delayedTargetRefreshSucceeded
+                                ? "message-target-refreshed-after-delay"
+                                : "message-target-refresh-failed",
+                            "post-send-message-url-not-observed"
+                        ]);
                 }
             }
             else
@@ -589,22 +618,32 @@ public static class DiscordAccessibilityWorker
         string correlationSignal,
         bool explicitSendObserved,
         bool cacheHit,
-        IReadOnlyList<string> confirmedUrls) =>
-        new(
+        IReadOnlyList<string> confirmedUrls,
+        bool delayedTargetRefreshSucceeded = false)
+    {
+        var signals = new List<string>
+        {
+            "discord-process-and-window",
+            explicitSendObserved
+                ? "validated-discord-send-key"
+                : "msaa-input-url-match",
+            explicitSendObserved
+                ? "post-send-message-url-match"
+                : "input-cleared-after-send",
+            cacheHit ? "target-cache-hit" : "target-cache-miss",
+            correlationSignal
+        };
+        if (delayedTargetRefreshSucceeded)
+        {
+            signals.Add("message-target-refreshed-after-delay");
+        }
+
+        return new DiscordConfirmationResponse(
             DiscordConfirmationOutcome.Confirmed,
             confirmedAt,
-            [
-                "discord-process-and-window",
-                explicitSendObserved
-                    ? "validated-discord-send-key"
-                    : "msaa-input-url-match",
-                explicitSendObserved
-                    ? "post-send-message-url-match"
-                    : "input-cleared-after-send",
-                cacheHit ? "target-cache-hit" : "target-cache-miss",
-                correlationSignal
-            ],
+            signals,
             ConfirmedUrls: confirmedUrls);
+    }
 
     private static DiscordConfirmationResponse CreateConfirmedImageResponse(
         DateTimeOffset confirmedAt,
@@ -1483,6 +1522,44 @@ public static class DiscordAccessibilityWorker
 
         messageList = refreshed;
         return GetDirectListItems(messageList);
+    }
+
+    private static bool TryRefreshMessageTargets(
+        DiscordConfirmationRequest request,
+        WorkerTargetCache targetCache,
+        out IAccessible accessibleRoot,
+        out AccessibleTarget messageList)
+    {
+        accessibleRoot = null!;
+        messageList = null!;
+        if (!TryCreateAccessible(
+                new nint(request.RendererWindowHandle),
+                out accessibleRoot))
+        {
+            return false;
+        }
+
+        var targets = FindTargets(
+            accessibleRoot,
+            new HashSet<string>(StringComparer.Ordinal),
+            requireMatchingUrlInput: false);
+        if (!TrySelectTargets(
+                targets,
+                requireMatchingUrlInput: false,
+                out messageList,
+                out _,
+                out _))
+        {
+            return false;
+        }
+
+        targetCache.Update(
+            request,
+            GetWindowTitle(new nint(request.MainWindowHandle)),
+            accessibleRoot,
+            messageList,
+            inputTarget: null);
+        return true;
     }
 
     private static List<AccessibleTarget> GetChildren(IAccessible? container)

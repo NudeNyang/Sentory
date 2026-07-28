@@ -5,6 +5,23 @@ namespace Sentory.Platform.Windows.Tests;
 
 public sealed class DiscordConfirmationEvaluatorTests
 {
+    [Theory]
+    [InlineData(4_999, false, 0)]
+    [InlineData(5_000, false, 1)]
+    [InlineData(14_999, true, 0)]
+    [InlineData(15_000, true, 2)]
+    public void RefreshesStaleMessageTargetsBeforeCancellingDelayedUrl(
+        int emptyInputMilliseconds,
+        bool targetsRefreshed,
+        int expected)
+    {
+        Assert.Equal(
+            (DiscordDelayedUrlConfirmationAction)expected,
+            DiscordDelayedUrlConfirmationPolicy.Decide(
+                TimeSpan.FromMilliseconds(emptyInputMilliseconds),
+                targetsRefreshed));
+    }
+
     [Fact]
     public void DoesNotRequirePopulatedInputAfterSendKeyWasObserved()
     {

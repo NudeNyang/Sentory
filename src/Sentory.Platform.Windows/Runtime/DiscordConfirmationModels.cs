@@ -77,6 +77,39 @@ internal enum DiscordCandidateDecision
     Cancelled
 }
 
+internal enum DiscordDelayedUrlConfirmationAction
+{
+    Pending,
+    RefreshTargets,
+    Cancelled
+}
+
+internal static class DiscordDelayedUrlConfirmationPolicy
+{
+    private static readonly TimeSpan RefreshTargetsAfter =
+        TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan CancelAfter =
+        TimeSpan.FromSeconds(15);
+
+    public static DiscordDelayedUrlConfirmationAction Decide(
+        TimeSpan emptyInputDuration,
+        bool targetRefreshAttempted)
+    {
+        if (emptyInputDuration >= CancelAfter)
+        {
+            return DiscordDelayedUrlConfirmationAction.Cancelled;
+        }
+
+        if (!targetRefreshAttempted &&
+            emptyInputDuration >= RefreshTargetsAfter)
+        {
+            return DiscordDelayedUrlConfirmationAction.RefreshTargets;
+        }
+
+        return DiscordDelayedUrlConfirmationAction.Pending;
+    }
+}
+
 internal readonly record struct DiscordCandidateObservation(
     bool ContextValid,
     bool InputContainsExpectedUrls,
