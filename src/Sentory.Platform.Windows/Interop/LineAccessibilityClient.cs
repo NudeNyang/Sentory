@@ -140,6 +140,24 @@ internal static class LineMessageMatchPolicy
                 StringSplitOptions.TrimEntries));
 }
 
+internal static class LineComposerFocusPolicy
+{
+    public static bool IsUsable(
+        bool composerVisible,
+        bool focusedInsideChatPanel,
+        string focusedClassName,
+        bool focusedIsListItem,
+        bool sameProcess) =>
+        composerVisible &&
+        sameProcess &&
+        ((focusedInsideChatPanel &&
+          string.Equals(
+              focusedClassName,
+              "LcTextField",
+              StringComparison.Ordinal)) ||
+         focusedIsListItem);
+}
+
 internal static class LineConversationMatchPolicy
 {
     public static bool IsSameConversation(
@@ -345,11 +363,43 @@ internal sealed class LineAccessibilityClient(
 
         var focused = AutomationElement.FocusedElement;
         return focused is not null &&
-               string.Equals(
-                   SafeClassName(focused),
-                   "LcTextField",
-                   StringComparison.Ordinal) &&
-               SafeProcessId(focused) == SafeProcessId(panel);
+               LineComposerFocusPolicy.IsUsable(
+                   composerVisible: true,
+                   focusedInsideChatPanel: IsDescendantOf(
+                       focused,
+                       panel),
+                   focusedClassName: SafeClassName(focused),
+                   focusedIsListItem: SafeIsListItem(focused),
+                   sameProcess:
+                       SafeProcessId(focused) == SafeProcessId(panel));
+    }
+
+    private static bool IsDescendantOf(
+        AutomationElement element,
+        AutomationElement ancestor)
+    {
+        var ancestorId = SafeRuntimeId(ancestor);
+        if (ancestorId.Length == 0)
+        {
+            return false;
+        }
+
+        var walker = TreeWalker.RawViewWalker;
+        var current = element;
+        for (var depth = 0; current is not null && depth < 20; depth++)
+        {
+            if (string.Equals(
+                    SafeRuntimeId(current),
+                    ancestorId,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            current = walker.GetParent(current);
+        }
+
+        return false;
     }
 
     private static AutomationElement? FindMainChatPanel(
@@ -444,6 +494,11 @@ internal sealed class LineAccessibilityClient(
 
     private static bool SafeIsOffscreen(AutomationElement element) =>
         SafeRead(() => element.Current.IsOffscreen, true);
+
+    private static bool SafeIsListItem(AutomationElement element) =>
+        SafeRead(
+            () => element.Current.ControlType == ControlType.ListItem,
+            false);
 
     private static System.Windows.Rect SafeBounds(AutomationElement element) =>
         SafeRead(

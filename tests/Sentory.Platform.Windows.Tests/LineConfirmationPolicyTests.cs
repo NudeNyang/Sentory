@@ -6,6 +6,39 @@ namespace Sentory.Platform.Windows.Tests;
 public sealed class LineConfirmationPolicyTests
 {
     [Fact]
+    public void AcceptsQtMessageListFocusReportedForVisibleComposer()
+    {
+        Assert.True(LineComposerFocusPolicy.IsUsable(
+            composerVisible: true,
+            focusedInsideChatPanel: true,
+            focusedClassName: string.Empty,
+            focusedIsListItem: true,
+            sameProcess: true));
+    }
+
+    [Fact]
+    public void AcceptsQtListFocusWhenPanelOwnershipIsAmbiguous()
+    {
+        Assert.True(LineComposerFocusPolicy.IsUsable(
+            composerVisible: true,
+            focusedInsideChatPanel: false,
+            focusedClassName: string.Empty,
+            focusedIsListItem: true,
+            sameProcess: true));
+    }
+
+    [Fact]
+    public void RejectsLineSearchFieldFocus()
+    {
+        Assert.False(LineComposerFocusPolicy.IsUsable(
+            composerVisible: true,
+            focusedInsideChatPanel: false,
+            focusedClassName: "AutoSuggestTextArea",
+            focusedIsListItem: false,
+            sameProcess: true));
+    }
+
+    [Fact]
     public void MatchesNormalizedUrlInNewMessage()
     {
         Assert.True(UrlNormalizer.TryNormalize(

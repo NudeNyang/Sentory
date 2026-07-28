@@ -2,6 +2,13 @@
 
 ## 개발 중
 
+- LINE 입력칸에서 실제로 Ctrl+V해도 Qt UI Automation이 포커스를 `LcTextField`가
+  아니라 선택 목록 `ListItem`으로 보고해 모든 붙여넣기 후보를 거부하던 문제 수정
+- 보이는 `MainChatPanel`·`LcTextField`가 있고 같은 LINE 프로세스의 포커스가
+  입력칸 또는 Qt 목록 항목일 때만 후보를 허용하며, 검색 입력
+  `AutoSuggestTextArea`·다른 프로세스·전송되지 않은 후보는 계속 거부
+- Release 전체 회귀 테스트 664개 통과(Core 60, Diagnostics 15,
+  Platform Windows 283, Infrastructure 172, App 134)
 - LINE 26.3의 UI Automation 창 클래스 `AllInOneWindow`를 Win32 창 클래스와
   동일한 값으로 오인해, 실제 `Qt663QWindowIcon` 창에서 붙여넣기·드롭 후보가
   모두 거부되던 문제 수정

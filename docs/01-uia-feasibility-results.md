@@ -482,6 +482,9 @@ Windows UI Automation으로 노출한다.
 - 메시지 목록: `LcListView`와 자식 `ListItem`
 - 메시지 입력: `LcTextField` (`TextPattern`, `ValuePattern`)
 - 대화 목록과 메시지 목록의 항목은 안정된 Runtime ID를 제공
+- 실제 입력칸 사용 중에도 Qt가 대화·메시지 `ListItem`에
+  `HasKeyboardFocus=true`를 동시에 보고할 수 있어 `LcTextField` 단독 포커스
+  판정은 사용할 수 없음
 
 실행 중인 실제 LINE 창에서 읽기 전용 기준점을 두 번 연속 수집해 선택 대화
 식별자와 메시지 Runtime ID가 유지되는 것을 확인했다. 붙여넣기·Explorer 드롭

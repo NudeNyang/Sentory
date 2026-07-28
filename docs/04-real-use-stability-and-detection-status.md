@@ -418,3 +418,17 @@ DPI와 색상 형식이 달라질 수 있다. 기존 중복 키는 저장 파일
   루트, 창 크기와 `MainChatPanel` 접근성 검증은 그대로 유지한다.
 - 실제 실행 창에서 새 판별 결과 `Accepted=True`, 대화 식별자와 메시지 Runtime
   ID 2개 수집을 읽기 전용으로 확인했다. 본문 Name/Value 길이는 모두 0이었다.
+
+### 2026-07-28 Qt 입력 포커스 오보고 대응
+
+- 실제 URL·사진 붙여넣기 세 번이 모두
+  `line-context-rejected reason=focused-element-not-composer`에서 종료됐다.
+  LINE은 입력칸을 사용 중이어도 UIA에서 `LcTextField` 대신 같은 프로세스의
+  대화·메시지 `ListItem`을 키보드 포커스로 보고하며, 스냅샷에서는 두 목록
+  항목이 동시에 `HasKeyboardFocus=true`였다.
+- `MainChatPanel`과 화면에 보이는 `LcTextField`가 존재하면서 같은 LINE
+  프로세스의 포커스가 `LcTextField` 또는 Qt `ListItem`일 때 기준점 생성을
+  허용한다. 검색 입력 `AutoSuggestTextArea`, 다른 프로세스와 채팅 패널·입력칸이
+  없는 창은 거부한다.
+- 이 단계는 후보 생성만 허용한다. 저장에는 같은 대화, 새 메시지 Runtime ID와
+  명시적 Enter 또는 검증된 `LcButton` 클릭이 계속 모두 필요하다.
