@@ -6,6 +6,16 @@ namespace Sentory.Platform.Windows.Tests;
 public sealed class WeChatConfirmationPolicyTests
 {
     [Fact]
+    public void ComposerTextPrefersValueOverAccessibleName()
+    {
+        var selected = WeChatComposerTextPolicy.Select(
+            ["https://example.com/path"],
+            "메시지 입력");
+
+        Assert.Equal("https://example.com/path", selected);
+    }
+
+    [Fact]
     public void AcceptsNewMessageContainingPastedUrl()
     {
         var urls = UrlExtractor.Extract("https://example.com/path");

@@ -4,6 +4,17 @@ using Sentory.Platform.Windows.Interop;
 
 namespace Sentory.Platform.Windows.Runtime;
 
+public enum WeChatNativeDropRegistrationResult
+{
+    Registered,
+    Paused,
+    TargetInvalid,
+    UnsupportedFiles,
+    ImageReadFailed,
+    Duplicate,
+    Failed
+}
+
 public sealed class WeChatCaptureRuntime : ICaptureRuntime
 {
     private const int MaximumActiveCandidates = 8;
@@ -337,6 +348,102 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
             _diagnostic?.Invoke(
                 "wechat-send-input-buffered",
                 $"kind={inputKind} candidates=0");
+        }
+    }
+
+    public async Task<WeChatNativeDropRegistrationResult>
+        RegisterNativeDroppedFilesAsync(
+            WeChatDropTarget target,
+            IReadOnlyList<string> paths,
+            DateTimeOffset occurredAt)
+    {
+        if (_paused)
+        {
+            return WeChatNativeDropRegistrationResult.Paused;
+        }
+
+        if (!_validator.TryValidate(
+                target,
+                _native.GetClipboardSequenceNumber(),
+                occurredAt,
+                out var context))
+        {
+            return WeChatNativeDropRegistrationResult.TargetInvalid;
+        }
+
+        var imagePaths = paths
+            .Where(ClipboardImageCodec.IsSupportedImagePath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (imagePaths.Length == 0)
+        {
+            return WeChatNativeDropRegistrationResult.UnsupportedFiles;
+        }
+
+        try
+        {
+            var images = await Task.Run(
+                () => ClipboardImageCodec.TryReadFiles(imagePaths),
+                _cancellation.Token);
+            if (images.Count == 0)
+            {
+                return WeChatNativeDropRegistrationResult.ImageReadFailed;
+            }
+
+            var result = await _coordinator.CaptureBatchAsync(
+                context.EventId,
+                null,
+                images.Select(image => new ImageCapturePayload(
+                    image.ContentBytes,
+                    image.Sha256,
+                    image.PixelWidth,
+                    image.PixelHeight,
+                    image.MimeType,
+                    image.FileExtension,
+                    image.OriginalFileName)).ToList(),
+                SourceApp.WeChat,
+                CaptureMethod.WeChatConfirmedDrop,
+                DeliveryStatus.Confirmed,
+                context.ContextHash,
+                occurredAt,
+                [
+                    "native-explorer-file-drop",
+                    "wechat-drop-release-send"
+                ],
+                _cancellation.Token);
+            var applied = result?.EventApplied == true;
+            _diagnostic?.Invoke(
+                "wechat-drop-candidate",
+                $"registered={applied} files={imagePaths.Length} images={images.Count} confirmation=drop-release");
+            if (!applied)
+            {
+                return WeChatNativeDropRegistrationResult.Duplicate;
+            }
+
+            Captured?.Invoke(
+                this,
+                new CaptureNotification(
+                    images.Count > 1
+                        ? ContentKind.Collection
+                        : ContentKind.Image,
+                    1,
+                    occurredAt,
+                    SourceApp.WeChat,
+                    DeliveryStatus.Confirmed));
+            _diagnostic?.Invoke(
+                "wechat-capture-applied",
+                $"urls=0 images={images.Count} drop=True confirmation=drop-release");
+            return WeChatNativeDropRegistrationResult.Registered;
+        }
+        catch (OperationCanceledException)
+            when (_cancellation.IsCancellationRequested)
+        {
+            return WeChatNativeDropRegistrationResult.Paused;
+        }
+        catch (Exception exception)
+        {
+            ReportIssue(exception);
+            return WeChatNativeDropRegistrationResult.Failed;
         }
     }
 

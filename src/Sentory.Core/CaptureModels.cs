@@ -48,7 +48,8 @@ public enum CaptureMethod
     TelegramConfirmedImage,
     TelegramConfirmedDrop,
     WeChatConfirmedSend,
-    WeChatConfirmedImage
+    WeChatConfirmedImage,
+    WeChatConfirmedDrop
 }
 
 public enum LinkPreviewStatus

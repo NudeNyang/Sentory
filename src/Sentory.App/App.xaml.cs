@@ -47,6 +47,7 @@ public partial class App : System.Windows.Application
     private WhatsAppDropOverlayRuntime? _whatsAppDropOverlay;
     private TelegramDropOverlayRuntime? _telegramDropOverlay;
     private LineDropOverlayRuntime? _lineDropOverlay;
+    private WeChatDropOverlayRuntime? _weChatDropOverlay;
     private GalleryWindow? _galleryWindow;
     private readonly CancellationTokenSource _maintenanceCancellation = new();
     private Task? _maintenanceTask;
@@ -332,6 +333,10 @@ public partial class App : System.Windows.Application
                 lineRuntime,
                 (category, message) =>
                     _diagnosticsLog?.Write(category, message));
+            _weChatDropOverlay = new WeChatDropOverlayRuntime(
+                weChatRuntime,
+                (category, message) =>
+                    _diagnosticsLog?.Write(category, message));
             _runtime.Captured += OnCaptured;
             _runtime.IssueDetected += OnCaptureIssueDetected;
             if (_runtime is ICaptureRuntimeStatusSource statusSource)
@@ -378,6 +383,7 @@ public partial class App : System.Windows.Application
             _whatsAppDropOverlay.Start();
             _telegramDropOverlay.Start();
             _lineDropOverlay.Start();
+            _weChatDropOverlay.Start();
             UpdatePauseUi();
             OpenGallery();
             _ = CheckForUpdatesAsync(_maintenanceCancellation.Token);
@@ -2326,6 +2332,8 @@ public partial class App : System.Windows.Application
         _telegramDropOverlay = null;
         _lineDropOverlay?.Dispose();
         _lineDropOverlay = null;
+        _weChatDropOverlay?.Dispose();
+        _weChatDropOverlay = null;
         if (_runtime is not null)
         {
             _runtime.Captured -= OnCaptured;

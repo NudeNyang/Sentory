@@ -101,6 +101,16 @@ internal static class WeChatMessageMatchPolicy
                 StringSplitOptions.TrimEntries));
 }
 
+internal static class WeChatComposerTextPolicy
+{
+    public static string Select(
+        IReadOnlyList<string> semanticValues,
+        string accessibleName) =>
+        semanticValues.FirstOrDefault(value =>
+            !string.IsNullOrWhiteSpace(value)) ??
+        accessibleName;
+}
+
 internal static class WeChatConversationMatchPolicy
 {
     public static bool IsSameConversation(
@@ -139,11 +149,11 @@ internal sealed class WeChatComposerTextReader : IWeChatComposerTextReader
                 return new WeChatComposerTextSnapshot(false, string.Empty);
             }
 
-            var values = WeChatAutomation.ReadTextValues(composer);
             return new WeChatComposerTextSnapshot(
                 true,
-                values.FirstOrDefault(value =>
-                    !string.IsNullOrWhiteSpace(value)) ?? string.Empty);
+                WeChatComposerTextPolicy.Select(
+                    WeChatAutomation.ReadSemanticTextValues(composer),
+                    WeChatAutomation.SafeName(composer)));
         }
         catch (Exception exception)
             when (WeChatAutomation.IsRecoverable(exception))
@@ -532,6 +542,14 @@ internal static class WeChatAutomation
         return values;
     }
 
+    public static IReadOnlyList<string> ReadSemanticTextValues(
+        AutomationElement element)
+    {
+        var values = new List<string>();
+        AddSemanticTextValues(element, values);
+        return values;
+    }
+
     public static string SafeClassName(AutomationElement element) =>
         SafeRead(() => element.Current.ClassName) ?? string.Empty;
 
@@ -561,6 +579,13 @@ internal static class WeChatAutomation
             values.Add(name);
         }
 
+        AddSemanticTextValues(element, values);
+    }
+
+    private static void AddSemanticTextValues(
+        AutomationElement element,
+        ICollection<string> values)
+    {
         try
         {
             if (element.TryGetCurrentPattern(

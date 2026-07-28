@@ -11,6 +11,11 @@ public sealed record ValidatedWeChatContext(
     DateTimeOffset OccurredAt,
     string ContextHash);
 
+public sealed record WeChatDropTarget(
+    nint MainWindow,
+    uint ProcessId,
+    WindowBounds Bounds);
+
 public sealed class WeChatContextValidator(INativeWindowApi native)
 {
     private static readonly string[] ProcessNames = ["Weixin", "WeChat"];
@@ -103,6 +108,22 @@ public sealed class WeChatContextValidator(INativeWindowApi native)
 
         return nint.Zero;
     }
+
+    public bool TryValidate(
+        WeChatDropTarget target,
+        uint clipboardSequenceNumber,
+        DateTimeOffset occurredAt,
+        out ValidatedWeChatContext context) =>
+        TryValidate(
+            new PasteTrigger(
+                Guid.NewGuid(),
+                target.MainWindow,
+                target.MainWindow,
+                target.ProcessId,
+                clipboardSequenceNumber,
+                occurredAt,
+                false),
+            out context);
 
     private static string CreateContextHash(uint processId, nint mainWindow)
     {
