@@ -657,9 +657,12 @@
                                    FontSize="10">
                             <Run Text="© 2026" Foreground="{DynamicResource MutedTextBrush}" />
                             <Run Text=" · " Foreground="{DynamicResource LineBrush}" />
-                            <Run Text="NudeNyang"
-                                 FontWeight="SemiBold"
-                                 Foreground="{DynamicResource TextBrush}" />
+                            <Hyperlink NavigateUri="https://x.com/NudeNyang_VRC"
+                                       RequestNavigate="GitHubLink_RequestNavigate"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextBrush}"
+                                       TextDecorations="{x:Null}"
+                                       Cursor="Hand">NudeNyang</Hyperlink>
                             <Run Text=" · " Foreground="{DynamicResource LineBrush}" />
                             <Hyperlink NavigateUri="https://github.com/NudeNyang/Sentory"
                                        RequestNavigate="GitHubLink_RequestNavigate"

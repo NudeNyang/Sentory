@@ -6,6 +6,22 @@ namespace Sentory.App.Tests;
 public sealed class SentoryLocalizationTests
 {
     [Theory]
+    [InlineData("ko-KR", "전송 시 저장됨")]
+    [InlineData("en-US", "Saved on send")]
+    [InlineData("ja-JP", "送信時に保存")]
+    [InlineData("zh-CN", "发送时保存")]
+    public void ConfirmedCapturesUseOneSavedOnSendLabel(
+        string language,
+        string expected)
+    {
+        SentoryLocalization.SetLanguage(language);
+
+        Assert.Equal(
+            expected,
+            SentoryLocalization.Text("SavedOnSend"));
+    }
+
+    [Theory]
     [InlineData("ko-KR", "WeChat 감지를 켰습니다.")]
     [InlineData("en-US", "WeChat detection is on.")]
     [InlineData("ja-JP", "WeChat 検出をオンにしました。")]

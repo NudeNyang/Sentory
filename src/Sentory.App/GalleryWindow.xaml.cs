@@ -427,9 +427,7 @@ public partial class GalleryWindow : Window
             SentoryLocalization.FormatDate(item.LastCapturedAt.LocalDateTime),
             item.DeliveryStatus == DeliveryStatus.NotObserved
                 ? SentoryLocalization.Text("SavedOnInput")
-                : item.LastSourceApp == SourceApp.Discord
-                    ? SentoryLocalization.Text("DiscordSent")
-                    : SentoryLocalization.Text("SentConfirmed"),
+                : SentoryLocalization.Text("SavedOnSend"),
             GetInitial(isCollection && urlCount > 0
                 ? members.First(member => member.Kind == ContentKind.Url).Domain
                 : title),
