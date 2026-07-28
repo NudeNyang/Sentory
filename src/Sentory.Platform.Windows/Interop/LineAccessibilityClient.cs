@@ -158,6 +158,15 @@ internal static class LineComposerFocusPolicy
          focusedIsListItem);
 }
 
+internal sealed record LineComposerFocusSnapshot(
+    bool ComposerVisible,
+    bool FocusedPresent,
+    string FocusedClassName,
+    string FocusedControlKind,
+    bool FocusedInsideChatPanel,
+    bool SameProcess,
+    bool IsUsable);
+
 internal static class LineConversationMatchPolicy
 {
     public static bool IsSameConversation(
@@ -309,14 +318,16 @@ internal sealed class LineAccessibilityClient(
         {
             var root = AutomationElement.FromHandle(context.MainWindow);
             var panel = FindMainChatPanel(root);
-            if (panel is null ||
-                (requireFocusedComposer && !IsFocusedComposer(panel)))
+            var focus = panel is not null && requireFocusedComposer
+                ? CaptureComposerFocus(panel)
+                : null;
+            if (panel is null || focus is { IsUsable: false })
             {
                 diagnostic?.Invoke(
                     "line-context-rejected",
                     panel is null
                         ? "reason=main-chat-panel-unavailable"
-                        : "reason=focused-element-not-composer");
+                        : CreateFocusDiagnostic(focus!));
                 return null;
             }
 
@@ -351,28 +362,53 @@ internal sealed class LineAccessibilityClient(
         }
     }
 
-    private static bool IsFocusedComposer(AutomationElement panel)
+    private static LineComposerFocusSnapshot CaptureComposerFocus(
+        AutomationElement panel)
     {
         var composer = panel.FindFirst(
             TreeScope.Descendants,
             ComposerCondition);
-        if (composer is null || SafeIsOffscreen(composer))
-        {
-            return false;
-        }
-
+        var composerVisible = composer is not null &&
+                              !SafeIsOffscreen(composer);
         var focused = AutomationElement.FocusedElement;
-        return focused is not null &&
-               LineComposerFocusPolicy.IsUsable(
-                   composerVisible: true,
-                   focusedInsideChatPanel: IsDescendantOf(
-                       focused,
-                       panel),
-                   focusedClassName: SafeClassName(focused),
-                   focusedIsListItem: SafeIsListItem(focused),
-                   sameProcess:
-                       SafeProcessId(focused) == SafeProcessId(panel));
+        var focusedPresent = focused is not null;
+        var focusedClassName = focusedPresent
+            ? SafeClassName(focused!)
+            : string.Empty;
+        var focusedIsListItem = focusedPresent &&
+                                SafeIsListItem(focused!);
+        var focusedInsideChatPanel = focusedPresent &&
+                                     IsDescendantOf(focused!, panel);
+        var sameProcess = focusedPresent &&
+                          SafeProcessId(focused!) == SafeProcessId(panel);
+        return new LineComposerFocusSnapshot(
+            composerVisible,
+            focusedPresent,
+            focusedClassName,
+            focusedIsListItem
+                ? "ListItem"
+                : focusedPresent
+                    ? SafeControlKind(focused!)
+                    : "None",
+            focusedInsideChatPanel,
+            sameProcess,
+            LineComposerFocusPolicy.IsUsable(
+                composerVisible,
+                focusedInsideChatPanel,
+                focusedClassName,
+                focusedIsListItem,
+                sameProcess));
     }
+
+    private static string CreateFocusDiagnostic(
+        LineComposerFocusSnapshot focus) =>
+        "reason=focused-element-not-composer " +
+        $"composerVisible={focus.ComposerVisible} " +
+        $"focusedPresent={focus.FocusedPresent} " +
+        $"focusedClass={SanitizeDiagnosticToken(focus.FocusedClassName)} " +
+        $"focusedType={focus.FocusedControlKind} " +
+        $"insideChat={focus.FocusedInsideChatPanel} " +
+        $"sameProcess={focus.SameProcess}";
 
     private static bool IsDescendantOf(
         AutomationElement element,
@@ -499,6 +535,42 @@ internal sealed class LineAccessibilityClient(
         SafeRead(
             () => element.Current.ControlType == ControlType.ListItem,
             false);
+
+    private static string SafeControlKind(AutomationElement element)
+    {
+        var controlType = SafeRead(
+            () => element.Current.ControlType,
+            ControlType.Custom);
+        if (controlType == ControlType.Edit)
+        {
+            return "Edit";
+        }
+
+        if (controlType == ControlType.Button)
+        {
+            return "Button";
+        }
+
+        return controlType == ControlType.List
+            ? "List"
+            : "Other";
+    }
+
+    private static string SanitizeDiagnosticToken(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "empty";
+        }
+
+        return new string(
+            value.Take(64)
+                .Select(character => char.IsLetterOrDigit(character) ||
+                                     character is '_' or '-'
+                    ? character
+                    : '_')
+                .ToArray());
+    }
 
     private static System.Windows.Rect SafeBounds(AutomationElement element) =>
         SafeRead(

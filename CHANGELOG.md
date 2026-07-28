@@ -2,6 +2,8 @@
 
 ## 개발 중
 
+- LINE Qt 포커스 판별 실패를 입력칸 표시 여부, 포커스 컨트롤 종류, 채팅 패널
+  소속과 같은 프로세스 여부로 나눠 기록하는 개인정보 비수집 진단 신호 추가
 - LINE 입력칸에서 실제로 Ctrl+V해도 Qt UI Automation이 포커스를 `LcTextField`가
   아니라 선택 목록 `ListItem`으로 보고해 모든 붙여넣기 후보를 거부하던 문제 수정
 - 보이는 `MainChatPanel`·`LcTextField`가 있고 같은 LINE 프로세스의 포커스가
