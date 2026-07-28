@@ -71,6 +71,71 @@
             <Setter Property="Background" Value="{DynamicResource SecondaryButtonBackgroundBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
         </Style>
+        <Style x:Key="MessengerToggleStyle" TargetType="ToggleButton">
+            <Setter Property="Width" Value="46" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Background" Value="{DynamicResource InputBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Grid>
+                            <Border x:Name="FocusRing"
+                                    BorderBrush="{DynamicResource AccentBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="14"
+                                    Visibility="Collapsed" />
+                            <Border x:Name="Track"
+                                    Width="42"
+                                    Height="24"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="12">
+                                <Ellipse x:Name="Thumb"
+                                         Width="18"
+                                         Height="18"
+                                         Margin="2"
+                                         HorizontalAlignment="Left"
+                                         Fill="{DynamicResource SurfaceBrush}" />
+                            </Border>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track"
+                                        Property="Background"
+                                        Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="Track"
+                                        Property="BorderBrush"
+                                        Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="Thumb"
+                                        Property="HorizontalAlignment"
+                                        Value="Right" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="FocusRing"
+                                        Property="Visibility"
+                                        Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Track" Property="Opacity" Value="0.88" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Track" Property="Opacity" Value="0.72" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Track" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style TargetType="ComboBox">
             <Setter Property="Height" Value="38" />
             <Setter Property="Padding" Value="10,0" />
@@ -284,161 +349,162 @@
                            Foreground="{DynamicResource MutedTextBrush}" />
                 <Border Style="{StaticResource SettingCardStyle}">
                     <StackPanel>
-                        <Grid>
-                            <StackPanel>
+                        <Grid MinHeight="48">
+                            <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="Discord"
                                            FontSize="13"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextBrush}" />
                                 <TextBlock x:Name="DiscordStatusText"
-                                           Margin="0,4,0,0"
+                                           Margin="0,3,0,0"
                                            FontSize="11"
                                            Foreground="{DynamicResource MutedTextBrush}" />
                             </StackPanel>
                             <StackPanel HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
                                         Orientation="Horizontal">
                                 <Button x:Name="DiscordRepairButton"
                                         Margin="0,0,7,0"
                                         Content="{DynamicResource Loc.DiscordReconnect}"
+                                        Height="30"
                                         Style="{StaticResource SecondaryButtonStyle}"
                                         Click="DiscordRepairButton_Click" />
-                                <Button x:Name="DiscordSupportToggleButton"
-                                        Width="92"
-                                        Style="{StaticResource ActionButtonStyle}"
-                                        Click="DiscordSupportToggleButton_Click" />
+                                <ToggleButton x:Name="DiscordSupportToggleButton"
+                                              Style="{StaticResource MessengerToggleStyle}"
+                                              Click="DiscordSupportToggleButton_Click" />
                             </StackPanel>
                         </Grid>
 
                         <Border Height="1"
-                                Margin="0,16"
+                                Margin="0,8"
                                 Background="{DynamicResource LineBrush}" />
 
-                        <Grid>
-                            <StackPanel>
+                        <Grid MinHeight="48">
+                            <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="{DynamicResource Loc.KakaoTalk}"
                                            FontSize="13"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextBrush}" />
                                 <TextBlock x:Name="KakaoStatusText"
-                                           Margin="0,4,0,0"
+                                           Margin="0,3,0,0"
                                            FontSize="11"
                                            Foreground="{DynamicResource MutedTextBrush}" />
                             </StackPanel>
-                            <Button x:Name="KakaoSupportToggleButton"
-                                    Width="92"
-                                    HorizontalAlignment="Right"
-                                    Style="{StaticResource ActionButtonStyle}"
-                                    Click="KakaoSupportToggleButton_Click" />
+                            <ToggleButton x:Name="KakaoSupportToggleButton"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          Style="{StaticResource MessengerToggleStyle}"
+                                          Click="KakaoSupportToggleButton_Click" />
                         </Grid>
 
                         <Border Height="1"
-                                Margin="0,16"
+                                Margin="0,8"
                                 Background="{DynamicResource LineBrush}" />
 
-                        <Grid>
-                            <StackPanel>
+                        <Grid MinHeight="48">
+                            <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="Slack"
                                            FontSize="13"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextBrush}" />
                                 <TextBlock x:Name="SlackStatusText"
-                                           Margin="0,4,0,0"
+                                           Margin="0,3,0,0"
                                            FontSize="11"
                                            Foreground="{DynamicResource MutedTextBrush}" />
                             </StackPanel>
-                            <Button x:Name="SlackSupportToggleButton"
-                                    Width="92"
-                                    HorizontalAlignment="Right"
-                                    Style="{StaticResource ActionButtonStyle}"
-                                    Click="SlackSupportToggleButton_Click" />
+                            <ToggleButton x:Name="SlackSupportToggleButton"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          Style="{StaticResource MessengerToggleStyle}"
+                                          Click="SlackSupportToggleButton_Click" />
                         </Grid>
 
                         <Border Height="1"
-                                Margin="0,16"
+                                Margin="0,8"
                                 Background="{DynamicResource LineBrush}" />
 
-                        <Grid>
-                            <StackPanel>
+                        <Grid MinHeight="48">
+                            <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="WhatsApp"
                                            FontSize="13"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextBrush}" />
                                 <TextBlock x:Name="WhatsAppStatusText"
-                                           Margin="0,4,0,0"
+                                           Margin="0,3,0,0"
                                            FontSize="11"
                                            Foreground="{DynamicResource MutedTextBrush}" />
                             </StackPanel>
-                            <Button x:Name="WhatsAppSupportToggleButton"
-                                    Width="92"
-                                    HorizontalAlignment="Right"
-                                    Style="{StaticResource ActionButtonStyle}"
-                                    Click="WhatsAppSupportToggleButton_Click" />
+                            <ToggleButton x:Name="WhatsAppSupportToggleButton"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          Style="{StaticResource MessengerToggleStyle}"
+                                          Click="WhatsAppSupportToggleButton_Click" />
                         </Grid>
 
                         <Border Height="1"
-                                Margin="0,16"
+                                Margin="0,8"
                                 Background="{DynamicResource LineBrush}" />
 
-                        <Grid>
-                            <StackPanel>
+                        <Grid MinHeight="48">
+                            <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="Telegram"
                                            FontSize="13"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextBrush}" />
                                 <TextBlock x:Name="TelegramStatusText"
-                                           Margin="0,4,0,0"
+                                           Margin="0,3,0,0"
                                            FontSize="11"
                                            Foreground="{DynamicResource MutedTextBrush}" />
                             </StackPanel>
-                            <Button x:Name="TelegramSupportToggleButton"
-                                    Width="92"
-                                    HorizontalAlignment="Right"
-                                    Style="{StaticResource ActionButtonStyle}"
-                                    Click="TelegramSupportToggleButton_Click" />
+                            <ToggleButton x:Name="TelegramSupportToggleButton"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          Style="{StaticResource MessengerToggleStyle}"
+                                          Click="TelegramSupportToggleButton_Click" />
                         </Grid>
 
                         <Border Height="1"
-                                Margin="0,16"
+                                Margin="0,8"
                                 Background="{DynamicResource LineBrush}" />
 
-                        <Grid>
-                            <StackPanel>
+                        <Grid MinHeight="48">
+                            <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="LINE"
                                            FontSize="13"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextBrush}" />
                                 <TextBlock x:Name="LineStatusText"
-                                           Margin="0,4,0,0"
+                                           Margin="0,3,0,0"
                                            FontSize="11"
                                            Foreground="{DynamicResource MutedTextBrush}" />
                             </StackPanel>
-                            <Button x:Name="LineSupportToggleButton"
-                                    Width="92"
-                                    HorizontalAlignment="Right"
-                                    Style="{StaticResource ActionButtonStyle}"
-                                    Click="LineSupportToggleButton_Click" />
+                            <ToggleButton x:Name="LineSupportToggleButton"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          Style="{StaticResource MessengerToggleStyle}"
+                                          Click="LineSupportToggleButton_Click" />
                         </Grid>
 
                         <Border Height="1"
-                                Margin="0,16"
+                                Margin="0,8"
                                 Background="{DynamicResource LineBrush}" />
 
-                        <Grid>
-                            <StackPanel>
+                        <Grid MinHeight="48">
+                            <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="WeChat"
                                            FontSize="13"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextBrush}" />
                                 <TextBlock x:Name="WeChatStatusText"
-                                           Margin="0,4,0,0"
+                                           Margin="0,3,0,0"
                                            FontSize="11"
                                            Foreground="{DynamicResource MutedTextBrush}" />
                             </StackPanel>
-                            <Button x:Name="WeChatSupportToggleButton"
-                                    Width="92"
-                                    HorizontalAlignment="Right"
-                                    Style="{StaticResource ActionButtonStyle}"
-                                    Click="WeChatSupportToggleButton_Click" />
+                            <ToggleButton x:Name="WeChatSupportToggleButton"
+                                          HorizontalAlignment="Right"
+                                          VerticalAlignment="Center"
+                                          Style="{StaticResource MessengerToggleStyle}"
+                                          Click="WeChatSupportToggleButton_Click" />
                         </Grid>
                     </StackPanel>
                 </Border>

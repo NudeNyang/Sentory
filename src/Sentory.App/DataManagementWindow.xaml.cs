@@ -2,7 +2,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Navigation;
 using System.Windows.Threading;
 using Microsoft.Win32;
@@ -435,7 +437,7 @@ public partial class DataManagementWindow : Window
             settings.DiscordSupportEnabled = !settings.DiscordSupportEnabled;
             _settingsStore.Save(settings);
             DiscordSupportChanged = true;
-            UpdateDiscordControls(settings.DiscordSupportEnabled);
+            UpdateMessengerControls(settings);
             MessengerSupportSelectionChanged?.Invoke(
                 SourceApp.Discord,
                 settings.DiscordSupportEnabled);
@@ -446,6 +448,8 @@ public partial class DataManagementWindow : Window
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException)
         {
+            DiscordSupportToggleButton.IsChecked =
+                !DiscordSupportToggleButton.IsChecked;
             StatusText.Text = SentoryLocalization.Text("DiscordSettingFailed");
         }
     }
@@ -461,7 +465,7 @@ public partial class DataManagementWindow : Window
                 !settings.KakaoTalkSupportEnabled;
             _settingsStore.Save(settings);
             KakaoSupportChanged = true;
-            UpdateKakaoControls(settings.KakaoTalkSupportEnabled);
+            UpdateMessengerControls(settings);
             MessengerSupportSelectionChanged?.Invoke(
                 SourceApp.KakaoTalk,
                 settings.KakaoTalkSupportEnabled);
@@ -472,6 +476,8 @@ public partial class DataManagementWindow : Window
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException)
         {
+            KakaoSupportToggleButton.IsChecked =
+                !KakaoSupportToggleButton.IsChecked;
             StatusText.Text = SentoryLocalization.Text("KakaoSettingFailed");
         }
     }
@@ -541,7 +547,7 @@ public partial class DataManagementWindow : Window
             settings.SlackSupportEnabled = !settings.SlackSupportEnabled;
             _settingsStore.Save(settings);
             SlackSupportChanged = true;
-            UpdateSlackControls(settings.SlackSupportEnabled);
+            UpdateMessengerControls(settings);
             MessengerSupportSelectionChanged?.Invoke(
                 SourceApp.Slack,
                 settings.SlackSupportEnabled);
@@ -552,6 +558,8 @@ public partial class DataManagementWindow : Window
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException)
         {
+            SlackSupportToggleButton.IsChecked =
+                !SlackSupportToggleButton.IsChecked;
             StatusText.Text = SentoryLocalization.Text("SlackSettingFailed");
         }
     }
@@ -567,7 +575,7 @@ public partial class DataManagementWindow : Window
                 !settings.WhatsAppSupportEnabled;
             _settingsStore.Save(settings);
             WhatsAppSupportChanged = true;
-            UpdateWhatsAppControls(settings.WhatsAppSupportEnabled);
+            UpdateMessengerControls(settings);
             MessengerSupportSelectionChanged?.Invoke(
                 SourceApp.WhatsApp,
                 settings.WhatsAppSupportEnabled);
@@ -578,6 +586,8 @@ public partial class DataManagementWindow : Window
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException)
         {
+            WhatsAppSupportToggleButton.IsChecked =
+                !WhatsAppSupportToggleButton.IsChecked;
             StatusText.Text =
                 SentoryLocalization.Text("WhatsAppSettingFailed");
         }
@@ -593,7 +603,7 @@ public partial class DataManagementWindow : Window
             settings.LineSupportEnabled = !settings.LineSupportEnabled;
             _settingsStore.Save(settings);
             LineSupportChanged = true;
-            UpdateLineControls(settings.LineSupportEnabled);
+            UpdateMessengerControls(settings);
             MessengerSupportSelectionChanged?.Invoke(
                 SourceApp.Line,
                 settings.LineSupportEnabled);
@@ -604,6 +614,8 @@ public partial class DataManagementWindow : Window
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException)
         {
+            LineSupportToggleButton.IsChecked =
+                !LineSupportToggleButton.IsChecked;
             StatusText.Text = SentoryLocalization.Text("LineSettingFailed");
         }
     }
@@ -619,7 +631,7 @@ public partial class DataManagementWindow : Window
                 !settings.TelegramSupportEnabled;
             _settingsStore.Save(settings);
             TelegramSupportChanged = true;
-            UpdateTelegramControls(settings.TelegramSupportEnabled);
+            UpdateMessengerControls(settings);
             MessengerSupportSelectionChanged?.Invoke(
                 SourceApp.Telegram,
                 settings.TelegramSupportEnabled);
@@ -630,6 +642,8 @@ public partial class DataManagementWindow : Window
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException)
         {
+            TelegramSupportToggleButton.IsChecked =
+                !TelegramSupportToggleButton.IsChecked;
             StatusText.Text =
                 SentoryLocalization.Text("TelegramSettingFailed");
         }
@@ -645,7 +659,7 @@ public partial class DataManagementWindow : Window
             settings.WeChatSupportEnabled = !settings.WeChatSupportEnabled;
             _settingsStore.Save(settings);
             WeChatSupportChanged = true;
-            UpdateWeChatControls(settings.WeChatSupportEnabled);
+            UpdateMessengerControls(settings);
             MessengerSupportSelectionChanged?.Invoke(
                 SourceApp.WeChat,
                 settings.WeChatSupportEnabled);
@@ -656,6 +670,8 @@ public partial class DataManagementWindow : Window
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException)
         {
+            WeChatSupportToggleButton.IsChecked =
+                !WeChatSupportToggleButton.IsChecked;
             StatusText.Text =
                 SentoryLocalization.Text("WeChatSettingFailed");
         }
@@ -1127,15 +1143,12 @@ public partial class DataManagementWindow : Window
             _discordProcessRunning,
             _discordState,
             _discordRepairNeeded);
-        DiscordSupportToggleButton.Content = enabled
-            ? SentoryLocalization.Text("InUse")
-            : SentoryLocalization.Text("NotInUse");
         DiscordRepairButton.Visibility =
             settingsState == MessengerDetectionSettingsState.Active &&
             presentation.ShowRepairAction
             ? Visibility.Visible
             : Visibility.Collapsed;
-        DiscordStatusText.Text = settingsState switch
+        var accessibleState = settingsState switch
         {
             MessengerDetectionSettingsState.Disabled =>
                 SentoryLocalization.Text("DiscordNotInUse"),
@@ -1147,114 +1160,88 @@ public partial class DataManagementWindow : Window
                 SentoryLocalization.Text("StateReconnect"),
             _ => DiscordDetectionPresentation.GetLabel(_discordState)
         };
+        UpdateMessengerToggle(
+            DiscordSupportToggleButton,
+            DiscordStatusText,
+            enabled,
+            "Discord",
+            "DiscordNotInUse",
+            accessibleState);
     }
 
     private void UpdateKakaoControls(bool enabled)
-    {
-        var settingsState = MessengerDetectionSettingsUiPolicy.Resolve(
+        => UpdateMessengerToggle(
+            KakaoSupportToggleButton,
+            KakaoStatusText,
             enabled,
-            _detectionPaused);
-        KakaoSupportToggleButton.Content = enabled
-            ? SentoryLocalization.Text("InUse")
-            : SentoryLocalization.Text("NotInUse");
-        KakaoStatusText.Text = settingsState switch
-        {
-            MessengerDetectionSettingsState.Disabled =>
-                SentoryLocalization.Text("KakaoNotInUse"),
-            MessengerDetectionSettingsState.Paused =>
-                SentoryLocalization.Text("DetectionPaused"),
-            _ => SentoryLocalization.Text("DetectionReady")
-        };
-    }
+            SentoryLocalization.Text("KakaoTalk"),
+            "KakaoNotInUse");
 
     private void UpdateSlackControls(bool enabled)
-    {
-        var settingsState = MessengerDetectionSettingsUiPolicy.Resolve(
+        => UpdateMessengerToggle(
+            SlackSupportToggleButton,
+            SlackStatusText,
             enabled,
-            _detectionPaused);
-        SlackSupportToggleButton.Content = enabled
-            ? SentoryLocalization.Text("InUse")
-            : SentoryLocalization.Text("NotInUse");
-        SlackStatusText.Text = settingsState switch
-        {
-            MessengerDetectionSettingsState.Disabled =>
-                SentoryLocalization.Text("SlackNotInUse"),
-            MessengerDetectionSettingsState.Paused =>
-                SentoryLocalization.Text("DetectionPaused"),
-            _ => SentoryLocalization.Text("DetectionReady")
-        };
-    }
+            "Slack",
+            "SlackNotInUse");
 
     private void UpdateWhatsAppControls(bool enabled)
-    {
-        var settingsState = MessengerDetectionSettingsUiPolicy.Resolve(
+        => UpdateMessengerToggle(
+            WhatsAppSupportToggleButton,
+            WhatsAppStatusText,
             enabled,
-            _detectionPaused);
-        WhatsAppSupportToggleButton.Content = enabled
-            ? SentoryLocalization.Text("InUse")
-            : SentoryLocalization.Text("NotInUse");
-        WhatsAppStatusText.Text = settingsState switch
-        {
-            MessengerDetectionSettingsState.Disabled =>
-                SentoryLocalization.Text("WhatsAppNotInUse"),
-            MessengerDetectionSettingsState.Paused =>
-                SentoryLocalization.Text("DetectionPaused"),
-            _ => SentoryLocalization.Text("DetectionReady")
-        };
-    }
+            "WhatsApp",
+            "WhatsAppNotInUse");
 
     private void UpdateLineControls(bool enabled)
-    {
-        var settingsState = MessengerDetectionSettingsUiPolicy.Resolve(
+        => UpdateMessengerToggle(
+            LineSupportToggleButton,
+            LineStatusText,
             enabled,
-            _detectionPaused);
-        LineSupportToggleButton.Content = enabled
-            ? SentoryLocalization.Text("InUse")
-            : SentoryLocalization.Text("NotInUse");
-        LineStatusText.Text = settingsState switch
-        {
-            MessengerDetectionSettingsState.Disabled =>
-                SentoryLocalization.Text("LineNotInUse"),
-            MessengerDetectionSettingsState.Paused =>
-                SentoryLocalization.Text("DetectionPaused"),
-            _ => SentoryLocalization.Text("DetectionReady")
-        };
-    }
+            "LINE",
+            "LineNotInUse");
 
     private void UpdateTelegramControls(bool enabled)
-    {
-        var settingsState = MessengerDetectionSettingsUiPolicy.Resolve(
+        => UpdateMessengerToggle(
+            TelegramSupportToggleButton,
+            TelegramStatusText,
             enabled,
-            _detectionPaused);
-        TelegramSupportToggleButton.Content = enabled
-            ? SentoryLocalization.Text("InUse")
-            : SentoryLocalization.Text("NotInUse");
-        TelegramStatusText.Text = settingsState switch
-        {
-            MessengerDetectionSettingsState.Disabled =>
-                SentoryLocalization.Text("TelegramNotInUse"),
-            MessengerDetectionSettingsState.Paused =>
-                SentoryLocalization.Text("DetectionPaused"),
-            _ => SentoryLocalization.Text("DetectionReady")
-        };
-    }
+            "Telegram",
+            "TelegramNotInUse");
 
     private void UpdateWeChatControls(bool enabled)
+        => UpdateMessengerToggle(
+            WeChatSupportToggleButton,
+            WeChatStatusText,
+            enabled,
+            "WeChat",
+            "WeChatNotInUse");
+
+    private void UpdateMessengerToggle(
+        ToggleButton toggleButton,
+        TextBlock statusText,
+        bool enabled,
+        string messengerName,
+        string disabledTextKey,
+        string? accessibleState = null)
     {
         var settingsState = MessengerDetectionSettingsUiPolicy.Resolve(
             enabled,
             _detectionPaused);
-        WeChatSupportToggleButton.Content = enabled
-            ? SentoryLocalization.Text("InUse")
-            : SentoryLocalization.Text("NotInUse");
-        WeChatStatusText.Text = settingsState switch
+        accessibleState ??= settingsState switch
         {
             MessengerDetectionSettingsState.Disabled =>
-                SentoryLocalization.Text("WeChatNotInUse"),
+                SentoryLocalization.Text(disabledTextKey),
             MessengerDetectionSettingsState.Paused =>
                 SentoryLocalization.Text("DetectionPaused"),
             _ => SentoryLocalization.Text("DetectionReady")
         };
+        statusText.Text = accessibleState;
+        toggleButton.IsChecked = enabled;
+        toggleButton.ToolTip = accessibleState;
+        AutomationProperties.SetName(
+            toggleButton,
+            $"{messengerName}, {accessibleState}");
     }
 
     private void UpdateMessengerControls(SentorySettings settings)
