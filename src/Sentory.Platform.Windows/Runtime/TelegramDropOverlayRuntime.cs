@@ -24,6 +24,7 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
     private bool _started;
     private bool _leftWasDown;
     private int _releaseTargetGraceFrames;
+    private DateTimeOffset _releasedAt;
 
     public TelegramDropOverlayRuntime(
         TelegramCaptureRuntime captureRuntime,
@@ -150,6 +151,7 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
         {
             _leftWasDown = false;
             _releaseTargetGraceFrames = ReleaseTargetGraceFrames;
+            _releasedAt = DateTimeOffset.UtcNow;
         }
 
         if (_releaseTargetGraceFrames <= 0)
@@ -168,8 +170,10 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
             _locator.FindAt(cursor.X, cursor.Y, requireTopmost: true));
         if (_dropState.TryTakeCompleted(out var target, out var paths))
         {
+            var releasedAt = _releasedAt;
             _releaseTargetGraceFrames = 0;
-            _ = RegisterPassiveDropAsync(target, paths);
+            _releasedAt = default;
+            _ = RegisterPassiveDropAsync(target, paths, releasedAt);
             return;
         }
 
@@ -205,14 +209,16 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
 
     private async Task RegisterPassiveDropAsync(
         TelegramDropTarget target,
-        IReadOnlyList<string> paths)
+        IReadOnlyList<string> paths,
+        DateTimeOffset releasedAt)
     {
         _diagnostic?.Invoke(
             "telegram-drop-released",
             $"files={paths.Count}, window=0x{target.MainWindow.ToInt64():X}, mode=passive");
         var result = await _captureRuntime.RegisterNativeDroppedFilesAsync(
             target,
-            paths);
+            paths,
+            releasedAt);
         _diagnostic?.Invoke(
             "telegram-drop-result",
             $"result={result}, files={paths.Count}, mode=passive");
@@ -222,6 +228,7 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
     {
         _leftWasDown = false;
         _releaseTargetGraceFrames = 0;
+        _releasedAt = default;
         _dropState.Reset();
     }
 

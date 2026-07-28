@@ -108,22 +108,58 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
 
     private void OnSendDetected(object? sender, PasteTrigger trigger)
     {
-        if (_paused || !_validator.TryValidate(trigger, out var context))
+        if (_paused || trigger.ForegroundProcessId == 0 ||
+            !string.Equals(
+                _native.GetProcessName(trigger.ForegroundProcessId),
+                TelegramContextValidator.ProcessName,
+                StringComparison.OrdinalIgnoreCase))
         {
+            return;
+        }
+
+        if (_validator.TryValidate(trigger, out var context))
+        {
+            lock (_candidateGate)
+            {
+                _recentSendSignals.Observe(
+                    context.ContextHash,
+                    context.OccurredAt);
+                _recentSendSignals.ObserveProcess(
+                    context.ProcessId,
+                    context.OccurredAt);
+            }
+
+            var exactObserved = MarkSendObserved(
+                context.MainWindow,
+                context.OccurredAt,
+                "keyboard");
+            if (exactObserved == 0)
+            {
+                _diagnostic?.Invoke(
+                    "telegram-send-input-buffered",
+                    "kind=keyboard candidates=0");
+            }
+
             return;
         }
 
         lock (_candidateGate)
         {
-            _recentSendSignals.Observe(
-                context.ContextHash,
-                context.OccurredAt);
+            _recentSendSignals.ObserveProcess(
+                trigger.ForegroundProcessId,
+                trigger.OccurredAt);
         }
 
-        MarkSendObserved(
-            context.MainWindow,
-            context.OccurredAt,
-            "keyboard");
+        var fallbackObserved = MarkSendObservedByProcess(
+            trigger.ForegroundProcessId,
+            trigger.OccurredAt,
+            "keyboard-fallback");
+        if (fallbackObserved == 0)
+        {
+            _diagnostic?.Invoke(
+                "telegram-send-input-buffered",
+                "kind=keyboard-fallback candidates=0");
+        }
     }
 
     private void OnPointerDown(object? sender, PointerTrigger trigger)
@@ -137,7 +173,7 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
             return;
         }
 
-        if (!_validator.TryValidate(
+        var hasContext = _validator.TryValidate(
                 new PasteTrigger(
                     trigger.EventId,
                     trigger.ForegroundWindow,
@@ -146,24 +182,17 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
                     _native.GetClipboardSequenceNumber(),
                     trigger.OccurredAt,
                     trigger.Injected),
-                out var context))
+                out var context);
+        var root = hasContext
+            ? context.MainWindow
+            : _native.GetRootWindow(trigger.ForegroundWindow);
+        if (root == nint.Zero)
         {
             return;
         }
 
-        var root = context.MainWindow;
         var foregroundRoot = _native.GetRootWindow(
             trigger.ForegroundWindow);
-
-        lock (_candidateGate)
-        {
-            if (!_candidates.Any(candidate =>
-                    candidate.Context.MainWindow == root &&
-                    !candidate.Cancellation.IsCancellationRequested))
-            {
-                return;
-            }
-        }
 
         if (!TelegramSendButtonPolicy.IsWithin(
                 _native.GetWindowBounds(
@@ -176,10 +205,38 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
             return;
         }
 
-        MarkSendObserved(root, trigger.OccurredAt, "pointer");
+        lock (_candidateGate)
+        {
+            if (hasContext)
+            {
+                _recentSendSignals.Observe(
+                    context.ContextHash,
+                    trigger.OccurredAt);
+            }
+
+            _recentSendSignals.ObserveProcess(
+                trigger.ForegroundProcessId,
+                trigger.OccurredAt);
+        }
+
+        var observed = hasContext
+            ? MarkSendObserved(
+                root,
+                trigger.OccurredAt,
+                "pointer")
+            : MarkSendObservedByProcess(
+                trigger.ForegroundProcessId,
+                trigger.OccurredAt,
+                "pointer-fallback");
+        if (observed == 0)
+        {
+            _diagnostic?.Invoke(
+                "telegram-send-input-buffered",
+                $"kind={(hasContext ? "pointer" : "pointer-fallback")} candidates=0");
+        }
     }
 
-    private void MarkSendObserved(
+    private int MarkSendObserved(
         nint mainWindow,
         DateTimeOffset occurredAt,
         string inputKind)
@@ -205,12 +262,45 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
                 "telegram-send-input-observed",
                 $"kind={inputKind} candidates={observed}");
         }
+
+        return observed;
+    }
+
+    private int MarkSendObservedByProcess(
+        uint processId,
+        DateTimeOffset occurredAt,
+        string inputKind)
+    {
+        var observed = 0;
+        lock (_candidateGate)
+        {
+            foreach (var candidate in _candidates.Where(candidate =>
+                         candidate.Context.ProcessId == processId &&
+                         candidate.Context.OccurredAt <= occurredAt &&
+                         !candidate.Cancellation.IsCancellationRequested))
+            {
+                if (candidate.MarkSendObserved())
+                {
+                    observed++;
+                }
+            }
+        }
+
+        if (observed > 0)
+        {
+            _diagnostic?.Invoke(
+                "telegram-send-input-observed",
+                $"kind={inputKind} candidates={observed}");
+        }
+
+        return observed;
     }
 
     public async Task<TelegramNativeDropRegistrationResult>
         RegisterNativeDroppedFilesAsync(
             TelegramDropTarget target,
-            IReadOnlyList<string> paths)
+            IReadOnlyList<string> paths,
+            DateTimeOffset occurredAt)
     {
         if (_paused)
         {
@@ -220,7 +310,7 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
         if (!_validator.TryValidate(
                 target,
                 _native.GetClipboardSequenceNumber(),
-                DateTimeOffset.UtcNow,
+                occurredAt,
                 out var context))
         {
             return TelegramNativeDropRegistrationResult.TargetInvalid;
@@ -394,6 +484,7 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
             _candidates.Add(registration);
             if (_recentSendSignals.CanApply(
                     context.ContextHash,
+                    context.ProcessId,
                     context.OccurredAt,
                     DateTimeOffset.UtcNow))
             {

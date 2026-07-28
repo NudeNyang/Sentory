@@ -24,6 +24,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
     private bool _started;
     private bool _leftWasDown;
     private int _releaseTargetGraceFrames;
+    private DateTimeOffset _releasedAt;
 
     public LineDropOverlayRuntime(
         LineCaptureRuntime captureRuntime,
@@ -153,6 +154,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
         {
             _leftWasDown = false;
             _releaseTargetGraceFrames = ReleaseTargetGraceFrames;
+            _releasedAt = DateTimeOffset.UtcNow;
         }
 
         if (_releaseTargetGraceFrames <= 0)
@@ -174,8 +176,10 @@ public sealed class LineDropOverlayRuntime : IDisposable
                 requireTopmost: true));
         if (_dropState.TryTakeCompleted(out var target, out var paths))
         {
+            var releasedAt = _releasedAt;
             _releaseTargetGraceFrames = 0;
-            _ = RegisterPassiveDropAsync(target, paths);
+            _releasedAt = default;
+            _ = RegisterPassiveDropAsync(target, paths, releasedAt);
             return;
         }
 
@@ -211,14 +215,16 @@ public sealed class LineDropOverlayRuntime : IDisposable
 
     private async Task RegisterPassiveDropAsync(
         LineDropTarget target,
-        IReadOnlyList<string> paths)
+        IReadOnlyList<string> paths,
+        DateTimeOffset releasedAt)
     {
         _diagnostic?.Invoke(
             "line-drop-released",
             $"files={paths.Count}, window=0x{target.MainWindow.ToInt64():X}, mode=passive");
         var result = await _captureRuntime.RegisterNativeDroppedFilesAsync(
             target,
-            paths);
+            paths,
+            releasedAt);
         _diagnostic?.Invoke(
             "line-drop-result",
             $"result={result}, files={paths.Count}, mode=passive");
@@ -228,6 +234,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
     {
         _leftWasDown = false;
         _releaseTargetGraceFrames = 0;
+        _releasedAt = default;
         _dropState.Reset();
     }
 
