@@ -392,9 +392,10 @@ DPI와 색상 형식이 달라질 수 있다. 기존 중복 키는 저장 파일
 ## 2026-07-27 LINE 붙여넣기·드롭 지원
 
 - LINE 26.3.0.3916의 `LINE.exe`, Win32 `Qt<숫자>QWindowIcon` 또는 호환
-  `AllInOneWindow`, UIA `MainChatPanel`이 모두 확인된 창만 후보를 만든다.
-- 포커스된 `LcTextField`에서 URL·사진 Ctrl+V를 관찰하고, Explorer에서 실제로
-  보이는 LINE 창에 놓은 로컬 사진 경로를 비간섭 방식으로 읽는다.
+  `AllInOneWindow`, UIA `MainChatPanel`·`ChatMessageView`·
+  `AutoSuggestTextArea`가 모두 확인된 창만 후보를 만든다.
+- 포커스된 `AutoSuggestTextArea`에서 URL·사진 Ctrl+V를 관찰하고, Explorer에서
+  실제로 보이는 LINE 창에 놓은 로컬 사진 경로를 비간섭 방식으로 읽는다.
 - 후보 이전 메시지 Runtime ID, 선택 대화 식별자, 새 메시지 Runtime ID와
   명시적 Enter·마우스 전송 입력이 모두 맞아야
   `LineConfirmedSend/Image/Drop`으로 저장한다. 메시지 본문이 UIA에 노출되면
@@ -421,6 +422,9 @@ DPI와 색상 형식이 달라질 수 있다. 기존 중복 키는 저장 파일
 
 ### 2026-07-28 Qt 입력 포커스 오보고 대응
 
+아래 내용은 실제 접근성 역할을 재구성하기 전의 임시 대응 기록이며, 현재 구현은
+다음 `LINE 접근성 역할 재구성` 절의 구조를 사용한다.
+
 - 실제 URL·사진 붙여넣기 세 번이 모두
   `line-context-rejected reason=focused-element-not-composer`에서 종료됐다.
   LINE은 입력칸을 사용 중이어도 UIA에서 `LcTextField` 대신 같은 프로세스의
@@ -436,3 +440,18 @@ DPI와 색상 형식이 달라질 수 있다. 기존 중복 키는 저장 파일
   않고 진단 경계를 세분화했다. 다음 실패 로그에는 입력칸 표시 여부, 포커스
   컨트롤 클래스·종류, 채팅 패널 소속과 같은 프로세스 여부만 기록한다. 메시지,
   링크, 사진 내용과 접근성 Name/Value는 기록하지 않는다.
+
+### 2026-07-28 LINE 접근성 역할 재구성
+
+- 세분화한 실제 로그에서 사용자가 채팅 입력칸에 붙여넣었을 때 포커스 요소는
+  `AutoSuggestTextArea`, `sameProcess=True`로 확인됐다. 화면 좌표와 Raw View
+  부모 관계를 대조한 결과 기존 역할 해석이 반대였음이 드러났다.
+- `MainChatPanel`(왼쪽 528px)은 대화 목록과 `LcTextField` 검색창이고,
+  `ChatMessageView`(오른쪽 1615px)가 실제 메시지 목록을 포함한다. 실제 작성기
+  `AutoSuggestTextArea`는 `MessageInputPanel` 아래에 있다.
+- 붙여넣기는 포커스 요소와 실제 작성기 Runtime ID가 정확히 같을 때만 허용한다.
+  대화 식별자는 `MainChatPanel > LcListView`의 선택 항목 하나로 만들고, 새 메시지
+  확인은 `ChatMessageView > LcListView`의 자식 Runtime ID만 비교한다.
+- 실행 중인 LINE에서 재구성된 읽기 전용 기준점은 선택 대화 식별자 1개와 실제
+  메시지 4개를 수집했고, 별도 600ms 간격 검사에서도 선택 대화·메시지 ID와
+  작성기 1개가 모두 안정적으로 유지됐다. 원문 Name/Value는 출력하지 않았다.

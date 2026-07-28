@@ -144,18 +144,11 @@ internal static class LineComposerFocusPolicy
 {
     public static bool IsUsable(
         bool composerVisible,
-        bool focusedInsideChatPanel,
-        string focusedClassName,
-        bool focusedIsListItem,
+        bool focusedMatchesComposer,
         bool sameProcess) =>
         composerVisible &&
-        sameProcess &&
-        ((focusedInsideChatPanel &&
-          string.Equals(
-              focusedClassName,
-              "LcTextField",
-              StringComparison.Ordinal)) ||
-         focusedIsListItem);
+        focusedMatchesComposer &&
+        sameProcess;
 }
 
 internal sealed record LineComposerFocusSnapshot(
@@ -163,9 +156,26 @@ internal sealed record LineComposerFocusSnapshot(
     bool FocusedPresent,
     string FocusedClassName,
     string FocusedControlKind,
-    bool FocusedInsideChatPanel,
+    bool FocusedMatchesComposer,
     bool SameProcess,
     bool IsUsable);
+
+internal static class LineConversationIdentityPolicy
+{
+    public static bool TryCreate(
+        IReadOnlyCollection<string> selectedIds,
+        out string identity)
+    {
+        identity = string.Empty;
+        if (selectedIds.Count != 1)
+        {
+            return false;
+        }
+
+        identity = selectedIds.Single();
+        return !string.IsNullOrWhiteSpace(identity);
+    }
+}
 
 internal static class LineConversationMatchPolicy
 {
@@ -197,9 +207,12 @@ internal static class LineConversationMatchPolicy
 internal sealed class LineAccessibilityClient(
     Action<string, string>? diagnostic = null) : ILineAccessibilityClient
 {
-    private static readonly PropertyCondition MainChatPanelCondition = new(
+    private static readonly PropertyCondition ConversationPanelCondition = new(
         AutomationElement.ClassNameProperty,
         "MainChatPanel");
+    private static readonly PropertyCondition MessageViewCondition = new(
+        AutomationElement.ClassNameProperty,
+        "ChatMessageView");
     private static readonly PropertyCondition MessageListCondition = new(
         AutomationElement.ClassNameProperty,
         "LcListView");
@@ -208,7 +221,7 @@ internal sealed class LineAccessibilityClient(
         ControlType.ListItem);
     private static readonly PropertyCondition ComposerCondition = new(
         AutomationElement.ClassNameProperty,
-        "LcTextField");
+        "AutoSuggestTextArea");
 
     public Task<LineAccessibilitySnapshot?> TryCaptureAsync(
         ValidatedLineContext context,
@@ -234,11 +247,17 @@ internal sealed class LineAccessibilityClient(
             {
                 var root = AutomationElement.FromHandle(
                     request.Context.MainWindow);
-                var panel = FindMainChatPanel(root);
-                var list = panel is null ? null : FindMessageList(panel);
-                if (panel is not null && list is not null)
+                var conversationPanel = FindConversationPanel(root);
+                var messageView = FindMessageView(root);
+                var list = messageView is null
+                    ? null
+                    : FindMessageList(messageView);
+                if (conversationPanel is not null &&
+                    list is not null &&
+                    TryCreateConversationIdentity(
+                        conversationPanel,
+                        out var identity))
                 {
-                    var identity = CreateConversationIdentity(root, panel);
                     var messages = ReadMessages(list);
                     if (LineConversationMatchPolicy.IsSameConversation(
                             request.Baseline,
@@ -317,21 +336,30 @@ internal sealed class LineAccessibilityClient(
         try
         {
             var root = AutomationElement.FromHandle(context.MainWindow);
-            var panel = FindMainChatPanel(root);
-            var focus = panel is not null && requireFocusedComposer
-                ? CaptureComposerFocus(panel)
+            var conversationPanel = FindConversationPanel(root);
+            var messageView = FindMessageView(root);
+            var composer = FindComposer(root);
+            var focus = requireFocusedComposer
+                ? CaptureComposerFocus(root, composer)
                 : null;
-            if (panel is null || focus is { IsUsable: false })
+            if (conversationPanel is null ||
+                messageView is null ||
+                composer is null ||
+                focus is { IsUsable: false })
             {
                 diagnostic?.Invoke(
                     "line-context-rejected",
-                    panel is null
-                        ? "reason=main-chat-panel-unavailable"
-                        : CreateFocusDiagnostic(focus!));
+                    conversationPanel is null
+                        ? "reason=conversation-panel-unavailable"
+                        : messageView is null
+                            ? "reason=message-view-unavailable"
+                            : composer is null
+                                ? "reason=message-composer-unavailable"
+                                : CreateFocusDiagnostic(focus!));
                 return null;
             }
 
-            var list = FindMessageList(panel);
+            var list = FindMessageList(messageView);
             if (list is null)
             {
                 diagnostic?.Invoke(
@@ -340,9 +368,19 @@ internal sealed class LineAccessibilityClient(
                 return null;
             }
 
+            if (!TryCreateConversationIdentity(
+                    conversationPanel,
+                    out var conversationIdentity))
+            {
+                diagnostic?.Invoke(
+                    "line-context-rejected",
+                    "reason=selected-conversation-unavailable");
+                return null;
+            }
+
             var messages = ReadMessages(list);
             var snapshot = new LineAccessibilitySnapshot(
-                CreateConversationIdentity(root, panel),
+                conversationIdentity,
                 messages.Select(message => message.Id)
                     .ToHashSet(StringComparer.Ordinal));
             diagnostic?.Invoke(
@@ -363,11 +401,9 @@ internal sealed class LineAccessibilityClient(
     }
 
     private static LineComposerFocusSnapshot CaptureComposerFocus(
-        AutomationElement panel)
+        AutomationElement root,
+        AutomationElement? composer)
     {
-        var composer = panel.FindFirst(
-            TreeScope.Descendants,
-            ComposerCondition);
         var composerVisible = composer is not null &&
                               !SafeIsOffscreen(composer);
         var focused = AutomationElement.FocusedElement;
@@ -375,28 +411,26 @@ internal sealed class LineAccessibilityClient(
         var focusedClassName = focusedPresent
             ? SafeClassName(focused!)
             : string.Empty;
-        var focusedIsListItem = focusedPresent &&
-                                SafeIsListItem(focused!);
-        var focusedInsideChatPanel = focusedPresent &&
-                                     IsDescendantOf(focused!, panel);
+        var focusedMatchesComposer = focusedPresent &&
+                                     composer is not null &&
+                                     string.Equals(
+                                         SafeRuntimeId(focused!),
+                                         SafeRuntimeId(composer),
+                                         StringComparison.Ordinal);
         var sameProcess = focusedPresent &&
-                          SafeProcessId(focused!) == SafeProcessId(panel);
+                          SafeProcessId(focused!) == SafeProcessId(root);
         return new LineComposerFocusSnapshot(
             composerVisible,
             focusedPresent,
             focusedClassName,
-            focusedIsListItem
-                ? "ListItem"
-                : focusedPresent
-                    ? SafeControlKind(focused!)
-                    : "None",
-            focusedInsideChatPanel,
+            focusedPresent
+                ? SafeControlKind(focused!)
+                : "None",
+            focusedMatchesComposer,
             sameProcess,
             LineComposerFocusPolicy.IsUsable(
                 composerVisible,
-                focusedInsideChatPanel,
-                focusedClassName,
-                focusedIsListItem,
+                focusedMatchesComposer,
                 sameProcess));
     }
 
@@ -407,40 +441,20 @@ internal sealed class LineAccessibilityClient(
         $"focusedPresent={focus.FocusedPresent} " +
         $"focusedClass={SanitizeDiagnosticToken(focus.FocusedClassName)} " +
         $"focusedType={focus.FocusedControlKind} " +
-        $"insideChat={focus.FocusedInsideChatPanel} " +
+        $"matchesComposer={focus.FocusedMatchesComposer} " +
         $"sameProcess={focus.SameProcess}";
 
-    private static bool IsDescendantOf(
-        AutomationElement element,
-        AutomationElement ancestor)
-    {
-        var ancestorId = SafeRuntimeId(ancestor);
-        if (ancestorId.Length == 0)
-        {
-            return false;
-        }
-
-        var walker = TreeWalker.RawViewWalker;
-        var current = element;
-        for (var depth = 0; current is not null && depth < 20; depth++)
-        {
-            if (string.Equals(
-                    SafeRuntimeId(current),
-                    ancestorId,
-                    StringComparison.Ordinal))
-            {
-                return true;
-            }
-
-            current = walker.GetParent(current);
-        }
-
-        return false;
-    }
-
-    private static AutomationElement? FindMainChatPanel(
+    private static AutomationElement? FindConversationPanel(
         AutomationElement root) =>
-        root.FindFirst(TreeScope.Descendants, MainChatPanelCondition);
+        root.FindFirst(TreeScope.Descendants, ConversationPanelCondition);
+
+    private static AutomationElement? FindMessageView(
+        AutomationElement root) =>
+        root.FindFirst(TreeScope.Descendants, MessageViewCondition);
+
+    private static AutomationElement? FindComposer(
+        AutomationElement root) =>
+        root.FindFirst(TreeScope.Descendants, ComposerCondition);
 
     private static AutomationElement? FindMessageList(
         AutomationElement panel) =>
@@ -471,36 +485,39 @@ internal sealed class LineAccessibilityClient(
         return messages;
     }
 
-    private static string CreateConversationIdentity(
-        AutomationElement root,
-        AutomationElement panel)
+    private static bool TryCreateConversationIdentity(
+        AutomationElement conversationPanel,
+        out string identity)
     {
-        var panelBounds = SafeBounds(panel);
-        var selectedIds = new List<string>();
-        foreach (AutomationElement list in root.FindAll(
-                     TreeScope.Descendants,
-                     MessageListCondition))
+        identity = string.Empty;
+        var conversationList = conversationPanel.FindFirst(
+            TreeScope.Descendants,
+            MessageListCondition);
+        if (conversationList is null)
         {
-            var bounds = SafeBounds(list);
-            if (bounds.Width <= 0 || bounds.Right > panelBounds.Left + 1)
+            return false;
+        }
+
+        var selectedIds = new List<string>();
+        foreach (AutomationElement item in conversationList.FindAll(
+                     TreeScope.Children,
+                     ListItemCondition))
+        {
+            if (!SafeIsSelected(item))
             {
                 continue;
             }
 
-            foreach (AutomationElement item in list.FindAll(
-                         TreeScope.Children,
-                         ListItemCondition))
+            var runtimeId = SafeRuntimeId(item);
+            if (runtimeId.Length > 0)
             {
-                if (SafeIsSelected(item))
-                {
-                    selectedIds.Add(SafeRuntimeId(item));
-                }
+                selectedIds.Add(runtimeId);
             }
         }
 
-        return selectedIds.Count > 0
-            ? string.Join('|', selectedIds.Order(StringComparer.Ordinal))
-            : $"panel:{SafeRuntimeId(panel)}";
+        return LineConversationIdentityPolicy.TryCreate(
+            selectedIds,
+            out identity);
     }
 
     private static string SafeRuntimeId(AutomationElement element)
@@ -530,11 +547,6 @@ internal sealed class LineAccessibilityClient(
 
     private static bool SafeIsOffscreen(AutomationElement element) =>
         SafeRead(() => element.Current.IsOffscreen, true);
-
-    private static bool SafeIsListItem(AutomationElement element) =>
-        SafeRead(
-            () => element.Current.ControlType == ControlType.ListItem,
-            false);
 
     private static string SafeControlKind(AutomationElement element)
     {
@@ -571,11 +583,6 @@ internal sealed class LineAccessibilityClient(
                     : '_')
                 .ToArray());
     }
-
-    private static System.Windows.Rect SafeBounds(AutomationElement element) =>
-        SafeRead(
-            () => element.Current.BoundingRectangle,
-            System.Windows.Rect.Empty);
 
     private static bool SafeIsSelected(AutomationElement element)
     {

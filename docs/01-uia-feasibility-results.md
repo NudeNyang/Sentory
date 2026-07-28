@@ -478,17 +478,15 @@ Windows UI Automation으로 노출한다.
 
 - 최상위 창: `LINE.exe`; Win32 네이티브 클래스 `Qt663QWindowIcon`, UIA 클래스
   `AllInOneWindow`
-- 현재 대화: `MainChatPanel`
-- 메시지 목록: `LcListView`와 자식 `ListItem`
-- 메시지 입력: `LcTextField` (`TextPattern`, `ValuePattern`)
-- 대화 목록과 메시지 목록의 항목은 안정된 Runtime ID를 제공
-- 실제 입력칸 사용 중에도 Qt가 대화·메시지 `ListItem`에
-  `HasKeyboardFocus=true`를 동시에 보고할 수 있어 `LcTextField` 단독 포커스
-  판정은 사용할 수 없음
+- 대화 목록: 왼쪽 `MainChatPanel > LcListView`; 선택 항목이 현재 대화
+- 대화 검색: `MainChatPanel` 안의 `LcTextField`
+- 실제 메시지 영역: 오른쪽 `ChatMessageView > LcListView`
+- 실제 메시지 입력: `MessageInputPanel` 안의 `AutoSuggestTextArea`
+- 선택된 대화 항목, 실제 메시지 항목과 작성기는 각각 안정된 Runtime ID를 제공
 
 실행 중인 실제 LINE 창에서 읽기 전용 기준점을 두 번 연속 수집해 선택 대화
-식별자와 메시지 Runtime ID가 유지되는 것을 확인했다. 붙여넣기·Explorer 드롭
-직전에 기준점을 만들고, 같은 대화에서 새 Runtime ID와 명시적 Enter·마우스
+식별자와 실제 메시지 Runtime ID가 유지되는 것을 확인했다. 붙여넣기·Explorer
+드롭 직전에 기준점을 만들고, 같은 대화에서 새 Runtime ID와 명시적 Enter·마우스
 입력이 함께 확인된 경우만 확정한다. LINE 26.3은 메시지 항목의 Runtime ID는
 제공하지만 Name/Value 본문은 비워 둔다. 본문이 제공되면 정규화 URL까지
 대조하고, 제공되지 않으면 같은 대화·명시적 전송·새 Runtime ID의 결합을 사진과

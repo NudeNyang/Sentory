@@ -2,6 +2,15 @@
 
 ## 개발 중
 
+- LINE 접근성 구조를 실제 화면 좌표·부모 관계로 다시 분석해 왼쪽
+  `MainChatPanel`을 대화 목록, 오른쪽 `ChatMessageView`를 실제 메시지 영역,
+  `AutoSuggestTextArea`를 메시지 작성기로 올바르게 재연결
+- 선택된 대화 목록 항목 Runtime ID를 대화 식별자로 사용하고
+  `ChatMessageView > LcListView`의 실제 메시지 ID만 전송 전후로 비교하도록 변경
+- 포커스 요소가 실제 `AutoSuggestTextArea` 작성기와 같은 Runtime ID인지 확인해
+  `LcTextField` 대화 검색창의 붙여넣기는 후보로 만들지 않도록 수정
+- Release 전체 회귀 테스트 666개 통과(Core 60, Diagnostics 15,
+  Platform Windows 285, Infrastructure 172, App 134)
 - LINE Qt 포커스 판별 실패를 입력칸 표시 여부, 포커스 컨트롤 종류, 채팅 패널
   소속과 같은 프로세스 여부로 나눠 기록하는 개인정보 비수집 진단 신호 추가
 - LINE 입력칸에서 실제로 Ctrl+V해도 Qt UI Automation이 포커스를 `LcTextField`가
