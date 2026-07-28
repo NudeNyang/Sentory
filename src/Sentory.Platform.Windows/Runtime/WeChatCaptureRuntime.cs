@@ -9,10 +9,21 @@ public enum WeChatNativeDropRegistrationResult
     Registered,
     Paused,
     TargetInvalid,
+    ContextUnavailable,
     UnsupportedFiles,
     ImageReadFailed,
     Duplicate,
     Failed
+}
+
+internal static class WeChatCaptureMethodPolicy
+{
+    public static CaptureMethod Select(bool hasImages, bool nativeDrop) =>
+        nativeDrop
+            ? CaptureMethod.WeChatConfirmedDrop
+            : hasImages
+                ? CaptureMethod.WeChatConfirmedImage
+                : CaptureMethod.WeChatConfirmedSend;
 }
 
 public sealed class WeChatCaptureRuntime : ICaptureRuntime
@@ -382,6 +393,15 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
 
         try
         {
+            var baseline = await _accessibility.TryCaptureAsync(
+                context,
+                requireFocusedComposer: false,
+                _cancellation.Token);
+            if (baseline is null)
+            {
+                return WeChatNativeDropRegistrationResult.ContextUnavailable;
+            }
+
             var images = await Task.Run(
                 () => ClipboardImageCodec.TryReadFiles(imagePaths),
                 _cancellation.Token);
@@ -390,50 +410,19 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
                 return WeChatNativeDropRegistrationResult.ImageReadFailed;
             }
 
-            var result = await _coordinator.CaptureBatchAsync(
-                context.EventId,
+            var registered = StartCandidate(
+                context,
+                baseline,
                 null,
-                images.Select(image => new ImageCapturePayload(
-                    image.ContentBytes,
-                    image.Sha256,
-                    image.PixelWidth,
-                    image.PixelHeight,
-                    image.MimeType,
-                    image.FileExtension,
-                    image.OriginalFileName)).ToList(),
-                SourceApp.WeChat,
-                CaptureMethod.WeChatConfirmedDrop,
-                DeliveryStatus.Confirmed,
-                context.ContextHash,
-                occurredAt,
-                [
-                    "native-explorer-file-drop",
-                    "wechat-drop-release-send"
-                ],
-                _cancellation.Token);
-            var applied = result?.EventApplied == true;
+                [],
+                images,
+                nativeDrop: true);
             _diagnostic?.Invoke(
                 "wechat-drop-candidate",
-                $"registered={applied} files={imagePaths.Length} images={images.Count} confirmation=drop-release");
-            if (!applied)
-            {
-                return WeChatNativeDropRegistrationResult.Duplicate;
-            }
-
-            Captured?.Invoke(
-                this,
-                new CaptureNotification(
-                    images.Count > 1
-                        ? ContentKind.Collection
-                        : ContentKind.Image,
-                    1,
-                    occurredAt,
-                    SourceApp.WeChat,
-                    DeliveryStatus.Confirmed));
-            _diagnostic?.Invoke(
-                "wechat-capture-applied",
-                $"urls=0 images={images.Count} drop=True confirmation=drop-release");
-            return WeChatNativeDropRegistrationResult.Registered;
+                $"registered={registered} files={imagePaths.Length} images={images.Count} confirmation=new-message");
+            return registered
+                ? WeChatNativeDropRegistrationResult.Registered
+                : WeChatNativeDropRegistrationResult.Duplicate;
         }
         catch (OperationCanceledException)
             when (_cancellation.IsCancellationRequested)
@@ -518,7 +507,8 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
         WeChatAccessibilitySnapshot baseline,
         string? clipboardText,
         IReadOnlyList<NormalizedUrl> urls,
-        IReadOnlyList<ClipboardImageSnapshot> images)
+        IReadOnlyList<ClipboardImageSnapshot> images,
+        bool nativeDrop = false)
     {
         lock (_candidateGate)
         {
@@ -553,6 +543,7 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
                 clipboardText,
                 candidateUrls,
                 candidateImages,
+                nativeDrop,
                 cancellation);
             _candidates.Add(registration);
             if (_recentSendSignals.CanApply(
@@ -605,13 +596,17 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
                     image.FileExtension,
                     image.OriginalFileName)).ToList(),
                 SourceApp.WeChat,
-                registration.Images.Count > 0
-                    ? CaptureMethod.WeChatConfirmedImage
-                    : CaptureMethod.WeChatConfirmedSend,
+                WeChatCaptureMethodPolicy.Select(
+                    registration.Images.Count > 0,
+                    registration.NativeDrop),
                 DeliveryStatus.Confirmed,
                 registration.Context.ContextHash,
                 capturedAt,
-                response.Signals.Append("ctrl-v").ToList(),
+                response.Signals
+                    .Append(registration.NativeDrop
+                        ? "native-explorer-file-drop"
+                        : "ctrl-v")
+                    .ToList(),
                 registration.Cancellation.Token);
             if (result?.EventApplied != true)
             {
@@ -634,7 +629,7 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
                     DeliveryStatus.Confirmed));
             _diagnostic?.Invoke(
                 "wechat-capture-applied",
-                $"urls={registration.Urls.Count} images={registration.Images.Count}");
+                $"urls={registration.Urls.Count} images={registration.Images.Count} drop={registration.NativeDrop}");
         }
         catch (OperationCanceledException)
             when (registration.Cancellation.IsCancellationRequested)
@@ -739,6 +734,7 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
         string? clipboardText,
         IReadOnlyList<NormalizedUrl> urls,
         IReadOnlyList<ClipboardImageSnapshot> images,
+        bool nativeDrop,
         CancellationTokenSource cancellation)
     {
         private int _sendObserved;
@@ -748,6 +744,7 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
         public string? ClipboardText { get; } = clipboardText;
         public IReadOnlyList<NormalizedUrl> Urls { get; } = urls;
         public IReadOnlyList<ClipboardImageSnapshot> Images { get; } = images;
+        public bool NativeDrop { get; } = nativeDrop;
         public CancellationTokenSource Cancellation { get; } = cancellation;
         public Task Task { get; set; } = Task.CompletedTask;
 

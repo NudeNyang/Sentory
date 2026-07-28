@@ -25,6 +25,23 @@ public sealed class WeChatPassiveDropStateTests
     }
 
     [Fact]
+    public void KeepsTargetWhileWeChatPreviewCoversDropArea()
+    {
+        var state = new WeChatPassiveDropState();
+        state.Begin((100, 100), ["photo.png"]);
+        state.Observe((450, 300), Target);
+
+        for (var frame = 0; frame < 120; frame++)
+        {
+            state.Observe((450, 300), null);
+        }
+
+        Assert.True(state.TryTakeCompleted(out var target, out var paths));
+        Assert.Equal(Target, target);
+        Assert.Equal(["photo.png"], paths);
+    }
+
+    [Fact]
     public void ClearsRecentTargetAfterPointerLeavesWeChatBounds()
     {
         var state = new WeChatPassiveDropState();

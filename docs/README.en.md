@@ -23,7 +23,7 @@ planned.
 | Telegram | After a pasted or Explorer-dropped link or image is actually sent from the desktop app | Paste or drop without sending, canceled drafts, other apps |
 | KakaoTalk | When a link or image is pasted into an individual chat, or local images are dropped into that chat | Manually typed URLs, search input, anything outside a chat input |
 | LINE | After a pasted or Explorer-dropped link or image is actually sent from the desktop app | Paste or drop without sending, other input fields, sends in another chat |
-| WeChat | After a pasted link or image is actually sent from the desktop app, or an Explorer image is dropped into a chat | Paste without sending, removed links, non-image files, other input fields, sends in another chat |
+| WeChat | After a pasted or Explorer-dropped link or image is actually sent from the desktop app | Paste or drop without sending, removed links, non-image files, other input fields, sends in another chat |
 
 Clipboard activity in other apps does not create library items. Detection for each
 supported messenger can be enabled or disabled separately in settings.

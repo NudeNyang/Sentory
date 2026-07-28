@@ -5,13 +5,10 @@ namespace Sentory.Platform.Windows.Runtime;
 internal sealed class WeChatPassiveDropState(
     double minimumDragDistance = 8)
 {
-    private const int MaximumTargetMissFrames = 3;
-
     private (int X, int Y) _start;
     private string[] _paths = [];
     private WeChatDropTarget? _target;
     private bool _activated;
-    private int _targetMissFrames;
 
     public bool IsTracking => _paths.Length > 0;
 
@@ -46,22 +43,12 @@ internal sealed class WeChatPassiveDropState(
         if (target is not null)
         {
             _target = target;
-            _targetMissFrames = 0;
             return;
         }
 
         if (_target is null || !Contains(_target.Bounds, cursor))
         {
             _target = null;
-            _targetMissFrames = 0;
-            return;
-        }
-
-        _targetMissFrames++;
-        if (_targetMissFrames > MaximumTargetMissFrames)
-        {
-            _target = null;
-            _targetMissFrames = 0;
         }
     }
 
@@ -87,7 +74,6 @@ internal sealed class WeChatPassiveDropState(
         _paths = [];
         _target = null;
         _activated = false;
-        _targetMissFrames = 0;
     }
 
     private static bool Contains(

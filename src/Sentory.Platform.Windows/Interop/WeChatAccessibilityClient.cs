@@ -101,6 +101,19 @@ internal static class WeChatMessageMatchPolicy
                 StringSplitOptions.TrimEntries));
 }
 
+internal static class WeChatNewMessageConfirmationPolicy
+{
+    public static bool IsConfirmed(
+        string messageText,
+        IReadOnlyList<NormalizedUrl> urls,
+        bool explicitSendObserved) =>
+        explicitSendObserved &&
+        WeChatMessageMatchPolicy.HasMatchingSendEvidence(
+            messageText,
+            urls,
+            preSendComposerMatched: explicitSendObserved);
+}
+
 internal static class WeChatComposerTextPolicy
 {
     public static string Select(
@@ -270,12 +283,10 @@ internal sealed class WeChatAccessibilityClient(
                                  !request.Baseline.MessageIds.Contains(
                                      message.Id)))
                     {
-                        var composerMatched = explicitSendObserved();
-                        if (!composerMatched ||
-                            !WeChatMessageMatchPolicy.HasMatchingSendEvidence(
+                        if (!WeChatNewMessageConfirmationPolicy.IsConfirmed(
                                 message.Text,
                                 request.Urls,
-                                composerMatched))
+                                explicitSendObserved()))
                         {
                             continue;
                         }
