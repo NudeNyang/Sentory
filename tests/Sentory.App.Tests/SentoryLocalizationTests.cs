@@ -6,6 +6,20 @@ namespace Sentory.App.Tests;
 public sealed class SentoryLocalizationTests
 {
     [Theory]
+    [InlineData("ko-KR", "누군가에게 공유한 사진과 링크를 한 곳에서")]
+    [InlineData("en-US", "Photos and links you've shared, all in one place")]
+    [InlineData("ja-JP", "誰かに共有した写真とリンクを一か所に")]
+    [InlineData("zh-CN", "将分享给他人的图片和链接集中一处")]
+    public void TaglineDescribesContentSharedWithOthers(
+        string language,
+        string expected)
+    {
+        SentoryLocalization.SetLanguage(language);
+
+        Assert.Equal(expected, SentoryLocalization.Text("Tagline"));
+    }
+
+    [Theory]
     [InlineData("ko-KR", "전송 시 저장됨")]
     [InlineData("en-US", "Saved on send")]
     [InlineData("ja-JP", "送信時に保存")]
