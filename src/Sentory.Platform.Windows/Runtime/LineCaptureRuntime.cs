@@ -322,17 +322,6 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
 
         try
         {
-            var baseline = await _accessibility.TryCaptureAsync(
-                context,
-                requireFocusedComposer: false,
-                allowImageSendDialog: false,
-                _cancellation.Token);
-            if (baseline is null)
-            {
-                return LineNativeDropRegistrationResult
-                    .ConversationUnavailable;
-            }
-
             var images = await Task.Run(
                 () => ClipboardImageCodec.TryReadFiles(imagePaths),
                 _cancellation.Token);
@@ -341,19 +330,50 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
                 return LineNativeDropRegistrationResult.ImageReadFailed;
             }
 
-            var registered = StartCandidate(
-                context,
-                baseline,
+            var result = await _coordinator.CaptureBatchAsync(
+                context.EventId,
                 null,
-                [],
-                images,
-                nativeDrop: true);
+                images.Select(image => new ImageCapturePayload(
+                    image.ContentBytes,
+                    image.Sha256,
+                    image.PixelWidth,
+                    image.PixelHeight,
+                    image.MimeType,
+                    image.FileExtension,
+                    image.OriginalFileName)).ToList(),
+                SourceApp.Line,
+                CaptureMethod.LineConfirmedDrop,
+                DeliveryStatus.Confirmed,
+                context.ContextHash,
+                occurredAt,
+                [
+                    "native-explorer-file-drop",
+                    "line-drop-release-send"
+                ],
+                _cancellation.Token);
+            var applied = result?.EventApplied == true;
             _diagnostic?.Invoke(
                 "line-drop-candidate",
-                $"registered={registered} files={imagePaths.Length} images={images.Count}");
-            return registered
-                ? LineNativeDropRegistrationResult.Registered
-                : LineNativeDropRegistrationResult.Duplicate;
+                $"registered={applied} files={imagePaths.Length} images={images.Count} confirmation=drop-release");
+            if (!applied)
+            {
+                return LineNativeDropRegistrationResult.Duplicate;
+            }
+
+            Captured?.Invoke(
+                this,
+                new CaptureNotification(
+                    images.Count > 1
+                        ? ContentKind.Collection
+                        : ContentKind.Image,
+                    1,
+                    occurredAt,
+                    SourceApp.Line,
+                    DeliveryStatus.Confirmed));
+            _diagnostic?.Invoke(
+                "line-capture-applied",
+                $"urls=0 images={images.Count} drop=True confirmation=drop-release");
+            return LineNativeDropRegistrationResult.Registered;
         }
         catch (OperationCanceledException)
             when (_cancellation.IsCancellationRequested)
