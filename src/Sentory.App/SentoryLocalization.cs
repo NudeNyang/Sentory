@@ -206,7 +206,7 @@ internal static class SentoryLocalization
             L("LicenseTitle", "Sentory 라이선스", "Sentory License", "Sentory ライセンス", "Sentory 许可协议"),
             L("LicenseHeading", "라이선스 및 제3자 고지", "Licenses and third-party notices", "ライセンスと第三者表記", "许可证与第三方声明"),
             L("LicenseDescription", "Sentory의 배포 조건과 포함된 오픈소스 구성 요소", "Distribution terms and included open-source components", "Sentory の配布条件と同梱オープンソース構成要素", "Sentory 的分发条款及所含开源组件"),
-            L("Tagline", "누군가에게 공유한 사진과 링크를 한 곳에서", "Photos and links you've shared, all in one place", "誰かに共有した写真とリンクを一か所に", "将分享给他人的图片和链接集中一处"),
+            L("Tagline", "대화 속, 흩어진 순간들을 한 곳에", "Moments scattered across your conversations, all in one place", "会話に散らばる瞬間を、一か所に", "将散落在对话中的瞬间汇聚一处"),
             L("DiscordDetection", "Discord 감지", "Discord detection", "Discord 検出", "Discord 检测"),
             L("Search", "보관함 검색", "Search library", "ライブラリを検索", "搜索收藏库"),
             L("SearchPlaceholder", "제목, URL, 도메인 검색", "Search title, URL, or domain", "タイトル、URL、ドメインを検索", "搜索标题、URL 或域名"),

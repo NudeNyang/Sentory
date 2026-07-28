@@ -6,11 +6,11 @@ namespace Sentory.App.Tests;
 public sealed class SentoryLocalizationTests
 {
     [Theory]
-    [InlineData("ko-KR", "누군가에게 공유한 사진과 링크를 한 곳에서")]
-    [InlineData("en-US", "Photos and links you've shared, all in one place")]
-    [InlineData("ja-JP", "誰かに共有した写真とリンクを一か所に")]
-    [InlineData("zh-CN", "将分享给他人的图片和链接集中一处")]
-    public void TaglineDescribesContentSharedWithOthers(
+    [InlineData("ko-KR", "대화 속, 흩어진 순간들을 한 곳에")]
+    [InlineData("en-US", "Moments scattered across your conversations, all in one place")]
+    [InlineData("ja-JP", "会話に散らばる瞬間を、一か所に")]
+    [InlineData("zh-CN", "将散落在对话中的瞬间汇聚一处")]
+    public void TaglineDescribesScatteredConversationMoments(
         string language,
         string expected)
     {
