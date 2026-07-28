@@ -177,6 +177,72 @@ public sealed class SyncItemProjectionTests : IDisposable
     }
 
     [Fact]
+    public async Task NewerMessengerOperationRemainsPendingWithoutBlockingKnownItems()
+    {
+        var replicaB = await CreateReplicaAsync("b");
+        var objectStore = new InMemorySyncObjectStore();
+        var remoteDeviceId = SyncDeviceIdentity.Create();
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/future",
+            out var futureUrl));
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/known",
+            out var knownUrl));
+        var futurePayload = new SyncItemPayload(
+            SyncItemPayload.CurrentPayloadVersion,
+            SyncItemContentKinds.Url,
+            "FutureMessenger",
+            "FutureMessengerConfirmedSend",
+            DeliveryStatus.Confirmed.ToString(),
+            "future-context",
+            DateTimeOffset.UtcNow,
+            ["future-send"],
+            new SyncUrlContent(
+                futureUrl.Original,
+                futureUrl.Value,
+                futureUrl.Domain),
+            null);
+        var knownPayload = SyncItemPayload.CreateUrl(
+            new SyncUrlContent(
+                knownUrl.Original,
+                knownUrl.Value,
+                knownUrl.Domain),
+            SourceApp.Discord,
+            CaptureMethod.DiscordConfirmedSend,
+            DeliveryStatus.Confirmed,
+            "known-context",
+            DateTimeOffset.UtcNow.AddSeconds(1),
+            ["known-send"]);
+        objectStore.Seed(SyncOperation.Create(
+            remoteDeviceId,
+            1,
+            Guid.NewGuid(),
+            SyncOperationKind.Upsert,
+            DateTimeOffset.UtcNow,
+            SyncItemPayloadSerializer.Serialize(futurePayload)));
+        objectStore.Seed(SyncOperation.Create(
+            remoteDeviceId,
+            2,
+            Guid.NewGuid(),
+            SyncOperationKind.Upsert,
+            DateTimeOffset.UtcNow.AddSeconds(1),
+            SyncItemPayloadSerializer.Serialize(knownPayload)));
+        await new SyncCoordinator(
+            replicaB.Journal,
+            objectStore).RunOnceAsync();
+
+        var result = await new SyncItemProjectionService(
+            replicaB.Captures,
+            objectStore).ProjectReceivedAsync(replicaB.Journal);
+
+        Assert.Equal(1, result.Pending);
+        Assert.Equal(1, result.Projected);
+        var item = Assert.Single(
+            await replicaB.Captures.GetRecentAsync(10));
+        Assert.Equal(knownUrl.Value, item.NormalizedKey);
+    }
+
+    [Fact]
     public async Task CorruptedImageBlobDoesNotCreateGalleryItem()
     {
         var replicaB = await CreateReplicaAsync("b");

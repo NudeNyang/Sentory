@@ -124,7 +124,7 @@ internal static class SentoryLocalization
             L("ScreenThemeDescription", "라이트 모드와 다크 모드를 선택합니다", "Choose light or dark mode", "ライトモードとダークモードを選択します", "选择浅色或深色模式"),
             L("Language", "Language", "Language", "Language", "Language"),
             L("LanguageDescription", "화면에 표시할 언어를 선택합니다", "Choose the display language", "表示する言語を選択します", "选择界面显示语言"),
-            L("Automatic", "자동", "Auto", "自動", "自动"),
+            L("Automatic", "Auto", "Auto", "Auto", "Auto"),
             L("LightMode", "라이트 모드", "Light mode", "ライトモード", "浅色模式"),
             L("DarkMode", "다크 모드", "Dark mode", "ダークモード", "深色模式"),
             L("SystemTheme", "시스템 테마", "System theme", "システムテーマ", "系统主题"),

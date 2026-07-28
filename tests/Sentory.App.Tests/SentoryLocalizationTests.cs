@@ -235,11 +235,11 @@ public sealed class SentoryLocalizationTests
     }
 
     [Theory]
-    [InlineData("ko-KR", "자동")]
+    [InlineData("ko-KR", "Auto")]
     [InlineData("en-US", "Auto")]
-    [InlineData("ja-JP", "自動")]
-    [InlineData("zh-CN", "自动")]
-    public void AutomaticOptionIsFirstAndLocalized(
+    [InlineData("ja-JP", "Auto")]
+    [InlineData("zh-CN", "Auto")]
+    public void AutomaticOptionIsFirstAndUsesUniversalLabel(
         string displayLanguage,
         string expectedLabel)
     {

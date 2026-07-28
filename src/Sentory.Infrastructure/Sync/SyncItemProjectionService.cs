@@ -93,15 +93,31 @@ public sealed class SyncItemProjectionService(
                 continue;
             }
 
+            if (!TryParseProjectionEnums(
+                    payload,
+                    out var sourceApp,
+                    out var captureMethod,
+                    out var deliveryStatus))
+            {
+                pending++;
+                continue;
+            }
+
             CaptureResult? result = payload.ContentKind switch
             {
                 SyncItemContentKinds.Url => await ProjectUrlAsync(
                     operation,
                     payload,
+                    sourceApp,
+                    captureMethod,
+                    deliveryStatus,
                     cancellationToken),
                 SyncItemContentKinds.Image => await ProjectImageAsync(
                     operation,
                     payload,
+                    sourceApp,
+                    captureMethod,
+                    deliveryStatus,
                     cancellationToken),
                 _ => throw new NotSupportedException(
                     "지원하지 않는 동기화 콘텐츠 종류입니다.")
@@ -141,6 +157,9 @@ public sealed class SyncItemProjectionService(
     private async Task<CaptureResult> ProjectUrlAsync(
         SyncOperation operation,
         SyncItemPayload payload,
+        SourceApp sourceApp,
+        CaptureMethod captureMethod,
+        DeliveryStatus deliveryStatus,
         CancellationToken cancellationToken)
     {
         var url = payload.Url ??
@@ -167,13 +186,9 @@ public sealed class SyncItemProjectionService(
                 operation.OperationId,
                 url.OriginalUrl,
                 normalized,
-                ParseEnum<SourceApp>(payload.SourceApp, "출처"),
-                ParseEnum<CaptureMethod>(
-                    payload.CaptureMethod,
-                    "캡처 방식"),
-                ParseEnum<DeliveryStatus>(
-                    payload.DeliveryStatus,
-                    "전송 상태"),
+                sourceApp,
+                captureMethod,
+                deliveryStatus,
                 payload.ContextHash,
                 payload.CapturedAt,
                 payload.ConfirmationSignals,
@@ -184,6 +199,9 @@ public sealed class SyncItemProjectionService(
     private async Task<CaptureResult?> ProjectImageAsync(
         SyncOperation operation,
         SyncItemPayload payload,
+        SourceApp sourceApp,
+        CaptureMethod captureMethod,
+        DeliveryStatus deliveryStatus,
         CancellationToken cancellationToken)
     {
         var image = payload.Image ??
@@ -240,13 +258,9 @@ public sealed class SyncItemProjectionService(
                 image.PixelHeight,
                 image.MimeType,
                 image.FileExtension,
-                ParseEnum<SourceApp>(payload.SourceApp, "출처"),
-                ParseEnum<CaptureMethod>(
-                    payload.CaptureMethod,
-                    "캡처 방식"),
-                ParseEnum<DeliveryStatus>(
-                    payload.DeliveryStatus,
-                    "전송 상태"),
+                sourceApp,
+                captureMethod,
+                deliveryStatus,
                 payload.ContextHash,
                 payload.CapturedAt,
                 payload.ConfirmationSignals,
@@ -255,20 +269,34 @@ public sealed class SyncItemProjectionService(
             cancellationToken);
     }
 
-    private static T ParseEnum<T>(string value, string fieldName)
+    private static bool TryParseProjectionEnums(
+        SyncItemPayload payload,
+        out SourceApp sourceApp,
+        out CaptureMethod captureMethod,
+        out DeliveryStatus deliveryStatus)
+    {
+        var hasKnownSource = TryParseEnum(
+            payload.SourceApp,
+            out sourceApp);
+        var hasKnownCaptureMethod = TryParseEnum(
+            payload.CaptureMethod,
+            out captureMethod);
+        var hasKnownDeliveryStatus = TryParseEnum(
+            payload.DeliveryStatus,
+            out deliveryStatus);
+        return hasKnownSource &&
+               hasKnownCaptureMethod &&
+               hasKnownDeliveryStatus;
+    }
+
+    private static bool TryParseEnum<T>(string value, out T parsed)
         where T : struct, Enum
     {
-        if (!Enum.TryParse<T>(
+        return Enum.TryParse(
                 value,
                 ignoreCase: false,
-                out var parsed) ||
-            !Enum.IsDefined(parsed))
-        {
-            throw new InvalidDataException(
-                $"원격 항목의 {fieldName} 값을 지원하지 않습니다.");
-        }
-
-        return parsed;
+                out parsed) &&
+            Enum.IsDefined(parsed);
     }
 
     private static string ComputeSha256(ReadOnlySpan<byte> content) =>
