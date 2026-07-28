@@ -50,4 +50,19 @@ public sealed class TelegramPassiveDropStateTests
 
         Assert.False(state.TryTakeCompleted(out _, out _));
     }
+
+    [Fact]
+    public void KeepsTrackingDuringReleaseGraceUntilTargetAppears()
+    {
+        var state = new TelegramPassiveDropState();
+        state.Begin((100, 100), ["photo.png"]);
+        state.Observe((450, 300), null);
+
+        Assert.False(state.TryTakeCompleted(out _, out _));
+
+        state.Observe((450, 300), Target);
+
+        Assert.True(state.TryTakeCompleted(out _, out var paths));
+        Assert.Equal(["photo.png"], paths);
+    }
 }

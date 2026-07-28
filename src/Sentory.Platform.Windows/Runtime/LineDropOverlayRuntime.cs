@@ -9,6 +9,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
         TimeSpan.FromMilliseconds(16);
     private static readonly TimeSpan ExplorerOriginMaximumAge =
         TimeSpan.FromMilliseconds(150);
+    private const int ReleaseTargetGraceFrames = 16;
 
     private readonly INativeWindowApi _native;
     private readonly IKakaoDropWindowApi _dropWindows;
@@ -22,6 +23,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
         new(ExplorerOriginMaximumAge);
     private bool _started;
     private bool _leftWasDown;
+    private int _releaseTargetGraceFrames;
 
     public LineDropOverlayRuntime(
         LineCaptureRuntime captureRuntime,
@@ -89,6 +91,11 @@ public sealed class LineDropOverlayRuntime : IDisposable
             return;
         }
 
+        if (!_leftWasDown && _releaseTargetGraceFrames > 0)
+        {
+            ResetDrag();
+        }
+
         if (!_leftWasDown)
         {
             _leftWasDown = true;
@@ -142,14 +149,20 @@ public sealed class LineDropOverlayRuntime : IDisposable
 
     private void CompleteDrag((int X, int Y) cursor)
     {
-        if (!_leftWasDown)
+        if (_leftWasDown)
+        {
+            _leftWasDown = false;
+            _releaseTargetGraceFrames = ReleaseTargetGraceFrames;
+        }
+
+        if (_releaseTargetGraceFrames <= 0)
         {
             return;
         }
 
-        _leftWasDown = false;
         if (!_dropState.IsTracking)
         {
+            _releaseTargetGraceFrames = 0;
             return;
         }
 
@@ -161,7 +174,18 @@ public sealed class LineDropOverlayRuntime : IDisposable
                 requireTopmost: true));
         if (_dropState.TryTakeCompleted(out var target, out var paths))
         {
+            _releaseTargetGraceFrames = 0;
             _ = RegisterPassiveDropAsync(target, paths);
+            return;
+        }
+
+        _releaseTargetGraceFrames--;
+        if (_releaseTargetGraceFrames == 0)
+        {
+            _dropState.Reset();
+            _diagnostic?.Invoke(
+                "line-drop-cancelled",
+                "reason=release-target-unavailable");
         }
     }
 
@@ -203,6 +227,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
     private void ResetDrag()
     {
         _leftWasDown = false;
+        _releaseTargetGraceFrames = 0;
         _dropState.Reset();
     }
 

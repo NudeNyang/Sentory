@@ -137,14 +137,21 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
             return;
         }
 
-        var root = _native.GetRootWindow(trigger.ForegroundWindow);
-        if (root == nint.Zero ||
-            _native.GetProcessId(root) != trigger.ForegroundProcessId ||
-            !LineContextValidator.IsSupportedMainWindowClass(
-                _native.GetClassName(root)))
+        if (!_validator.TryValidate(
+                new PasteTrigger(
+                    trigger.EventId,
+                    trigger.ForegroundWindow,
+                    trigger.ForegroundWindow,
+                    trigger.ForegroundProcessId,
+                    _native.GetClipboardSequenceNumber(),
+                    trigger.OccurredAt,
+                    trigger.Injected),
+                out var context))
         {
             return;
         }
+
+        var root = context.MainWindow;
 
         lock (_candidateGate)
         {

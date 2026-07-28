@@ -73,7 +73,6 @@ internal sealed class TelegramPassiveDropState(
         paths = [];
         if (!_activated || _target is null)
         {
-            Reset();
             return false;
         }
 

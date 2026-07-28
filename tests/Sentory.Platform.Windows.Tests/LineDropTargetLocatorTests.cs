@@ -34,6 +34,18 @@ public sealed class LineDropTargetLocatorTests
         Assert.Null(locator.FindAt(450, 300, requireTopmost: true));
     }
 
+    [Fact]
+    public void AcceptsLineOwnedDragSurfaceAboveMainWindow()
+    {
+        var native = new FakeNative { HasLineDragSurface = true };
+        var locator = new LineDropTargetLocator(native, native);
+
+        var target = locator.FindAt(450, 300, requireTopmost: true);
+
+        Assert.NotNull(target);
+        Assert.Equal(native.Main, target.MainWindow);
+    }
+
     private sealed class FakeNative :
         INativeWindowApi,
         IKakaoDropWindowApi
@@ -41,13 +53,18 @@ public sealed class LineDropTargetLocatorTests
         public nint Main { get; } = new(20);
         public uint ProcessId { get; } = 84;
         public bool IsOccluded { get; set; }
+        public bool HasLineDragSurface { get; set; }
 
         public nint GetForegroundWindow() => Main;
         public nint GetFocusedWindow(nint foregroundWindow) => Main;
         public nint GetRootWindow(nint window) =>
-            window == new nint(99) ? window : Main;
-        public uint GetProcessId(nint window) => ProcessId;
-        public string? GetProcessName(uint processId) => "LINE";
+            window == new nint(98) || window == new nint(99)
+                ? window
+                : Main;
+        public uint GetProcessId(nint window) =>
+            window == new nint(99) ? 999u : ProcessId;
+        public string? GetProcessName(uint processId) =>
+            processId == 999 ? "notepad" : "LINE";
         public string GetClassName(nint window) => "Qt663QWindowIcon";
         public int GetControlId(nint window) => 0;
         public nint GetOwnerWindow(nint window) => nint.Zero;
@@ -67,7 +84,11 @@ public sealed class LineDropTargetLocatorTests
         public bool IsWindowMinimized(nint window) => false;
         public (int X, int Y) GetCursorPosition() => (450, 300);
         public nint GetWindowAtPoint(int x, int y) =>
-            IsOccluded ? new nint(99) : Main;
+            IsOccluded
+                ? new nint(99)
+                : HasLineDragSurface
+                    ? new nint(98)
+                    : Main;
         public bool IsLeftMouseButtonDown() => false;
         public bool IsEscapeKeyDown() => false;
         public bool PositionTopmostWindow(

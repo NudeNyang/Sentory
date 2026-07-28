@@ -46,7 +46,6 @@ internal sealed class LinePassiveDropState(
         paths = [];
         if (!_activated || _target is null)
         {
-            Reset();
             return false;
         }
 

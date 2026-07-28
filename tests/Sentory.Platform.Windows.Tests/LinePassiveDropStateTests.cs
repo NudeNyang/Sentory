@@ -39,4 +39,19 @@ public sealed class LinePassiveDropStateTests
         outside.Observe((50, 50), null);
         Assert.False(outside.TryTakeCompleted(out _, out _));
     }
+
+    [Fact]
+    public void KeepsTrackingDuringReleaseGraceUntilTargetAppears()
+    {
+        var state = new LinePassiveDropState();
+        state.Begin((10, 10), ["one.png"]);
+        state.Observe((40, 40), null);
+
+        Assert.False(state.TryTakeCompleted(out _, out _));
+
+        state.Observe((40, 40), Target);
+
+        Assert.True(state.TryTakeCompleted(out _, out var paths));
+        Assert.Equal(["one.png"], paths);
+    }
 }

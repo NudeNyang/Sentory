@@ -39,8 +39,11 @@ public sealed class LineDropTargetLocator(
             }
 
             if (requireTopmost &&
-                native.GetRootWindow(
-                    dropWindows.GetWindowAtPoint(cursorX, cursorY)) != root)
+                !IsTopmostOrLineOwnedSurface(
+                    root,
+                    processId,
+                    cursorX,
+                    cursorY))
             {
                 continue;
             }
@@ -49,6 +52,23 @@ public sealed class LineDropTargetLocator(
         }
 
         return null;
+    }
+
+    private bool IsTopmostOrLineOwnedSurface(
+        nint mainWindow,
+        uint lineProcessId,
+        int cursorX,
+        int cursorY)
+    {
+        var windowAtPoint = dropWindows.GetWindowAtPoint(cursorX, cursorY);
+        var rootAtPoint = native.GetRootWindow(windowAtPoint);
+        return rootAtPoint == mainWindow ||
+               (rootAtPoint != nint.Zero &&
+                native.GetProcessId(rootAtPoint) == lineProcessId &&
+                string.Equals(
+                    native.GetProcessName(lineProcessId),
+                    LineContextValidator.ProcessName,
+                    StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool Contains(WindowBounds bounds, int x, int y) =>

@@ -9,6 +9,7 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
         TimeSpan.FromMilliseconds(16);
     private static readonly TimeSpan ExplorerOriginMaximumAge =
         TimeSpan.FromMilliseconds(150);
+    private const int ReleaseTargetGraceFrames = 16;
 
     private readonly INativeWindowApi _native;
     private readonly IKakaoDropWindowApi _dropWindows;
@@ -22,6 +23,7 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
         new(ExplorerOriginMaximumAge);
     private bool _started;
     private bool _leftWasDown;
+    private int _releaseTargetGraceFrames;
 
     public TelegramDropOverlayRuntime(
         TelegramCaptureRuntime captureRuntime,
@@ -89,6 +91,11 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
             return;
         }
 
+        if (!_leftWasDown && _releaseTargetGraceFrames > 0)
+        {
+            ResetDrag();
+        }
+
         if (!_leftWasDown)
         {
             _leftWasDown = true;
@@ -139,14 +146,20 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
 
     private void CompleteDrag((int X, int Y) cursor)
     {
-        if (!_leftWasDown)
+        if (_leftWasDown)
+        {
+            _leftWasDown = false;
+            _releaseTargetGraceFrames = ReleaseTargetGraceFrames;
+        }
+
+        if (_releaseTargetGraceFrames <= 0)
         {
             return;
         }
 
-        _leftWasDown = false;
         if (!_dropState.IsTracking)
         {
+            _releaseTargetGraceFrames = 0;
             return;
         }
 
@@ -155,7 +168,18 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
             _locator.FindAt(cursor.X, cursor.Y, requireTopmost: true));
         if (_dropState.TryTakeCompleted(out var target, out var paths))
         {
+            _releaseTargetGraceFrames = 0;
             _ = RegisterPassiveDropAsync(target, paths);
+            return;
+        }
+
+        _releaseTargetGraceFrames--;
+        if (_releaseTargetGraceFrames == 0)
+        {
+            _dropState.Reset();
+            _diagnostic?.Invoke(
+                "telegram-drop-cancelled",
+                "reason=release-target-unavailable");
         }
     }
 
@@ -197,6 +221,7 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
     private void ResetDrag()
     {
         _leftWasDown = false;
+        _releaseTargetGraceFrames = 0;
         _dropState.Reset();
     }
 

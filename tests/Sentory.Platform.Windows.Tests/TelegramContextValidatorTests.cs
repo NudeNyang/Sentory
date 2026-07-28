@@ -27,6 +27,20 @@ public sealed class TelegramContextValidatorTests
                 "Qt6129QWindowIcon"));
     }
 
+    [Fact]
+    public void ResolvesOwnedPhotoDialogBackToMainChatWindow()
+    {
+        var native = new FakeNative { UseOwnedPhotoDialog = true };
+        var validator = new TelegramContextValidator(native);
+
+        var accepted = validator.TryValidate(
+            CreateTrigger(native),
+            out var context);
+
+        Assert.True(accepted);
+        Assert.Equal(native.Main, context.MainWindow);
+    }
+
     [Theory]
     [InlineData("Telegram", "Chrome_WidgetWin_1")]
     [InlineData("TelegramUpdater", "Qt51519QWindowIcon")]
@@ -66,8 +80,8 @@ public sealed class TelegramContextValidatorTests
     private static PasteTrigger CreateTrigger(FakeNative native) =>
         new(
             Guid.NewGuid(),
-            native.Main,
-            nint.Zero,
+            native.GetForegroundWindow(),
+            native.GetFocusedWindow(native.GetForegroundWindow()),
             native.ProcessId,
             12,
             DateTimeOffset.UtcNow,
@@ -76,18 +90,24 @@ public sealed class TelegramContextValidatorTests
     private sealed class FakeNative : INativeWindowApi
     {
         public nint Main { get; } = new(10);
+        public nint PhotoDialog { get; } = new(20);
         public uint ProcessId { get; } = 42;
         public string ProcessName { get; set; } = "Telegram";
         public string MainClass { get; set; } = "Qt51519QWindowIcon";
+        public bool UseOwnedPhotoDialog { get; set; }
 
-        public nint GetForegroundWindow() => Main;
-        public nint GetFocusedWindow(nint foregroundWindow) => nint.Zero;
-        public nint GetRootWindow(nint window) => Main;
+        public nint GetForegroundWindow() =>
+            UseOwnedPhotoDialog ? PhotoDialog : Main;
+        public nint GetFocusedWindow(nint foregroundWindow) =>
+            UseOwnedPhotoDialog ? PhotoDialog : nint.Zero;
+        public nint GetRootWindow(nint window) =>
+            window == PhotoDialog ? PhotoDialog : Main;
         public uint GetProcessId(nint window) => ProcessId;
         public string? GetProcessName(uint processId) => ProcessName;
         public string GetClassName(nint window) => MainClass;
         public int GetControlId(nint window) => 0;
-        public nint GetOwnerWindow(nint window) => nint.Zero;
+        public nint GetOwnerWindow(nint window) =>
+            window == PhotoDialog ? Main : nint.Zero;
         public WindowBounds GetWindowBounds(nint window) =>
             new(0, 0, 1200, 900);
         public bool HasDescendant(
