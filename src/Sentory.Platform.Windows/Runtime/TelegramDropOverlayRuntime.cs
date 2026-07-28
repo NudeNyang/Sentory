@@ -25,6 +25,8 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
     private bool _leftWasDown;
     private int _releaseTargetGraceFrames;
     private DateTimeOffset _releasedAt;
+    private nint _preDropBaselineWindow;
+    private Task<TelegramVisualSnapshot?>? _preDropBaselineTask;
 
     public TelegramDropOverlayRuntime(
         TelegramCaptureRuntime captureRuntime,
@@ -105,18 +107,21 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
 
         if (_dropState.IsTracking)
         {
-            _dropState.Observe(
-                cursor,
-                MessengerDropTargetProbe.IsProcessAt(
+            var target = MessengerDropTargetProbe.IsProcessAt(
                     _native,
                     _dropWindows,
                     cursor,
                     TelegramContextValidator.ProcessName)
-                    ? _locator.FindAt(
+                ? _locator.FindAt(
                         cursor.X,
                         cursor.Y,
                         requireTopmost: true)
-                    : null);
+                : null;
+            _dropState.Observe(cursor, target);
+            if (target is not null)
+            {
+                BeginPreDropBaselineCapture(target);
+            }
         }
     }
 
@@ -206,9 +211,16 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
         if (_dropState.TryTakeCompleted(out var target, out var paths))
         {
             var releasedAt = _releasedAt;
+            var preDropBaselineTask = _preDropBaselineTask;
             _releaseTargetGraceFrames = 0;
             _releasedAt = default;
-            _ = RegisterPassiveDropAsync(target, paths, releasedAt);
+            _preDropBaselineWindow = nint.Zero;
+            _preDropBaselineTask = null;
+            _ = RegisterPassiveDropAsync(
+                target,
+                paths,
+                releasedAt,
+                preDropBaselineTask);
             return;
         }
 
@@ -245,15 +257,20 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
     private async Task RegisterPassiveDropAsync(
         TelegramDropTarget target,
         IReadOnlyList<string> paths,
-        DateTimeOffset releasedAt)
+        DateTimeOffset releasedAt,
+        Task<TelegramVisualSnapshot?>? preDropBaselineTask)
     {
         _diagnostic?.Invoke(
             "telegram-drop-released",
             $"files={paths.Count}, window=0x{target.MainWindow.ToInt64():X}, mode=passive");
+        var preDropSnapshot = preDropBaselineTask is null
+            ? null
+            : await preDropBaselineTask;
         var result = await _captureRuntime.RegisterNativeDroppedFilesAsync(
             target,
             paths,
-            releasedAt);
+            releasedAt,
+            preDropSnapshot);
         _diagnostic?.Invoke(
             "telegram-drop-result",
             $"result={result}, files={paths.Count}, mode=passive");
@@ -264,7 +281,24 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
         _leftWasDown = false;
         _releaseTargetGraceFrames = 0;
         _releasedAt = default;
+        _preDropBaselineWindow = nint.Zero;
+        _preDropBaselineTask = null;
         _dropState.Reset();
+    }
+
+    private void BeginPreDropBaselineCapture(TelegramDropTarget target)
+    {
+        if (_preDropBaselineTask is not null &&
+            _preDropBaselineWindow == target.MainWindow)
+        {
+            return;
+        }
+
+        _preDropBaselineWindow = target.MainWindow;
+        _preDropBaselineTask =
+            _captureRuntime.TryCaptureNativeDropBaselineAsync(
+                target,
+                DateTimeOffset.UtcNow);
     }
 
     public void Dispose()

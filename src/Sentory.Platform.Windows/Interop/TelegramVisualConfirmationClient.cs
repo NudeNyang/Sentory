@@ -15,7 +15,8 @@ internal sealed record TelegramVisualSnapshot(
 internal sealed record TelegramVisualConfirmationRequest(
     ValidatedTelegramContext Context,
     TelegramVisualSnapshot Snapshot,
-    TimeSpan Timeout);
+    TimeSpan Timeout,
+    TelegramVisualSnapshot? NativeDropPreDropSnapshot = null);
 
 internal sealed record TelegramVisualConfirmationResponse(
     bool Confirmed,
@@ -47,14 +48,22 @@ internal sealed class TelegramVisualConfirmationState
     internal const double ConversationChangedThreshold = 0.004;
 
     private readonly TelegramVisualFrame _baseline;
+    private readonly TelegramVisualFrame? _nativeDropPreDropBaseline;
     private TelegramVisualFrame _beforeSend;
+    private TelegramVisualFrame _nativeDropPreview;
     private bool _sendObserved;
     private int _confirmationFrames;
+    private int _nativeDropStableFrames;
+    private bool _nativeDropPreviewArmed;
 
-    public TelegramVisualConfirmationState(TelegramVisualFrame baseline)
+    public TelegramVisualConfirmationState(
+        TelegramVisualFrame baseline,
+        TelegramVisualFrame? nativeDropPreDropBaseline = null)
     {
         _baseline = baseline;
         _beforeSend = baseline;
+        _nativeDropPreview = baseline;
+        _nativeDropPreDropBaseline = nativeDropPreDropBaseline;
     }
 
     public TelegramVisualDecision Observe(
@@ -70,8 +79,7 @@ internal sealed class TelegramVisualConfirmationState
         {
             _beforeSend = current;
             _sendObserved = false;
-            _confirmationFrames = 0;
-            return TelegramVisualDecision.Pending;
+            return ObserveNativeDropPreview(current);
         }
 
         _sendObserved = true;
@@ -91,6 +99,54 @@ internal sealed class TelegramVisualConfirmationState
     }
 
     public bool SendObserved => _sendObserved;
+
+    private TelegramVisualDecision ObserveNativeDropPreview(
+        TelegramVisualFrame current)
+    {
+        if (_nativeDropPreDropBaseline is null)
+        {
+            _confirmationFrames = 0;
+            return TelegramVisualDecision.Pending;
+        }
+
+        var changed = WhatsAppVisualDifference.Calculate(
+            _nativeDropPreview.ConversationPixels,
+            current.ConversationPixels) >= ConversationChangedThreshold;
+        if (!_nativeDropPreviewArmed)
+        {
+            if (changed)
+            {
+                _nativeDropPreview = current;
+                _nativeDropStableFrames = 0;
+                return TelegramVisualDecision.Pending;
+            }
+
+            _nativeDropStableFrames++;
+            _nativeDropPreviewArmed = _nativeDropStableFrames >= 2;
+            return TelegramVisualDecision.Pending;
+        }
+
+        if (!changed)
+        {
+            _confirmationFrames = 0;
+            return TelegramVisualDecision.Pending;
+        }
+
+        var conversationChangedSinceDrop =
+            WhatsAppVisualDifference.Calculate(
+                _nativeDropPreDropBaseline.ConversationPixels,
+                current.ConversationPixels) >= ConversationChangedThreshold;
+        if (!conversationChangedSinceDrop)
+        {
+            _confirmationFrames = 0;
+            return TelegramVisualDecision.Pending;
+        }
+
+        _confirmationFrames++;
+        return _confirmationFrames >= 2
+            ? TelegramVisualDecision.Confirmed
+            : TelegramVisualDecision.Pending;
+    }
 
     private static bool SameBounds(WindowBounds left, WindowBounds right) =>
         left.Width == right.Width && left.Height == right.Height;
@@ -248,7 +304,8 @@ internal sealed class TelegramVisualConfirmationClient(
     {
         var startedAt = DateTimeOffset.UtcNow;
         var state = new TelegramVisualConfirmationState(
-            request.Snapshot.Baseline);
+            request.Snapshot.Baseline,
+            request.NativeDropPreDropSnapshot?.Baseline);
         while (DateTimeOffset.UtcNow - startedAt < request.Timeout)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -261,14 +318,21 @@ internal sealed class TelegramVisualConfirmationClient(
             {
                 diagnostic?.Invoke(
                     "telegram-send-confirmed",
-                    "sendInput=True visualChange=True");
+                    $"sendInput={state.SendObserved} visualChange=True nativeDropFallback={request.NativeDropPreDropSnapshot is not null}");
                 return new TelegramVisualConfirmationResponse(
                     true,
                     DateTimeOffset.UtcNow,
-                    [
-                        "telegram-explicit-send-input",
-                        "telegram-conversation-region-changed"
-                    ]);
+                    state.SendObserved
+                        ?
+                        [
+                            "telegram-explicit-send-input",
+                            "telegram-conversation-region-changed"
+                        ]
+                        :
+                        [
+                            "telegram-native-drop-preview-dismissed",
+                            "telegram-conversation-region-changed"
+                        ]);
             }
 
             await Task.Delay(120, cancellationToken);

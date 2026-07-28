@@ -9,7 +9,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
         TimeSpan.FromMilliseconds(16);
     private static readonly TimeSpan ExplorerOriginMaximumAge =
         TimeSpan.FromMilliseconds(150);
-    private const int ReleaseTargetGraceFrames = 16;
+    private const int ReleaseTargetGraceFrames = 48;
 
     private readonly INativeWindowApi _native;
     private readonly IKakaoDropWindowApi _dropWindows;
@@ -25,6 +25,8 @@ public sealed class LineDropOverlayRuntime : IDisposable
     private bool _leftWasDown;
     private int _releaseTargetGraceFrames;
     private DateTimeOffset _releasedAt;
+    private nint _preDropBaselineWindow;
+    private Task<LineAccessibilitySnapshot?>? _preDropBaselineTask;
 
     public LineDropOverlayRuntime(
         LineCaptureRuntime captureRuntime,
@@ -105,18 +107,21 @@ public sealed class LineDropOverlayRuntime : IDisposable
 
         if (_dropState.IsTracking)
         {
-            _dropState.Observe(
-                cursor,
-                MessengerDropTargetProbe.IsProcessAt(
+            var target = MessengerDropTargetProbe.IsProcessAt(
                     _native,
                     _dropWindows,
                     cursor,
                     LineContextValidator.ProcessName)
-                    ? _locator.FindAt(
+                ? _locator.FindAt(
                         cursor.X,
                         cursor.Y,
                         requireTopmost: true)
-                    : null);
+                : null;
+            _dropState.Observe(cursor, target);
+            if (target is not null)
+            {
+                BeginPreDropBaselineCapture(target);
+            }
         }
     }
 
@@ -209,9 +214,16 @@ public sealed class LineDropOverlayRuntime : IDisposable
         if (_dropState.TryTakeCompleted(out var target, out var paths))
         {
             var releasedAt = _releasedAt;
+            var preDropBaselineTask = _preDropBaselineTask;
             _releaseTargetGraceFrames = 0;
             _releasedAt = default;
-            _ = RegisterPassiveDropAsync(target, paths, releasedAt);
+            _preDropBaselineWindow = nint.Zero;
+            _preDropBaselineTask = null;
+            _ = RegisterPassiveDropAsync(
+                target,
+                paths,
+                releasedAt,
+                preDropBaselineTask);
             return;
         }
 
@@ -248,15 +260,20 @@ public sealed class LineDropOverlayRuntime : IDisposable
     private async Task RegisterPassiveDropAsync(
         LineDropTarget target,
         IReadOnlyList<string> paths,
-        DateTimeOffset releasedAt)
+        DateTimeOffset releasedAt,
+        Task<LineAccessibilitySnapshot?>? preDropBaselineTask)
     {
         _diagnostic?.Invoke(
             "line-drop-released",
             $"files={paths.Count}, window=0x{target.MainWindow.ToInt64():X}, mode=passive");
+        var preDropBaseline = preDropBaselineTask is null
+            ? null
+            : await preDropBaselineTask;
         var result = await _captureRuntime.RegisterNativeDroppedFilesAsync(
             target,
             paths,
-            releasedAt);
+            releasedAt,
+            preDropBaseline);
         _diagnostic?.Invoke(
             "line-drop-result",
             $"result={result}, files={paths.Count}, mode=passive");
@@ -267,7 +284,24 @@ public sealed class LineDropOverlayRuntime : IDisposable
         _leftWasDown = false;
         _releaseTargetGraceFrames = 0;
         _releasedAt = default;
+        _preDropBaselineWindow = nint.Zero;
+        _preDropBaselineTask = null;
         _dropState.Reset();
+    }
+
+    private void BeginPreDropBaselineCapture(LineDropTarget target)
+    {
+        if (_preDropBaselineTask is not null &&
+            _preDropBaselineWindow == target.MainWindow)
+        {
+            return;
+        }
+
+        _preDropBaselineWindow = target.MainWindow;
+        _preDropBaselineTask =
+            _captureRuntime.TryCaptureNativeDropBaselineAsync(
+                target,
+                DateTimeOffset.UtcNow);
     }
 
     public void Dispose()

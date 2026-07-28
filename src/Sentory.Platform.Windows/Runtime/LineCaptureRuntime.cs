@@ -209,14 +209,32 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
             return;
         }
 
-        if (!_pointerSendVerifier.IsPotentialSendControl(
+        var verifiedSendControl =
+            _pointerSendVerifier.IsPotentialSendControl(
                 trigger.ScreenX,
                 trigger.ScreenY,
                 trigger.ForegroundProcessId,
-                root))
+                root);
+        var foregroundRoot = _native.GetRootWindow(trigger.ForegroundWindow);
+        var imageDialogRegionFallback = !verifiedSendControl &&
+                                        HasPendingImageCandidate(
+                                            trigger.ForegroundProcessId,
+                                            trigger.OccurredAt) &&
+                                        LineImageDialogSendButtonPolicy.IsWithin(
+                                            _native.GetWindowBounds(
+                                                foregroundRoot != nint.Zero
+                                                    ? foregroundRoot
+                                                    : root),
+                                            trigger.ScreenX,
+                                            trigger.ScreenY);
+        if (!verifiedSendControl && !imageDialogRegionFallback)
         {
             return;
         }
+
+        var inputKind = imageDialogRegionFallback
+            ? "pointer-region-fallback"
+            : "pointer";
 
         var composer = _composerTextReader.Read(
             root,
@@ -242,18 +260,34 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
             ? MarkSendObserved(
                 root,
                 trigger.OccurredAt,
-                "pointer",
+                inputKind,
                 composer)
             : MarkSendObservedByProcess(
                 trigger.ForegroundProcessId,
                 trigger.OccurredAt,
-                "pointer-fallback",
+                imageDialogRegionFallback
+                    ? "pointer-region-fallback"
+                    : "pointer-fallback",
                 composer);
         if (observed == 0)
         {
             _diagnostic?.Invoke(
                 "line-send-input-buffered",
-                $"kind={(hasContext ? "pointer" : "pointer-fallback")} candidates=0");
+                $"kind={(hasContext ? inputKind : imageDialogRegionFallback ? "pointer-region-fallback" : "pointer-fallback")} candidates=0");
+        }
+    }
+
+    private bool HasPendingImageCandidate(
+        uint processId,
+        DateTimeOffset occurredAt)
+    {
+        lock (_candidateGate)
+        {
+            return _candidates.Any(candidate =>
+                candidate.Context.ProcessId == processId &&
+                candidate.Context.OccurredAt <= occurredAt &&
+                candidate.Images.Count > 0 &&
+                !candidate.Cancellation.IsCancellationRequested);
         }
     }
 
@@ -365,7 +399,19 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
         RegisterNativeDroppedFilesAsync(
             LineDropTarget target,
             IReadOnlyList<string> paths,
-            DateTimeOffset occurredAt)
+            DateTimeOffset occurredAt) =>
+        await RegisterNativeDroppedFilesAsync(
+            target,
+            paths,
+            occurredAt,
+            preDropBaseline: null);
+
+    internal async Task<LineNativeDropRegistrationResult>
+        RegisterNativeDroppedFilesAsync(
+            LineDropTarget target,
+            IReadOnlyList<string> paths,
+            DateTimeOffset occurredAt,
+            LineAccessibilitySnapshot? preDropBaseline)
     {
         if (_paused)
         {
@@ -392,11 +438,12 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
 
         try
         {
-            var baseline = await _accessibility.TryCaptureAsync(
-                context,
-                requireFocusedComposer: false,
-                allowImageSendDialog: false,
-                _cancellation.Token);
+            var baseline = preDropBaseline ??
+                           await _accessibility.TryCaptureAsync(
+                               context,
+                               requireFocusedComposer: false,
+                               allowImageSendDialog: true,
+                               _cancellation.Token);
             if (baseline is null)
             {
                 return LineNativeDropRegistrationResult
@@ -420,7 +467,7 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
                 nativeDrop: true);
             _diagnostic?.Invoke(
                 "line-drop-candidate",
-                $"registered={registered} files={imagePaths.Length} images={images.Count} confirmation=explicit-send-and-new-message");
+                $"registered={registered} files={imagePaths.Length} images={images.Count} confirmation=explicit-send-and-new-message preDropBaseline={preDropBaseline is not null}");
             return registered
                 ? LineNativeDropRegistrationResult.Registered
                 : LineNativeDropRegistrationResult.Duplicate;
@@ -450,6 +497,35 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
         catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested)
         {
+        }
+    }
+
+    internal async Task<LineAccessibilitySnapshot?>
+        TryCaptureNativeDropBaselineAsync(
+            LineDropTarget target,
+            DateTimeOffset occurredAt)
+    {
+        if (_paused || !_validator.TryValidate(
+                target,
+                _native.GetClipboardSequenceNumber(),
+                occurredAt,
+                out var context))
+        {
+            return null;
+        }
+
+        try
+        {
+            return await _accessibility.TryCaptureAsync(
+                context,
+                requireFocusedComposer: false,
+                allowImageSendDialog: false,
+                _cancellation.Token);
+        }
+        catch (OperationCanceledException)
+            when (_cancellation.IsCancellationRequested)
+        {
+            return null;
         }
     }
 

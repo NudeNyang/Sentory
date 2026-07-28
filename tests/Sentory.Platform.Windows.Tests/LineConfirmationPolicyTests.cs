@@ -181,4 +181,72 @@ public sealed class LineConfirmationPolicyTests
                 new LineAccessibleMessage("two", string.Empty)
             ]));
     }
+
+    [Fact]
+    public void ExistingMessagesCanAnchorBaselineWhenSelectionPanelIsUnavailable()
+    {
+        Assert.True(LineConversationMatchPolicy.CanCreateBaseline(
+            identityAvailable: false,
+            messageCount: 2));
+        Assert.False(LineConversationMatchPolicy.CanCreateBaseline(
+            identityAvailable: false,
+            messageCount: 0));
+    }
+
+    [Fact]
+    public void MissingBaselineIdentityStillRequiresExistingMessageOverlap()
+    {
+        var baseline = new LineAccessibilitySnapshot(
+            string.Empty,
+            new HashSet<string>(["one", "two"]),
+            ImageSendDialogFocused: true);
+
+        Assert.True(LineConversationMatchPolicy.IsSameConversation(
+            baseline,
+            "chat-a",
+            [new LineAccessibleMessage("two", string.Empty)]));
+        Assert.False(LineConversationMatchPolicy.IsSameConversation(
+            baseline,
+            "chat-b",
+            [new LineAccessibleMessage("three", string.Empty)]));
+    }
+
+    [Fact]
+    public void ConversationChangeRequiresTwoAvailableDistinctIdentities()
+    {
+        var identified = new LineAccessibilitySnapshot(
+            "chat-a",
+            new HashSet<string>(["one"]));
+        var fallback = new LineAccessibilitySnapshot(
+            string.Empty,
+            new HashSet<string>(["one"]));
+
+        Assert.True(LineConversationMatchPolicy.HasConversationChanged(
+            identified,
+            "chat-b"));
+        Assert.False(LineConversationMatchPolicy.HasConversationChanged(
+            identified,
+            string.Empty));
+        Assert.False(LineConversationMatchPolicy.HasConversationChanged(
+            fallback,
+            "chat-b"));
+    }
+
+    [Theory]
+    [InlineData(760, 650, true)]
+    [InlineData(510, 650, true)]
+    [InlineData(490, 650, false)]
+    [InlineData(760, 500, false)]
+    public void ImageDialogSendPolicyUsesLowerRightButtonArea(
+        int x,
+        int y,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            LineImageDialogSendButtonPolicy.IsWithin(
+                new WindowBounds(0, 0, 1000, 800),
+                x,
+                y));
+    }
 }

@@ -26,6 +26,7 @@ internal sealed class LinePointerSendVerifier : ILinePointerSendVerifier
             var current = AutomationElement.FromPoint(
                 new System.Windows.Point(screenX, screenY));
             var walker = TreeWalker.RawViewWalker;
+            AutomationElement? imageDialog = null;
             for (var depth = 0;
                  current is not null && depth < 12;
                  depth++)
@@ -43,6 +44,15 @@ internal sealed class LinePointerSendVerifier : ILinePointerSendVerifier
                     return true;
                 }
 
+                if (string.Equals(
+                        current.Current.ClassName,
+                        "AlertWindow",
+                        StringComparison.Ordinal))
+                {
+                    imageDialog = current;
+                    break;
+                }
+
                 if (Equals(current, root))
                 {
                     break;
@@ -50,16 +60,44 @@ internal sealed class LinePointerSendVerifier : ILinePointerSendVerifier
 
                 current = walker.GetParent(current);
             }
+
+            if (imageDialog is not null)
+            {
+                var bounds = imageDialog.Current.BoundingRectangle;
+                return LineImageDialogSendButtonPolicy.IsWithin(
+                    new WindowBounds(
+                        checked((int)bounds.Left),
+                        checked((int)bounds.Top),
+                        checked((int)bounds.Right),
+                        checked((int)bounds.Bottom)),
+                    screenX,
+                    screenY);
+            }
         }
         catch (Exception exception)
             when (exception is ElementNotAvailableException or
                   InvalidOperationException or
-                  ArgumentException)
+                  ArgumentException or
+                  OverflowException)
         {
         }
 
         return false;
     }
+}
+
+internal static class LineImageDialogSendButtonPolicy
+{
+    public static bool IsWithin(
+        WindowBounds bounds,
+        int screenX,
+        int screenY) =>
+        bounds.Width >= 240 &&
+        bounds.Height >= 180 &&
+        screenX >= bounds.Left + bounds.Width * 0.5 &&
+        screenX < bounds.Right &&
+        screenY >= bounds.Top + bounds.Height * 0.65 &&
+        screenY < bounds.Bottom;
 }
 
 internal sealed record LineAccessibilitySnapshot(
@@ -273,12 +311,19 @@ internal static class LineConversationIdentityPolicy
 
 internal static class LineConversationMatchPolicy
 {
+    public static bool CanCreateBaseline(
+        bool identityAvailable,
+        int messageCount) =>
+        identityAvailable ||
+        messageCount > 0;
+
     public static bool IsSameConversation(
         LineAccessibilitySnapshot baseline,
         string currentIdentity,
         IReadOnlyCollection<LineAccessibleMessage> currentMessages)
     {
-        if (!string.Equals(
+        if (!string.IsNullOrEmpty(baseline.ConversationIdentity) &&
+            !string.Equals(
                 baseline.ConversationIdentity,
                 currentIdentity,
                 StringComparison.Ordinal))
@@ -288,7 +333,7 @@ internal static class LineConversationMatchPolicy
 
         if (baseline.MessageIds.Count == 0)
         {
-            return true;
+            return !string.IsNullOrEmpty(baseline.ConversationIdentity);
         }
 
         var requiredOverlap = 1;
@@ -296,6 +341,16 @@ internal static class LineConversationMatchPolicy
                    baseline.MessageIds.Contains(message.Id)) >=
                requiredOverlap;
     }
+
+    public static bool HasConversationChanged(
+        LineAccessibilitySnapshot baseline,
+        string currentIdentity) =>
+        !string.IsNullOrEmpty(baseline.ConversationIdentity) &&
+        !string.IsNullOrEmpty(currentIdentity) &&
+        !string.Equals(
+            baseline.ConversationIdentity,
+            currentIdentity,
+            StringComparison.Ordinal);
 }
 
 internal sealed class LineAccessibilityClient(
@@ -348,13 +403,15 @@ internal sealed class LineAccessibilityClient(
                 var list = messageView is null
                     ? null
                     : FindMessageList(messageView);
-                if (conversationPanel is not null &&
-                    list is not null &&
-                    TryCreateConversationIdentity(
-                        conversationPanel,
-                        out var identity))
+                if (list is not null)
                 {
                     var messages = ReadMessages(list);
+                    var identity = conversationPanel is not null &&
+                                   TryCreateConversationIdentity(
+                                       conversationPanel,
+                                       out var selectedIdentity)
+                        ? selectedIdentity
+                        : string.Empty;
                     if (LineConversationMatchPolicy.IsSameConversation(
                             request.Baseline,
                             identity,
@@ -392,7 +449,9 @@ internal sealed class LineAccessibilityClient(
                                 ]);
                         }
                     }
-                    else
+                    else if (LineConversationMatchPolicy.HasConversationChanged(
+                                 request.Baseline,
+                                 identity))
                     {
                         diagnostic?.Invoke(
                             "line-candidate-cancelled",
@@ -439,25 +498,23 @@ internal sealed class LineAccessibilityClient(
             var conversationPanel = FindConversationPanel(root);
             var messageView = FindMessageView(root);
             var composer = FindComposer(root);
-            var focus = requireFocusedComposer
+            var focus = requireFocusedComposer || allowImageSendDialog
                 ? CaptureComposerFocus(root, composer)
                 : null;
-            if (conversationPanel is null ||
-                messageView is null ||
+            if (messageView is null ||
                 composer is null ||
-                (focus is { IsUsable: false } &&
+                (requireFocusedComposer &&
+                 focus is { IsUsable: false } &&
                  (!allowImageSendDialog ||
                   !focus.IsImageSendDialogUsable)))
             {
                 diagnostic?.Invoke(
                     "line-context-rejected",
-                    conversationPanel is null
-                        ? "reason=conversation-panel-unavailable"
-                        : messageView is null
-                            ? "reason=message-view-unavailable"
-                            : composer is null
-                                ? "reason=message-composer-unavailable"
-                                : CreateFocusDiagnostic(focus!));
+                    messageView is null
+                        ? "reason=message-view-unavailable"
+                        : composer is null
+                            ? "reason=message-composer-unavailable"
+                            : CreateFocusDiagnostic(focus!));
                 return null;
             }
 
@@ -470,25 +527,32 @@ internal sealed class LineAccessibilityClient(
                 return null;
             }
 
-            if (!TryCreateConversationIdentity(
-                    conversationPanel,
-                    out var conversationIdentity))
+            var messages = ReadMessages(list);
+            var selectedIdentity = string.Empty;
+            var identityAvailable = conversationPanel is not null &&
+                                    TryCreateConversationIdentity(
+                                        conversationPanel,
+                                        out selectedIdentity);
+            if (!LineConversationMatchPolicy.CanCreateBaseline(
+                    identityAvailable,
+                    messages.Count))
             {
                 diagnostic?.Invoke(
                     "line-context-rejected",
-                    "reason=selected-conversation-unavailable");
+                    conversationPanel is null
+                        ? $"reason=conversation-panel-unavailable messages={messages.Count} imageDialog={focus?.IsImageSendDialogUsable == true}"
+                        : "reason=selected-conversation-unavailable");
                 return null;
             }
 
-            var messages = ReadMessages(list);
             var snapshot = new LineAccessibilitySnapshot(
-                conversationIdentity,
+                identityAvailable ? selectedIdentity : string.Empty,
                 messages.Select(message => message.Id)
                     .ToHashSet(StringComparer.Ordinal),
                 focus?.IsImageSendDialogUsable == true);
             diagnostic?.Invoke(
                 "line-context-ready",
-                $"messages={snapshot.MessageIds.Count}");
+                $"messages={snapshot.MessageIds.Count} identity={identityAvailable} imageDialog={snapshot.ImageSendDialogFocused}");
             return snapshot;
         }
         catch (Exception exception)

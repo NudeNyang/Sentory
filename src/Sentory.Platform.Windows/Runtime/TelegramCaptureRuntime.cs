@@ -300,7 +300,19 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
         RegisterNativeDroppedFilesAsync(
             TelegramDropTarget target,
             IReadOnlyList<string> paths,
-            DateTimeOffset occurredAt)
+            DateTimeOffset occurredAt) =>
+        await RegisterNativeDroppedFilesAsync(
+            target,
+            paths,
+            occurredAt,
+            preDropSnapshot: null);
+
+    internal async Task<TelegramNativeDropRegistrationResult>
+        RegisterNativeDroppedFilesAsync(
+            TelegramDropTarget target,
+            IReadOnlyList<string> paths,
+            DateTimeOffset occurredAt,
+            TelegramVisualSnapshot? preDropSnapshot)
     {
         if (_paused)
         {
@@ -351,10 +363,11 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
                 null,
                 [],
                 images,
-                nativeDrop: true);
+                nativeDrop: true,
+                preDropSnapshot: preDropSnapshot);
             _diagnostic?.Invoke(
                 "telegram-drop-candidate",
-                $"registered={registered} files={imagePaths.Length} images={images.Count} confirmation=explicit-send-and-visual-change");
+                $"registered={registered} files={imagePaths.Length} images={images.Count} confirmation=explicit-send-or-pre-drop-visual-change preDropBaseline={preDropSnapshot is not null}");
             return registered
                 ? TelegramNativeDropRegistrationResult.Registered
                 : TelegramNativeDropRegistrationResult.Duplicate;
@@ -384,6 +397,34 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
         catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested)
         {
+        }
+    }
+
+    internal async Task<TelegramVisualSnapshot?>
+        TryCaptureNativeDropBaselineAsync(
+            TelegramDropTarget target,
+            DateTimeOffset occurredAt)
+    {
+        if (_paused || !_validator.TryValidate(
+                target,
+                _native.GetClipboardSequenceNumber(),
+                occurredAt,
+                out var context))
+        {
+            return null;
+        }
+
+        try
+        {
+            return await _visual.TryCaptureAsync(
+                context,
+                requireForeground: false,
+                _cancellation.Token);
+        }
+        catch (OperationCanceledException)
+            when (_cancellation.IsCancellationRequested)
+        {
+            return null;
         }
     }
 
@@ -444,7 +485,8 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
         string? clipboardText,
         IReadOnlyList<NormalizedUrl> urls,
         IReadOnlyList<ClipboardImageSnapshot> images,
-        bool nativeDrop)
+        bool nativeDrop,
+        TelegramVisualSnapshot? preDropSnapshot = null)
     {
         lock (_candidateGate)
         {
@@ -480,6 +522,7 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
                 candidateUrls,
                 candidateImages,
                 nativeDrop,
+                preDropSnapshot,
                 cancellation);
             _candidates.Add(registration);
             if (_recentSendSignals.CanApply(
@@ -507,7 +550,8 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
                 new TelegramVisualConfirmationRequest(
                     registration.Context,
                     registration.Baseline,
-                    TimeSpan.FromMinutes(2)),
+                    TimeSpan.FromMinutes(2),
+                    registration.PreDropSnapshot),
                 registration.IsSendObserved,
                 registration.Cancellation.Token);
             if (!response.Confirmed || _paused)
@@ -671,6 +715,7 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
         IReadOnlyList<NormalizedUrl> urls,
         IReadOnlyList<ClipboardImageSnapshot> images,
         bool nativeDrop,
+        TelegramVisualSnapshot? preDropSnapshot,
         CancellationTokenSource cancellation)
     {
         private int _sendObserved;
@@ -681,6 +726,8 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
         public IReadOnlyList<NormalizedUrl> Urls { get; } = urls;
         public IReadOnlyList<ClipboardImageSnapshot> Images { get; } = images;
         public bool NativeDrop { get; } = nativeDrop;
+        public TelegramVisualSnapshot? PreDropSnapshot { get; } =
+            preDropSnapshot;
         public CancellationTokenSource Cancellation { get; } = cancellation;
         public Task Task { get; set; } = Task.CompletedTask;
 

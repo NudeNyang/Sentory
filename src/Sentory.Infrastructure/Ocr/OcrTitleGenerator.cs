@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -18,6 +19,12 @@ public static class OcrTitleGenerator
     private static readonly Regex GeneratedFileNamePattern = new(
         @"^(?:img|dsc|dscn|pxl|mvimg|screenshot|screen[\s_-]*shot|capture|photo|image|download|kakaotalk|discord)[\s_-]*\d[\d\s_.-]*$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    private static readonly Regex SeparatedDateStampPattern = new(
+        @"(?<!\d)(?<year>(?:19|20|21)\d{2})(?<separator>[-_.])(?<month>0[1-9]|1[0-2])\k<separator>(?<day>0[1-9]|[12]\d|3[01])(?!\d)",
+        RegexOptions.CultureInvariant);
+    private static readonly Regex CompactDateStampPattern = new(
+        @"(?<!\d)(?<year>(?:19|20|21)\d{2})(?<month>0[1-9]|1[0-2])(?<day>0[1-9]|[12]\d|3[01])(?!\d)",
+        RegexOptions.CultureInvariant);
 
     public static string? CreateFileNameCandidate(string? fileName)
     {
@@ -27,7 +34,10 @@ public static class OcrTitleGenerator
         }
 
         var baseName = Path.GetFileNameWithoutExtension(fileName);
-        return CreateCandidate(baseName);
+        var candidate = CreateCandidate(baseName);
+        return candidate ?? (HasClearDateStamp(baseName)
+            ? Normalize(baseName)
+            : null);
     }
 
     public static string? CreateBestDisplayTitle(
@@ -48,7 +58,8 @@ public static class OcrTitleGenerator
 
         var baseName = Path.GetFileNameWithoutExtension(
             originalFileName ?? string.Empty);
-        return GeneratedFileNamePattern.IsMatch(baseName)
+        return GeneratedFileNamePattern.IsMatch(baseName) &&
+               !HasClearDateStamp(baseName)
             ? ocrTitle
             : fileTitle;
     }
@@ -210,5 +221,30 @@ public static class OcrTitleGenerator
             .Replace("_", string.Empty, StringComparison.Ordinal)
             .Replace(" ", string.Empty, StringComparison.Ordinal);
         return compact.Length >= 16 && compact.All(Uri.IsHexDigit);
+    }
+
+    private static bool HasClearDateStamp(string value) =>
+        HasValidDate(SeparatedDateStampPattern, value) ||
+        HasValidDate(CompactDateStampPattern, value);
+
+    private static bool HasValidDate(Regex pattern, string value)
+    {
+        foreach (Match match in pattern.Matches(value))
+        {
+            var date = string.Create(
+                CultureInfo.InvariantCulture,
+                $"{match.Groups["year"].Value}-{match.Groups["month"].Value}-{match.Groups["day"].Value}");
+            if (DateOnly.TryParseExact(
+                    date,
+                    "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out _))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

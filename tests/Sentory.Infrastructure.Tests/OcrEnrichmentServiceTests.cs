@@ -68,8 +68,6 @@ public sealed class OcrEnrichmentServiceTests : IDisposable
     }
 
     [Theory]
-    [InlineData("IMG_20250128_230256.png")]
-    [InlineData("Screenshot_2025-01-28-230256.png")]
     [InlineData("image_001.png")]
     public void GeneratedFileNameYieldsToMeaningfulOcr(string fileName)
     {
@@ -78,6 +76,33 @@ public sealed class OcrEnrichmentServiceTests : IDisposable
             OcrTitleGenerator.CreateBestDisplayTitle(
                 fileName,
                 "프로젝트 일정"));
+    }
+
+    [Theory]
+    [InlineData("2025-07-14 01.53.43.png", "2025-07-14 01.53.43")]
+    [InlineData("2025-02-29 01.53.43.png", null)]
+    public void DateOnlyFileNameMustContainAValidCalendarDate(
+        string fileName,
+        string? expected)
+    {
+        Assert.Equal(
+            expected,
+            OcrTitleGenerator.CreateFileNameCandidate(fileName));
+    }
+
+    [Theory]
+    [InlineData("IMG_20250128_230256.png", "IMG_20250128_230256")]
+    [InlineData("Screenshot_2025-01-28-230256.png", "Screenshot_2025-01-28-230256")]
+    [InlineData("2025-08-18 03.38.48.png", "2025-08-18 03.38.48")]
+    public void ClearDateFileNameTakesPriorityOverRecognizedTitle(
+        string fileName,
+        string expected)
+    {
+        Assert.Equal(
+            expected,
+            OcrTitleGenerator.CreateBestDisplayTitle(
+                fileName,
+                "{applicationVRCX,version1}"));
     }
 
     [Fact]
