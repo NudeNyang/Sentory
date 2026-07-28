@@ -19,6 +19,7 @@ public sealed class WeChatDropOverlayRuntime : IDisposable
     private readonly Action<string, string>? _diagnostic;
     private readonly DispatcherTimer _timer;
     private readonly WeChatPassiveDropState _dropState = new();
+    private readonly WeChatDropPointerHistory _pointerHistory = new();
     private readonly RecentExplorerDragOrigin _dragOrigin =
         new(ExplorerOriginMaximumAge);
     private bool _started;
@@ -103,6 +104,8 @@ public sealed class WeChatDropOverlayRuntime : IDisposable
             BeginPossibleExplorerDrag(cursor);
         }
 
+        _pointerHistory.ObserveDown(cursor);
+
         if (_dropState.IsTracking)
         {
             _dropState.Observe(
@@ -162,18 +165,33 @@ public sealed class WeChatDropOverlayRuntime : IDisposable
         if (!_dropState.IsTracking)
         {
             _releaseTargetGraceFrames = 0;
+            _pointerHistory.Reset();
             return;
         }
 
-        _dropState.Observe(
-            cursor,
-            _locator.FindAt(cursor.X, cursor.Y, requireTopmost: true));
-        if (_dropState.TryTakeCompleted(out var target, out var paths))
+        var releaseCursor = _pointerHistory.ResolveRelease(cursor);
+        var releaseTarget = _locator.FindReleaseAt(
+            releaseCursor.X,
+            releaseCursor.Y);
+        if (releaseTarget is null && releaseCursor != cursor)
+        {
+            releaseCursor = cursor;
+            releaseTarget = _locator.FindReleaseAt(cursor.X, cursor.Y);
+        }
+
+        _dropState.Observe(releaseCursor, releaseTarget);
+        if (_dropState.TryTakeCompleted(
+                out var completedTarget,
+                out var paths))
         {
             var releasedAt = _releasedAt;
             _releaseTargetGraceFrames = 0;
             _releasedAt = default;
-            _ = RegisterPassiveDropAsync(target, paths, releasedAt);
+            _pointerHistory.Reset();
+            _ = RegisterPassiveDropAsync(
+                completedTarget,
+                paths,
+                releasedAt);
             return;
         }
 
@@ -181,6 +199,7 @@ public sealed class WeChatDropOverlayRuntime : IDisposable
         if (_releaseTargetGraceFrames == 0)
         {
             _dropState.Reset();
+            _pointerHistory.Reset();
             _diagnostic?.Invoke(
                 "wechat-drop-cancelled",
                 "reason=release-target-unavailable");
@@ -230,6 +249,7 @@ public sealed class WeChatDropOverlayRuntime : IDisposable
         _releaseTargetGraceFrames = 0;
         _releasedAt = default;
         _dropState.Reset();
+        _pointerHistory.Reset();
     }
 
     public void Dispose()

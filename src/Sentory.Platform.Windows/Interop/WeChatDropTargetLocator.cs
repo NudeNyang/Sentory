@@ -7,7 +7,25 @@ public sealed class WeChatDropTargetLocator(
     public WeChatDropTarget? FindAt(
         int cursorX,
         int cursorY,
-        bool requireTopmost = false)
+        bool requireTopmost = false) =>
+        FindAt(
+            cursorX,
+            cursorY,
+            requireTopmost,
+            allowForegroundFallback: false);
+
+    public WeChatDropTarget? FindReleaseAt(int cursorX, int cursorY) =>
+        FindAt(
+            cursorX,
+            cursorY,
+            requireTopmost: true,
+            allowForegroundFallback: true);
+
+    private WeChatDropTarget? FindAt(
+        int cursorX,
+        int cursorY,
+        bool requireTopmost,
+        bool allowForegroundFallback)
     {
         foreach (var root in dropWindows.EnumerateTopLevelWindows())
         {
@@ -41,7 +59,9 @@ public sealed class WeChatDropTargetLocator(
                     root,
                     processId,
                     cursorX,
-                    cursorY))
+                    cursorY) &&
+                !(allowForegroundFallback &&
+                  IsForegroundWeChatSurface(root, processId)))
             {
                 continue;
             }
@@ -50,6 +70,19 @@ public sealed class WeChatDropTargetLocator(
         }
 
         return null;
+    }
+
+    private bool IsForegroundWeChatSurface(
+        nint mainWindow,
+        uint weChatProcessId)
+    {
+        var foregroundRoot = native.GetRootWindow(
+            native.GetForegroundWindow());
+        return foregroundRoot == mainWindow ||
+               (foregroundRoot != nint.Zero &&
+                native.GetProcessId(foregroundRoot) == weChatProcessId &&
+                WeChatContextValidator.IsSupportedProcessName(
+                    native.GetProcessName(weChatProcessId)));
     }
 
     private bool IsTopmostOrWeChatOwnedSurface(

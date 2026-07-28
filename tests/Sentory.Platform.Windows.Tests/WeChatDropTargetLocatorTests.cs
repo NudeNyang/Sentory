@@ -37,14 +37,42 @@ public sealed class WeChatDropTargetLocatorTests
         Assert.Equal(native.Main, target.MainWindow);
     }
 
+    [Fact]
+    public void ReleaseAcceptsForegroundWeChatBehindTransientDragSurface()
+    {
+        var native = new FakeNative { HasTransientDragSurface = true };
+        var locator = new WeChatDropTargetLocator(native, native);
+
+        var target = locator.FindReleaseAt(450, 300);
+
+        Assert.NotNull(target);
+        Assert.Equal(native.Main, target.MainWindow);
+    }
+
+    [Fact]
+    public void ReleaseRejectsTransientSurfaceWhenWeChatIsNotForeground()
+    {
+        var native = new FakeNative
+        {
+            HasTransientDragSurface = true,
+            IsForegroundOtherApp = true
+        };
+        var locator = new WeChatDropTargetLocator(native, native);
+
+        Assert.Null(locator.FindReleaseAt(450, 300));
+    }
+
     private sealed class FakeNative : INativeWindowApi, IKakaoDropWindowApi
     {
         public nint Main { get; } = new(20);
         public uint ProcessId { get; } = 84;
         public bool IsOccluded { get; set; }
         public bool HasWeChatDragSurface { get; set; }
+        public bool HasTransientDragSurface { get; set; }
+        public bool IsForegroundOtherApp { get; set; }
 
-        public nint GetForegroundWindow() => Main;
+        public nint GetForegroundWindow() =>
+            IsForegroundOtherApp ? new nint(99) : Main;
         public nint GetFocusedWindow(nint foregroundWindow) => nint.Zero;
         public nint GetRootWindow(nint window) =>
             window == new nint(98) || window == new nint(99)
@@ -75,9 +103,11 @@ public sealed class WeChatDropTargetLocatorTests
         public nint GetWindowAtPoint(int x, int y) =>
             IsOccluded
                 ? new nint(99)
-                : HasWeChatDragSurface
-                    ? new nint(98)
-                    : Main;
+                : HasTransientDragSurface
+                    ? new nint(99)
+                    : HasWeChatDragSurface
+                        ? new nint(98)
+                        : Main;
         public bool IsLeftMouseButtonDown() => false;
         public bool IsEscapeKeyDown() => false;
         public bool PositionTopmostWindow(

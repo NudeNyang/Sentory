@@ -11,6 +11,15 @@ public sealed class WeChatPassiveDropStateTests
         new WindowBounds(300, 120, 940, 820));
 
     [Fact]
+    public void ReleaseUsesLastPositionObservedWhileMouseWasDown()
+    {
+        var history = new WeChatDropPointerHistory();
+        history.ObserveDown((450, 300));
+
+        Assert.Equal((450, 300), history.ResolveRelease((900, 900)));
+    }
+
+    [Fact]
     public void KeepsRecentTargetAcrossSingleReleaseFrameGap()
     {
         var state = new WeChatPassiveDropState();
