@@ -43,6 +43,44 @@ git status --short
 .\scripts\Publish-Portable.ps1 -Runtime win-x64 -BuildFlavor Developer
 ```
 
+### QA VM 개발자판 자동 배포
+
+다음 사용자 환경 변수를 모두 설정한 개발 PC에서는 x64 `Developer` 포터블을
+게시할 때 QA VM도 같은 실행 파일로 자동 갱신한다.
+
+```text
+SENTORY_QA_VM_NAME
+SENTORY_QA_VM_USERNAME
+SENTORY_QA_VM_PASSWORD_FILE
+SENTORY_QA_VM_TARGET
+```
+
+`SENTORY_QA_VM_PASSWORD_FILE`에는 비밀번호 자체가 아니라 로컬 비밀번호 파일
+경로만 넣는다. 네 값 가운데 일부만 설정됐거나 VM이 꺼져 있거나 실행 중인
+Sentory가 정상 종료 완료 신호를 보내지 않으면 게시를 실패시킨다. VM을 의도적으로
+갱신하지 않을 때만 `-SkipQaVmDeployment`를 명시한다.
+
+자동 배포는 후보 실행 파일이 `+developers`인지와 자체 설치 점검 결과를 먼저
+확인한다. 실행 중 앱에는 `Global\Sentory.Desktop.Shutdown` 신호를 보내고 종료
+완료를 최대 30초 기다린 뒤 기존 실행 파일을 시각이 붙은 `.backup-*` 파일로
+보존한다. 교체 뒤에는 현재 로그인한 VM 사용자의 임시 예약 작업으로 앱을 다시
+열고, 전역 종료 신호와 호스트·게스트 SHA-256이 일치하는지 확인한 다음 예약
+작업을 삭제한다.
+
+전역 종료 신호를 지원하지 않는 구형 개발자판을 처음 올릴 때만 VM 트레이 메뉴에서
+앱을 완전히 종료하고 아래처럼 1회 이행한다. 이후 배포에는 이 옵션을 사용하지
+않아야 실행 중 앱을 놓치는 사고가 실패로 드러난다.
+
+```powershell
+.\scripts\Deploy-DeveloperBuildToVm.ps1 `
+    -Executable <개발자판-Sentory.exe> `
+    -VmName <VM-이름> `
+    -VmUsername <VM-사용자> `
+    -VmPasswordFile <로컬-비밀번호-파일> `
+    -GuestTargetPath <VM-Sentory.exe-경로> `
+    -AllowStoppedInstance
+```
+
 공개판을 수동으로 만들 때도 `-BuildFlavor Public`을 반드시 명시한다. 정식
 릴리스에서는 수동 호출 대신 `Publish-Release.ps1`을 사용한다.
 

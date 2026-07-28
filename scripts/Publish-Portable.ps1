@@ -6,7 +6,8 @@ param(
     [string]$Runtime = "win-x64",
     [ValidateSet("Developer", "Public")]
     [string]$BuildFlavor = "Developer",
-    [string]$OutputRoot = "artifacts"
+    [string]$OutputRoot = "artifacts",
+    [switch]$SkipQaVmDeployment
 )
 
 $ErrorActionPreference = "Stop"
@@ -182,6 +183,34 @@ try {
                 "루트 Sentory.exe가 실행 중이어서 교체하지 못했습니다. " +
                 "배포 패키지 생성은 계속합니다.")
         }
+    }
+
+    $qaVmSettings = @(
+        $env:SENTORY_QA_VM_NAME,
+        $env:SENTORY_QA_VM_USERNAME,
+        $env:SENTORY_QA_VM_PASSWORD_FILE,
+        $env:SENTORY_QA_VM_TARGET)
+    $qaVmConfigured = $qaVmSettings.Where(
+        { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0
+    if ($Runtime -eq "win-x64" -and
+        $BuildFlavor -eq "Developer" -and
+        -not $SkipQaVmDeployment -and
+        $qaVmConfigured) {
+        if ($qaVmSettings.Where(
+                { [string]::IsNullOrWhiteSpace($_) }).Count -gt 0) {
+            throw (
+                "QA VM 자동 배포 환경 변수가 일부만 설정되었습니다. " +
+                "SENTORY_QA_VM_NAME, SENTORY_QA_VM_USERNAME, " +
+                "SENTORY_QA_VM_PASSWORD_FILE, SENTORY_QA_VM_TARGET을 " +
+                "모두 설정하세요.")
+        }
+
+        & (Join-Path $PSScriptRoot "Deploy-DeveloperBuildToVm.ps1") `
+            -Executable $stagedExecutable `
+            -VmName $env:SENTORY_QA_VM_NAME `
+            -VmUsername $env:SENTORY_QA_VM_USERNAME `
+            -VmPasswordFile $env:SENTORY_QA_VM_PASSWORD_FILE `
+            -GuestTargetPath $env:SENTORY_QA_VM_TARGET
     }
 
     Compress-Archive `

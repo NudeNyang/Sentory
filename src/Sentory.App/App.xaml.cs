@@ -23,6 +23,10 @@ public partial class App : System.Windows.Application
         "Local\\Sentory.Desktop.Singleton";
     private const string OpenGalleryEventName =
         "Local\\Sentory.Desktop.OpenGallery";
+    private const string ShutdownEventName =
+        "Global\\Sentory.Desktop.Shutdown";
+    private const string ShutdownCompletedEventName =
+        "Global\\Sentory.Desktop.ShutdownCompleted";
     private const string InstallationVerificationArgument =
         "--verify-installation";
 
@@ -33,6 +37,9 @@ public partial class App : System.Windows.Application
     private bool _ownsMutex;
     private EventWaitHandle? _openGalleryEvent;
     private RegisteredWaitHandle? _openGalleryRegistration;
+    private EventWaitHandle? _shutdownEvent;
+    private EventWaitHandle? _shutdownCompletedEvent;
+    private RegisteredWaitHandle? _shutdownRegistration;
     private Forms.NotifyIcon? _trayIcon;
     private Icon? _trayIconImage;
     private TrayMenuWindow? _trayMenuWindow;
@@ -139,6 +146,13 @@ public partial class App : System.Windows.Application
             initialSettings.Language);
         _statusText = SentoryLocalization.Text("Starting");
         _diagnosticsLog = new SentoryDiagnosticsLog(_paths);
+        if (AppInstanceCommandPolicy.IsShutdownRequest(e.Args))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Shutdown(RequestShutdownFromRunningInstance() ? 0 : 1);
+            return;
+        }
+
         var isInstallationVerification = e.Args.Contains(
             InstallationVerificationArgument,
             StringComparer.OrdinalIgnoreCase);
@@ -189,6 +203,7 @@ public partial class App : System.Windows.Application
             }
 
             RegisterGalleryOpenSignal();
+            RegisterShutdownSignal();
         }
 
         DisplayNamedImageFile.CleanupOldCopies(TimeSpan.FromDays(7));
@@ -779,6 +794,69 @@ public partial class App : System.Windows.Application
                 using var signal = EventWaitHandle.OpenExisting(
                     OpenGalleryEventName);
                 return signal.Set();
+            }
+            catch (WaitHandleCannotBeOpenedException)
+            {
+                Thread.Sleep(50);
+            }
+        }
+
+        return false;
+    }
+
+    private void RegisterShutdownSignal()
+    {
+        _shutdownEvent = new EventWaitHandle(
+            false,
+            EventResetMode.AutoReset,
+            ShutdownEventName);
+        _shutdownCompletedEvent = new EventWaitHandle(
+            false,
+            EventResetMode.ManualReset,
+            ShutdownCompletedEventName);
+        _shutdownRegistration = ThreadPool.RegisterWaitForSingleObject(
+            _shutdownEvent,
+            (_, timedOut) =>
+            {
+                if (timedOut || _shuttingDown)
+                {
+                    return;
+                }
+
+                Dispatcher.BeginInvoke(async () =>
+                {
+                    if (_shuttingDown)
+                    {
+                        return;
+                    }
+
+                    await ShutdownRuntimeAsync();
+                    _shutdownCompletedEvent?.Set();
+                    Shutdown();
+                });
+            },
+            null,
+            Timeout.Infinite,
+            executeOnlyOnce: false);
+    }
+
+    private static bool RequestShutdownFromRunningInstance()
+    {
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            try
+            {
+                using var signal = EventWaitHandle.OpenExisting(
+                    ShutdownEventName);
+                using var completed = EventWaitHandle.OpenExisting(
+                    ShutdownCompletedEventName);
+                completed.Reset();
+                if (!signal.Set())
+                {
+                    return false;
+                }
+
+                return completed.WaitOne(TimeSpan.FromSeconds(30));
             }
             catch (WaitHandleCannotBeOpenedException)
             {
@@ -2386,6 +2464,12 @@ public partial class App : System.Windows.Application
         _openGalleryRegistration = null;
         _openGalleryEvent?.Dispose();
         _openGalleryEvent = null;
+        _shutdownRegistration?.Unregister(null);
+        _shutdownRegistration = null;
+        _shutdownEvent?.Dispose();
+        _shutdownEvent = null;
+        _shutdownCompletedEvent?.Dispose();
+        _shutdownCompletedEvent = null;
         _maintenanceCancellation.Dispose();
         _linkPreviewWakeSignal.Dispose();
         _ocrWakeSignal.Dispose();
