@@ -309,6 +309,77 @@ public sealed class LocalFolderSyncIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task DeletedStoreRebuildPreservesDeletionMadeBeforeRecovery()
+    {
+        var replica = await CreateReplicaAsync("deleted-store-change-source");
+        var destination = await CreateReplicaAsync(
+            "deleted-store-change-destination");
+        var sharedFolder = Path.Combine(
+            _root,
+            "shared-deleted-store-change");
+        var settingsStore = new SentorySettingsStore(replica.Paths);
+        var destinationSettingsStore = new SentorySettingsStore(
+            destination.Paths);
+        settingsStore.Save(new SentorySettings
+        {
+            SyncEnabled = true,
+            SyncFolderPath = sharedFolder,
+            SyncDeviceId = replica.Journal.DeviceId,
+            SyncStorageVersion = SentorySettings.CurrentSyncStorageVersion
+        });
+        destinationSettingsStore.Save(new SentorySettings
+        {
+            SyncEnabled = true,
+            SyncFolderPath = sharedFolder,
+            SyncDeviceId = destination.Journal.DeviceId,
+            SyncStorageVersion = SentorySettings.CurrentSyncStorageVersion
+        });
+        var deletedImage = await CaptureImageAsync(replica, 101);
+        var runtime = new LocalFolderSyncRuntimeService(
+            replica.Paths,
+            replica.Captures,
+            settingsStore);
+        var destinationRuntime = new LocalFolderSyncRuntimeService(
+            destination.Paths,
+            destination.Captures,
+            destinationSettingsStore);
+
+        await runtime.RunOnceAsync(replica.Journal.DeviceId, sharedFolder);
+        await destinationRuntime.RunOnceAsync(
+            destination.Journal.DeviceId,
+            sharedFolder);
+        Assert.Single(await destination.Captures.GetRecentAsync(10));
+
+        Directory.Delete(sharedFolder, recursive: true);
+        Assert.True(await replica.Captures.DeleteItemAsync(
+            deletedImage.ItemId));
+        var addedImage = await CaptureImageAsync(replica, 102);
+
+        var rebuilt = await runtime.RunOnceAsync(
+            replica.Journal.DeviceId,
+            sharedFolder);
+        var received = await destinationRuntime.RunOnceAsync(
+            destination.Journal.DeviceId,
+            sharedFolder);
+        await runtime.RunOnceAsync(
+            settingsStore.Load().SyncDeviceId!,
+            sharedFolder);
+        await destinationRuntime.RunOnceAsync(
+            destinationSettingsStore.Load().SyncDeviceId!,
+            sharedFolder);
+
+        Assert.True(rebuilt.StoreReset);
+        Assert.True(received.StoreReset);
+        Assert.Equal(
+            addedImage.ItemId,
+            Assert.Single(await replica.Captures.GetRecentAsync(10)).ItemId);
+        Assert.Equal(
+            addedImage.ItemId,
+            Assert.Single(
+                await destination.Captures.GetRecentAsync(10)).ItemId);
+    }
+
+    [Fact]
     public async Task AutomaticRuntimeRepairsDeletedPublishedPhoto()
     {
         var replica = await CreateReplicaAsync("deleted-photo-source");

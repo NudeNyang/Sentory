@@ -2783,6 +2783,7 @@ public partial class GalleryWindow : Window
             {
                 _allItems.Remove(item);
                 ApplyFilter();
+                ItemMetadataChanged?.Invoke(this, EventArgs.Empty);
                 ShowFeedback(SentoryLocalization.Text("Deleted"));
             }
         }

@@ -426,6 +426,46 @@ public sealed class SqliteSyncOperationJournalTests : IDisposable
                 await resetJournal.GetUnpublishedAsync(10)).Sequence);
     }
 
+    [Fact]
+    public async Task ChangingStoreKeepsPayloadForDeletionBeforeReexport()
+    {
+        var replica = await CreateReplicaAsync("reset-delete-before-reexport");
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/delete-during-reset",
+            out var normalized));
+        var captured = await replica.Captures.UpsertUrlAsync(
+            new UrlCaptureRequest(
+                Guid.NewGuid(),
+                normalized.Original,
+                normalized,
+                SourceApp.Discord,
+                CaptureMethod.DiscordConfirmedSend,
+                DeliveryStatus.Confirmed,
+                "context",
+                DateTimeOffset.UtcNow,
+                ["url-match"]));
+        var exporter = new SyncItemExportService(
+            replica.Journal,
+            new InMemorySyncObjectStore(),
+            replica.Paths);
+        Assert.Equal(1, (await exporter.ExportPendingAsync(10)).Exported);
+        var newDeviceId = SyncDeviceIdentity.Create();
+
+        await SqliteSyncOperationJournal.ResetForNewStoreAsync(
+            replica.Paths,
+            newDeviceId);
+        Assert.True(await replica.Captures.DeleteItemAsync(captured.ItemId));
+        var resetJournal = new SqliteSyncOperationJournal(
+            replica.Paths,
+            newDeviceId);
+
+        var deletion = Assert.Single(
+            await resetJournal.GetUnpublishedAsync(10));
+        Assert.Equal(SyncOperationKind.Delete, deletion.Kind);
+        Assert.Equal(newDeviceId, deletion.DeviceId);
+        Assert.Equal(1, deletion.Sequence);
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();

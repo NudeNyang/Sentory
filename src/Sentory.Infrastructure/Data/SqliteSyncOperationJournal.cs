@@ -152,32 +152,130 @@ public sealed class SqliteSyncOperationJournal :
             Cache = SqliteCacheMode.Shared,
             Pooling = true
         }.ToString();
-        await using (var connection = new SqliteConnection(
-                         connectionString))
+        await using var connection = new SqliteConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using (var busyTimeout = connection.CreateCommand())
         {
-            await connection.OpenAsync(cancellationToken);
-            await using var command = connection.CreateCommand();
-            command.CommandText =
-                """
-                PRAGMA busy_timeout = 5000;
-
-                DROP TABLE IF EXISTS sync_item_exports;
-                DROP TABLE IF EXISTS sync_item_metadata_exports;
-                DROP TABLE IF EXISTS sync_item_copy_components;
-                DROP TABLE IF EXISTS sync_item_favorite_clock;
-                DROP TABLE IF EXISTS sync_metadata_applied;
-                DROP TABLE IF EXISTS sync_auto_favorite_clock;
-                DROP TABLE IF EXISTS sync_checkpoints;
-                DROP TABLE IF EXISTS sync_operations;
-                DROP TABLE IF EXISTS sync_replica_state;
-                """;
-            await command.ExecuteNonQueryAsync(cancellationToken);
+            busyTimeout.CommandText = "PRAGMA busy_timeout = 5000;";
+            await busyTimeout.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        var journal = new SqliteSyncOperationJournal(
-            paths,
-            newDeviceId);
-        await journal.InitializeAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(
+            cancellationToken);
+        IReadOnlyList<SyncOperation> preservedOperations;
+        await using (var readOperations = connection.CreateCommand())
+        {
+            readOperations.Transaction = (SqliteTransaction)transaction;
+            readOperations.CommandText =
+                """
+                SELECT format_version, encryption_mode, operation_id,
+                       device_id, sequence, item_id, kind, occurred_at,
+                       payload_sha256, payload
+                FROM sync_operations
+                WHERE kind IN ($upsertKind, $deleteKind)
+                ORDER BY julianday(occurred_at), device_id, sequence;
+                """;
+            readOperations.Parameters.AddWithValue(
+                "$upsertKind",
+                SyncOperationKind.Upsert.ToString());
+            readOperations.Parameters.AddWithValue(
+                "$deleteKind",
+                SyncOperationKind.Delete.ToString());
+            preservedOperations = await ReadOperationsAsync(
+                readOperations,
+                cancellationToken);
+        }
+
+        var preservedDeletions = preservedOperations
+            .Where(operation => operation.Kind == SyncOperationKind.Delete)
+            .ToArray();
+        var preservedUpserts = preservedOperations
+            .Where(operation => operation.Kind == SyncOperationKind.Upsert)
+            .GroupBy(operation => operation.ItemId)
+            .Select(group => group
+                .OrderByDescending(operation => operation.OccurredAt)
+                .ThenByDescending(operation => operation.Sequence)
+                .First())
+            .OrderBy(operation => operation.OccurredAt)
+            .ThenBy(operation => operation.ItemId)
+            .ToArray();
+
+        await using (var clearState = connection.CreateCommand())
+        {
+            clearState.Transaction = (SqliteTransaction)transaction;
+            clearState.CommandText =
+                """
+                DELETE FROM sync_item_exports;
+                DELETE FROM sync_item_metadata_exports;
+                DELETE FROM sync_item_copy_components;
+                DELETE FROM sync_item_favorite_clock;
+                DELETE FROM sync_metadata_applied;
+                DELETE FROM sync_auto_favorite_clock;
+                DELETE FROM sync_checkpoints;
+                DELETE FROM sync_operations;
+                DELETE FROM sync_replica_state;
+                """;
+            await clearState.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using (var initializeState = connection.CreateCommand())
+        {
+            initializeState.Transaction = (SqliteTransaction)transaction;
+            initializeState.CommandText =
+                """
+                INSERT INTO sync_replica_state (
+                    singleton_id,
+                    device_id,
+                    next_sequence
+                ) VALUES (1, $deviceId, $nextSequence);
+                """;
+            initializeState.Parameters.AddWithValue("$deviceId", newDeviceId);
+            initializeState.Parameters.AddWithValue(
+                "$nextSequence",
+                preservedDeletions.LongLength + 1L);
+            await initializeState.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        long sequence = 1;
+        foreach (var deletion in preservedDeletions)
+        {
+            var requeuedDeletion = SyncOperation.Create(
+                newDeviceId,
+                sequence++,
+                deletion.ItemId,
+                SyncOperationKind.Delete,
+                deletion.OccurredAt,
+                deletion.Payload);
+            await InsertOperationAsync(
+                connection,
+                transaction,
+                requeuedDeletion,
+                isPublished: false,
+                receivedAt: null,
+                cancellationToken);
+        }
+
+        var historyDeviceId = SyncDeviceIdentity.Create();
+        sequence = 1;
+        foreach (var upsert in preservedUpserts)
+        {
+            var retainedUpsert = SyncOperation.Create(
+                historyDeviceId,
+                sequence++,
+                upsert.ItemId,
+                SyncOperationKind.Upsert,
+                upsert.OccurredAt,
+                upsert.Payload);
+            await InsertOperationAsync(
+                connection,
+                transaction,
+                retainedUpsert,
+                isPublished: true,
+                receivedAt: null,
+                cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task InitializeAsync(
