@@ -970,11 +970,11 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
     }
 
     [Theory]
-    [InlineData("ko-KR", "ko-KR")]
+    [InlineData("ko-KR", "auto")]
     [InlineData("en-us", "en-US")]
     [InlineData("ja-JP", "ja-JP")]
     [InlineData("zh-CN", "zh-CN")]
-    [InlineData("fr-FR", "ko-KR")]
+    [InlineData("fr-FR", "auto")]
     public void SettingsStoreNormalizesSupportedLanguage(
         string savedLanguage,
         string expectedLanguage)

@@ -14,6 +14,8 @@ public enum SentoryThemeMode
 
 public sealed class SentorySettings
 {
+    public const string AutomaticLanguage = "auto";
+    public const int CurrentLanguageSettingVersion = 1;
     public const int CurrentSyncStorageVersion = 2;
     public const bool DefaultAutoFavoriteEnabled = true;
     public const int DefaultAutoFavoriteCopyThreshold = 3;
@@ -22,7 +24,7 @@ public sealed class SentorySettings
 
     private static readonly int[] SupportedCleanupDays = [0, 7, 30, 90, 180];
     private static readonly string[] SupportedLanguages =
-        ["ko-KR", "en-US", "ja-JP", "zh-CN"];
+        [AutomaticLanguage, "ko-KR", "en-US", "ja-JP", "zh-CN"];
 
     public string SortMode { get; set; } = "Newest";
 
@@ -34,7 +36,9 @@ public sealed class SentorySettings
 
     public string? ThemeMode { get; set; }
 
-    public string Language { get; set; } = "ko-KR";
+    public string Language { get; set; } = AutomaticLanguage;
+
+    public int LanguageSettingVersion { get; set; }
 
     public bool DiscordSupportEnabled { get; set; } = true;
 
@@ -90,11 +94,24 @@ public sealed class SentorySettings
     {
         ThemeMode = ResolveThemeMode(ThemeMode, IsDarkTheme).ToString();
 
+        if (LanguageSettingVersion < CurrentLanguageSettingVersion)
+        {
+            if (string.Equals(
+                    Language,
+                    "ko-KR",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                Language = AutomaticLanguage;
+            }
+
+            LanguageSettingVersion = CurrentLanguageSettingVersion;
+        }
+
         if (!SupportedLanguages.Contains(
                 Language,
                 StringComparer.OrdinalIgnoreCase))
         {
-            Language = "ko-KR";
+            Language = AutomaticLanguage;
         }
         else
         {

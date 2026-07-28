@@ -6,6 +6,50 @@ namespace Sentory.Infrastructure.Tests;
 public sealed class SentorySettingsTests
 {
     [Fact]
+    public void LanguageDefaultsToAutomatic()
+    {
+        var settings = new SentorySettings();
+
+        Assert.Equal(
+            SentorySettings.AutomaticLanguage,
+            settings.Language);
+    }
+
+    [Fact]
+    public void MigratesLegacyKoreanLanguageDefaultToAutomatic()
+    {
+        var settings = new SentorySettings
+        {
+            Language = "ko-KR",
+            LanguageSettingVersion = 0
+        };
+
+        settings.Normalize();
+
+        Assert.Equal(
+            SentorySettings.AutomaticLanguage,
+            settings.Language);
+        Assert.Equal(
+            SentorySettings.CurrentLanguageSettingVersion,
+            settings.LanguageSettingVersion);
+    }
+
+    [Fact]
+    public void PreservesExplicitKoreanLanguageSelection()
+    {
+        var settings = new SentorySettings
+        {
+            Language = "ko-KR",
+            LanguageSettingVersion =
+                SentorySettings.CurrentLanguageSettingVersion
+        };
+
+        settings.Normalize();
+
+        Assert.Equal("ko-KR", settings.Language);
+    }
+
+    [Fact]
     public void AutoFavoriteDefaultsToEnabledAtThreeCopies()
     {
         var settings = new SentorySettings();

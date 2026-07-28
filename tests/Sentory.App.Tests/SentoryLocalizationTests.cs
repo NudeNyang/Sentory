@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 
 namespace Sentory.App.Tests;
@@ -195,5 +196,40 @@ public sealed class SentoryLocalizationTests
         Assert.Contains("Sentory.LICENSE.txt", resourceNames);
         Assert.Contains("Sentory.THIRD-PARTY-NOTICES.txt", resourceNames);
         Assert.Contains("Sentory.MODEL-PROVENANCE.md", resourceNames);
+    }
+
+    [Theory]
+    [InlineData("ko-KR", "ko-KR")]
+    [InlineData("en-GB", "en-US")]
+    [InlineData("ja-JP", "ja-JP")]
+    [InlineData("zh-TW", "zh-CN")]
+    [InlineData("fr-FR", "en-US")]
+    public void AutomaticLanguageFollowsSupportedSystemLanguage(
+        string systemLanguage,
+        string expected)
+    {
+        var actual = SentoryLocalization.ResolveLanguage(
+            SentoryLocalization.AutomaticLanguage,
+            CultureInfo.GetCultureInfo(systemLanguage));
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Theory]
+    [InlineData("ko-KR", "자동")]
+    [InlineData("en-US", "Auto")]
+    [InlineData("ja-JP", "自動")]
+    [InlineData("zh-CN", "自动")]
+    public void AutomaticOptionIsFirstAndLocalized(
+        string displayLanguage,
+        string expectedLabel)
+    {
+        var options = SentoryLocalization.GetLanguageOptions(
+            displayLanguage);
+
+        Assert.Equal(
+            SentoryLocalization.AutomaticLanguage,
+            options[0].Code);
+        Assert.Equal(expectedLabel, options[0].Label);
     }
 }

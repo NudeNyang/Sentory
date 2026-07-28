@@ -283,21 +283,8 @@
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource MutedTextBrush}" />
                 <Border Style="{StaticResource SettingCardStyle}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="1" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="33" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="33" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
-                        <Grid Margin="0,0,16,0">
+                    <StackPanel>
+                        <Grid>
                             <StackPanel>
                                 <TextBlock Text="Discord"
                                            FontSize="13"
@@ -322,10 +309,11 @@
                             </StackPanel>
                         </Grid>
 
-                        <Border Grid.Column="1"
+                        <Border Height="1"
+                                Margin="0,16"
                                 Background="{DynamicResource LineBrush}" />
 
-                        <Grid Grid.Column="2" Margin="16,0,0,0">
+                        <Grid>
                             <StackPanel>
                                 <TextBlock Text="{DynamicResource Loc.KakaoTalk}"
                                            FontSize="13"
@@ -343,13 +331,11 @@
                                     Click="KakaoSupportToggleButton_Click" />
                         </Grid>
 
-                        <Border Grid.Row="1"
-                                Grid.ColumnSpan="3"
-                                Height="1"
-                                VerticalAlignment="Center"
+                        <Border Height="1"
+                                Margin="0,16"
                                 Background="{DynamicResource LineBrush}" />
 
-                        <Grid Grid.Row="2" Margin="0,0,16,0">
+                        <Grid>
                             <StackPanel>
                                 <TextBlock Text="Slack"
                                            FontSize="13"
@@ -367,11 +353,11 @@
                                     Click="SlackSupportToggleButton_Click" />
                         </Grid>
 
-                        <Border Grid.Row="2"
-                                Grid.Column="1"
+                        <Border Height="1"
+                                Margin="0,16"
                                 Background="{DynamicResource LineBrush}" />
 
-                        <Grid Grid.Row="2" Grid.Column="2" Margin="16,0,0,0">
+                        <Grid>
                             <StackPanel>
                                 <TextBlock Text="WhatsApp"
                                            FontSize="13"
@@ -389,13 +375,11 @@
                                     Click="WhatsAppSupportToggleButton_Click" />
                         </Grid>
 
-                        <Border Grid.Row="3"
-                                Grid.ColumnSpan="3"
-                                Height="1"
-                                VerticalAlignment="Center"
+                        <Border Height="1"
+                                Margin="0,16"
                                 Background="{DynamicResource LineBrush}" />
 
-                        <Grid Grid.Row="4" Margin="0,0,16,0">
+                        <Grid>
                             <StackPanel>
                                 <TextBlock Text="LINE"
                                            FontSize="13"
@@ -412,7 +396,7 @@
                                     Style="{StaticResource ActionButtonStyle}"
                                     Click="LineSupportToggleButton_Click" />
                         </Grid>
-                    </Grid>
+                    </StackPanel>
                 </Border>
 
                 <TextBlock Text="{DynamicResource Loc.ComputerSync}"

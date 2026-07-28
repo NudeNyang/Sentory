@@ -5,16 +5,18 @@ namespace Sentory.App;
 
 internal static class SentoryLocalization
 {
-    public const string DefaultLanguage = "ko-KR";
+    public const string AutomaticLanguage = "auto";
+
+    private const string FallbackLanguage = "en-US";
 
     private static readonly string[] SupportedLanguages =
-        [DefaultLanguage, "en-US", "ja-JP", "zh-CN"];
+        ["ko-KR", "en-US", "ja-JP", "zh-CN"];
 
     private static readonly IReadOnlyDictionary<string, LocalizedText> Texts =
         CreateTexts();
 
     public static string CurrentLanguage { get; private set; } =
-        DefaultLanguage;
+        ResolveLanguage(AutomaticLanguage, CultureInfo.CurrentUICulture);
 
     public static CultureInfo Culture =>
         CultureInfo.GetCultureInfo(CurrentLanguage);
@@ -26,7 +28,9 @@ internal static class SentoryLocalization
     }
 
     public static void SetLanguage(string? language) =>
-        CurrentLanguage = NormalizeLanguage(language);
+        CurrentLanguage = ResolveLanguage(
+            language,
+            CultureInfo.CurrentUICulture);
 
     public static void ApplyCurrent(ResourceDictionary resources)
     {
@@ -55,12 +59,53 @@ internal static class SentoryLocalization
         };
 
     public static string NormalizeLanguage(string? language) =>
-        SupportedLanguages.FirstOrDefault(value =>
-            string.Equals(value, language, StringComparison.OrdinalIgnoreCase))
-        ?? DefaultLanguage;
+        ResolveLanguage(language, CultureInfo.CurrentUICulture);
+
+    internal static string ResolveLanguage(
+        string? language,
+        CultureInfo systemCulture)
+    {
+        ArgumentNullException.ThrowIfNull(systemCulture);
+        var explicitLanguage = SupportedLanguages.FirstOrDefault(value =>
+            string.Equals(
+                value,
+                language,
+                StringComparison.OrdinalIgnoreCase));
+        if (explicitLanguage is not null)
+        {
+            return explicitLanguage;
+        }
+
+        if (!string.Equals(
+                language,
+                AutomaticLanguage,
+                StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(language))
+        {
+            return FallbackLanguage;
+        }
+
+        return systemCulture.TwoLetterISOLanguageName.ToLowerInvariant() switch
+        {
+            "ko" => "ko-KR",
+            "ja" => "ja-JP",
+            "zh" => "zh-CN",
+            "en" => "en-US",
+            _ => FallbackLanguage
+        };
+    }
 
     public static IReadOnlyList<LanguageOption> GetLanguageOptions() =>
+        GetLanguageOptions(CurrentLanguage);
+
+    internal static IReadOnlyList<LanguageOption> GetLanguageOptions(
+        string displayLanguage) =>
     [
+        new(
+            AutomaticLanguage,
+            Texts["Automatic"].Get(ResolveLanguage(
+                displayLanguage,
+                CultureInfo.CurrentUICulture))),
         new("ko-KR", "한국어"),
         new("en-US", "English"),
         new("ja-JP", "日本語"),
@@ -79,6 +124,7 @@ internal static class SentoryLocalization
             L("ScreenThemeDescription", "라이트 모드와 다크 모드를 선택합니다", "Choose light or dark mode", "ライトモードとダークモードを選択します", "选择浅色或深色模式"),
             L("Language", "Language", "Language", "Language", "Language"),
             L("LanguageDescription", "화면에 표시할 언어를 선택합니다", "Choose the display language", "表示する言語を選択します", "选择界面显示语言"),
+            L("Automatic", "자동", "Auto", "自動", "自动"),
             L("LightMode", "라이트 모드", "Light mode", "ライトモード", "浅色模式"),
             L("DarkMode", "다크 모드", "Dark mode", "ダークモード", "深色模式"),
             L("SystemTheme", "시스템 테마", "System theme", "システムテーマ", "系统主题"),
