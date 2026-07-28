@@ -89,7 +89,7 @@ public sealed class LineConfirmationPolicyTests
     }
 
     [Fact]
-    public void AcceptsNewMessageWhenLineHidesItsTextValue()
+    public void AcceptsHiddenMessageTextAfterComposerUrlWasVerified()
     {
         Assert.True(UrlNormalizer.TryNormalize(
             "https://example.com/path",
@@ -97,7 +97,21 @@ public sealed class LineConfirmationPolicyTests
 
         Assert.True(LineMessageMatchPolicy.HasMatchingSendEvidence(
             string.Empty,
-            [url]));
+            [url],
+            preSendComposerMatched: true));
+    }
+
+    [Fact]
+    public void RejectsHiddenMessageTextWithoutComposerUrlEvidence()
+    {
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/path",
+            out var url));
+
+        Assert.False(LineMessageMatchPolicy.HasMatchingSendEvidence(
+            string.Empty,
+            [url],
+            preSendComposerMatched: false));
     }
 
     [Fact]
@@ -109,6 +123,25 @@ public sealed class LineConfirmationPolicyTests
 
         Assert.False(LineMessageMatchPolicy.HasMatchingSendEvidence(
             "https://example.net/path",
+            [url],
+            preSendComposerMatched: true));
+    }
+
+    [Fact]
+    public void ComposerEvidenceRequiresOriginalUrlToRemainBeforeSend()
+    {
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/path",
+            out var url));
+
+        Assert.True(LineMessageMatchPolicy.HasMatchingComposerEvidence(
+            "https://example.com/path",
+            [url]));
+        Assert.False(LineMessageMatchPolicy.HasMatchingComposerEvidence(
+            "다른 메시지",
+            [url]));
+        Assert.False(LineMessageMatchPolicy.HasMatchingComposerEvidence(
+            string.Empty,
             [url]));
     }
 

@@ -27,6 +27,7 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
     private readonly StaClipboardReader _clipboardReader;
     private readonly ILineAccessibilityClient _accessibility;
     private readonly ILinePointerSendVerifier _pointerSendVerifier;
+    private readonly ILineComposerTextReader _composerTextReader;
     private readonly CaptureCoordinator _coordinator;
     private readonly Action<string, string>? _diagnostic;
     private readonly Channel<PasteTrigger> _triggers =
@@ -62,6 +63,7 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
         _clipboardReader = new StaClipboardReader(native);
         _accessibility = new LineAccessibilityClient(diagnostic);
         _pointerSendVerifier = new LinePointerSendVerifier();
+        _composerTextReader = new LineComposerTextReader();
         _coordinator = new CaptureCoordinator(repository);
         _diagnostic = diagnostic;
     }
@@ -119,20 +121,26 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
 
         if (_validator.TryValidate(trigger, out var context))
         {
+            var composer = _composerTextReader.Read(
+                context.MainWindow,
+                context.ProcessId);
             lock (_candidateGate)
             {
                 _recentSendSignals.Observe(
                     context.ContextHash,
-                    context.OccurredAt);
+                    context.OccurredAt,
+                    composer.IsAvailable ? composer.Text : null);
                 _recentSendSignals.ObserveProcess(
                     context.ProcessId,
-                    context.OccurredAt);
+                    context.OccurredAt,
+                    composer.IsAvailable ? composer.Text : null);
             }
 
             var exactObserved = MarkSendObserved(
                 context.MainWindow,
                 context.OccurredAt,
-                "keyboard");
+                "keyboard",
+                composer);
             if (exactObserved == 0)
             {
                 _diagnostic?.Invoke(
@@ -143,17 +151,27 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
             return;
         }
 
+        var fallbackRoot = _native.GetRootWindow(trigger.ForegroundWindow);
+        var fallbackComposer = fallbackRoot == nint.Zero
+            ? new LineComposerTextSnapshot(false, string.Empty)
+            : _composerTextReader.Read(
+                fallbackRoot,
+                trigger.ForegroundProcessId);
         lock (_candidateGate)
         {
             _recentSendSignals.ObserveProcess(
                 trigger.ForegroundProcessId,
-                trigger.OccurredAt);
+                trigger.OccurredAt,
+                fallbackComposer.IsAvailable
+                    ? fallbackComposer.Text
+                    : null);
         }
 
         var fallbackObserved = MarkSendObservedByProcess(
             trigger.ForegroundProcessId,
             trigger.OccurredAt,
-            "keyboard-fallback");
+            "keyboard-fallback",
+            fallbackComposer);
         if (fallbackObserved == 0)
         {
             _diagnostic?.Invoke(
@@ -200,29 +218,37 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
             return;
         }
 
+        var composer = _composerTextReader.Read(
+            root,
+            trigger.ForegroundProcessId);
+
         lock (_candidateGate)
         {
             if (hasContext)
             {
                 _recentSendSignals.Observe(
                     context.ContextHash,
-                    trigger.OccurredAt);
+                    trigger.OccurredAt,
+                    composer.IsAvailable ? composer.Text : null);
             }
 
             _recentSendSignals.ObserveProcess(
                 trigger.ForegroundProcessId,
-                trigger.OccurredAt);
+                trigger.OccurredAt,
+                composer.IsAvailable ? composer.Text : null);
         }
 
         var observed = hasContext
             ? MarkSendObserved(
                 root,
                 trigger.OccurredAt,
-                "pointer")
+                "pointer",
+                composer)
             : MarkSendObservedByProcess(
                 trigger.ForegroundProcessId,
                 trigger.OccurredAt,
-                "pointer-fallback");
+                "pointer-fallback",
+                composer);
         if (observed == 0)
         {
             _diagnostic?.Invoke(
@@ -234,9 +260,11 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
     private int MarkSendObserved(
         nint mainWindow,
         DateTimeOffset occurredAt,
-        string inputKind)
+        string inputKind,
+        LineComposerTextSnapshot composer)
     {
         var observed = 0;
+        var rejected = 0;
         lock (_candidateGate)
         {
             foreach (var candidate in _candidates.Where(candidate =>
@@ -244,12 +272,20 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
                          candidate.Context.OccurredAt <= occurredAt &&
                          !candidate.Cancellation.IsCancellationRequested))
             {
+                if (!CanApplySendEvidence(candidate, composer))
+                {
+                    rejected++;
+                    continue;
+                }
+
                 if (candidate.MarkSendObserved())
                 {
                     observed++;
                 }
             }
         }
+
+        ReportRejectedSendEvidence(inputKind, rejected, composer.IsAvailable);
 
         if (observed > 0)
         {
@@ -264,9 +300,11 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
     private int MarkSendObservedByProcess(
         uint processId,
         DateTimeOffset occurredAt,
-        string inputKind)
+        string inputKind,
+        LineComposerTextSnapshot composer)
     {
         var observed = 0;
+        var rejected = 0;
         lock (_candidateGate)
         {
             foreach (var candidate in _candidates.Where(candidate =>
@@ -274,12 +312,20 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
                          candidate.Context.OccurredAt <= occurredAt &&
                          !candidate.Cancellation.IsCancellationRequested))
             {
+                if (!CanApplySendEvidence(candidate, composer))
+                {
+                    rejected++;
+                    continue;
+                }
+
                 if (candidate.MarkSendObserved())
                 {
                     observed++;
                 }
             }
         }
+
+        ReportRejectedSendEvidence(inputKind, rejected, composer.IsAvailable);
 
         if (observed > 0)
         {
@@ -289,6 +335,30 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
         }
 
         return observed;
+    }
+
+    private static bool CanApplySendEvidence(
+        CandidateRegistration candidate,
+        LineComposerTextSnapshot composer) =>
+        candidate.Urls.Count == 0 ||
+        (composer.IsAvailable &&
+         LineMessageMatchPolicy.HasMatchingComposerEvidence(
+             composer.Text,
+             candidate.Urls));
+
+    private void ReportRejectedSendEvidence(
+        string inputKind,
+        int rejected,
+        bool composerAvailable)
+    {
+        if (rejected == 0)
+        {
+            return;
+        }
+
+        _diagnostic?.Invoke(
+            "line-send-input-rejected",
+            $"reason=composer-url-mismatch kind={inputKind} candidates={rejected} composerAvailable={composerAvailable}");
     }
 
     public async Task<LineNativeDropRegistrationResult>
@@ -511,7 +581,9 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
                     context.ContextHash,
                     context.ProcessId,
                     context.OccurredAt,
-                    DateTimeOffset.UtcNow))
+                    DateTimeOffset.UtcNow,
+                    candidateUrls,
+                    candidateImages.Count > 0))
             {
                 registration.MarkSendObserved();
                 _diagnostic?.Invoke(

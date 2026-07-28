@@ -101,10 +101,19 @@ internal static class LineMessageMatchPolicy
 {
     public static bool HasMatchingSendEvidence(
         string messageText,
+        IReadOnlyList<NormalizedUrl> urls,
+        bool preSendComposerMatched) =>
+        urls.Count == 0 ||
+        (string.IsNullOrWhiteSpace(messageText)
+            ? preSendComposerMatched
+            : ContainsEveryUrl(messageText, urls));
+
+    public static bool HasMatchingComposerEvidence(
+        string composerText,
         IReadOnlyList<NormalizedUrl> urls) =>
         urls.Count == 0 ||
-        string.IsNullOrWhiteSpace(messageText) ||
-        ContainsEveryUrl(messageText, urls);
+        (!string.IsNullOrWhiteSpace(composerText) &&
+         ContainsEveryUrl(composerText, urls));
 
     public static bool ContainsEveryUrl(
         string messageText,
@@ -173,6 +182,77 @@ internal sealed record LineComposerFocusSnapshot(
     bool SameProcess,
     bool IsUsable,
     bool IsImageSendDialogUsable);
+
+internal readonly record struct LineComposerTextSnapshot(
+    bool IsAvailable,
+    string Text);
+
+internal interface ILineComposerTextReader
+{
+    LineComposerTextSnapshot Read(
+        nint mainWindow,
+        uint processId);
+}
+
+internal sealed class LineComposerTextReader : ILineComposerTextReader
+{
+    private static readonly PropertyCondition ComposerCondition = new(
+        AutomationElement.ClassNameProperty,
+        "AutoSuggestTextArea");
+
+    public LineComposerTextSnapshot Read(
+        nint mainWindow,
+        uint processId)
+    {
+        try
+        {
+            var root = AutomationElement.FromHandle(mainWindow);
+            var composer = root.FindFirst(
+                TreeScope.Descendants,
+                ComposerCondition);
+            if (composer is null ||
+                composer.Current.ProcessId != checked((int)processId))
+            {
+                return new LineComposerTextSnapshot(false, string.Empty);
+            }
+
+            var available = false;
+            var values = new List<string>();
+            if (composer.TryGetCurrentPattern(
+                    ValuePattern.Pattern,
+                    out var valueObject) &&
+                valueObject is ValuePattern valuePattern)
+            {
+                available = true;
+                values.Add(valuePattern.Current.Value ?? string.Empty);
+            }
+
+            if (composer.TryGetCurrentPattern(
+                    TextPattern.Pattern,
+                    out var textObject) &&
+                textObject is TextPattern textPattern)
+            {
+                available = true;
+                values.Add(textPattern.DocumentRange.GetText(-1) ??
+                           string.Empty);
+            }
+
+            values.Add(composer.Current.Name ?? string.Empty);
+            return new LineComposerTextSnapshot(
+                available,
+                values.FirstOrDefault(value =>
+                    !string.IsNullOrWhiteSpace(value)) ?? string.Empty);
+        }
+        catch (Exception exception)
+            when (exception is ElementNotAvailableException or
+                  InvalidOperationException or
+                  ArgumentException or
+                  OverflowException)
+        {
+            return new LineComposerTextSnapshot(false, string.Empty);
+        }
+    }
+}
 
 internal static class LineConversationIdentityPolicy
 {
@@ -284,10 +364,13 @@ internal sealed class LineAccessibilityClient(
                                      !request.Baseline.MessageIds.Contains(
                                          message.Id)))
                         {
-                            if (!explicitSendObserved() ||
+                            var preSendComposerMatched =
+                                explicitSendObserved();
+                            if (!preSendComposerMatched ||
                                 !LineMessageMatchPolicy.HasMatchingSendEvidence(
                                     message.Text,
-                                    request.Urls))
+                                    request.Urls,
+                                    preSendComposerMatched))
                             {
                                 continue;
                             }

@@ -1,3 +1,4 @@
+using Sentory.Core;
 using Sentory.Platform.Windows.Runtime;
 
 namespace Sentory.Platform.Windows.Tests;
@@ -85,5 +86,40 @@ public sealed class LineRecentSendSignalsTests
             99,
             droppedAt,
             droppedAt.AddMilliseconds(500)));
+    }
+
+    [Fact]
+    public void ReplaysUrlSendOnlyWhenComposerStillContainedCandidate()
+    {
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/path",
+            out var url));
+        var droppedAt = DateTimeOffset.UtcNow;
+
+        var matching = new LineRecentSendSignals();
+        matching.Observe(
+            "same-window",
+            droppedAt.AddMilliseconds(80),
+            "https://example.com/path");
+        Assert.True(matching.CanApply(
+            "same-window",
+            42,
+            droppedAt,
+            droppedAt.AddMilliseconds(500),
+            [url],
+            hasImages: false));
+
+        var deleted = new LineRecentSendSignals();
+        deleted.Observe(
+            "same-window",
+            droppedAt.AddMilliseconds(80),
+            "다른 메시지");
+        Assert.False(deleted.CanApply(
+            "same-window",
+            42,
+            droppedAt,
+            droppedAt.AddMilliseconds(500),
+            [url],
+            hasImages: false));
     }
 }
