@@ -6,7 +6,8 @@
   옆이 아니라 Discord·KakaoTalk·Slack·WhatsApp·Telegram·LINE·WeChat 이름
   바로 아래에 표시하고, 오른쪽에는 토글과 필요한 경우의 Discord 재연결 버튼만
   둔다. 테마 설명·선택 종료·즐겨찾기 동작·상세·빈 화면·오류·설정 결과 문구도
-  WPF `SentoryLocalization` 원문으로 통일했다.
+  WPF `SentoryLocalization` 원문으로 통일했다. 일반 창 너비에서 도구 모음 문구를
+  숨기던 Tauri 전용 축약도 제거해 `필터·정렬 최신순·선택·설정`을 WPF처럼 표시한다.
 - Tauri를 단일 인스턴스 트레이 앱으로 확장했다. 창 닫기는 감지 엔진을 종료하지
   않고 알림 영역으로 숨기며, 두 번째 실행과 트레이 더블클릭은 기존 창을 복원한다.
   트레이에서 감지 일시정지·Windows 자동 실행·Discord 자동 연결·재연결·데이터

@@ -703,13 +703,6 @@ body.selection-mode .favorite { display: none; }
   .app-header { padding-inline: 20px; }
   .header-actions { grid-template-columns: minmax(220px, 360px) 48px; }
   .search-box { width: 100%; }
-  .toolbar-button > span:not(.fluent):not(.filter-count) { display: none; }
-  .toolbar-button .chevron { display: none; }
-}
-
-@media (min-width: 901px) and (max-width: 1380px) {
-  .toolbar-button > span:not(.fluent):not(.filter-count) { display: none; }
-  .toolbar-button .chevron { display: none; }
 }
 
 @media (max-width: 620px) {
