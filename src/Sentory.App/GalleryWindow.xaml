@@ -858,6 +858,7 @@
               PreviewMouseLeftButtonDown="GallerySelectionSurface_PreviewMouseLeftButtonDown"
               PreviewMouseMove="GallerySelectionSurface_PreviewMouseMove"
               PreviewMouseLeftButtonUp="GallerySelectionSurface_PreviewMouseLeftButtonUp"
+              PreviewMouseWheel="GallerySelectionSurface_PreviewMouseWheel"
               LostMouseCapture="GallerySelectionSurface_LostMouseCapture"
               MouseLeave="GallerySelectionSurface_MouseLeave">
             <ScrollViewer x:Name="GalleryScrollViewer"

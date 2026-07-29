@@ -26,6 +26,8 @@ public partial class GalleryWindow : Window
     private const string SelectionCheckGlyph = "\uE73E";
     private const double ScrollIndicatorRevealDistance = 44;
     private const int ScrollIndicatorActiveMilliseconds = 1200;
+    private const int SelectionAutoScrollIntervalMilliseconds = 24;
+    private const int SelectionWheelPauseMilliseconds = 180;
 
     private readonly ICaptureRepository _repository;
     private readonly CopyUsageRecorder _copyUsageRecorder;
@@ -55,11 +57,15 @@ public partial class GalleryWindow : Window
     private SentoryThemeMode _themeMode;
     private bool _selectionMode;
     private Point? _selectionDragStart;
+    private Point? _selectionDragStartContent;
     private bool _selectionDragInProgress;
     private bool _selectionDragAdditive;
     private bool _selectionDragStartedOnItem;
     private readonly HashSet<Guid> _selectionDragBaseIds = [];
     private readonly HashSet<Guid> _selectionDragPreviewIds = [];
+    private readonly DispatcherTimer _selectionAutoScrollTimer;
+    private DateTime _selectionAutoScrollPausedUntilUtc;
+    private bool _selectionDragRefreshPending;
     private readonly DispatcherTimer _scrollIndicatorHideTimer;
     private bool _scrollIndicatorNear;
     private bool _scrollIndicatorActive;
@@ -139,12 +145,24 @@ public partial class GalleryWindow : Window
         };
         _scrollIndicatorHideTimer.Tick +=
             ScrollIndicatorHideTimer_Tick;
+        _selectionAutoScrollTimer = new DispatcherTimer(
+            DispatcherPriority.Input)
+        {
+            Interval = TimeSpan.FromMilliseconds(
+                SelectionAutoScrollIntervalMilliseconds)
+        };
+        _selectionAutoScrollTimer.Tick +=
+            SelectionAutoScrollTimer_Tick;
         Loaded += OnLoaded;
         SourceInitialized += (_, _) => ApplyTitleBarTheme();
         SystemEvents.UserPreferenceChanged +=
             SystemEvents_UserPreferenceChanged;
-        Closed += (_, _) => SystemEvents.UserPreferenceChanged -=
-            SystemEvents_UserPreferenceChanged;
+        Closed += (_, _) =>
+        {
+            _selectionAutoScrollTimer.Stop();
+            SystemEvents.UserPreferenceChanged -=
+                SystemEvents_UserPreferenceChanged;
+        };
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -1024,6 +1042,7 @@ public partial class GalleryWindow : Window
         }
 
         _selectionDragStart = e.GetPosition(GallerySelectionSurface);
+        _selectionDragStartContent = e.GetPosition(GalleryItems);
         _selectionDragInProgress = false;
         _selectionDragStartedOnItem =
             FindGalleryItemFromSource(
@@ -1070,10 +1089,14 @@ public partial class GalleryWindow : Window
             }
 
             DragSelectionRectangle.Visibility = Visibility.Visible;
+            _selectionAutoScrollPausedUntilUtc = DateTime.MinValue;
+            _selectionAutoScrollTimer.Start();
         }
 
-        UpdateDragSelectionRectangle(start, current);
-        UpdateDragSelectionPreview(CreateSelectionBounds(start, current));
+        UpdateSelectionDrag(
+            start,
+            current,
+            e.GetPosition(GalleryItems));
         e.Handled = true;
     }
 
@@ -1101,18 +1124,31 @@ public partial class GalleryWindow : Window
             return;
         }
 
-        var bounds = CreateSelectionBounds(
+        UpdateSelectionDrag(
             start,
-            e.GetPosition(GallerySelectionSurface));
-        UpdateDragSelectionRectangle(
-            start,
-            e.GetPosition(GallerySelectionSurface));
-        UpdateDragSelectionPreview(bounds);
+            e.GetPosition(GallerySelectionSurface),
+            e.GetPosition(GalleryItems));
         _selectedItemIds.Clear();
         _selectedItemIds.UnionWith(_selectionDragPreviewIds);
         EndSelectionDrag();
         e.Handled = true;
         RefreshSelectionState();
+    }
+
+    private void GallerySelectionSurface_PreviewMouseWheel(
+        object sender,
+        MouseWheelEventArgs e)
+    {
+        if (!_selectionDragInProgress || e.Delta == 0)
+        {
+            return;
+        }
+
+        _selectionAutoScrollPausedUntilUtc = DateTime.UtcNow.AddMilliseconds(
+            SelectionWheelPauseMilliseconds);
+        ScrollGalleryByWheel(e.Delta);
+        ScheduleSelectionDragRefresh();
+        e.Handled = true;
     }
 
     private void GallerySelectionSurface_LostMouseCapture(
@@ -1145,6 +1181,7 @@ public partial class GalleryWindow : Window
         if (Math.Abs(e.VerticalChange) > double.Epsilon)
         {
             ShowGalleryScrollIndicatorAfterScroll();
+            ScheduleSelectionDragRefresh();
         }
     }
 
@@ -1243,20 +1280,26 @@ public partial class GalleryWindow : Window
             return;
         }
 
+        ScrollGalleryByWheel(e.Delta);
+        e.Handled = true;
+    }
+
+    private void ScrollGalleryByWheel(int delta)
+    {
         var wheelLines = SystemParameters.WheelScrollLines;
-        if (wheelLines == 0)
+        if (wheelLines == 0 || delta == 0)
         {
             return;
         }
 
         var notches = Math.Max(
             1,
-            Math.Abs(e.Delta) / Mouse.MouseWheelDeltaForOneLine);
+            Math.Abs(delta) / Mouse.MouseWheelDeltaForOneLine);
         if (wheelLines < 0)
         {
             for (var index = 0; index < notches; index++)
             {
-                if (e.Delta > 0)
+                if (delta > 0)
                 {
                     GalleryScrollViewer.PageUp();
                 }
@@ -1265,24 +1308,22 @@ public partial class GalleryWindow : Window
                     GalleryScrollViewer.PageDown();
                 }
             }
-        }
-        else
-        {
-            var lineCount = notches * wheelLines;
-            for (var index = 0; index < lineCount; index++)
-            {
-                if (e.Delta > 0)
-                {
-                    GalleryScrollViewer.LineUp();
-                }
-                else
-                {
-                    GalleryScrollViewer.LineDown();
-                }
-            }
+
+            return;
         }
 
-        e.Handled = true;
+        var lineCount = notches * wheelLines;
+        for (var index = 0; index < lineCount; index++)
+        {
+            if (delta > 0)
+            {
+                GalleryScrollViewer.LineUp();
+            }
+            else
+            {
+                GalleryScrollViewer.LineDown();
+            }
+        }
     }
 
     private void ScrollIndicatorHideTimer_Tick(
@@ -1480,6 +1521,81 @@ public partial class GalleryWindow : Window
         UpdateGalleryScrollIndicatorVisibility();
     }
 
+    private void SelectionAutoScrollTimer_Tick(
+        object? sender,
+        EventArgs e)
+    {
+        if (!_selectionDragInProgress ||
+            Mouse.LeftButton != MouseButtonState.Pressed)
+        {
+            _selectionAutoScrollTimer.Stop();
+            return;
+        }
+
+        if (DateTime.UtcNow < _selectionAutoScrollPausedUntilUtc)
+        {
+            return;
+        }
+
+        var pointer = Mouse.GetPosition(GalleryScrollViewer);
+        var delta = GallerySelectionDragPolicy.CalculateAutoScrollDelta(
+            pointer.Y,
+            GalleryScrollViewer.ActualHeight,
+            GalleryScrollViewer.VerticalOffset,
+            GalleryScrollViewer.ScrollableHeight);
+        if (Math.Abs(delta) <= double.Epsilon)
+        {
+            return;
+        }
+
+        var nextOffset = Math.Clamp(
+            GalleryScrollViewer.VerticalOffset + delta,
+            0,
+            GalleryScrollViewer.ScrollableHeight);
+        GalleryScrollViewer.ScrollToVerticalOffset(nextOffset);
+        ScheduleSelectionDragRefresh();
+    }
+
+    private void ScheduleSelectionDragRefresh()
+    {
+        if (!_selectionDragInProgress || _selectionDragRefreshPending)
+        {
+            return;
+        }
+
+        _selectionDragRefreshPending = true;
+        _ = Dispatcher.BeginInvoke(
+            () =>
+            {
+                _selectionDragRefreshPending = false;
+                if (_selectionDragInProgress &&
+                    _selectionDragStart is Point start)
+                {
+                    UpdateSelectionDrag(
+                        start,
+                        Mouse.GetPosition(GallerySelectionSurface),
+                        Mouse.GetPosition(GalleryItems));
+                }
+            },
+            DispatcherPriority.Render);
+    }
+
+    private void UpdateSelectionDrag(
+        Point fallbackStart,
+        Point currentSurface,
+        Point currentContent)
+    {
+        var startContent = _selectionDragStartContent ?? fallbackStart;
+        var startSurface = _selectionDragStartContent is Point contentPoint
+            ? GalleryItems.TranslatePoint(
+                contentPoint,
+                GallerySelectionSurface)
+            : fallbackStart;
+        UpdateDragSelectionRectangle(startSurface, currentSurface);
+        UpdateDragSelectionPreview(
+            CreateSelectionBounds(startContent, currentContent));
+    }
+
     private void UpdateDragSelectionRectangle(Point start, Point current)
     {
         var bounds = CreateSelectionBounds(start, current);
@@ -1501,21 +1617,38 @@ public partial class GalleryWindow : Window
             _selectionDragPreviewIds.UnionWith(_selectionDragBaseIds);
         }
 
-        foreach (var item in _visibleItems)
+        var panel = FindVisualDescendant<VirtualizingCenteredWrapPanel>(
+            GalleryItems);
+        if (panel is not null &&
+            panel.CurrentLayout.ItemCount == _visibleItems.Count)
         {
-            if (GalleryItems.ItemContainerGenerator.ContainerFromItem(item)
-                    is not FrameworkElement container)
+            foreach (var index in GallerySelectionDragPolicy
+                         .FindIntersectingItemIndices(
+                             panel.CurrentLayout,
+                             selectionBounds))
             {
-                continue;
+                _selectionDragPreviewIds.Add(
+                    _visibleItems[index].Item.ItemId);
             }
-
-            var topLeft = container.TranslatePoint(
-                new Point(0, 0),
-                GallerySelectionSurface);
-            var itemBounds = new Rect(topLeft, container.RenderSize);
-            if (selectionBounds.IntersectsWith(itemBounds))
+        }
+        else
+        {
+            foreach (var item in _visibleItems)
             {
-                _selectionDragPreviewIds.Add(item.Item.ItemId);
+                if (GalleryItems.ItemContainerGenerator.ContainerFromItem(item)
+                        is not FrameworkElement container)
+                {
+                    continue;
+                }
+
+                var topLeft = container.TranslatePoint(
+                    new Point(0, 0),
+                    GalleryItems);
+                var itemBounds = new Rect(topLeft, container.RenderSize);
+                if (selectionBounds.IntersectsWith(itemBounds))
+                {
+                    _selectionDragPreviewIds.Add(item.Item.ItemId);
+                }
             }
         }
 
@@ -1631,7 +1764,9 @@ public partial class GalleryWindow : Window
     private void EndSelectionDrag()
     {
         ClearDragSelectionPreviewVisuals();
+        _selectionAutoScrollTimer.Stop();
         _selectionDragStart = null;
+        _selectionDragStartContent = null;
         _selectionDragInProgress = false;
         _selectionDragAdditive = false;
         _selectionDragStartedOnItem = false;
