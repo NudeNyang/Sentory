@@ -7,7 +7,8 @@ using System.Security.Cryptography;
 namespace Sentory.Infrastructure.Data;
 
 public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
-    : ICaptureRepository, IGalleryPageRepository, IImageOcrRepository,
+    : ICaptureRepository, IGalleryPageRepository, IGalleryItemRepository,
+      IImageOcrRepository,
       ISyncItemDeletionRepository
 {
     private const int CurrentSchemaVersion = 7;
@@ -838,6 +839,53 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         }
 
         return new GalleryPageResult(total, results);
+    }
+
+    public async Task<CapturedItemSummary?> GetGalleryItemAsync(
+        Guid itemId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT id, kind, original_url, normalized_key, domain,
+                   last_source_app, last_capture_method, delivery_status,
+                   capture_count, share_count, created_at, last_captured_at,
+                   content_path, items.content_hash, is_favorite, copy_count,
+                   last_copied_at, page_title, page_description,
+                   site_icon_path, preview_image_path, preview_status,
+                   preview_fetched_at, mime_type,
+                   (SELECT GROUP_CONCAT(DISTINCT source_app)
+                    FROM capture_events
+                    WHERE item_id = items.id) AS source_apps,
+                   image_ocr.display_name, image_ocr.recognized_text,
+                   image_ocr.status, image_ocr.language,
+                   image_width, image_height
+            FROM items
+            LEFT JOIN image_ocr
+              ON image_ocr.content_hash = lower(items.content_hash)
+            WHERE items.id = $itemId
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$itemId", itemId.ToString());
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        var item = ReadCapturedItemSummary(reader);
+        if (item.Kind != ContentKind.Collection)
+        {
+            return item;
+        }
+        await reader.DisposeAsync();
+        var members = await ReadCollectionMembersAsync(
+            connection,
+            [itemId],
+            cancellationToken);
+        return item with { Members = members.GetValueOrDefault(itemId, []) };
     }
 
     private static string ConfigureGalleryQuery(

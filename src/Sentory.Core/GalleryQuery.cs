@@ -43,6 +43,13 @@ public interface IGalleryPageRepository
         CancellationToken cancellationToken = default);
 }
 
+public interface IGalleryItemRepository
+{
+    Task<CapturedItemSummary?> GetGalleryItemAsync(
+        Guid itemId,
+        CancellationToken cancellationToken = default);
+}
+
 public static class GalleryQuery
 {
     public static IReadOnlyList<CapturedItemSummary> Apply(

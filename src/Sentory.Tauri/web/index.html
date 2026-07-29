@@ -105,7 +105,56 @@
         <div id="scroll-indicator" class="scroll-indicator" aria-hidden="true">
           <div class="scroll-indicator-thumb"></div>
         </div>
+        <div id="selection-rectangle" class="selection-rectangle" hidden></div>
+        <div id="selection-bar" class="selection-bar" hidden>
+          <strong id="selected-count">0개 선택</strong>
+          <button id="select-visible" type="button">보이는 항목 선택</button>
+          <button id="clear-selection" type="button">선택 취소</button>
+          <button id="delete-selected" class="danger-action" type="button">선택 항목 삭제</button>
+        </div>
       </section>
     </main>
+
+    <div id="detail-layer" class="modal-layer" hidden>
+      <section class="detail-dialog" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+        <button id="detail-close" class="detail-close fluent" type="button" aria-label="닫기">&#xE711;</button>
+        <div class="detail-heading">
+          <span id="detail-type"></span>
+          <strong id="detail-favorite-mark" hidden>즐겨찾기</strong>
+          <h2 id="detail-title">항목 상세</h2>
+        </div>
+        <div class="detail-content">
+          <div id="detail-artwork" class="detail-artwork"></div>
+          <div class="detail-info">
+            <p id="detail-description"></p>
+            <dl>
+              <div><dt>저장 횟수</dt><dd id="detail-capture-count"></dd></div>
+              <div><dt>복사 횟수</dt><dd id="detail-copy-count"></dd></div>
+              <div><dt>메신저</dt><dd id="detail-source"></dd></div>
+              <div><dt>저장 시각</dt><dd id="detail-date"></dd></div>
+              <div><dt>저장 상태</dt><dd id="detail-delivery"></dd></div>
+            </dl>
+          </div>
+        </div>
+        <div class="detail-actions">
+          <button id="detail-delete" class="danger-text" type="button">삭제</button>
+          <span></span>
+          <button id="detail-open" type="button">원본 열기</button>
+          <button id="detail-copy" class="primary-action" type="button">복사</button>
+        </div>
+      </section>
+    </div>
+
+    <div id="confirm-layer" class="modal-layer" hidden>
+      <section class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title">
+        <h2 id="confirm-title">항목을 삭제할까?</h2>
+        <p id="confirm-message">삭제한 항목은 되돌릴 수 없어.</p>
+        <div>
+          <button id="confirm-cancel" type="button">취소</button>
+          <button id="confirm-ok" class="danger-action" type="button">삭제</button>
+        </div>
+      </section>
+    </div>
+    <div id="toast" class="toast" hidden></div>
   </body>
 </html>

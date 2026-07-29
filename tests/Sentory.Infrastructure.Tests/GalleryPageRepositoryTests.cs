@@ -90,6 +90,11 @@ public sealed class GalleryPageRepositoryTests : IDisposable
             now,
             sort: GallerySortMode.MostCopied));
         Assert.Equal(old.ItemId, mostCopied.Items[0].ItemId);
+
+        var loaded = await repository.GetGalleryItemAsync(middle.ItemId);
+        Assert.NotNull(loaded);
+        Assert.Equal("middle.example", loaded.Domain);
+        Assert.Null(await repository.GetGalleryItemAsync(Guid.NewGuid()));
     }
 
     private static GalleryPageRequest Request(

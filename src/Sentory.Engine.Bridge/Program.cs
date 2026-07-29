@@ -28,11 +28,15 @@ internal static class Program
                 return 0;
             }
 
-            if (command is not ("gallery-list" or "gallery-page"))
+            if (command is not ("gallery-list" or "gallery-page" or
+                "gallery-item" or "gallery-favorite" or "gallery-delete" or
+                "gallery-copy-record"))
             {
                 Console.Error.WriteLine(
                     "사용법: sentory-engine health | gallery-list [limit] | " +
-                    "gallery-page <request-json>");
+                    "gallery-page <request-json> | gallery-item <id> | " +
+                    "gallery-favorite <id> <true|false> | gallery-delete <ids-json> | " +
+                    "gallery-copy-record <id>");
                 return 2;
             }
 
@@ -48,6 +52,29 @@ internal static class Program
                     JsonOptions) ?? throw new ArgumentException(
                     "갤러리 페이지 요청을 읽지 못했습니다.");
                 await WriteJsonAsync(await service.GetGalleryPageAsync(request));
+            }
+            else if (command == "gallery-item")
+            {
+                await WriteJsonAsync(await service.GetItemAsync(
+                    args.ElementAtOrDefault(1) ?? string.Empty));
+            }
+            else if (command == "gallery-favorite")
+            {
+                await WriteJsonAsync(await service.SetFavoriteAsync(
+                    args.ElementAtOrDefault(1) ?? string.Empty,
+                    bool.Parse(args.ElementAtOrDefault(2) ?? string.Empty)));
+            }
+            else if (command == "gallery-delete")
+            {
+                var ids = JsonSerializer.Deserialize<string[]>(
+                    args.ElementAtOrDefault(1) ?? "[]",
+                    JsonOptions) ?? [];
+                await WriteJsonAsync(await service.DeleteItemsAsync(ids));
+            }
+            else if (command == "gallery-copy-record")
+            {
+                await WriteJsonAsync(await service.RecordCopyAsync(
+                    args.ElementAtOrDefault(1) ?? string.Empty));
             }
             else
             {

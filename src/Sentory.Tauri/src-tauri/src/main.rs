@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fs::{create_dir_all, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
@@ -62,6 +63,152 @@ async fn gallery_page(
         .map_err(|error| format!("갤러리 요청을 만들지 못했습니다: {error}"))?;
     append_diagnostic("gallery-page-request", &request_json);
     run_sidecar_json(&app, &["gallery-page", &request_json]).await
+}
+
+#[tauri::command]
+async fn gallery_item(
+    app: AppHandle,
+    item_id: String,
+) -> Result<serde_json::Value, String> {
+    run_sidecar_json(&app, &["gallery-item", &item_id]).await
+}
+
+#[tauri::command]
+async fn gallery_favorite(
+    app: AppHandle,
+    item_id: String,
+    is_favorite: bool,
+) -> Result<serde_json::Value, String> {
+    let value = is_favorite.to_string();
+    run_sidecar_json(&app, &["gallery-favorite", &item_id, &value]).await
+}
+
+#[tauri::command]
+async fn gallery_delete(
+    app: AppHandle,
+    item_ids: Vec<String>,
+) -> Result<serde_json::Value, String> {
+    let json = serde_json::to_string(&item_ids)
+        .map_err(|error| format!("삭제 요청을 만들지 못했습니다: {error}"))?;
+    run_sidecar_json(&app, &["gallery-delete", &json]).await
+}
+
+#[tauri::command]
+async fn gallery_open(
+    app: AppHandle,
+    item_id: String,
+) -> Result<(), String> {
+    let detail = run_sidecar_json(&app, &["gallery-item", &item_id]).await?;
+    let target = resolve_open_target(&detail)
+        .ok_or_else(|| "열 수 있는 원본이 없습니다.".to_string())?;
+    open::that_detached(target)
+        .map_err(|error| format!("원본을 열지 못했습니다: {error}"))
+}
+
+#[tauri::command]
+async fn gallery_copy(
+    app: AppHandle,
+    item_id: String,
+) -> Result<serde_json::Value, String> {
+    let detail = run_sidecar_json(&app, &["gallery-item", &item_id]).await?;
+    let clipboard_detail = detail.clone();
+    tauri::async_runtime::spawn_blocking(move || copy_detail_to_clipboard(&clipboard_detail))
+        .await
+        .map_err(|error| format!("클립보드 작업을 기다리지 못했습니다: {error}"))??;
+    run_sidecar_json(&app, &["gallery-copy-record", &item_id]).await
+}
+
+fn resolve_open_target(detail: &serde_json::Value) -> Option<String> {
+    let card = detail.get("card")?;
+    match card.get("kind")?.as_str()? {
+        "Image" => detail.get("contentPath")?.as_str().map(str::to_owned),
+        "Collection" => detail
+            .get("members")?
+            .as_array()?
+            .iter()
+            .find_map(|member| {
+                member
+                    .get("contentPath")
+                    .and_then(serde_json::Value::as_str)
+                    .or_else(|| member.get("originalUrl").and_then(serde_json::Value::as_str))
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_owned)
+            }),
+        _ => card
+            .get("originalUrl")?
+            .as_str()
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned),
+    }
+}
+
+fn copy_detail_to_clipboard(detail: &serde_json::Value) -> Result<(), String> {
+    let card = detail
+        .get("card")
+        .ok_or_else(|| "항목 정보를 읽지 못했습니다.".to_string())?;
+    let kind = card
+        .get("kind")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "항목 종류를 읽지 못했습니다.".to_string())?;
+    let mut clipboard = arboard::Clipboard::new()
+        .map_err(|error| format!("클립보드를 열지 못했습니다: {error}"))?;
+    if kind == "Image" {
+        let path = detail
+            .get("contentPath")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| "사진 원본을 찾지 못했습니다.".to_string())?;
+        return copy_image(&mut clipboard, path);
+    }
+    if kind == "Collection" {
+        let members = detail
+            .get("members")
+            .and_then(serde_json::Value::as_array)
+            .ok_or_else(|| "모음 항목을 읽지 못했습니다.".to_string())?;
+        if let Some(path) = members.iter().find_map(|member| {
+            member
+                .get("contentPath")
+                .and_then(serde_json::Value::as_str)
+        }) {
+            return copy_image(&mut clipboard, path);
+        }
+        let links = members
+            .iter()
+            .filter_map(|member| member.get("originalUrl").and_then(serde_json::Value::as_str))
+            .filter(|value| !value.is_empty())
+            .collect::<Vec<_>>()
+            .join("\r\n");
+        if links.is_empty() {
+            return Err("복사할 모음 원본이 없습니다.".to_string());
+        }
+        return clipboard
+            .set_text(links)
+            .map_err(|error| format!("링크를 복사하지 못했습니다: {error}"));
+    }
+    let url = card
+        .get("originalUrl")
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "링크 원본을 찾지 못했습니다.".to_string())?;
+    clipboard
+        .set_text(url)
+        .map_err(|error| format!("링크를 복사하지 못했습니다: {error}"))
+}
+
+fn copy_image(clipboard: &mut arboard::Clipboard, path: &str) -> Result<(), String> {
+    let decoded = image::ImageReader::open(path)
+        .map_err(|error| format!("사진을 열지 못했습니다: {error}"))?
+        .decode()
+        .map_err(|error| format!("사진을 읽지 못했습니다: {error}"))?
+        .into_rgba8();
+    let width = decoded.width() as usize;
+    let height = decoded.height() as usize;
+    clipboard
+        .set_image(arboard::ImageData {
+            width,
+            height,
+            bytes: Cow::Owned(decoded.into_raw()),
+        })
+        .map_err(|error| format!("사진을 복사하지 못했습니다: {error}"))
 }
 
 async fn run_sidecar_json(
@@ -134,6 +281,11 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             gallery_list,
             gallery_page,
+            gallery_item,
+            gallery_favorite,
+            gallery_delete,
+            gallery_open,
+            gallery_copy,
             ui_diagnostic
         ])
         .run(tauri::generate_context!())

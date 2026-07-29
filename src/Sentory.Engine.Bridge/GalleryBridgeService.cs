@@ -73,6 +73,95 @@ public sealed class GalleryBridgeService(
                 .ToArray());
     }
 
+    public async Task<GalleryItemDetailDto?> GetItemAsync(
+        string itemId,
+        CancellationToken cancellationToken = default)
+    {
+        var id = ParseItemId(itemId);
+        if (repository is not IGalleryItemRepository items)
+        {
+            throw new NotSupportedException(
+                "현재 C# 엔진은 항목 상세 조회를 지원하지 않습니다.");
+        }
+        var item = await items.GetGalleryItemAsync(id, cancellationToken);
+        return item is null ? null : GalleryCardProjection.CreateDetail(item, paths);
+    }
+
+    public async Task<GalleryMutationDto> SetFavoriteAsync(
+        string itemId,
+        bool isFavorite,
+        CancellationToken cancellationToken = default)
+    {
+        var id = ParseItemId(itemId);
+        var changed = await repository.SetFavoriteAsync(
+            id,
+            isFavorite,
+            cancellationToken);
+        return new GalleryMutationDto(changed, changed ? 1 : 0, 0, isFavorite);
+    }
+
+    public async Task<GalleryMutationDto> DeleteItemsAsync(
+        IReadOnlyList<string> itemIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(itemIds);
+        var ids = itemIds
+            .Take(MaximumPageSize * 10)
+            .Select(ParseItemId)
+            .Distinct()
+            .ToArray();
+        var result = await repository.DeleteItemsAsync(ids, cancellationToken);
+        return new GalleryMutationDto(
+            result.DeletedItems > 0,
+            result.DeletedItems,
+            result.MissingItems);
+    }
+
+    public async Task<GalleryMutationDto> RecordCopyAsync(
+        string itemId,
+        CancellationToken cancellationToken = default)
+    {
+        var id = ParseItemId(itemId);
+        if (repository is not IGalleryItemRepository items)
+        {
+            throw new NotSupportedException(
+                "현재 C# 엔진은 항목 조회를 지원하지 않습니다.");
+        }
+        var item = await items.GetGalleryItemAsync(id, cancellationToken);
+        if (item is null || !await repository.RecordCopyAsync(
+                id,
+                DateTimeOffset.Now,
+                cancellationToken))
+        {
+            return new GalleryMutationDto(false, 0, 1);
+        }
+
+        var copyCount = item.CopyCount + 1;
+        var isFavorite = item.IsFavorite;
+        var settings = new SentorySettingsStore(paths).Load();
+        if (settings.AutoFavoriteEnabled &&
+            !isFavorite &&
+            copyCount >= settings.AutoFavoriteCopyThreshold &&
+            item.Kind is ContentKind.Url or ContentKind.Image)
+        {
+            isFavorite = await repository.SetFavoriteAsync(
+                id,
+                true,
+                cancellationToken);
+        }
+        return new GalleryMutationDto(
+            true,
+            1,
+            0,
+            isFavorite,
+            copyCount);
+    }
+
+    private static Guid ParseItemId(string itemId) =>
+        Guid.TryParse(itemId, out var parsed)
+            ? parsed
+            : throw new ArgumentException("올바르지 않은 항목 ID입니다.", nameof(itemId));
+
     private static TEnum? ParseOptionalEnum<TEnum>(
         string? value,
         string parameterName)
@@ -114,6 +203,26 @@ public sealed record GalleryPageRequestDto(
     string? SortMode,
     bool FavoritesOnly,
     IReadOnlyList<string>? SourceApps);
+
+public sealed record GalleryMutationDto(
+    bool Success,
+    int Changed,
+    int Missing,
+    bool? IsFavorite = null,
+    int? CopyCount = null);
+
+public sealed record GalleryItemDetailDto(
+    GalleryCardDto Card,
+    string? ContentPath,
+    IReadOnlyList<GalleryMemberDto> Members);
+
+public sealed record GalleryMemberDto(
+    string Kind,
+    string Title,
+    string OriginalUrl,
+    string Domain,
+    string? ContentPath,
+    string? MimeType);
 
 public sealed record GallerySnapshotDto(
     int ProtocolVersion,
@@ -194,6 +303,31 @@ public static class GalleryCardProjection
             item.CopyCount,
             item.CaptureCount,
             item.LastCopiedAt);
+    }
+
+    public static GalleryItemDetailDto CreateDetail(
+        CapturedItemSummary item,
+        SentoryDataPaths paths)
+    {
+        var members = (item.Members ?? [])
+            .Select(member => new GalleryMemberDto(
+                member.Kind.ToString(),
+                member.Kind == ContentKind.Image
+                    ? OcrTitleGenerator.CreateBestDisplayTitle(
+                        member.OriginalUrl,
+                        member.OcrDisplayName) ?? "이미지"
+                    : string.IsNullOrWhiteSpace(member.Domain)
+                        ? member.OriginalUrl
+                        : member.Domain,
+                member.OriginalUrl,
+                member.Domain,
+                ResolveStoredPath(member.ContentPath, paths),
+                member.MimeType))
+            .ToArray();
+        return new GalleryItemDetailDto(
+            Create(item, paths),
+            ResolveStoredPath(item.ContentPath, paths),
+            members);
     }
 
     private static (string? Path, string Mode) ResolveArtwork(
