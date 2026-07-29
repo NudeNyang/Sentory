@@ -305,6 +305,29 @@ button { color: inherit; }
 .menu-options button:hover { background: var(--status-background); color: var(--text); }
 .menu-options button.selected { background: var(--status-background); color: var(--accent); font-weight: 600; }
 
+.filter-menu .menu-options button {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 7px;
+  align-items: center;
+}
+
+.filter-menu .menu-options button::before {
+  width: 14px;
+  color: var(--accent);
+  content: "";
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+}
+
+.filter-menu .menu-options button.selected {
+  background: transparent;
+}
+
+.filter-menu .menu-options button.selected::before { content: "✓"; }
+
 .filter-columns {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);

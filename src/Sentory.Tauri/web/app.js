@@ -643,13 +643,15 @@ function resetGallery({ announce = false, preserveScroll = false } = {}) {
   const previousScrollTop = preserveScroll ? scroller.scrollTop : 0;
   state.generation += 1;
   state.pendingPages.clear();
-  state.items = new Array(state.hasLoaded ? Math.max(1, state.total) : PAGE_SIZE);
-  state.total = state.items.length;
-  state.renderRevision += 1;
-  state.renderedRange = "";
   scroller.scrollTop = previousScrollTop;
-  measureGrid();
-  renderVisibleCards();
+  if (!state.hasLoaded) {
+    state.items = new Array(PAGE_SIZE);
+    state.total = PAGE_SIZE;
+    state.renderRevision += 1;
+    state.renderedRange = "";
+    measureGrid();
+    renderVisibleCards();
+  }
   if (announce) setStatus(t("galleryRefreshing"));
   void loadPage(0, state.generation, true);
 }
