@@ -186,27 +186,28 @@
           </div>
           <button id="settings-close" class="detail-close fluent" type="button" aria-label="알림 닫기">&#xE711;</button>
         </header>
-        <div class="settings-scroll">
+        <div class="settings-scroll-region">
+          <div id="settings-scroll" class="settings-scroll">
           <h3 id="general-heading">일반</h3>
           <section class="settings-card">
-            <label class="setting-row" for="setting-theme">
+            <div class="setting-row">
               <span><strong id="theme-setting-title">화면 테마</strong><small id="theme-setting-description">라이트 모드와 다크 모드를 선택합니다</small></span>
-              <select id="setting-theme">
+              <select id="setting-theme" aria-labelledby="theme-setting-title">
                 <option value="Light">라이트 모드</option>
                 <option value="Dark">다크 모드</option>
                 <option value="System">시스템 테마</option>
               </select>
-            </label>
-            <label class="setting-row" for="setting-language">
+            </div>
+            <div class="setting-row">
               <span><strong id="language-setting-title">Language</strong><small id="language-setting-description">화면에 표시할 언어를 선택합니다</small></span>
-              <select id="setting-language">
+              <select id="setting-language" aria-labelledby="language-setting-title">
                 <option value="auto">Auto</option>
                 <option value="ko-KR">한국어</option>
                 <option value="en-US">English</option>
                 <option value="ja-JP">日本語</option>
                 <option value="zh-CN">简体中文</option>
               </select>
-            </label>
+            </div>
             <div class="setting-row">
               <span><strong id="startup-title">Windows 시작 시 실행</strong><small id="startup-description">현재 자동 실행을 사용하지 않습니다</small></span>
               <button id="startup-toggle" class="settings-action" type="button">켜기</button>
@@ -227,7 +228,7 @@
             <div class="data-setting-block">
               <span><strong id="auto-favorite-title">자동 즐겨찾기</strong><small id="auto-favorite-description">같은 링크나 사진을 반복해서 사용하면 즐겨찾기에 추가합니다</small></span>
               <div class="inline-setting-actions">
-                <select id="auto-favorite-select"></select>
+                <select id="auto-favorite-select" aria-labelledby="auto-favorite-title"></select>
                 <button id="auto-favorite-save" class="settings-action primary-action" type="button">설정 저장</button>
               </div>
             </div>
@@ -235,7 +236,7 @@
             <div class="data-setting-block">
               <span><strong id="auto-cleanup-title">자동 정리</strong><small id="auto-cleanup-description">기본값 사용 안 함</small></span>
               <div class="inline-setting-actions">
-                <select id="auto-cleanup-select"></select>
+                <select id="auto-cleanup-select" aria-labelledby="auto-cleanup-title"></select>
                 <button id="auto-cleanup-save" class="settings-action primary-action" type="button">설정 저장</button>
               </div>
             </div>
@@ -248,8 +249,8 @@
           <h3 id="app-info-heading">앱 정보</h3>
           <section class="settings-card app-info-card">
             <div class="setting-row">
-              <span><strong>Sentory</strong><small id="version-label">버전 2.0.0 · 개발 버전</small></span>
-              <span class="app-links">© 2026 · NudeNyang · GitHub</span>
+              <span><strong>Sentory</strong><small id="version-label">버전 2.0.0 · for Developers</small></span>
+              <span class="app-links">© 2026 <span aria-hidden="true">·</span> <a href="https://x.com/NudeNyang_VRC" data-external-url>NudeNyang</a> <span aria-hidden="true">·</span> <a href="https://github.com/NudeNyang/Sentory" data-external-url>GitHub</a></span>
             </div>
             <div class="setting-row">
               <span><strong id="update-title">수동 업데이트 확인</strong><small id="update-description">자동 확인 대기 시간과 관계없이 새 버전을 확인합니다</small></span>
@@ -257,8 +258,31 @@
             </div>
             <div class="setting-row">
               <span><strong id="copyright-label">Copyright © 2026 NudeNyang</strong><small id="license-summary">GNU GPL v3에 따라 이용 가능</small></span>
+              <button id="view-license" class="settings-action" type="button">라이선스 보기</button>
             </div>
           </section>
+          </div>
+          <div id="settings-scroll-indicator" class="scroll-indicator" aria-hidden="true">
+            <div class="scroll-indicator-thumb"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div id="license-layer" class="modal-layer" hidden>
+      <section class="license-dialog" role="dialog" aria-modal="true" aria-labelledby="license-heading">
+        <header class="license-header">
+          <div>
+            <h2 id="license-heading">라이선스 및 제3자 고지</h2>
+            <p id="license-description">Sentory의 배포 조건과 포함된 오픈소스 구성 요소</p>
+          </div>
+          <button id="license-close" class="detail-close fluent" type="button" aria-label="닫기">&#xE711;</button>
+        </header>
+        <div class="license-scroll-region">
+          <pre id="license-text" class="license-text"></pre>
+          <div id="license-scroll-indicator" class="scroll-indicator" aria-hidden="true">
+            <div class="scroll-indicator-thumb"></div>
+          </div>
         </div>
       </section>
     </div>

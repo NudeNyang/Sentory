@@ -50,6 +50,42 @@ public sealed class GalleryBridgeMutationTests : IDisposable
         Assert.Null(await service.GetItemAsync(id));
     }
 
+    [Fact]
+    public async Task RepeatedCopyAutomaticallyFavoritesSinglePhotoOrLink()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var repository = new SqliteCaptureRepository(paths);
+        await repository.InitializeAsync();
+        Assert.True(UrlNormalizer.TryNormalize(
+            "https://example.com/repeated",
+            out var normalized));
+        var captured = await repository.UpsertUrlAsync(new UrlCaptureRequest(
+            Guid.NewGuid(),
+            "https://example.com/repeated",
+            normalized,
+            SourceApp.Line,
+            CaptureMethod.LineConfirmedSend,
+            DeliveryStatus.NotObserved,
+            "bridge-test",
+            DateTimeOffset.Now,
+            ["test"]));
+        var settingsStore = new SentorySettingsStore(paths);
+        var settings = settingsStore.Load();
+        settings.AutoFavoriteEnabled = true;
+        settings.AutoFavoriteCopyThreshold = 2;
+        settings.AutoFavoriteChangedAt = DateTimeOffset.UtcNow;
+        settingsStore.Save(settings);
+        var service = new GalleryBridgeService(repository, paths);
+        var id = captured.ItemId.ToString("N");
+
+        var first = await service.RecordCopyAsync(id);
+        var second = await service.RecordCopyAsync(id);
+
+        Assert.False(first.IsFavorite);
+        Assert.True(second.IsFavorite);
+        Assert.True((await repository.GetGalleryItemAsync(captured.ItemId))!.IsFavorite);
+    }
+
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();

@@ -404,6 +404,85 @@ async fn open_data_directory(
         .map_err(|error| format!("데이터 폴더를 열지 못했습니다: {error}"))
 }
 
+fn is_allowed_external_url(url: &str) -> bool {
+    matches!(
+        url,
+        "https://x.com/NudeNyang_VRC" |
+        "https://github.com/NudeNyang/Sentory"
+    )
+}
+
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    if !is_allowed_external_url(&url) {
+        return Err("허용되지 않은 외부 주소입니다.".to_string());
+    }
+    open::that_detached(url)
+        .map_err(|error| format!("외부 링크를 열지 못했습니다: {error}"))
+}
+
+#[tauri::command]
+fn license_text() -> String {
+    const DIVIDER: &str = "\n\n========================================================================\n\n";
+    [
+        include_str!("../../../../LICENSE.txt"),
+        include_str!("../../../../distribution/THIRD-PARTY-NOTICES.txt"),
+        include_str!("../../../../docs/model-provenance.md"),
+    ]
+    .join(DIVIDER)
+}
+
+#[cfg(windows)]
+fn apply_window_title_bar(window: &tauri::WebviewWindow, dark: bool) -> Result<(), String> {
+    use std::ffi::c_void;
+    #[link(name = "dwmapi")]
+    extern "system" {
+        fn DwmSetWindowAttribute(
+            hwnd: *mut c_void,
+            attribute: u32,
+            value: *const c_void,
+            value_size: u32,
+        ) -> i32;
+    }
+    const USE_IMMERSIVE_DARK_MODE: u32 = 20;
+    const CAPTION_COLOR: u32 = 35;
+    const TEXT_COLOR: u32 = 36;
+    let hwnd = window
+        .hwnd()
+        .map_err(|error| format!("창 핸들을 읽지 못했습니다: {error}"))?;
+    let dark_mode: i32 = i32::from(dark);
+    let caption_color: i32 = if dark { 0x00201c19 } else { 0x00cad6de };
+    let text_color: i32 = if dark { 0x00e7ebec } else { 0x00222729 };
+    for (attribute, value) in [
+        (USE_IMMERSIVE_DARK_MODE, dark_mode),
+        (CAPTION_COLOR, caption_color),
+        (TEXT_COLOR, text_color),
+    ] {
+        let _ = unsafe {
+            DwmSetWindowAttribute(
+                hwnd.0 as *mut c_void,
+                attribute,
+                (&value as *const i32).cast(),
+                std::mem::size_of::<i32>() as u32,
+            )
+        };
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn apply_window_title_bar(_window: &tauri::WebviewWindow, _dark: bool) -> Result<(), String> {
+    Ok(())
+}
+
+#[tauri::command]
+fn window_theme_set(app: AppHandle, dark: bool) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "Sentory 창을 찾지 못했습니다.".to_string())?;
+    apply_window_title_bar(&window, dark)
+}
+
 #[tauri::command]
 async fn update_check(
     app: AppHandle,
@@ -631,6 +710,22 @@ fn copy_collection_to_clipboard(_payload: &CollectionClipboardPayload) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn app_info_links_only_allow_the_project_profiles() {
+        assert!(is_allowed_external_url("https://x.com/NudeNyang_VRC"));
+        assert!(is_allowed_external_url("https://github.com/NudeNyang/Sentory"));
+        assert!(!is_allowed_external_url("https://example.com"));
+        assert!(!is_allowed_external_url("https://github.com/NudeNyang/Sentory/issues"));
+    }
+
+    #[test]
+    fn license_view_contains_project_and_third_party_notices() {
+        let text = license_text();
+        assert!(text.contains("GNU GENERAL PUBLIC LICENSE"));
+        assert!(text.contains("Third-Party Notices"));
+        assert!(text.contains("OCR 모델 출처와 무결성"));
+    }
 
     #[test]
     fn collection_clipboard_payload_keeps_all_existing_images_and_unique_links() {
@@ -1086,6 +1181,9 @@ fn main() {
         .manage(engine)
         .setup(move |app| {
             create_tray(app)?;
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = apply_window_title_bar(&window, false);
+            }
             let handle = app.handle().clone();
             let client = setup_engine.clone();
             tauri::async_runtime::spawn(async move {
@@ -1134,6 +1232,7 @@ fn main() {
                                         "captured" => "capture-event",
                                         "runtime-issue" => "runtime-issue",
                                         "settings-changed" => "settings-changed",
+                                        "automatic-cleanup" => "automatic-cleanup",
                                         _ => "runtime-status",
                                     };
                                     let _ = handle.emit(event_name, payload);
@@ -1173,6 +1272,9 @@ fn main() {
             data_cleanup_preview,
             data_cleanup,
             open_data_directory,
+            open_external_url,
+            license_text,
+            window_theme_set,
             update_check,
             startup_get,
             startup_set,

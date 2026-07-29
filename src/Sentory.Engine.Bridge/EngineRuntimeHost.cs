@@ -14,6 +14,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
     private readonly SqliteCaptureRepository _repository;
     private readonly SentoryDataPaths _paths;
     private readonly SentorySettingsStore _settingsStore;
+    private readonly AutomaticCleanupCoordinator _automaticCleanup;
     private readonly ConcurrentQueue<EngineRuntimeEventDto> _events = new();
     private readonly TaskCompletionSource _ready = new(
         TaskCreationOptions.RunContinuationsAsynchronously);
@@ -25,6 +26,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
     private IReadOnlyList<IDisposable> _dropRuntimes = [];
     private CaptureRuntimeState _discordState = CaptureRuntimeState.Connecting;
     private Task? _discordMonitor;
+    private Task? _maintenanceTask;
     private int? _observedDiscordProcessId;
     private bool _discordAccessibilityArgumentMissing;
     private string? _lastIssueCode;
@@ -38,6 +40,9 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         _repository = repository;
         _paths = paths;
         _settingsStore = new SentorySettingsStore(paths);
+        _automaticCleanup = new AutomaticCleanupCoordinator(
+            repository,
+            _settingsStore);
         _dispatcherThread = new Thread(RunDispatcher)
         {
             IsBackground = true,
@@ -57,6 +62,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         _dispatcherThread.Start();
         await _ready.Task;
         _discordMonitor = Task.Run(() => MonitorDiscordAsync(_lifetime.Token));
+        _maintenanceTask = Task.Run(() => RunMaintenanceAsync(_lifetime.Token));
     }
 
     public EngineSettingsDto GetSettings()
@@ -246,7 +252,11 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
             _runtime.Captured += OnCaptured;
             _runtime.IssueDetected += OnIssueDetected;
             _runtime.StatusChanged += OnStatusChanged;
-            ApplySourceSettings(_settingsStore.Load());
+            var startupSettings = _settingsStore.Load();
+            _repository.ConfigureAutomaticFavorites(
+                startupSettings.AutoFavoriteEnabled,
+                startupSettings.AutoFavoriteCopyThreshold);
+            ApplySourceSettings(startupSettings);
             _runtime.Start();
             foreach (var dropRuntime in _dropRuntimes)
             {
@@ -415,6 +425,59 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         }
     }
 
+    private async Task RunMaintenanceAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (true)
+            {
+                await ApplyAutomaticCleanupAsync(cancellationToken);
+                await Task.Delay(TimeSpan.FromHours(6), cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task ApplyAutomaticCleanupAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _automaticCleanup.RunIfDueAsync(
+                DateTimeOffset.UtcNow,
+                cancellationToken);
+            if (result is { Deleted.TotalItems: > 0 })
+            {
+                Enqueue("automatic-cleanup", new
+                {
+                    deleted = result.Deleted.TotalItems,
+                    result.FileDeleteFailures
+                });
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            lock (_stateGate)
+            {
+                _lastIssueCode = "auto-cleanup-failed";
+                _lastIssue = exception.Message;
+            }
+            Enqueue("runtime-issue", new
+            {
+                code = "auto-cleanup-failed",
+                message = exception.Message
+            });
+        }
+    }
+
     private EngineSettingsDto CreateSettingsDto(SentorySettings settings) => new(
         settings.GetThemeMode().ToString(),
         settings.Language,
@@ -473,6 +536,16 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
             try
             {
                 await _discordMonitor;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+        if (_maintenanceTask is not null)
+        {
+            try
+            {
+                await _maintenanceTask;
             }
             catch (OperationCanceledException)
             {

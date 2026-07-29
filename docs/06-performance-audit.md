@@ -32,10 +32,14 @@ LINE 10ms였으며 각 응답의 `count`와 `total`은 각각 8/8, 7/7, 24/24로
 스크롤 버퍼는 화면 앞뒤 세 행으로 넓혔고, 범위가 한 행씩 이동할 때 겹치는 카드
 DOM과 이미지 요소를 그대로 옮겨 쓴다. 따라서 스크롤마다 전체 가시 카드를
 재생성하지 않고 새 가장자리와 로딩 완료된 스켈레톤만 교체한다.
+테마 변경과 그 설정 저장 응답도 `renderRevision`을 올리지 않는다. CSS 테마 토큰과
+Windows 제목 표시줄 색만 바꾸고 번역이 필요한 보이는 텍스트는 기존 카드 요소에
+제자리 반영하므로, 이미 디코딩한 썸네일을 다시 만들거나 반짝이게 하지 않는다.
 Release 전체 자동 테스트는 Core 60개, Diagnostics 15개, Platform Windows
-425개, Infrastructure 187개, Engine Bridge 8개, App 184개로 총 879개가
-통과했다. 묶음 9장 페이로드를 검증하는 Rust 단위 테스트 1개, Tauri Release
-빌드와 JavaScript 문법 검사도 통과했다.
+425개, Infrastructure 187개, Engine Bridge 11개, App 184개로 총 882개가
+통과했다. 묶음 9장 페이로드·앱 정보 링크 허용 목록·라이선스 포함 내용을
+검증하는 Rust 단위 테스트 3개, Tauri Release 빌드와 JavaScript 문법 검사도
+통과했다.
 
 ## 2026-07-29 Tauri UI 전환 기준
 

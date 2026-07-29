@@ -21,8 +21,8 @@
   --status-text: #5e5952;
   --skeleton: #d9d3ca;
   --danger: #a6504a;
-  --selection-tint: rgba(117, 102, 85, 0.10);
-  --selection-border: rgba(117, 102, 85, 0.40);
+  --selection-tint: rgba(117, 102, 85, 0.07);
+  --selection-border: rgba(117, 102, 85, 0.27);
   --scroll: rgba(117, 102, 85, 0.46);
   background: var(--window);
   color: var(--text);
@@ -50,8 +50,8 @@
   --status-text: #bec2c8;
   --skeleton: #24282d;
   --danger: #bd8078;
-  --selection-tint: rgba(175, 160, 142, 0.14);
-  --selection-border: rgba(175, 160, 142, 0.50);
+  --selection-tint: rgba(175, 160, 142, 0.09);
+  --selection-border: rgba(175, 160, 142, 0.32);
   --scroll: rgba(175, 160, 142, 0.46);
 }
 
@@ -397,7 +397,7 @@ button { color: inherit; }
   transform: translateY(-2px);
 }
 
-.card.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--selection-border); }
+.card.selected { border-color: var(--selection-border); box-shadow: inset 0 0 0 1px var(--selection-border); }
 .card.selected::after { position: absolute; z-index: 1; inset: 1px; border: 1px solid var(--selection-border); border-radius: 15px; background: var(--selection-tint); content: ""; pointer-events: none; }
 
 .artwork {
@@ -657,10 +657,14 @@ body.selection-mode .favorite { display: none; }
 .settings-header { position: relative; padding: 28px 30px 20px; border-bottom: 1px solid var(--line); background: var(--header); }
 .settings-header h2 { margin: 0; font-size: 26px; font-weight: 600; }
 .settings-header p { margin: 6px 42px 0 0; color: var(--muted); font-size: 13px; }
-.settings-scroll { min-height: 0; overflow: auto; padding: 24px 30px 34px; scrollbar-width: thin; scrollbar-color: var(--scroll) transparent; }
+.settings-scroll-region { position: relative; min-height: 0; overflow: hidden; }
+.settings-scroll { width: 100%; height: 100%; min-height: 0; overflow: auto; padding: 24px 30px 34px; scrollbar-width: none; }
+.settings-scroll::-webkit-scrollbar { width: 0; height: 0; }
+.settings-scroll-region.scrolling > .scroll-indicator { opacity: 1; }
 .settings-scroll > h3 { margin: 0 0 9px; color: var(--accent); font-size: 13px; font-weight: 600; }
 .settings-scroll > h3:not(:first-child) { margin-top: 25px; }
 .settings-card { overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.settings-card:has(.wpf-select) { overflow: visible; }
 .setting-row {
   display: flex;
   align-items: center;
@@ -673,19 +677,53 @@ body.selection-mode .favorite { display: none; }
 .setting-row > span { display: grid; gap: 4px; min-width: 0; }
 .setting-row strong { font-size: 13px; font-weight: 600; }
 .setting-row small { color: var(--muted); font-size: 11px; line-height: 1.4; }
-.setting-row select {
+.wpf-select {
+  position: relative;
   width: 160px;
-  height: 38px;
   flex: 0 0 auto;
-  padding: 0 34px 0 12px;
+}
+.native-select-control { position: fixed; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+.wpf-select-trigger {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20px;
+  align-items: center;
+  width: 100%;
+  height: 38px;
+  padding: 0 10px 0 12px;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 8px;
   outline: 0;
   background: var(--input);
   color: var(--text);
   font-size: 12px;
+  text-align: left;
+  cursor: pointer;
 }
-.setting-row select:focus { border-color: var(--card-hover); }
+.wpf-select.open .wpf-select-trigger { border-color: var(--card-hover); border-radius: 8px 8px 0 0; }
+.wpf-select-trigger:focus-visible { outline: 2px solid var(--card-hover); outline-offset: 1px; }
+.wpf-select-trigger .fluent { justify-self: end; color: var(--muted); font-size: 10px; }
+.wpf-select-popup {
+  position: absolute;
+  z-index: 260;
+  top: calc(100% - 1px);
+  right: 0;
+  left: 0;
+  max-height: 220px;
+  overflow: auto;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 0 0 8px 8px;
+  background: var(--surface);
+  box-shadow: 0 9px 22px rgba(41, 39, 34, 0.14);
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll) transparent;
+}
+.wpf-select-popup[hidden] { display: none; }
+.wpf-select-option { display: block; width: 100%; min-height: 38px; padding: 9px 12px; border: 0; background: transparent; color: var(--text); font-size: 12px; line-height: 20px; text-align: left; cursor: pointer; }
+.wpf-select-option:hover,
+.wpf-select-option:focus-visible,
+.wpf-select-option.selected { outline: 0; background: var(--status-background); }
+.wpf-select-option.selected { font-weight: 600; }
 .settings-action {
   min-height: 34px;
   padding: 0 12px;
@@ -697,7 +735,11 @@ body.selection-mode .favorite { display: none; }
   font-size: 11px;
   cursor: pointer;
 }
-.settings-action:hover { border-color: var(--card-hover); background: var(--copy-hover); }
+.settings-action:not(:disabled):hover,
+.repair-button:not(:disabled):hover,
+.wpf-select-trigger:hover { border-color: var(--card-hover); background: color-mix(in srgb, var(--input) 70%, var(--surface) 30%); }
+.settings-action.primary-action:not(:disabled):hover { background: color-mix(in srgb, var(--accent) 88%, var(--surface)) !important; }
+.settings-action.danger-action:not(:disabled):hover { background: color-mix(in srgb, var(--danger) 88%, var(--surface)) !important; }
 .settings-action:disabled { cursor: default; opacity: 0.54; }
 .source-setting { min-height: 64px; }
 .source-control { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
@@ -712,7 +754,6 @@ body.selection-mode .favorite { display: none; }
   font-size: 11px;
   cursor: pointer;
 }
-.repair-button:hover { border-color: var(--card-hover); background: var(--copy-hover); }
 .switch { position: relative; display: inline-grid; width: 46px; height: 28px; cursor: pointer; }
 .switch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .switch-track { position: absolute; inset: 2px; border: 1px solid var(--line); border-radius: 999px; background: var(--status-background); transition: background 100ms ease, border-color 100ms ease; }
@@ -720,6 +761,8 @@ body.selection-mode .favorite { display: none; }
 .switch input:checked + .switch-track { border-color: var(--accent); background: var(--accent); }
 .switch input:checked + .switch-track::after { background: var(--accent-text); transform: translateX(18px); }
 .switch input:focus-visible + .switch-track { outline: 2px solid var(--card-hover); outline-offset: 2px; }
+.switch:hover .switch-track { border-color: var(--card-hover); background: color-mix(in srgb, var(--status-background) 72%, var(--surface) 28%); }
+.switch:hover input:checked + .switch-track { background: color-mix(in srgb, var(--accent) 88%, var(--surface)); }
 .data-settings { padding: 17px 18px 18px; }
 .settings-note { margin: 0; color: var(--muted); font-size: 11px; }
 .statistics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 15px; }
@@ -732,9 +775,20 @@ body.selection-mode .favorite { display: none; }
 .data-setting-block strong { font-size: 13px; font-weight: 600; }
 .data-setting-block small { color: var(--muted); font-size: 11px; }
 .inline-setting-actions { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
-.inline-setting-actions select { min-width: 0; height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--input); color: var(--text); font-size: 11px; }
+.inline-setting-actions .wpf-select { width: auto; min-width: 0; }
+.inline-setting-actions .wpf-select-trigger { height: 36px; font-size: 11px; }
 .data-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; }
 .app-info-card .app-links { display: block; color: var(--muted); font-size: 10.5px; white-space: nowrap; }
+.app-info-card .app-links a { color: inherit; text-decoration: none; }
+.app-info-card .app-links a:hover { color: var(--text); text-decoration: underline; }
+.license-dialog { display: grid; grid-template-rows: auto minmax(0, 1fr); width: min(680px, calc(100vw - 48px)); height: min(720px, calc(100vh - 48px)); overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--window); box-shadow: 0 22px 64px rgba(21, 23, 25, 0.25); }
+.license-header { position: relative; padding: 26px 30px 18px; }
+.license-header h2 { margin: 0; font-size: 24px; font-weight: 600; }
+.license-header p { margin: 6px 42px 0 0; color: var(--muted); font-size: 12px; }
+.license-scroll-region { position: relative; min-height: 0; margin: 0 30px 28px; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.license-text { width: 100%; height: 100%; margin: 0; overflow: auto; padding: 22px 34px 22px 22px; color: var(--text); font: 11.5px/19px Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; scrollbar-width: none; }
+.license-text::-webkit-scrollbar { width: 0; height: 0; }
+.license-scroll-region.scrolling > .scroll-indicator { opacity: 1; }
 .confirm-dialog { width: min(390px, calc(100vw - 48px)); padding: 24px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: 0 22px 64px rgba(21, 23, 25, 0.28); }
 .confirm-dialog h2 { margin: 0; font-size: 18px; font-weight: 600; }
 .confirm-dialog p { margin: 10px 0 22px; color: var(--muted); font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
@@ -759,7 +813,7 @@ body.selection-mode .favorite { display: none; }
   .settings-header { padding-inline: 20px; }
   .settings-scroll { padding-inline: 20px; }
   .setting-row { align-items: flex-start; gap: 12px; }
-  .setting-row select { width: 136px; }
+  .setting-row .wpf-select { width: 136px; }
   .source-control { justify-content: flex-end; }
 }
 
