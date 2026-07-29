@@ -22,6 +22,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
     private readonly DispatcherTimer _timer;
     private readonly LineIdleBaselineRefreshScheduler _idleBaselineRefresh;
     private readonly LinePassiveDropState _dropState = new();
+    private readonly LineDropPointerHistory _pointerHistory = new();
     private readonly RecentExplorerDragOrigin _dragOrigin =
         new(ExplorerOriginMaximumAge);
     private bool _started;
@@ -131,6 +132,8 @@ public sealed class LineDropOverlayRuntime : IDisposable
         {
             TryJoinSharedExplorerDrag();
         }
+
+        _pointerHistory.ObserveDown(cursor);
 
         if (_dropState.IsTracking)
         {
@@ -258,12 +261,16 @@ public sealed class LineDropOverlayRuntime : IDisposable
         if (!_dropState.IsTracking)
         {
             _releaseTargetGraceFrames = 0;
+            _pointerHistory.Reset();
             return;
         }
 
+        var releaseCursor = _pointerHistory.ResolveRelease(cursor);
         _dropState.Observe(
-            cursor,
-            _locator.FindTrackedReleaseAt(cursor.X, cursor.Y));
+            releaseCursor,
+            _locator.FindTrackedReleaseAt(
+                releaseCursor.X,
+                releaseCursor.Y));
         if (_dropState.TryTakeCompleted(out var target, out var paths))
         {
             var releasedAt = _releasedAt;
@@ -272,6 +279,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
             _releasedAt = default;
             _preDropBaselineWindow = nint.Zero;
             _preDropBaselineTask = null;
+            _pointerHistory.Reset();
             _ = RegisterPassiveDropAsync(
                 target,
                 paths,
@@ -284,6 +292,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
         if (_releaseTargetGraceFrames == 0)
         {
             _dropState.Reset();
+            _pointerHistory.Reset();
             _diagnostic?.Invoke(
                 "line-drop-cancelled",
                 "reason=release-target-unavailable");
@@ -345,6 +354,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
         _preDropBaselineWindow = nint.Zero;
         _preDropBaselineTask = null;
         _dropState.Reset();
+        _pointerHistory.Reset();
     }
 
     private void BeginPreDropBaselineCapture(LineDropTarget target)

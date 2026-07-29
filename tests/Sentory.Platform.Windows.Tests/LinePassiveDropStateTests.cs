@@ -11,6 +11,16 @@ public sealed class LinePassiveDropStateTests
         new WindowBounds(0, 0, 900, 700));
 
     [Fact]
+    public void ReleaseKeepsLastPositionObservedWhileMouseWasDown()
+    {
+        var history = new LineDropPointerHistory();
+        history.ObserveDown((450, 300));
+
+        Assert.Equal((450, 300), history.ResolveRelease((100, 100)));
+        Assert.Equal((450, 300), history.ResolveRelease((700, 600)));
+    }
+
+    [Fact]
     public void CompletesExplorerImageDragOverLine()
     {
         var state = new LinePassiveDropState();

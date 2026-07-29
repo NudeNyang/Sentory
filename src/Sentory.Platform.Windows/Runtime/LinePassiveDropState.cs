@@ -2,6 +2,28 @@ using Sentory.Platform.Windows.Interop;
 
 namespace Sentory.Platform.Windows.Runtime;
 
+internal sealed class LineDropPointerHistory
+{
+    private (int X, int Y) _lastDown;
+    private bool _hasLastDown;
+
+    public void ObserveDown((int X, int Y) position)
+    {
+        _lastDown = position;
+        _hasLastDown = true;
+    }
+
+    public (int X, int Y) ResolveRelease(
+        (int X, int Y) currentPosition) =>
+        _hasLastDown ? _lastDown : currentPosition;
+
+    public void Reset()
+    {
+        _lastDown = default;
+        _hasLastDown = false;
+    }
+}
+
 internal sealed class LinePassiveDropState(
     double minimumDragDistance = 8)
 {
