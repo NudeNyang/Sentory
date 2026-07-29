@@ -1,8 +1,10 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Windows.Threading;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
+using Sentory.Infrastructure.Updates;
 using Sentory.Platform.Windows.Runtime;
 
 namespace Sentory.Engine.Bridge;
@@ -10,6 +12,7 @@ namespace Sentory.Engine.Bridge;
 public sealed class EngineRuntimeHost : IAsyncDisposable
 {
     private readonly SqliteCaptureRepository _repository;
+    private readonly SentoryDataPaths _paths;
     private readonly SentorySettingsStore _settingsStore;
     private readonly ConcurrentQueue<EngineRuntimeEventDto> _events = new();
     private readonly TaskCompletionSource _ready = new(
@@ -33,6 +36,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         SentoryDataPaths paths)
     {
         _repository = repository;
+        _paths = paths;
         _settingsStore = new SentorySettingsStore(paths);
         _dispatcherThread = new Thread(RunDispatcher)
         {
@@ -59,6 +63,53 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
     {
         var settings = _settingsStore.Load();
         return CreateSettingsDto(settings);
+    }
+
+    public async Task<DataStatistics> GetDataStatisticsAsync(
+        CancellationToken cancellationToken = default) =>
+        await _repository.GetDataStatisticsAsync(cancellationToken);
+
+    public async Task<DataCleanupPreview> PreviewCleanupAsync(
+        CancellationToken cancellationToken = default) =>
+        await _repository.PreviewCleanupAsync(null, cancellationToken);
+
+    public async Task<DataCleanupResult> CleanupAsync(
+        CancellationToken cancellationToken = default) =>
+        await _repository.CleanupAsync(null, cancellationToken);
+
+    public string GetDataDirectory() => _paths.RootDirectory;
+
+    public async Task<EngineUpdateCheckDto> CheckForUpdatesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        using var client = new GitHubReleaseUpdateClient();
+        var update = await client.CheckAsync(
+            "2.0.0",
+            RuntimeInformation.ProcessArchitecture,
+            UpdatePackageKind.Portable,
+            cancellationToken);
+        return update is null
+            ? new EngineUpdateCheckDto(false, null, null)
+            : new EngineUpdateCheckDto(
+                true,
+                update.Version,
+                update.ReleasePage.AbsoluteUri);
+    }
+
+    public async Task<EngineRuntimeStatusDto> TogglePauseAsync()
+    {
+        var dispatcher = _dispatcher ?? throw new InvalidOperationException(
+            "감지 런타임이 준비되지 않았습니다.");
+        await dispatcher.InvokeAsync(() =>
+        {
+            if (_runtime is not null)
+            {
+                _runtime.IsPaused = !_runtime.IsPaused;
+            }
+        });
+        var status = GetStatus();
+        Enqueue("detection-status", status);
+        return status;
     }
 
     public async Task<EngineSettingsDto> UpdateSettingsAsync(
@@ -299,6 +350,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         return new EngineRuntimeStatusDto(
             discordState.ToString(),
             new DiscordAccessibilityLauncher().IsRunning(),
+            _runtime?.IsPaused == true,
             issueCode,
             issue,
             CreateSourceStates(settings));
@@ -497,6 +549,7 @@ public sealed record EngineSettingsPatchDto(
 public sealed record EngineRuntimeStatusDto(
     string DiscordState,
     bool DiscordRunning,
+    bool DetectionPaused,
     string? LastIssueCode,
     string? LastIssue,
     IReadOnlyDictionary<string, bool> Sources);
@@ -506,6 +559,11 @@ public sealed record EngineRuntimeEventDto(string Type, object Payload);
 public sealed record EngineRuntimePollDto(
     EngineRuntimeStatusDto Status,
     IReadOnlyList<EngineRuntimeEventDto> Events);
+
+public sealed record EngineUpdateCheckDto(
+    bool UpdateAvailable,
+    string? Version,
+    string? ReleasePage);
 
 public sealed record EngineCaptureEventDto(
     string Kind,

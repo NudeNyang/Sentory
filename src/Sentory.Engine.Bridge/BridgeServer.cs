@@ -106,7 +106,17 @@ public sealed class BridgeServer(
                 request.Payload.Deserialize<EngineSettingsPatchDto>(JsonOptions) ??
                 throw new ArgumentException("설정 변경 요청을 읽지 못했습니다.")),
             "runtime-poll" => RequireRuntime().Poll(),
+            "runtime-pause-toggle" => await RequireRuntime().TogglePauseAsync(),
             "discord-repair" => await RequireRuntime().RepairDiscordAsync(),
+            "data-statistics" => await RequireRuntime().GetDataStatisticsAsync(
+                cancellationToken),
+            "data-cleanup-preview" => await RequireRuntime().PreviewCleanupAsync(
+                cancellationToken),
+            "data-cleanup" => await RequireRuntime().CleanupAsync(
+                cancellationToken),
+            "data-directory" => RequireRuntime().GetDataDirectory(),
+            "update-check" => await RequireRuntime().CheckForUpdatesAsync(
+                cancellationToken),
             "shutdown" => new { status = "stopping" },
             _ => throw new ArgumentException(
                 $"지원하지 않는 브리지 명령입니다: {request.Command}")

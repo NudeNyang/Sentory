@@ -33,7 +33,7 @@
         </div>
 
         <div class="control-row">
-          <nav class="tabs" aria-label="콘텐츠 종류">
+          <nav class="tabs" aria-label="전체">
             <button class="tab active" type="button" data-kind="all">전체</button>
             <button class="tab" type="button" data-kind="Url">링크</button>
             <button class="tab" type="button" data-kind="Image">사진</button>
@@ -63,7 +63,7 @@
               <span class="fluent" aria-hidden="true">&#xE713;</span>
               <span id="settings-label">설정</span>
             </button>
-            <button id="refresh" class="visually-hidden" type="button">새로 고침</button>
+            <button id="refresh" class="visually-hidden" type="button">다시 시도</button>
             <section id="filter-menu" class="popup filter-menu" hidden aria-label="필터">
               <div class="popup-heading">
                 <strong>필터</strong>
@@ -85,7 +85,7 @@
                 </div>
               </div>
             </section>
-            <section id="sort-menu" class="popup sort-menu menu-options" hidden aria-label="정렬">
+            <section id="sort-menu" class="popup sort-menu menu-options" hidden aria-label="정렬 최신순">
               <button type="button" data-sort="Newest">정렬 최신순</button>
               <button type="button" data-sort="Oldest">정렬 오래된순</button>
               <button type="button" data-sort="MostCaptured">많이 저장한 순</button>
@@ -117,7 +117,7 @@
 
     <div id="detail-layer" class="modal-layer" hidden>
       <section class="detail-dialog" role="dialog" aria-modal="true" aria-labelledby="detail-title">
-        <button id="detail-close" class="detail-close fluent" type="button" aria-label="닫기">&#xE711;</button>
+        <button id="detail-close" class="detail-close fluent" type="button" aria-label="알림 닫기">&#xE711;</button>
         <div class="detail-heading">
           <span id="detail-type"></span>
           <strong id="detail-favorite-mark" hidden>★ 즐겨찾기</strong>
@@ -132,8 +132,8 @@
               <div><dt>복사 횟수</dt><dd id="detail-copy-count"></dd></div>
               <div><dt>마지막 출처</dt><dd id="detail-source"></dd></div>
               <div><dt>마지막 저장</dt><dd id="detail-date"></dd></div>
-              <div><dt>저장 상태</dt><dd id="detail-delivery"></dd></div>
             </dl>
+            <p id="detail-delivery" class="detail-delivery"></p>
           </div>
         </div>
         <div class="detail-actions">
@@ -152,7 +152,7 @@
             <h2 id="settings-title">설정</h2>
             <p id="settings-description">Sentory의 실행, 메신저 감지와 보관 데이터를 한곳에서 관리합니다</p>
           </div>
-          <button id="settings-close" class="detail-close fluent" type="button" aria-label="닫기">&#xE711;</button>
+          <button id="settings-close" class="detail-close fluent" type="button" aria-label="알림 닫기">&#xE711;</button>
         </header>
         <div class="settings-scroll">
           <h3 id="general-heading">일반</h3>
@@ -160,25 +160,73 @@
             <label class="setting-row" for="setting-theme">
               <span><strong id="theme-setting-title">화면 테마</strong><small id="theme-setting-description">라이트 모드와 다크 모드를 선택합니다</small></span>
               <select id="setting-theme">
-                <option value="Light">라이트</option>
-                <option value="Dark">다크</option>
-                <option value="System">시스템 설정</option>
+                <option value="Light">라이트 모드</option>
+                <option value="Dark">다크 모드</option>
+                <option value="System">시스템 테마</option>
               </select>
             </label>
             <label class="setting-row" for="setting-language">
               <span><strong id="language-setting-title">Language</strong><small id="language-setting-description">화면에 표시할 언어를 선택합니다</small></span>
               <select id="setting-language">
-                <option value="auto">자동</option>
+                <option value="auto">Auto</option>
                 <option value="ko-KR">한국어</option>
                 <option value="en-US">English</option>
                 <option value="ja-JP">日本語</option>
                 <option value="zh-CN">简体中文</option>
               </select>
             </label>
+            <div class="setting-row">
+              <span><strong id="startup-title">Windows 시작 시 실행</strong><small id="startup-description">현재 자동 실행을 사용하지 않습니다</small></span>
+              <button id="startup-toggle" class="settings-action" type="button">켜기</button>
+            </div>
           </section>
 
           <h3 id="messenger-heading">메신저 감지</h3>
           <section id="settings-sources" class="settings-card source-settings"></section>
+
+          <h3 id="data-heading">데이터 관리</h3>
+          <section class="settings-card data-settings">
+            <p id="favorite-cleanup-note" class="settings-note">즐겨찾기에 등록된 항목은 자동 정리에서 포함되지 않음</p>
+            <div class="statistics-grid">
+              <span><small id="stored-label">보관 중</small><strong id="stored-value">-</strong><small id="kinds-value"></small></span>
+              <span><small id="image-storage-label">사진 저장 용량</small><strong id="image-storage-value">-</strong><small id="favorites-value"></small></span>
+            </div>
+            <div class="data-divider"></div>
+            <div class="data-setting-block">
+              <span><strong id="auto-favorite-title">자동 즐겨찾기</strong><small id="auto-favorite-description">같은 링크나 사진을 반복해서 사용하면 즐겨찾기에 추가합니다</small></span>
+              <div class="inline-setting-actions">
+                <select id="auto-favorite-select"></select>
+                <button id="auto-favorite-save" class="settings-action primary-action" type="button">설정 저장</button>
+              </div>
+            </div>
+            <div class="data-divider"></div>
+            <div class="data-setting-block">
+              <span><strong id="auto-cleanup-title">자동 정리</strong><small id="auto-cleanup-description">기본값 사용 안 함</small></span>
+              <div class="inline-setting-actions">
+                <select id="auto-cleanup-select"></select>
+                <button id="auto-cleanup-save" class="settings-action primary-action" type="button">설정 저장</button>
+              </div>
+            </div>
+            <div class="data-actions">
+              <button id="open-data-folder" class="settings-action" type="button">데이터 폴더 열기</button>
+              <button id="delete-non-favorites" class="settings-action danger-action" type="button">즐겨찾기 제외 항목 모두 삭제</button>
+            </div>
+          </section>
+
+          <h3 id="app-info-heading">앱 정보</h3>
+          <section class="settings-card app-info-card">
+            <div class="setting-row">
+              <span><strong>Sentory</strong><small id="version-label">버전 2.0.0 · 개발 버전</small></span>
+              <span class="app-links">© 2026 · NudeNyang · GitHub</span>
+            </div>
+            <div class="setting-row">
+              <span><strong id="update-title">수동 업데이트 확인</strong><small id="update-description">자동 확인 대기 시간과 관계없이 새 버전을 확인합니다</small></span>
+              <button id="update-check" class="settings-action" type="button">지금 확인</button>
+            </div>
+            <div class="setting-row">
+              <span><strong id="copyright-label">Copyright © 2026 NudeNyang</strong><small id="license-summary">GNU GPL v3에 따라 이용 가능</small></span>
+            </div>
+          </section>
         </div>
       </section>
     </div>

@@ -22,83 +22,135 @@ const TRANSLATIONS = {
   "ko-KR": {
     tagline: "이야기 속, 흩어진 순간들을 한 곳에", all: "전체", link: "링크", photo: "사진", image: "사진", typeLink: "링크", collection: "묶음", favorite: "즐겨찾기",
     filter: "필터", reset: "초기화", source: "메신저", period: "기간", allPeriod: "전체 기간", today: "오늘", last7: "최근 7일", last30: "최근 30일",
-    select: "선택", settings: "설정", search: "제목, URL, 도메인 검색", newest: "최신순",
+    select: "선택", selectExit: "선택 종료", settings: "설정", search: "제목, URL, 도메인 검색", switchToDark: "다크 테마로 전환", switchToLight: "밝은 테마로 전환", newest: "최신순",
     oldest: "오래된순", mostCaptured: "많이 저장한 순", mostCopied: "많이 복사한 순",
     recentlyCopied: "최근 복사한 순", name: "이름순", sortLabel: value => `정렬 ${value}`, general: "일반", messenger: "메신저 감지",
     settingsDescription: "Sentory의 실행, 메신저 감지와 보관 데이터를 한곳에서 관리합니다", theme: "화면 테마", themeDescription: "라이트 모드와 다크 모드를 선택합니다",
     language: "Language", languageDescription: "화면에 표시할 언어를 선택합니다", light: "라이트 모드", dark: "다크 모드", system: "시스템 테마",
-    auto: "Auto", korean: "한국어", detected: "감지 준비 완료", disabled: "사용 안 함", disabledSource: source => `${source} 감지를 사용하지 않습니다`, connecting: "연결 준비 중",
+    auto: "Auto", korean: "한국어", detected: "감지 준비 완료", disabled: "사용 안 함", disabledSource: source => `${source === "KakaoTalk" ? "카카오톡" : source} 감지를 사용하지 않습니다`, detectionPaused: "감지 일시정지됨", connecting: "연결 준비 중",
     recovering: "워커 복구 중", reconnect: "Discord 재연결 필요", repair: "다시 연결", discordDetection: "Discord 감지",
     copy: "복사", copyClipboard: "클립보드에 복사", copied: "복사됨", photoCopied: "사진을 복사했습니다.", urlCopied: "URL을 복사했습니다.", collectionCopied: "묶음 항목을 클립보드에 복사했습니다.", addFavorite: "즐겨찾기에 추가했습니다.",
-    removeFavorite: "즐겨찾기에서 제거했습니다.", savedOnInput: "입력 시 저장됨", savedOnSend: "전송 시 저장됨",
+    removeFavorite: "즐겨찾기에서 제거했습니다.", favoriteAddAction: "즐겨찾기에 추가", favoriteRemoveAction: "즐겨찾기에서 제거", savedOnInput: "입력 시 저장됨", savedOnSend: "전송 시 저장됨",
     copyCount: n => `복사 ${n}회`, selectedCount: n => `${n}개 선택`, visibleSelect: "전체 선택",
-    clearSelection: "선택 취소", deleteSelected: "선택 항목 삭제", emptyFiltered: "검색 결과가 없습니다", empty: "아직 보관된 항목이 없습니다",
-    items: n => `${n.toLocaleString("ko-KR")}개 항목`, engineConnected: "C# 엔진 연결됨", loading: "보관함을 불러오는 중",
-    close: "닫기", detail: "Sentory 항목 상세", favoriteMarked: "★ 즐겨찾기", captureCount: "저장 횟수", copyCountLabel: "복사 횟수", messageSource: "마지막 출처", savedAt: "마지막 저장",
-    savedState: "저장 상태", delete: "삭제", openOriginal: "원본 열기", cancel: "취소", deleteQuestion: n => n === 1 ? "항목을 삭제할까요?" : `선택한 ${n.toLocaleString("ko-KR")}개 항목을 삭제할까요?`,
+    clearSelection: "선택 취소", deleteSelected: "선택 항목 삭제", emptyFiltered: "검색 결과가 없습니다", emptyFilteredDescription: "다른 검색어나 필터로 다시 찾아보세요.", empty: "아직 보관된 항목이 없습니다", emptyDescription: "메신저에 URL이나 사진을 붙여넣어 보세요.",
+    items: n => `${n.toLocaleString("ko-KR")}개`, loading: "보관함을 불러오는 중", loadFailed: "보관함을 불러오지 못했습니다",
+    close: "알림 닫기", detail: "Sentory 항목 상세", favoriteMarked: "★ 즐겨찾기", captureCount: "저장 횟수", copyCountLabel: "복사 횟수", messageSource: "마지막 출처", savedAt: "마지막 저장",
+    times: n => `${n.toLocaleString("ko-KR")}회`, openPhoto: "사진 열기", openLink: "링크 열기", copyPhoto: "사진 복사", copyUrl: "URL 복사", copyCollection: "묶음 복사", delete: "삭제", openOriginal: "원본 열기", cancel: "취소", deleteQuestion: n => n === 1 ? "항목을 삭제할까요?" : `선택한 ${n.toLocaleString("ko-KR")}개 항목을 삭제할까요?`,
     deleteWarning: n => n === 1 ? "이 항목을 보관함에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다." : "선택한 항목과 저장된 사진 파일을 보관함에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다.", deleted: n => `${n.toLocaleString("ko-KR")}개 항목을 삭제했습니다.`,
     repairQuestion: "Discord를 다시 연결할까요?", repairWarning: "Discord를 접근성 모드로 다시 시작합니다. 작성 중인 메시지와 진행 중인 통화가 종료될 수 있습니다.", restart: "다시 시작",
-    repairing: "워커 복구 중", repaired: "Discord를 연결 복구 모드로 다시 시작했습니다.", settingsFailed: "설정을 불러오지 못했습니다.",
+    repairing: "워커 복구 중", repaired: "Discord를 연결 복구 모드로 다시 시작했습니다.", settingsFailed: "Sentory를 시작하지 못했습니다",
     discordPhotoSaved: "Discord에서 사진 전송을 확인해 저장했습니다.", discordUrlSaved: "Discord에서 URL 전송을 확인해 저장했습니다.", discordUrlsSaved: n => `Discord에서 URL ${n.toLocaleString("ko-KR")}개 전송을 확인해 저장했습니다.`, discordCollectionSaved: "Discord에서 여러 항목의 전송을 확인해 하나의 묶음으로 저장했습니다.",
     inputPhotoSaved: "사진을 입력 시 저장했습니다.", inputUrlSaved: "URL을 입력 시 저장했습니다.", inputUrlsSaved: n => `URL ${n.toLocaleString("ko-KR")}개를 입력 시 저장했습니다.`, inputCollectionSaved: "여러 항목을 입력 시 하나의 묶음으로 저장했습니다.",
-    galleryRefreshing: "보관함을 불러오는 중", newItem: "새 항목을 보관함에 반영했습니다.", enginePreparing: "시작 중...",
+    galleryRefreshing: "보관함을 불러오는 중", enginePreparing: "시작 중...",
     engineRecovering: "워커 복구 중", engineFailed: "Sentory를 시작하지 못했습니다", itemNotFound: "항목을 찾지 못했습니다.",
+    windowsStartup: "Windows 시작 시 실행", startupEnabledDescription: "현재 Windows 로그인 시 자동으로 실행됩니다", startupDisabledDescription: "현재 자동 실행을 사용하지 않습니다",
+    turnOn: "켜기", turnOff: "끄기", startupEnabled: "Windows 자동 실행을 켰습니다.", startupDisabled: "Windows 자동 실행을 껐습니다.", startupChangeFailed: "자동 실행 설정을 변경하지 못했습니다.",
+    dataManagement: "데이터 관리", favoriteCleanupExclusion: "즐겨찾기에 등록된 항목은 자동 정리에서 포함되지 않음", stored: "보관 중", imageStorage: "사진 저장 용량",
+    itemsCount: n => `${n.toLocaleString("ko-KR")}개`, kindsCount: (links, photos) => `링크 ${links.toLocaleString("ko-KR")} · 사진 ${photos.toLocaleString("ko-KR")}`,
+    favoritesPreserved: n => `즐겨찾기 ${n.toLocaleString("ko-KR")}개 보존 중`, statisticsLoadFailed: "데이터 현황을 불러오지 못했습니다.",
+    autoFavorite: "자동 즐겨찾기", autoFavoriteDescription: "같은 링크나 사진을 반복해서 사용하면 즐겨찾기에 추가합니다", autoFavoriteOff: "사용 안 함", autoFavoriteCount: n => `${n}회 반복 사용 후 추가`,
+    autoFavoriteDisabled: "자동 즐겨찾기를 사용하지 않습니다.", autoFavoriteSaved: n => `${n}회 반복 사용하면 자동으로 즐겨찾기에 추가합니다.`, autoFavoriteSaveFailed: "자동 즐겨찾기 설정을 저장하지 못했습니다.",
+    autoCleanup: "자동 정리", autoCleanupDefault: "기본값 사용 안 함", cleanupOff: "자동 정리 사용 안 함", cleanup7: "7일 기준으로 정리", cleanup30: "30일 기준으로 정리", cleanup90: "90일 기준으로 정리", cleanup180: "180일 기준으로 정리",
+    autoCleanupDisabled: "자동 정리를 사용하지 않습니다.", autoCleanupSaved: n => `${n}일 기준 자동 정리를 저장했습니다.`, autoCleanupSaveFailed: "자동 정리 설정을 저장하지 못했습니다.", saveSettings: "설정 저장",
+    openDataFolder: "데이터 폴더 열기", openDataFolderFailed: "데이터 폴더를 열지 못했습니다.", deleteNonFavorites: "즐겨찾기 제외 항목 모두 삭제", allNonFavoriteItems: "즐겨찾기가 아닌 모든 항목",
+    nothingToCleanup: "정리할 항목이 없습니다.", cleanupHeading: "항목을 정리할까요?", cleanupMessage: (total, links, photos, size) => `즐겨찾기가 아닌 모든 항목 ${total.toLocaleString("ko-KR")}개를 삭제할까요?\n\n링크 ${links.toLocaleString("ko-KR")}개 · 사진 ${photos.toLocaleString("ko-KR")}개 (${size})\n즐겨찾기는 삭제되지 않습니다.`,
+    deleteAll: "모두 삭제", cleanupCancelled: "정리를 취소했습니다.", cleanupComplete: n => `${n.toLocaleString("ko-KR")}개 항목을 정리했습니다.`, cleanupPartial: n => `${n.toLocaleString("ko-KR")}개를 정리했지만 일부 사진 파일은 다음 실행 때 다시 정리합니다.`, cleanupFailed: "데이터를 정리하지 못했습니다.", checkingCleanup: "삭제 대상을 확인하고 있습니다...",
+    appInfo: "앱 정보", version: value => `버전 ${value}`, developmentVersion: "개발 버전", checkForUpdates: "수동 업데이트 확인", checkForUpdatesDescription: "자동 확인 대기 시간과 관계없이 새 버전을 확인합니다", checkNow: "지금 확인", checkingForUpdates: "업데이트를 확인하고 있습니다.", appIsUpToDate: "현재 최신 버전을 사용하고 있습니다.", updateReady: version => `${version} 업데이트를 설치할 수 있습니다.`, updateCheckFailed: "업데이트를 확인하지 못했습니다. 네트워크 연결을 확인해 주세요.",
+    copyrightNotice: "Copyright © 2026 NudeNyang", licenseSummary: "GNU GPL v3에 따라 이용 가능", openLibrary: "보관함 열기", pauseDetection: "감지 일시정지", resumeDetection: "감지 다시 시작", discordAutoConnect: "Discord 자동 연결", discordReconnect: "Discord 재시작 후 연결", exitSentory: "Sentory 종료",
+    trayDetecting: "Sentory - 메신저 감지 중", trayPaused: "Sentory - 감지 일시정지됨", trayDetectionOff: "Sentory - 메신저 감지 꺼짐",
+    discordNotRunning: "Discord 미실행", discordRecoveryIssue: "Discord 연결 복구가 필요합니다. 설정에서 다시 연결해 주세요.", discordRepairFailed: "Discord 연결을 복구하지 못했습니다. Discord를 종료한 뒤 다시 시도해 주세요.", captureIssue: "일부 입력을 처리하지 못했습니다. 감지는 계속됩니다.", favoriteChangeFailed: "즐겨찾기를 변경하지 못했습니다.", copyFailedShort: "복사 실패", copyHistorySaveFailed: "복사했지만 사용 기록을 저장하지 못했습니다.", openOriginalFailed: "원본을 열지 못했습니다.", deleteSelectedFailed: "선택한 항목을 삭제하지 못했습니다.",
+    themeApplied: mode => mode === "Dark" ? "다크 모드를 적용했습니다." : mode === "System" ? "시스템 테마 모드를 적용했습니다." : "라이트 모드를 적용했습니다.", themeSaveFailed: "테마 설정을 저장하지 못했습니다.", languageApplied: "언어를 변경했습니다.", languageSaveFailed: "언어 설정을 저장하지 못했습니다.",
+    sourceEnabled: source => `${source === "KakaoTalk" ? "카카오톡" : source === "Line" ? "LINE" : source} 감지를 켰습니다.`, sourceDisabled: source => `${source === "KakaoTalk" ? "카카오톡" : source === "Line" ? "LINE" : source} 감지를 껐습니다.`, sourceSettingFailed: source => `${source === "KakaoTalk" ? "카카오톡" : source === "Line" ? "LINE" : source} 감지 설정을 저장하지 못했습니다.`,
   },
   "en-US": {
     tagline: "Moments scattered across your conversations, all in one place", all: "All", link: "Links", photo: "Photos", image: "Photo", typeLink: "Link", collection: "Collection", favorite: "Favorites",
     filter: "Filter", reset: "Reset", source: "Messenger", period: "Period", allPeriod: "All time", today: "Today", last7: "Last 7 days", last30: "Last 30 days",
-    select: "Select", settings: "Settings", search: "Search title, URL, or domain", newest: "Newest",
+    select: "Select", selectExit: "Done", settings: "Settings", search: "Search title, URL, or domain", switchToDark: "Switch to dark theme", switchToLight: "Switch to light theme", newest: "Newest",
     oldest: "Oldest", mostCaptured: "Most saved", mostCopied: "Most copied", recentlyCopied: "Recently copied", name: "Name", sortLabel: value => `Sort: ${value}`,
     general: "General", messenger: "Messenger detection", settingsDescription: "Manage Sentory, messenger detection, and saved data in one place",
     theme: "Theme", themeDescription: "Choose light or dark mode", language: "Language", languageDescription: "Choose the display language",
     light: "Light mode", dark: "Dark mode", system: "System theme", auto: "Auto", korean: "한국어", detected: "Ready to detect", disabled: "Off", disabledSource: source => `${source} detection is disabled`,
-    connecting: "Preparing connection", recovering: "Recovering worker", reconnect: "Discord reconnect required", repair: "Reconnect", discordDetection: "Discord detection",
+    connecting: "Preparing connection", recovering: "Recovering worker", reconnect: "Discord reconnect required", repair: "Reconnect", detectionPaused: "Detection paused", discordDetection: "Discord detection",
     copy: "Copy", copyClipboard: "Copy to clipboard", copied: "Copied", photoCopied: "Photo copied.", urlCopied: "URL copied.", collectionCopied: "Collection copied to the clipboard.", addFavorite: "Added to favorites.", removeFavorite: "Removed from favorites.",
-    savedOnInput: "Saved on input", savedOnSend: "Saved on send", copyCount: n => `Copied ${n} times`, selectedCount: n => `${n} selected`,
-    visibleSelect: "Select all", clearSelection: "Clear selection", deleteSelected: "Delete selected", emptyFiltered: "No results found",
-    empty: "Nothing saved yet", items: n => `${n.toLocaleString("en-US")} items`, engineConnected: "C# engine connected", loading: "Loading library",
-    close: "Close", detail: "Sentory Item Details", favoriteMarked: "★ Favorite", captureCount: "Times saved", copyCountLabel: "Times copied", messageSource: "Latest source", savedAt: "Last saved", savedState: "Save state",
+    favoriteAddAction: "Add to favorites", favoriteRemoveAction: "Remove from favorites", savedOnInput: "Saved on paste", savedOnSend: "Saved on send", copyCount: n => `Copied ${n} times`, selectedCount: n => `${n} selected`,
+    visibleSelect: "Select all", clearSelection: "Clear selection", deleteSelected: "Delete selected", emptyFiltered: "No results found", emptyFilteredDescription: "Try another search term or filter.",
+    empty: "Nothing saved yet", emptyDescription: "Paste a URL or photo into a messenger.", items: n => `${n.toLocaleString("en-US")} items`, loading: "Loading library", loadFailed: "Could not load the library",
+    close: "Dismiss notification", detail: "Sentory Item Details", favoriteMarked: "★ Favorite", captureCount: "Times saved", copyCountLabel: "Times copied", messageSource: "Latest source", savedAt: "Last saved", times: n => `${n.toLocaleString("en-US")}`, openPhoto: "Open photo", openLink: "Open link", copyPhoto: "Copy photo", copyUrl: "Copy URL", copyCollection: "Copy collection",
     delete: "Delete", openOriginal: "Open original", cancel: "Cancel", deleteQuestion: n => n === 1 ? "Delete this item?" : `Delete ${n} selected items?`,
     deleteWarning: n => n === 1 ? "This item will be removed from the library.\nThis cannot be undone." : "The selected items and saved photo files will be removed from the library.\nThis cannot be undone.", deleted: n => `Deleted ${n} items.`, repairQuestion: "Reconnect Discord?",
     repairWarning: "Discord will restart in accessibility mode. Draft messages and active calls may be ended.", restart: "Restart", repairing: "Recovering worker",
     repaired: "Discord restarted in connection recovery mode.", settingsFailed: "Could not load settings.", galleryRefreshing: "Loading library",
     discordPhotoSaved: "Saved a photo confirmed as sent in Discord.", discordUrlSaved: "Saved a URL confirmed as sent in Discord.", discordUrlsSaved: n => `Saved ${n.toLocaleString("en-US")} URLs confirmed as sent in Discord.`, discordCollectionSaved: "Saved multiple Discord items as one collection.",
     inputPhotoSaved: "Saved the photo when pasted.", inputUrlSaved: "Saved the URL when pasted.", inputUrlsSaved: n => `Saved ${n.toLocaleString("en-US")} URLs when pasted.`, inputCollectionSaved: "Saved multiple pasted items as one collection.",
-    newItem: "A new item was added to the gallery.", enginePreparing: "Preparing the C# engine…", engineRecovering: "Recovering the worker connection…",
+    enginePreparing: "Starting...", engineRecovering: "Recovering worker",
     engineFailed: "Could not recover the C# engine connection.", itemNotFound: "Item not found.",
+    windowsStartup: "Start with Windows", startupEnabledDescription: "Currently starts when you sign in to Windows", startupDisabledDescription: "Automatic startup is currently off",
+    turnOn: "Turn on", turnOff: "Turn off", startupEnabled: "Start with Windows is on.", startupDisabled: "Start with Windows is off.", startupChangeFailed: "Could not change the startup setting.",
+    dataManagement: "Data management", favoriteCleanupExclusion: "Favorites are excluded from automatic cleanup", stored: "Stored", imageStorage: "Photo storage",
+    itemsCount: n => `${n.toLocaleString("en-US")} items`, kindsCount: (links, photos) => `Links ${links.toLocaleString("en-US")} · Photos ${photos.toLocaleString("en-US")}`,
+    favoritesPreserved: n => `${n.toLocaleString("en-US")} favorites preserved`, statisticsLoadFailed: "Could not load storage statistics.",
+    autoFavorite: "Automatic favorites", autoFavoriteDescription: "Add a link or photo to favorites after repeated use", autoFavoriteOff: "Disabled", autoFavoriteCount: n => `Add after ${n} repeated uses`,
+    autoFavoriteDisabled: "Automatic favorites are disabled.", autoFavoriteSaved: n => `Items will be added to favorites after ${n} repeated uses.`, autoFavoriteSaveFailed: "Could not save the automatic favorites setting.",
+    autoCleanup: "Automatic cleanup", autoCleanupDefault: "Disabled by default", cleanupOff: "Do not clean automatically", cleanup7: "Delete after 7 days", cleanup30: "Delete after 30 days", cleanup90: "Delete after 90 days", cleanup180: "Delete after 180 days",
+    autoCleanupDisabled: "Automatic cleanup is disabled.", autoCleanupSaved: n => `Automatic cleanup after ${n} days was saved.`, autoCleanupSaveFailed: "Could not save automatic cleanup.", saveSettings: "Save",
+    openDataFolder: "Open data folder", openDataFolderFailed: "Could not open the data folder.", deleteNonFavorites: "Delete all except favorites", allNonFavoriteItems: "all non-favorite items",
+    nothingToCleanup: "There is nothing to clean up.", cleanupHeading: "Clean up items?", cleanupMessage: (total, links, photos, size) => `Delete ${total.toLocaleString("en-US")} all non-favorite items?\n\nLinks ${links.toLocaleString("en-US")} · Photos ${photos.toLocaleString("en-US")} (${size})\nFavorites will not be deleted.`,
+    deleteAll: "Delete all", cleanupCancelled: "Cleanup cancelled.", cleanupComplete: n => `Cleaned up ${n.toLocaleString("en-US")} items.`, cleanupPartial: n => `Cleaned up ${n.toLocaleString("en-US")} items; some photo files will be retried next time.`, cleanupFailed: "Could not clean up the data.", checkingCleanup: "Checking items to delete...",
+    appInfo: "About", version: value => `Version ${value}`, developmentVersion: "Development build", checkForUpdates: "Manual update check", checkForUpdatesDescription: "Check for a new version without waiting for the automatic interval", checkNow: "Check now", checkingForUpdates: "Checking for updates.", appIsUpToDate: "Sentory is up to date.", updateReady: version => `Update ${version} is ready to install.`, updateCheckFailed: "Could not check for updates. Check your network connection.",
+    copyrightNotice: "Copyright © 2026 NudeNyang", licenseSummary: "Licensed under GNU GPL v3", openLibrary: "Open library", pauseDetection: "Pause detection", resumeDetection: "Resume detection", discordAutoConnect: "Discord auto-connect", discordReconnect: "Restart and reconnect Discord", exitSentory: "Exit Sentory",
+    trayDetecting: "Sentory - Detecting messengers", trayPaused: "Sentory - Detection paused", trayDetectionOff: "Sentory - Detection off",
+    discordNotRunning: "Discord is not running", discordRecoveryIssue: "Discord needs to be reconnected. Reconnect it in Settings.", discordRepairFailed: "Could not repair the Discord connection. Exit Discord and try again.", captureIssue: "Some input could not be processed. Detection is continuing.", favoriteChangeFailed: "Could not update favorites.", copyFailedShort: "Copy failed", copyHistorySaveFailed: "Copied, but the usage history could not be saved.", openOriginalFailed: "Could not open the original.", deleteSelectedFailed: "Could not delete the selected items.",
+    themeApplied: mode => mode === "Dark" ? "Dark mode applied." : mode === "System" ? "System theme mode applied." : "Light mode applied.", themeSaveFailed: "Could not save the theme setting.", languageApplied: "Language changed.", languageSaveFailed: "Could not save the language setting.",
+    sourceEnabled: source => `${source} detection is on.`, sourceDisabled: source => `${source} detection is off.`, sourceSettingFailed: source => `Could not save the ${source} detection setting.`,
   },
 };
 TRANSLATIONS["ja-JP"] = {
   ...TRANSLATIONS["en-US"],
   tagline: "会話に散らばる瞬間を、一か所に", all: "すべて", link: "リンク", photo: "写真", image: "写真", typeLink: "リンク", collection: "まとめ", favorite: "お気に入り",
   filter: "フィルター", reset: "リセット", source: "メッセンジャー", period: "期間", allPeriod: "全期間", today: "今日", last7: "過去7日", last30: "過去30日",
-  select: "選択", settings: "設定", search: "タイトル、URL、ドメインを検索", newest: "新しい順", oldest: "古い順", mostCaptured: "保存回数順", mostCopied: "コピー回数順", recentlyCopied: "最近コピーした順", name: "名前順", sortLabel: value => `並べ替え: ${value}`,
+  select: "選択", selectExit: "選択終了", settings: "設定", search: "タイトル、URL、ドメインを検索", switchToDark: "ダークテーマに切り替え", switchToLight: "ライトテーマに切り替え", newest: "新しい順", oldest: "古い順", mostCaptured: "保存回数順", mostCopied: "コピー回数順", recentlyCopied: "最近コピーした順", name: "名前順", sortLabel: value => `並べ替え: ${value}`,
   general: "一般", messenger: "メッセンジャー検出", settingsDescription: "Sentory の動作、メッセンジャー検出、保存データを一か所で管理します",
   language: "Language", languageDescription: "表示する言語を選択します", theme: "画面テーマ", themeDescription: "ライトモードとダークモードを選択します", light: "ライトモード", dark: "ダークモード", system: "システムテーマ", auto: "Auto",
-  detected: "検出準備完了", disabled: "使用しない", disabledSource: source => `${source} 検出を使用していません`, connecting: "接続準備中", recovering: "ワーカーを復旧中", reconnect: "Discord の再接続が必要", repair: "再接続", discordDetection: "Discord 検出",
-  savedOnInput: "入力時に保存", savedOnSend: "送信時に保存", photoCopied: "写真をコピーしました。", urlCopied: "URL をコピーしました。", collectionCopied: "まとめた項目をクリップボードにコピーしました。", addFavorite: "お気に入りに追加しました。", removeFavorite: "お気に入りから削除しました。",
-  selectedCount: n => `${n.toLocaleString("ja-JP")}件選択`, visibleSelect: "すべて選択", clearSelection: "選択を解除", deleteSelected: "選択項目を削除", emptyFiltered: "検索結果がありません", empty: "まだ保存された項目はありません", loading: "ライブラリを読み込み中",
-  detail: "Sentory 項目の詳細", favoriteMarked: "★ お気に入り", captureCount: "保存回数", copyCountLabel: "コピー回数", messageSource: "最後の送信元", savedAt: "最終保存", delete: "削除", openOriginal: "元を開く", cancel: "キャンセル",
+  detected: "検出準備完了", disabled: "使用しない", disabledSource: source => `${source === "KakaoTalk" ? "カカオトーク" : source} 検出を使用していません`, detectionPaused: "検出一時停止中", connecting: "接続準備中", recovering: "ワーカーを復旧中", reconnect: "Discord の再接続が必要", repair: "再接続", discordDetection: "Discord 検出",
+  savedOnInput: "入力時に保存", savedOnSend: "送信時に保存", photoCopied: "写真をコピーしました。", urlCopied: "URL をコピーしました。", collectionCopied: "まとめた項目をクリップボードにコピーしました。", addFavorite: "お気に入りに追加しました。", removeFavorite: "お気に入りから削除しました。", favoriteAddAction: "お気に入りに追加", favoriteRemoveAction: "お気に入りから削除",
+  selectedCount: n => `${n.toLocaleString("ja-JP")}件選択`, visibleSelect: "すべて選択", clearSelection: "選択を解除", deleteSelected: "選択項目を削除", emptyFiltered: "検索結果がありません", emptyFilteredDescription: "別の検索語やフィルターをお試しください。", empty: "まだ保存された項目はありません", emptyDescription: "メッセンジャーに URL や写真を貼り付けてみてください。", loading: "ライブラリを読み込み中", loadFailed: "ライブラリを読み込めませんでした",
+  close: "通知を閉じる", detail: "Sentory 項目の詳細", favoriteMarked: "★ お気に入り", captureCount: "保存回数", copyCountLabel: "コピー回数", messageSource: "最後の送信元", savedAt: "最終保存", times: n => `${n.toLocaleString("ja-JP")}回`, openPhoto: "写真を開く", openLink: "リンクを開く", copyPhoto: "写真をコピー", copyUrl: "URL をコピー", copyCollection: "まとめてコピー", delete: "削除", openOriginal: "元を開く", cancel: "キャンセル",
   deleteQuestion: n => n === 1 ? "この項目を削除しますか？" : `選択した ${n.toLocaleString("ja-JP")}件を削除しますか？`, deleteWarning: n => n === 1 ? "この項目をライブラリから削除します。\nこの操作は元に戻せません。" : "選択した項目と保存された写真ファイルをライブラリから削除します。\nこの操作は元に戻せません。", deleted: n => `${n.toLocaleString("ja-JP")}件を削除しました。`,
   repairQuestion: "Discord を再接続しますか？", repairWarning: "Discord をアクセシビリティモードで再起動します。作成中のメッセージや通話が終了する場合があります。", restart: "再起動", repaired: "Discord を接続復旧モードで再起動しました。",
   discordPhotoSaved: "Discord で写真の送信を確認して保存しました。", discordUrlSaved: "Discord で URL の送信を確認して保存しました。", discordUrlsSaved: n => `Discord で URL ${n.toLocaleString("ja-JP")}件の送信を確認して保存しました。`, discordCollectionSaved: "Discord の複数項目を1つのまとめとして保存しました。",
   inputPhotoSaved: "写真を入力時に保存しました。", inputUrlSaved: "URL を入力時に保存しました。", inputUrlsSaved: n => `URL ${n.toLocaleString("ja-JP")}件を入力時に保存しました。`, inputCollectionSaved: "複数の入力項目を1つのまとめとして保存しました。",
+  windowsStartup: "Windows 起動時に実行", startupEnabledDescription: "現在 Windows サインイン時に自動実行されます", startupDisabledDescription: "現在、自動起動は使用していません", turnOn: "オン", turnOff: "オフ", startupEnabled: "Windows 自動起動をオンにしました。", startupDisabled: "Windows 自動起動をオフにしました。", startupChangeFailed: "自動起動設定を変更できませんでした。",
+  dataManagement: "データ管理", favoriteCleanupExclusion: "お気に入りは自動整理の対象外です", stored: "保存中", imageStorage: "写真の保存容量", itemsCount: n => `${n.toLocaleString("ja-JP")}件`, kindsCount: (links, photos) => `リンク ${links.toLocaleString("ja-JP")} · 写真 ${photos.toLocaleString("ja-JP")}`, favoritesPreserved: n => `お気に入り ${n.toLocaleString("ja-JP")}件を保持`, statisticsLoadFailed: "データの状況を読み込めませんでした。",
+  autoFavorite: "自動お気に入り", autoFavoriteDescription: "同じリンクや写真を繰り返し使用するとお気に入りに追加します", autoFavoriteOff: "使用しない", autoFavoriteCount: n => `${n}回の繰り返し使用後に追加`, autoFavoriteDisabled: "自動お気に入りを使用しません。", autoFavoriteSaved: n => `${n}回繰り返し使用すると自動的にお気に入りへ追加します。`, autoFavoriteSaveFailed: "自動お気に入りの設定を保存できませんでした。",
+  autoCleanup: "自動整理", autoCleanupDefault: "初期設定では使用しません", cleanupOff: "自動整理を使用しない", cleanup7: "7日を基準に整理", cleanup30: "30日を基準に整理", cleanup90: "90日を基準に整理", cleanup180: "180日を基準に整理", autoCleanupDisabled: "自動整理を使用しません。", autoCleanupSaved: n => `${n}日基準の自動整理を保存しました。`, autoCleanupSaveFailed: "自動整理設定を保存できませんでした。", saveSettings: "設定を保存",
+  openDataFolder: "データフォルダーを開く", openDataFolderFailed: "データフォルダーを開けませんでした。", deleteNonFavorites: "お気に入り以外をすべて削除", allNonFavoriteItems: "お気に入り以外のすべての項目", nothingToCleanup: "整理する項目はありません。", cleanupHeading: "項目を整理しますか？", cleanupMessage: (total, links, photos, size) => `お気に入り以外のすべての項目 ${total.toLocaleString("ja-JP")}件を削除しますか？\n\nリンク ${links.toLocaleString("ja-JP")}件 · 写真 ${photos.toLocaleString("ja-JP")}件 (${size})\nお気に入りは削除されません。`, deleteAll: "すべて削除", cleanupCancelled: "整理をキャンセルしました。", cleanupComplete: n => `${n.toLocaleString("ja-JP")}件を整理しました。`, cleanupPartial: n => `${n.toLocaleString("ja-JP")}件を整理しましたが、一部の写真ファイルは次回再試行します。`, cleanupFailed: "データを整理できませんでした。", checkingCleanup: "削除対象を確認しています...",
+  appInfo: "アプリ情報", version: value => `バージョン ${value}`, developmentVersion: "開発版", checkForUpdates: "手動アップデート確認", checkForUpdatesDescription: "自動確認の待機時間に関係なく新しいバージョンを確認します", checkNow: "今すぐ確認", checkingForUpdates: "アップデートを確認しています。", appIsUpToDate: "現在、最新バージョンを使用しています。", updateReady: version => `${version} アップデートをインストールできます。`, updateCheckFailed: "アップデートを確認できませんでした。ネットワーク接続を確認してください。", copyrightNotice: "Copyright © 2026 NudeNyang", licenseSummary: "GNU GPL v3 に基づいて利用できます", openLibrary: "ライブラリを開く", pauseDetection: "検出を一時停止", resumeDetection: "検出を再開", discordAutoConnect: "Discord 自動接続", discordReconnect: "Discord を再起動して接続", exitSentory: "Sentory を終了",
+  trayDetecting: "Sentory - メッセンジャー検出中", trayPaused: "Sentory - 検出一時停止", trayDetectionOff: "Sentory - メッセンジャー検出オフ", discordNotRunning: "Discord は実行されていません", discordRecoveryIssue: "Discord の接続復旧が必要です。設定から再接続してください。", discordRepairFailed: "Discord 接続を復旧できませんでした。Discord を終了して再試行してください。", captureIssue: "一部の入力を処理できませんでした。検出は継続しています。", favoriteChangeFailed: "お気に入りを変更できませんでした。", copyFailedShort: "コピー失敗", copyHistorySaveFailed: "コピーしましたが、使用履歴を保存できませんでした。", openOriginalFailed: "元のデータを開けませんでした。", deleteSelectedFailed: "選択した項目を削除できませんでした。",
+  themeApplied: mode => mode === "Dark" ? "ダークモードを適用しました。" : mode === "System" ? "システムテーマモードを適用しました。" : "ライトモードを適用しました。", themeSaveFailed: "テーマ設定を保存できませんでした。", languageApplied: "言語を変更しました。", languageSaveFailed: "言語設定を保存できませんでした。", sourceEnabled: source => `${source === "KakaoTalk" ? "カカオトーク" : source} 検出をオンにしました。`, sourceDisabled: source => `${source === "KakaoTalk" ? "カカオトーク" : source} 検出をオフにしました。`, sourceSettingFailed: source => `${source === "KakaoTalk" ? "カカオトーク" : source} 検出設定を保存できませんでした。`,
 };
 TRANSLATIONS["zh-CN"] = {
   ...TRANSLATIONS["en-US"],
   tagline: "将散落在对话中的瞬间汇聚一处", all: "全部", link: "链接", photo: "图片", image: "图片", typeLink: "链接", collection: "组合", favorite: "收藏",
   filter: "筛选", reset: "重置", source: "聊天应用", period: "时间范围", allPeriod: "全部时间", today: "今天", last7: "最近 7 天", last30: "最近 30 天",
-  select: "选择", settings: "设置", search: "搜索标题、URL 或域名", newest: "最新优先", oldest: "最早优先", mostCaptured: "保存次数最多", mostCopied: "复制次数最多", recentlyCopied: "最近复制", name: "按名称", sortLabel: value => `排序：${value}`,
+  select: "选择", selectExit: "完成选择", settings: "设置", search: "搜索标题、URL 或域名", switchToDark: "切换到深色主题", switchToLight: "切换到浅色主题", newest: "最新优先", oldest: "最早优先", mostCaptured: "保存次数最多", mostCopied: "复制次数最多", recentlyCopied: "最近复制", name: "按名称", sortLabel: value => `排序：${value}`,
   general: "常规", messenger: "聊天应用检测", settingsDescription: "在一个位置管理 Sentory、聊天应用检测和保存的数据",
   language: "Language", languageDescription: "选择界面显示语言", theme: "界面主题", themeDescription: "选择浅色或深色模式", light: "浅色模式", dark: "深色模式", system: "系统主题", auto: "Auto",
-  detected: "检测已就绪", disabled: "未使用", disabledSource: source => `${source} 检测已关闭`, connecting: "正在准备连接", recovering: "正在恢复工作进程", reconnect: "需要重新连接 Discord", repair: "重新连接", discordDetection: "Discord 检测",
-  savedOnInput: "粘贴时保存", savedOnSend: "发送时保存", photoCopied: "图片已复制。", urlCopied: "URL 已复制。", collectionCopied: "组合项目已复制到剪贴板。", addFavorite: "已添加到收藏。", removeFavorite: "已从收藏中移除。",
-  selectedCount: n => `已选择 ${n.toLocaleString("zh-CN")} 项`, visibleSelect: "全选", clearSelection: "取消选择", deleteSelected: "删除所选项目", emptyFiltered: "没有搜索结果", empty: "尚未保存任何项目", loading: "正在加载收藏库",
-  detail: "Sentory 项目详情", favoriteMarked: "★ 已收藏", captureCount: "保存次数", copyCountLabel: "复制次数", messageSource: "最近来源", savedAt: "最后保存", delete: "删除", openOriginal: "打开原文件", cancel: "取消",
+  detected: "检测已就绪", disabled: "未使用", disabledSource: source => `${source === "WeChat" ? "微信" : source} 检测已关闭`, detectionPaused: "检测已暂停", connecting: "正在准备连接", recovering: "正在恢复工作进程", reconnect: "需要重新连接 Discord", repair: "重新连接", discordDetection: "Discord 检测",
+  savedOnInput: "粘贴时保存", savedOnSend: "发送时保存", photoCopied: "图片已复制。", urlCopied: "URL 已复制。", collectionCopied: "组合项目已复制到剪贴板。", addFavorite: "已添加到收藏。", removeFavorite: "已从收藏中移除。", favoriteAddAction: "添加到收藏", favoriteRemoveAction: "从收藏中移除",
+  selectedCount: n => `已选择 ${n.toLocaleString("zh-CN")} 项`, visibleSelect: "全选", clearSelection: "取消选择", deleteSelected: "删除所选项目", emptyFiltered: "没有搜索结果", emptyFilteredDescription: "请尝试其他关键词或筛选条件。", empty: "尚未保存任何项目", emptyDescription: "请在聊天应用中粘贴链接或图片。", loading: "正在加载收藏库", loadFailed: "无法加载收藏库",
+  close: "关闭通知", detail: "Sentory 项目详情", favoriteMarked: "★ 已收藏", captureCount: "保存次数", copyCountLabel: "复制次数", messageSource: "最近来源", savedAt: "最后保存", times: n => `${n.toLocaleString("zh-CN")} 次`, openPhoto: "打开图片", openLink: "打开链接", copyPhoto: "复制图片", copyUrl: "复制 URL", copyCollection: "复制组合", delete: "删除", openOriginal: "打开原文件", cancel: "取消",
   deleteQuestion: n => n === 1 ? "要删除此项目吗？" : `要删除所选的 ${n.toLocaleString("zh-CN")} 个项目吗？`, deleteWarning: n => n === 1 ? "将从收藏库中删除此项目。\n此操作无法撤销。" : "将从收藏库中删除所选项目及保存的图片文件。\n此操作无法撤销。", deleted: n => `已删除 ${n.toLocaleString("zh-CN")} 个项目。`,
   repairQuestion: "要重新连接 Discord 吗？", repairWarning: "Discord 将以无障碍模式重启。正在编辑的消息和通话可能会结束。", restart: "重新启动", repaired: "Discord 已以连接恢复模式重新启动。",
   discordPhotoSaved: "已保存经确认在 Discord 中发送的图片。", discordUrlSaved: "已保存经确认在 Discord 中发送的 URL。", discordUrlsSaved: n => `已保存 ${n.toLocaleString("zh-CN")} 个经确认在 Discord 中发送的 URL。`, discordCollectionSaved: "已将 Discord 中发送的多个项目保存为一个组合。",
   inputPhotoSaved: "已在粘贴图片时保存。", inputUrlSaved: "已在粘贴 URL 时保存。", inputUrlsSaved: n => `已在粘贴时保存 ${n.toLocaleString("zh-CN")} 个 URL。`, inputCollectionSaved: "已将粘贴的多个项目保存为一个组合。",
+  windowsStartup: "Windows 启动时运行", startupEnabledDescription: "当前会在登录 Windows 时自动运行", startupDisabledDescription: "当前未使用自动启动", turnOn: "开启", turnOff: "关闭", startupEnabled: "已开启 Windows 自动启动。", startupDisabled: "已关闭 Windows 自动启动。", startupChangeFailed: "无法更改自动启动设置。",
+  dataManagement: "数据管理", favoriteCleanupExclusion: "收藏项目不会被自动清理", stored: "已保存", imageStorage: "图片存储空间", itemsCount: n => `${n.toLocaleString("zh-CN")} 项`, kindsCount: (links, photos) => `链接 ${links.toLocaleString("zh-CN")} · 图片 ${photos.toLocaleString("zh-CN")}`, favoritesPreserved: n => `保留 ${n.toLocaleString("zh-CN")} 个收藏项目`, statisticsLoadFailed: "无法加载数据统计。",
+  autoFavorite: "自动收藏", autoFavoriteDescription: "同一链接或图片被重复使用后自动收藏", autoFavoriteOff: "不使用", autoFavoriteCount: n => `重复使用 ${n} 次后收藏`, autoFavoriteDisabled: "已关闭自动收藏。", autoFavoriteSaved: n => `重复使用 ${n} 次后将自动添加到收藏。`, autoFavoriteSaveFailed: "无法保存自动收藏设置。",
+  autoCleanup: "自动清理", autoCleanupDefault: "默认关闭", cleanupOff: "不使用自动清理", cleanup7: "清理超过 7 天的项目", cleanup30: "清理超过 30 天的项目", cleanup90: "清理超过 90 天的项目", cleanup180: "清理超过 180 天的项目", autoCleanupDisabled: "自动清理已关闭。", autoCleanupSaved: n => `已保存按 ${n} 天自动清理的设置。`, autoCleanupSaveFailed: "无法保存自动清理设置。", saveSettings: "保存设置",
+  openDataFolder: "打开数据文件夹", openDataFolderFailed: "无法打开数据文件夹。", deleteNonFavorites: "删除除收藏外的所有项目", allNonFavoriteItems: "所有非收藏项目", nothingToCleanup: "没有可清理的项目。", cleanupHeading: "要清理项目吗？", cleanupMessage: (total, links, photos, size) => `要删除 ${total.toLocaleString("zh-CN")} 个所有非收藏项目吗？\n\n链接 ${links.toLocaleString("zh-CN")} · 图片 ${photos.toLocaleString("zh-CN")}（${size}）\n收藏项目不会被删除。`, deleteAll: "全部删除", cleanupCancelled: "已取消清理。", cleanupComplete: n => `已清理 ${n.toLocaleString("zh-CN")} 个项目。`, cleanupPartial: n => `已清理 ${n.toLocaleString("zh-CN")} 个项目；部分图片文件将在下次启动时重试。`, cleanupFailed: "无法清理数据。", checkingCleanup: "正在检查要删除的项目…",
+  appInfo: "应用信息", version: value => `版本 ${value}`, developmentVersion: "开发版本", checkForUpdates: "手动检查更新", checkForUpdatesDescription: "无需等待自动检查间隔即可检查新版本", checkNow: "立即检查", checkingForUpdates: "正在检查更新。", appIsUpToDate: "当前已是最新版本。", updateReady: version => `可以安装 ${version} 更新。`, updateCheckFailed: "无法检查更新，请检查网络连接。", copyrightNotice: "Copyright © 2026 NudeNyang", licenseSummary: "依据 GNU GPL v3 使用", openLibrary: "打开收藏库", pauseDetection: "暂停检测", resumeDetection: "恢复检测", discordAutoConnect: "Discord 自动连接", discordReconnect: "重启并重新连接 Discord", exitSentory: "退出 Sentory",
+  trayDetecting: "Sentory - 正在检测聊天应用", trayPaused: "Sentory - 检测已暂停", trayDetectionOff: "Sentory - 聊天应用检测已关闭", discordNotRunning: "Discord 未运行", discordRecoveryIssue: "需要恢复 Discord 连接。请在设置中重新连接。", discordRepairFailed: "无法恢复 Discord 连接。请退出 Discord 后重试。", captureIssue: "部分输入无法处理，检测仍在继续。", favoriteChangeFailed: "无法更新收藏。", copyFailedShort: "复制失败", copyHistorySaveFailed: "已复制，但无法保存使用记录。", openOriginalFailed: "无法打开原文件。", deleteSelectedFailed: "无法删除所选项目。",
+  themeApplied: mode => mode === "Dark" ? "已应用深色模式。" : mode === "System" ? "已应用系统主题模式。" : "已应用浅色模式。", themeSaveFailed: "无法保存主题设置。", languageApplied: "语言已更改。", languageSaveFailed: "无法保存语言设置。", sourceEnabled: source => `已开启 ${source} 检测。`, sourceDisabled: source => `已关闭 ${source} 检测。`, sourceSettingFailed: source => `无法保存 ${source} 检测设置。`,
 };
 
 const state = {
@@ -130,6 +182,8 @@ const state = {
   toastTimer: 0,
   settings: null,
   runtimeStatus: null,
+  startupEnabled: false,
+  dataStatistics: null,
   locale: "ko-KR",
   settingsBusy: false,
 };
@@ -185,6 +239,19 @@ const settingsClose = document.querySelector("#settings-close");
 const themeSetting = document.querySelector("#setting-theme");
 const languageSetting = document.querySelector("#setting-language");
 const settingsSources = document.querySelector("#settings-sources");
+const startupDescription = document.querySelector("#startup-description");
+const startupToggle = document.querySelector("#startup-toggle");
+const autoFavoriteSelect = document.querySelector("#auto-favorite-select");
+const autoFavoriteSave = document.querySelector("#auto-favorite-save");
+const autoCleanupSelect = document.querySelector("#auto-cleanup-select");
+const autoCleanupSave = document.querySelector("#auto-cleanup-save");
+const openDataFolder = document.querySelector("#open-data-folder");
+const deleteNonFavorites = document.querySelector("#delete-non-favorites");
+const updateCheck = document.querySelector("#update-check");
+const storedValue = document.querySelector("#stored-value");
+const kindsValue = document.querySelector("#kinds-value");
+const imageStorageValue = document.querySelector("#image-storage-value");
+const favoritesValue = document.querySelector("#favorites-value");
 const detectionStatus = document.querySelector("#detection-status");
 const detectionStatusText = document.querySelector("#detection-status-text");
 const colorScheme = window.matchMedia("(prefers-color-scheme: dark)");
@@ -213,8 +280,7 @@ function applyThemeMode(mode) {
   const dark = mode === "Dark" || (mode === "System" && colorScheme.matches);
   document.documentElement.dataset.theme = dark ? "dark" : "light";
   themeButton.querySelector("span").innerHTML = dark ? "&#xE706;" : "&#xE708;";
-  const nextLabel = dark ? t("light") : t("dark");
-  themeButton.title = `${nextLabel} ${t("theme")}`;
+  themeButton.title = t(dark ? "switchToLight" : "switchToDark");
   themeButton.setAttribute("aria-label", themeButton.title);
   themeSetting.value = mode || "Light";
 }
@@ -255,7 +321,7 @@ function applyLocalizedUi(language) {
   tabs[2].textContent = t("photo");
   tabs[3].lastElementChild.textContent = t("favorite");
   document.querySelector("#filter-label").textContent = t("filter");
-  document.querySelector("#select-label").textContent = t("select");
+  document.querySelector("#select-label").textContent = t(state.selectionMode ? "selectExit" : "select");
   document.querySelector("#settings-label").textContent = t("settings");
   document.querySelector("#detection-label").textContent = t("discordDetection");
   search.placeholder = t("search");
@@ -275,11 +341,34 @@ function applyLocalizedUi(language) {
   document.querySelector("#theme-setting-description").textContent = t("themeDescription");
   document.querySelector("#language-setting-title").textContent = t("language");
   document.querySelector("#language-setting-description").textContent = t("languageDescription");
+  document.querySelector("#startup-title").textContent = t("windowsStartup");
+  document.querySelector("#data-heading").textContent = t("dataManagement");
+  document.querySelector("#favorite-cleanup-note").textContent = t("favoriteCleanupExclusion");
+  document.querySelector("#stored-label").textContent = t("stored");
+  document.querySelector("#image-storage-label").textContent = t("imageStorage");
+  document.querySelector("#auto-favorite-title").textContent = t("autoFavorite");
+  document.querySelector("#auto-favorite-description").textContent = t("autoFavoriteDescription");
+  document.querySelector("#auto-cleanup-title").textContent = t("autoCleanup");
+  document.querySelector("#auto-cleanup-description").textContent = t("autoCleanupDefault");
+  document.querySelector("#app-info-heading").textContent = t("appInfo");
+  document.querySelector("#version-label").textContent = `${t("version", "2.0.0")} · ${t("developmentVersion")}`;
+  document.querySelector("#update-title").textContent = t("checkForUpdates");
+  document.querySelector("#update-description").textContent = t("checkForUpdatesDescription");
+  document.querySelector("#copyright-label").textContent = t("copyrightNotice");
+  document.querySelector("#license-summary").textContent = t("licenseSummary");
+  autoFavoriteSave.textContent = t("saveSettings");
+  autoCleanupSave.textContent = t("saveSettings");
+  openDataFolder.textContent = t("openDataFolder");
+  deleteNonFavorites.textContent = t("deleteNonFavorites");
+  updateCheck.textContent = t("checkNow");
   themeSetting.options[0].textContent = t("light");
   themeSetting.options[1].textContent = t("dark");
   themeSetting.options[2].textContent = t("system");
   languageSetting.options[0].textContent = t("auto");
   languageSetting.options[1].textContent = t("korean");
+  renderStartupState();
+  renderDataOptions();
+  renderDataStatistics();
   const sortKeys = ["newest", "oldest", "mostCaptured", "mostCopied", "recentlyCopied", "name"];
   [...sortMenu.querySelectorAll("button")].forEach((button, index) => { button.textContent = t(sortKeys[index]); });
   const selectedSort = sortMenu.querySelector(`[data-sort="${state.sort}"]`);
@@ -293,7 +382,6 @@ function applyLocalizedUi(language) {
   detailCopyCount.closest("div").querySelector("dt").textContent = t("copyCountLabel");
   detailSource.closest("div").querySelector("dt").textContent = t("messageSource");
   detailDate.closest("div").querySelector("dt").textContent = t("savedAt");
-  detailDelivery.closest("div").querySelector("dt").textContent = t("savedState");
   detailDelete.textContent = t("delete");
   detailOpen.textContent = t("openOriginal");
   detailCopy.textContent = t("copy");
@@ -307,6 +395,7 @@ function applyLocalizedUi(language) {
   state.renderedRange = "";
   renderVisibleCards();
   if (state.detailItem && !detailLayer.hidden) populateDetails(state.detailItem);
+  void configureTray();
 }
 
 function applySettings(settings) {
@@ -314,13 +403,122 @@ function applySettings(settings) {
   languageSetting.value = settings.language || "auto";
   applyLocalizedUi(settings.language || "auto");
   applyThemeMode(settings.themeMode || "Light");
+  autoFavoriteSelect.value = settings.autoFavoriteEnabled
+    ? String(settings.autoFavoriteCopyThreshold)
+    : "0";
+  autoCleanupSelect.value = String(settings.autoCleanupDays || 0);
+  void configureTray();
+}
+
+function renderStartupState() {
+  startupDescription.textContent = t(state.startupEnabled
+    ? "startupEnabledDescription"
+    : "startupDisabledDescription");
+  startupToggle.textContent = t(state.startupEnabled ? "turnOff" : "turnOn");
+}
+
+function renderDataOptions() {
+  const favoriteValue = autoFavoriteSelect.value || (state.settings?.autoFavoriteEnabled
+    ? String(state.settings.autoFavoriteCopyThreshold)
+    : "0");
+  autoFavoriteSelect.replaceChildren();
+  for (const value of [0, 2, 3, 4, 5]) {
+    const option = document.createElement("option");
+    option.value = String(value);
+    option.textContent = value === 0 ? t("autoFavoriteOff") : t("autoFavoriteCount", value);
+    autoFavoriteSelect.append(option);
+  }
+  autoFavoriteSelect.value = favoriteValue;
+
+  const cleanupValue = autoCleanupSelect.value || String(state.settings?.autoCleanupDays || 0);
+  autoCleanupSelect.replaceChildren();
+  for (const value of [0, 7, 30, 90, 180]) {
+    const option = document.createElement("option");
+    option.value = String(value);
+    option.textContent = t(value === 0 ? "cleanupOff" : `cleanup${value}`);
+    autoCleanupSelect.append(option);
+  }
+  autoCleanupSelect.value = cleanupValue;
+}
+
+function formatBytes(bytes) {
+  const units = ["B", "KB", "MB", "GB"];
+  let value = Math.max(0, Number(bytes || 0));
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value.toLocaleString(state.locale, {
+    minimumFractionDigits: unit === 0 ? 0 : 1,
+    maximumFractionDigits: unit === 0 ? 0 : 1,
+  })} ${units[unit]}`;
+}
+
+function renderDataStatistics() {
+  const statistics = state.dataStatistics;
+  if (!statistics) {
+    storedValue.textContent = "-";
+    kindsValue.textContent = "";
+    imageStorageValue.textContent = "-";
+    favoritesValue.textContent = "";
+    return;
+  }
+  storedValue.textContent = t("itemsCount", statistics.totalItems);
+  kindsValue.textContent = t("kindsCount", statistics.urlItems, statistics.imageItems);
+  imageStorageValue.textContent = formatBytes(statistics.imageBytes);
+  favoritesValue.textContent = t("favoritesPreserved", statistics.favoriteItems);
+}
+
+async function loadStartupState() {
+  try {
+    state.startupEnabled = await tauriCore().invoke("startup_get");
+    renderStartupState();
+    void configureTray();
+  } catch {
+    startupDescription.textContent = t("startupChangeFailed");
+  }
+}
+
+async function loadDataStatistics() {
+  try {
+    state.dataStatistics = await tauriCore().invoke("data_statistics");
+    renderDataStatistics();
+  } catch {
+    showToast(t("statisticsLoadFailed"));
+  }
+}
+
+async function configureTray() {
+  if (!state.settings) return;
+  try {
+    await tauriCore().invoke("tray_configure", {
+      openLabel: t("openLibrary"),
+      pauseLabel: t("pauseDetection"),
+      resumeLabel: t("resumeDetection"),
+      startupLabel: t("windowsStartup"),
+      discordLabel: t("discordAutoConnect"),
+      repairLabel: t("discordReconnect"),
+      openDataLabel: t("openDataFolder"),
+      exitLabel: t("exitSentory"),
+      detectingTooltip: t("trayDetecting"),
+      pausedTooltip: t("trayPaused"),
+      detectionOffTooltip: t("trayDetectionOff"),
+      paused: Boolean(state.runtimeStatus?.detectionPaused),
+      detectionEnabled: Object.values(state.settings.sources || {}).some(Boolean),
+      startupEnabled: state.startupEnabled,
+      discordEnabled: Boolean(state.settings.sources?.Discord),
+    });
+  } catch {
+    // The gallery remains usable if Windows has not created the tray yet.
+  }
 }
 
 async function loadSettings() {
   try {
     applySettings(await tauriCore().invoke("settings_get"));
   } catch (error) {
-    showToast(`${t("settingsFailed")} ${error instanceof Error ? error.message : String(error)}`);
+    showToast(t("settingsFailed"));
     applyLocalizedUi("auto");
   }
 }
@@ -330,8 +528,7 @@ async function persistSettings(patch) {
     const settings = await tauriCore().invoke("settings_update", { patch });
     applySettings(settings);
     return settings;
-  } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error));
+  } catch {
     await loadSettings();
     return null;
   }
@@ -339,9 +536,10 @@ async function persistSettings(patch) {
 
 function sourceRuntimeLabel(source) {
   if (!state.settings?.sources?.[source]) return { text: t("disabledSource", sourceLabel(source)), tone: "" };
+  if (state.runtimeStatus?.detectionPaused) return { text: t("detectionPaused"), tone: "" };
   if (source !== "Discord") return { text: t("detected"), tone: "ready" };
   const runtime = state.runtimeStatus;
-  if (!runtime?.discordRunning) return { text: t("disabled"), tone: "" };
+  if (!runtime?.discordRunning) return { text: t("discordNotRunning"), tone: "" };
   const key = runtime.discordState === "Ready" ? "detected"
     : runtime.discordState === "Recovering" ? "recovering"
       : runtime.discordState === "ReconnectRequired" ? "reconnect" : "connecting";
@@ -364,12 +562,12 @@ function renderSourceSettings() {
     const statusLabel = document.createElement("span");
     statusLabel.className = `source-status ${runtime.tone}`.trim();
     statusLabel.textContent = runtime.text;
-    control.append(statusLabel);
+    label.append(statusLabel);
     if (source === "Discord" && state.runtimeStatus?.discordState === "ReconnectRequired" && state.settings.sources.Discord) {
       const repair = document.createElement("button");
       repair.className = "repair-button";
       repair.type = "button";
-      repair.textContent = t("repair");
+      repair.textContent = t("discordReconnect");
       repair.addEventListener("click", () => void repairDiscord());
       control.append(repair);
     }
@@ -381,10 +579,13 @@ function renderSourceSettings() {
     input.setAttribute("aria-label", sourceLabel(source));
     const track = document.createElement("span");
     track.className = "switch-track";
-    input.addEventListener("change", () => {
+    input.addEventListener("change", async () => {
       state.settings.sources[source] = input.checked;
       renderSourceSettings();
-      void persistSettings({ [SOURCE_PATCH_KEYS[source]]: input.checked });
+      const enabled = input.checked;
+      const settings = await persistSettings({ [SOURCE_PATCH_KEYS[source]]: enabled });
+      const displaySource = sourceLabel(source);
+      showToast(settings ? t(enabled ? "sourceEnabled" : "sourceDisabled", displaySource) : t("sourceSettingFailed", displaySource));
     });
     switchLabel.append(input, track);
     control.append(switchLabel);
@@ -406,6 +607,7 @@ function applyRuntimeStatus(runtime) {
     detectionStatus.classList.toggle("ready", label.tone === "ready");
   }
   renderSourceSettings();
+  void configureTray();
 }
 
 async function repairDiscord() {
@@ -417,8 +619,8 @@ async function repairDiscord() {
   try {
     applyRuntimeStatus(await tauriCore().invoke("discord_repair"));
     showToast(t("repaired"));
-  } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error));
+  } catch {
+    showToast(t("discordRepairFailed"));
   }
 }
 
@@ -456,7 +658,6 @@ async function connectEngineEvents() {
   await listen("gallery-changed", () => {
     const preserveScroll = scroller.scrollTop > ROW_HEIGHT;
     resetGallery({ preserveScroll });
-    if (preserveScroll) showToast(t("newItem"));
   });
   await listen("engine-status", event => {
     const engineState = event.payload?.state;
@@ -464,12 +665,10 @@ async function connectEngineEvents() {
       setStatus(t("enginePreparing"));
     } else if (engineState === "recovering") {
       setStatus(t("engineRecovering"));
-    } else if (engineState === "ready" &&
-               (status.textContent.includes("C# 엔진") ||
-                status.textContent.includes("워커 연결"))) {
+    } else if (engineState === "ready") {
       status.classList.add("hidden");
     } else if (engineState === "error") {
-      setStatus(event.payload?.message || t("engineFailed"), true);
+      setStatus(t("engineFailed"), true);
     }
   });
   await listen("runtime-status", event => applyRuntimeStatus(event.payload));
@@ -477,10 +676,15 @@ async function connectEngineEvents() {
     showToast(localizedCaptureMessage(event.payload));
   });
   await listen("runtime-issue", event => {
-    if (event.payload?.message) showToast(event.payload.message);
+    if (event.payload?.message) {
+      showToast(event.payload.message.includes("Discord") ? t("discordRecoveryIssue") : t("captureIssue"));
+    }
   });
   await listen("settings-changed", event => {
-    if (event.payload) applySettings(event.payload);
+    if (event.payload) {
+      applySettings(event.payload);
+      void loadStartupState();
+    }
   });
 }
 
@@ -494,7 +698,7 @@ async function loadPage(offset, generation, isInitial = false) {
       });
       if (generation !== state.generation) return;
       if (snapshot.protocolVersion !== 2 || !Array.isArray(snapshot.items)) {
-        throw new Error("지원하지 않는 C# 엔진 응답입니다.");
+        throw new Error(t("loadFailed"));
       }
 
       if (isInitial) {
@@ -514,7 +718,7 @@ async function loadPage(offset, generation, isInitial = false) {
       renderVisibleCards();
 
       if (isInitial) {
-        setStatus(`${t("items", snapshot.total)} · ${t("engineConnected")}`);
+        setStatus(t("items", snapshot.total));
         window.setTimeout(() => status.classList.add("hidden"), 1000);
       }
       void tauriCore().invoke("ui_diagnostic", {
@@ -528,13 +732,13 @@ async function loadPage(offset, generation, isInitial = false) {
         state.items = [];
         state.hasLoaded = true;
         state.renderRevision += 1;
-        document.title = "Sentory · 연결 오류";
+        document.title = "Sentory";
         measureGrid();
         renderVisibleCards();
       }
-      const message = error instanceof Error ? error.message : String(error);
-      setStatus(message, true);
-      void tauriCore().invoke("ui_diagnostic", { event: "gallery-page-failed", detail: message });
+      const detail = error instanceof Error ? error.message : String(error);
+      setStatus(t("loadFailed"), true);
+      void tauriCore().invoke("ui_diagnostic", { event: "gallery-page-failed", detail });
     } finally {
       if (generation === state.generation) state.pendingPages.delete(pageOffset);
       refreshButton.disabled = false;
@@ -728,7 +932,7 @@ function createCard(item, index) {
   favorite.className = `favorite${item.isFavorite ? " active" : ""}`;
   favorite.type = "button";
   favorite.innerHTML = item.isFavorite ? "&#xE735;" : "&#xE734;";
-  favorite.title = item.isFavorite ? t("removeFavorite") : t("addFavorite");
+  favorite.title = item.isFavorite ? t("favoriteRemoveAction") : t("favoriteAddAction");
   favorite.setAttribute("aria-label", favorite.title);
   favorite.addEventListener("click", event => {
     event.stopPropagation();
@@ -755,11 +959,14 @@ function createUrlFallback(item) {
 }
 
 function createEmptyState() {
-  const empty = document.createElement("p");
+  const filtered = state.query || state.kind !== "all" || state.sources.size > 0 || state.dateRange !== "All";
+  const empty = document.createElement("div");
   empty.className = "empty";
-  empty.textContent = state.query || state.kind !== "all" || state.sources.size > 0 || state.dateRange !== "All"
-    ? t("emptyFiltered")
-    : t("empty");
+  const heading = document.createElement("strong");
+  heading.textContent = t(filtered ? "emptyFiltered" : "empty");
+  const description = document.createElement("span");
+  description.textContent = t(filtered ? "emptyFilteredDescription" : "emptyDescription");
+  empty.append(heading, description);
   return empty;
 }
 
@@ -774,9 +981,9 @@ async function showDetails(itemId) {
     if (!detail) throw new Error(t("itemNotFound"));
     state.detailItem = detail;
     populateDetails(detail);
-  } catch (error) {
+  } catch {
     detailLayer.hidden = true;
-    showToast(error instanceof Error ? error.message : String(error));
+    showToast(t("itemNotFound"));
   }
 }
 
@@ -786,11 +993,13 @@ function populateDetails(detail) {
   detailFavoriteMark.hidden = !card.isFavorite;
   detailTitle.textContent = card.title;
   detailDescription.textContent = card.subtitle;
-  detailCaptureCount.textContent = state.locale === "ko-KR" ? `${card.captureCount}회` : String(card.captureCount);
-  detailCopyCount.textContent = state.locale === "ko-KR" ? `${card.copyCount}회` : String(card.copyCount);
+  detailCaptureCount.textContent = t("times", card.captureCount);
+  detailCopyCount.textContent = t("times", card.copyCount);
   detailSource.textContent = sourceLabel(card.sourceApp);
   detailDate.textContent = new Intl.DateTimeFormat(state.locale, { dateStyle: "long", timeStyle: "short" }).format(new Date(card.lastCapturedAt));
   detailDelivery.textContent = localizedStatus(card);
+  detailOpen.textContent = t(card.kind === "Image" ? "openPhoto" : "openLink");
+  detailCopy.textContent = t(card.kind === "Image" ? "copyPhoto" : card.kind === "Collection" ? "copyCollection" : "copyUrl");
   detailArtwork.replaceChildren(createDetailArtwork(detail));
 }
 
@@ -814,7 +1023,7 @@ async function copyItem(itemId, button = null) {
   }
   try {
     const result = await tauriCore().invoke("gallery_copy", { itemId });
-    if (!result.success) throw new Error("복사 기록을 저장하지 못했습니다.");
+    if (!result.success) throw new Error(t("copyHistorySaveFailed"));
     updateLoadedItem(itemId, item => ({
       ...item,
       copyCount: result.copyCount ?? item.copyCount + 1,
@@ -823,14 +1032,14 @@ async function copyItem(itemId, button = null) {
     if (state.detailItem?.card.itemId === itemId) {
       state.detailItem.card.copyCount = result.copyCount ?? state.detailItem.card.copyCount + 1;
       state.detailItem.card.isFavorite = result.isFavorite ?? state.detailItem.card.isFavorite;
-      detailCopyCount.textContent = `${state.detailItem.card.copyCount}회`;
+      detailCopyCount.textContent = t("times", state.detailItem.card.copyCount);
       detailFavoriteMark.hidden = !state.detailItem.card.isFavorite;
     }
     const loaded = state.items.find(item => item?.itemId === itemId) ?? state.detailItem?.card;
     showToast(loaded?.kind === "Image" ? t("photoCopied") : loaded?.kind === "Collection" ? t("collectionCopied") : t("urlCopied"));
     if (button) button.innerHTML = "&#xE73E;";
-  } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error));
+  } catch {
+    showToast(t("copyFailedShort"));
     if (button) button.innerHTML = "&#xE783;";
   } finally {
     window.setTimeout(() => {
@@ -850,11 +1059,11 @@ async function toggleFavorite(item, button) {
       itemId: item.itemId,
       isFavorite: next,
     });
-    if (!result.success) throw new Error("항목을 찾지 못했습니다.");
+    if (!result.success) throw new Error(t("itemNotFound"));
     showToast(next ? t("addFavorite") : t("removeFavorite"));
   } catch (error) {
     updateLoadedItem(item.itemId, current => ({ ...current, isFavorite: !next }));
-    showToast(error instanceof Error ? error.message : String(error));
+    showToast(t("favoriteChangeFailed"));
   }
 }
 
@@ -870,7 +1079,7 @@ async function openItem(itemId) {
   try {
     await tauriCore().invoke("gallery_open", { itemId });
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error));
+    showToast(t("openOriginalFailed"));
   }
 }
 
@@ -883,7 +1092,7 @@ async function deleteItems(itemIds) {
   if (!confirmed) return false;
   try {
     const result = await tauriCore().invoke("gallery_delete", { itemIds });
-    if (!result.success && result.missing === 0) throw new Error("항목을 삭제하지 못했습니다.");
+    if (!result.success && result.missing === 0) throw new Error(t("deleteSelectedFailed"));
     showToast(t("deleted", result.changed));
     state.selectedIds.clear();
     if (!detailLayer.hidden) detailLayer.hidden = true;
@@ -891,7 +1100,7 @@ async function deleteItems(itemIds) {
     updateSelectionUi();
     return true;
   } catch (error) {
-    showToast(error instanceof Error ? error.message : String(error));
+    showToast(t("deleteSelectedFailed"));
     return false;
   }
 }
@@ -929,6 +1138,7 @@ function setSelectionMode(enabled) {
   state.selectionMode = enabled;
   document.body.classList.toggle("selection-mode", enabled);
   selectModeButton.classList.toggle("selected", enabled);
+  document.querySelector("#select-label").textContent = t(enabled ? "selectExit" : "select");
   if (!enabled) state.selectedIds.clear();
   updateSelectionUi();
   state.renderRevision += 1;
@@ -952,7 +1162,7 @@ function updateSelectionUi() {
 }
 
 function sourceLabel(source) {
-  return source === "KakaoTalk" ? "카카오톡" : source === "Line" ? "LINE" : source;
+  return source === "Line" ? "LINE" : source;
 }
 
 function beginSelectionDrag(event) {
@@ -1126,7 +1336,7 @@ for (const source of SOURCES) {
   const button = document.createElement("button");
   button.type = "button";
   button.dataset.source = source;
-  button.textContent = source === "KakaoTalk" ? "카카오톡" : source === "Line" ? "LINE" : source;
+  button.textContent = sourceLabel(source);
   button.addEventListener("click", () => {
     if (state.sources.has(source)) state.sources.delete(source);
     else state.sources.add(source);
@@ -1254,33 +1464,121 @@ document.addEventListener("keydown", event => {
   else if (state.selectionMode) setSelectionMode(false);
 });
 
-themeButton.addEventListener("click", () => {
+themeButton.addEventListener("click", async () => {
   const next = document.documentElement.dataset.theme === "dark" ? "Light" : "Dark";
   if (state.settings) state.settings.themeMode = next;
   applyThemeMode(next);
-  void persistSettings({ themeMode: next });
+  const settings = await persistSettings({ themeMode: next });
+  showToast(settings ? t("themeApplied", next) : t("themeSaveFailed"));
 });
 
 settingsButton.addEventListener("click", () => {
   settingsLayer.hidden = false;
   renderSourceSettings();
+  void loadStartupState();
+  void loadDataStatistics();
   themeSetting.focus();
 });
 settingsClose.addEventListener("click", () => { settingsLayer.hidden = true; });
 settingsLayer.addEventListener("pointerdown", event => {
   if (event.target === settingsLayer) settingsLayer.hidden = true;
 });
-themeSetting.addEventListener("change", () => {
+themeSetting.addEventListener("change", async () => {
   const mode = themeSetting.value;
   if (state.settings) state.settings.themeMode = mode;
   applyThemeMode(mode);
-  void persistSettings({ themeMode: mode });
+  const settings = await persistSettings({ themeMode: mode });
+  showToast(settings ? t("themeApplied", mode) : t("themeSaveFailed"));
 });
-languageSetting.addEventListener("change", () => {
+languageSetting.addEventListener("change", async () => {
   const language = languageSetting.value;
   if (state.settings) state.settings.language = language;
   applyLocalizedUi(language);
-  void persistSettings({ language });
+  const settings = await persistSettings({ language });
+  showToast(settings ? t("languageApplied") : t("languageSaveFailed"));
+});
+startupToggle.addEventListener("click", async () => {
+  startupToggle.disabled = true;
+  const next = !state.startupEnabled;
+  try {
+    const settings = await tauriCore().invoke("startup_set", { enabled: next });
+    state.startupEnabled = next;
+    applySettings(settings);
+    showToast(t(next ? "startupEnabled" : "startupDisabled"));
+  } catch {
+    showToast(t("startupChangeFailed"));
+  } finally {
+    startupToggle.disabled = false;
+    renderStartupState();
+  }
+});
+autoFavoriteSave.addEventListener("click", async () => {
+  const threshold = Number(autoFavoriteSelect.value);
+  autoFavoriteSave.disabled = true;
+  const settings = await persistSettings({
+    autoFavoriteEnabled: threshold > 0,
+    autoFavoriteCopyThreshold: threshold > 0 ? threshold : (state.settings?.autoFavoriteCopyThreshold || 3),
+  });
+  if (settings) showToast(t(threshold > 0 ? "autoFavoriteSaved" : "autoFavoriteDisabled", threshold));
+  else showToast(t("autoFavoriteSaveFailed"));
+  autoFavoriteSave.disabled = false;
+});
+autoCleanupSave.addEventListener("click", async () => {
+  const days = Number(autoCleanupSelect.value);
+  autoCleanupSave.disabled = true;
+  const settings = await persistSettings({ autoCleanupDays: days });
+  if (settings) showToast(t(days > 0 ? "autoCleanupSaved" : "autoCleanupDisabled", days));
+  else showToast(t("autoCleanupSaveFailed"));
+  autoCleanupSave.disabled = false;
+});
+openDataFolder.addEventListener("click", async () => {
+  try {
+    await tauriCore().invoke("open_data_directory");
+  } catch {
+    showToast(t("openDataFolderFailed"));
+  }
+});
+deleteNonFavorites.addEventListener("click", async () => {
+  deleteNonFavorites.disabled = true;
+  showToast(t("checkingCleanup"));
+  try {
+    const preview = await tauriCore().invoke("data_cleanup_preview");
+    if (!preview.totalItems) {
+      showToast(t("nothingToCleanup"));
+      return;
+    }
+    const confirmed = await askConfirmation(
+      t("cleanupHeading"),
+      t("cleanupMessage", preview.totalItems, preview.urlItems, preview.imageItems, formatBytes(preview.imageBytes)),
+      { okText: t("deleteAll"), danger: true });
+    if (!confirmed) {
+      showToast(t("cleanupCancelled"));
+      return;
+    }
+    const result = await tauriCore().invoke("data_cleanup");
+    showToast(t(result.fileDeleteFailures === 0 ? "cleanupComplete" : "cleanupPartial", result.deleted.totalItems));
+    await loadDataStatistics();
+    resetGallery();
+  } catch {
+    showToast(t("cleanupFailed"));
+  } finally {
+    deleteNonFavorites.disabled = false;
+  }
+});
+updateCheck.addEventListener("click", async () => {
+  updateCheck.disabled = true;
+  showToast(t("checkingForUpdates"));
+  try {
+    const result = await tauriCore().invoke("update_check");
+    showToast(result.updateAvailable ? t("updateReady", result.version) : t("appIsUpToDate"));
+    if (result.updateAvailable && result.releasePage) {
+      await tauriCore().invoke("ui_diagnostic", { event: "update-available", detail: result.releasePage });
+    }
+  } catch {
+    showToast(t("updateCheckFailed"));
+  } finally {
+    updateCheck.disabled = false;
+  }
 });
 colorScheme.addEventListener("change", () => {
   if (state.settings?.themeMode === "System") applyThemeMode("System");
@@ -1304,5 +1602,8 @@ new ResizeObserver(() => {
 updateFilterUi();
 updateSelectionUi();
 void connectEngineEvents();
-void loadSettings();
+void (async () => {
+  await loadSettings();
+  await loadStartupState();
+})();
 resetGallery();
