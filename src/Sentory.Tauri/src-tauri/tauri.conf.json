@@ -31,7 +31,7 @@
   "bundle": {
     "active": false,
     "icon": [
-      "../../Sentory.App/Assets/Sentory.ico"
+      "../../Sentory.App/Assets/Sentory.png"
     ],
     "externalBin": [
       "binaries/sentory-engine"
