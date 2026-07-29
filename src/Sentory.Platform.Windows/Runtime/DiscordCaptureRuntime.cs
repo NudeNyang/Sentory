@@ -49,6 +49,8 @@ public sealed class DiscordCaptureRuntime :
     private readonly IDiscordConfirmationClient _confirmationClient;
     private readonly IDiscordWorkerLifecycle? _workerLifecycle;
     private readonly DiscordDetectionStatusTracker _statusTracker = new();
+    private readonly DiscordAttachmentReplayGuard _attachmentReplayGuard =
+        new();
     private readonly CaptureCoordinator _coordinator;
     private readonly Channel<PasteTrigger> _triggers =
         Channel.CreateBounded<PasteTrigger>(
@@ -306,10 +308,12 @@ public sealed class DiscordCaptureRuntime :
                     15_000,
                     ExplicitSendObserved: true),
                 registration.Cancellation.Token);
-            var attachmentUrls = response.AttachmentUrls ?? [];
+            var discoveredAttachmentUrls = response.AttachmentUrls ?? [];
+            var attachmentUrls = _attachmentReplayGuard.SelectUnseen(
+                discoveredAttachmentUrls);
             DiscordCaptureTrace.Write(
                 "attachment-discovery-response",
-                $"outcome={response.Outcome} urls={attachmentUrls.Count} signals={string.Join(',', response.ConfirmationSignals)}");
+                $"outcome={response.Outcome} urls={discoveredAttachmentUrls.Count} eligible={attachmentUrls.Count} signals={string.Join(',', response.ConfirmationSignals)}");
             if (response.Outcome != DiscordConfirmationOutcome.Confirmed ||
                 attachmentUrls.Count == 0 ||
                 _paused)
@@ -354,6 +358,7 @@ public sealed class DiscordCaptureRuntime :
                 registration.Cancellation.Token);
             if (result?.EventApplied == true)
             {
+                _attachmentReplayGuard.Record(attachmentUrls);
                 Captured?.Invoke(
                     this,
                     new CaptureNotification(

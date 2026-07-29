@@ -39,4 +39,49 @@ internal static partial class DiscordAttachmentUrlExtractor
                    "media.discordapp.net",
                    StringComparison.OrdinalIgnoreCase);
     }
+
+    public static IReadOnlyList<string> SelectNew(
+        IEnumerable<string> candidateUrls,
+        IEnumerable<string> knownUrls)
+    {
+        var knownIdentities = knownUrls
+            .Select(CreateIdentity)
+            .Where(identity => identity is not null)
+            .Select(identity => identity!)
+            .ToHashSet(StringComparer.Ordinal);
+        return SelectNewAgainstIdentities(candidateUrls, knownIdentities);
+    }
+
+    internal static IReadOnlyList<string> SelectNewAgainstIdentities(
+        IEnumerable<string> candidateUrls,
+        IReadOnlySet<string> knownIdentities)
+    {
+        var selected = new List<string>();
+        var selectedIdentities = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var url in candidateUrls)
+        {
+            var identity = CreateIdentity(url);
+            if (identity is null ||
+                knownIdentities.Contains(identity) ||
+                !selectedIdentities.Add(identity))
+            {
+                continue;
+            }
+
+            selected.Add(url);
+        }
+
+        return selected;
+    }
+
+    internal static string? CreateIdentity(string value)
+    {
+        if (!IsAllowedAttachmentUrl(value) ||
+            !Uri.TryCreate(value, UriKind.Absolute, out var uri))
+        {
+            return null;
+        }
+
+        return uri.AbsolutePath;
+    }
 }
