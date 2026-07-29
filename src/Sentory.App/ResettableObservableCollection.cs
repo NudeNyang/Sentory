@@ -7,6 +7,8 @@ namespace Sentory.App;
 internal sealed class ResettableObservableCollection<T> :
     ObservableCollection<T>
 {
+    private const int ResetChangeThreshold = 32;
+
     public void ReconcileAll(
         IEnumerable<T> items,
         IEqualityComparer<T>? comparer = null)
@@ -14,6 +16,13 @@ internal sealed class ResettableObservableCollection<T> :
         ArgumentNullException.ThrowIfNull(items);
         comparer ??= EqualityComparer<T>.Default;
         var replacement = items as IReadOnlyList<T> ?? items.ToArray();
+        if (EstimateChangeCount(replacement, comparer) >=
+            ResetChangeThreshold)
+        {
+            ReplaceAll(replacement);
+            return;
+        }
+
         var unmatched = replacement.ToList();
 
         for (var currentIndex = Count - 1;
@@ -90,5 +99,71 @@ internal sealed class ResettableObservableCollection<T> :
         }
 
         return -1;
+    }
+
+    private int EstimateChangeCount(
+        IReadOnlyList<T> replacement,
+        IEqualityComparer<T> comparer)
+    {
+        var working = Items.ToList();
+        var unmatched = replacement.ToList();
+        var changes = 0;
+        for (var currentIndex = working.Count - 1;
+             currentIndex >= 0;
+             currentIndex--)
+        {
+            var replacementIndex = unmatched.FindIndex(item =>
+                comparer.Equals(working[currentIndex], item));
+            if (replacementIndex >= 0)
+            {
+                unmatched.RemoveAt(replacementIndex);
+            }
+            else
+            {
+                working.RemoveAt(currentIndex);
+                changes++;
+            }
+        }
+
+        for (var targetIndex = 0;
+             targetIndex < replacement.Count;
+             targetIndex++)
+        {
+            var desiredItem = replacement[targetIndex];
+            if (targetIndex < working.Count &&
+                comparer.Equals(working[targetIndex], desiredItem))
+            {
+                continue;
+            }
+
+            var currentIndex = -1;
+            for (var index = targetIndex + 1;
+                 index < working.Count;
+                 index++)
+            {
+                if (comparer.Equals(working[index], desiredItem))
+                {
+                    currentIndex = index;
+                    break;
+                }
+            }
+            if (currentIndex >= 0)
+            {
+                working.RemoveAt(currentIndex);
+                working.Insert(targetIndex, desiredItem);
+            }
+            else
+            {
+                working.Insert(targetIndex, desiredItem);
+            }
+
+            changes++;
+            if (changes >= ResetChangeThreshold)
+            {
+                return changes;
+            }
+        }
+
+        return changes;
     }
 }

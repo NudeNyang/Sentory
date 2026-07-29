@@ -51,6 +51,7 @@ public partial class GalleryWindow : Window
         new(256);
     private readonly FileBackedWeakLruCache<ImageSource> _detailArtworkCache =
         new(128);
+    private readonly GalleryCardThumbnailStore _cardThumbnailStore;
     private GalleryFilter _filter = GalleryFilter.All;
     private GalleryDateRange _dateRange = GalleryDateRange.All;
     private GallerySortMode _sortMode = GallerySortMode.Newest;
@@ -100,6 +101,8 @@ public partial class GalleryWindow : Window
 
     public event EventHandler? LanguageChanged;
 
+    public event EventHandler? ForegroundInteractionStarted;
+
     public event Action<bool, int>? AutoFavoriteSettingsChanged;
 
     public event EventHandler? SyncConfigurationChanged;
@@ -119,6 +122,8 @@ public partial class GalleryWindow : Window
         _repository = repository;
         _copyUsageRecorder = new CopyUsageRecorder(repository);
         _paths = paths;
+        _cardThumbnailStore = new GalleryCardThumbnailStore(
+            paths.RootDirectory);
         _settingsStore = settingsStore;
         _linkPreviewFetcher = linkPreviewFetcher;
         _syncStatusTracker = syncStatusTracker;
@@ -359,19 +364,19 @@ public partial class GalleryWindow : Window
                 .ToArray()
             : [];
         var collectionArtwork = isCollection
-            ? LoadArtwork(
+            ? CreateImageCardArtworkReference(
                 collectionImages.FirstOrDefault()?.ContentPath,
-                _cardArtworkCache,
-                GalleryArtworkDecodePolicy.CardWidth)
+                _cardArtworkCache)
             : null;
         var collectionLinkPreview = isCollection
-            ? LoadArtwork(
+            ? CreateArtworkReference(
                 item.PreviewImagePath,
                 _cardArtworkCache,
-                GalleryArtworkDecodePolicy.CardWidth)
+                GalleryArtworkDecodePolicy.CardWidth,
+                preferBackgroundLoad: true)
             : null;
         var collectionLinkIcon = isCollection
-            ? LoadArtwork(
+            ? CreateArtworkReference(
                 item.SiteIconPath,
                 _siteIconCache,
                 GalleryArtworkDecodePolicy.SiteIconWidth)
@@ -386,17 +391,17 @@ public partial class GalleryWindow : Window
         var thumbnail = isCollection
             ? collectionPreview
             : isImage
-                ? LoadArtwork(
+                ? CreateImageCardArtworkReference(
                     item.ContentPath,
-                    _cardArtworkCache,
-                    GalleryArtworkDecodePolicy.CardWidth)
-                : LoadArtwork(
+                    _cardArtworkCache)
+                : CreateArtworkReference(
                     item.PreviewImagePath,
                     _cardArtworkCache,
-                    GalleryArtworkDecodePolicy.CardWidth);
+                    GalleryArtworkDecodePolicy.CardWidth,
+                    preferBackgroundLoad: true);
         var siteIcon = isImage || isCollection
             ? null
-            : LoadArtwork(
+            : CreateArtworkReference(
                 item.SiteIconPath,
                 _siteIconCache,
                 GalleryArtworkDecodePolicy.SiteIconWidth);
@@ -496,7 +501,8 @@ public partial class GalleryWindow : Window
     private GalleryArtworkReference? CreateArtworkReference(
         string? relativePath,
         FileBackedWeakLruCache<ImageSource> cache,
-        int decodePixelWidth)
+        int decodePixelWidth,
+        bool preferBackgroundLoad = false)
     {
         var absolutePath = ResolveContentPath(relativePath);
         if (absolutePath is null || !File.Exists(absolutePath))
@@ -507,7 +513,44 @@ public partial class GalleryWindow : Window
         return new GalleryArtworkReference(() =>
             cache.GetOrAdd(
                 absolutePath,
-                path => LoadThumbnailFromFile(path, decodePixelWidth)));
+                path => LoadThumbnailFromFile(path, decodePixelWidth)),
+            preferBackgroundLoad);
+    }
+
+    private GalleryArtworkReference? CreateImageCardArtworkReference(
+        string? relativePath,
+        FileBackedWeakLruCache<ImageSource> cache)
+    {
+        var absolutePath = ResolveContentPath(relativePath);
+        if (absolutePath is null || !File.Exists(absolutePath))
+        {
+            return null;
+        }
+
+        var existingThumbnail =
+            _cardThumbnailStore.TryGetExisting(absolutePath);
+        if (existingThumbnail is not null)
+        {
+            return new GalleryArtworkReference(() =>
+                cache.GetOrAdd(
+                    existingThumbnail,
+                    path => LoadThumbnailFromFile(
+                        path,
+                        GalleryArtworkDecodePolicy.CardWidth)),
+                preferBackgroundLoad: true);
+        }
+
+        return new GalleryArtworkReference(() =>
+        {
+            var thumbnailPath = _cardThumbnailStore.GetOrCreate(absolutePath);
+            return thumbnailPath is null
+                ? null
+                : cache.GetOrAdd(
+                    thumbnailPath,
+                    path => LoadThumbnailFromFile(
+                        path,
+                        GalleryArtworkDecodePolicy.CardWidth));
+        }, preferBackgroundLoad: true);
     }
 
     private ImageSource? LoadArtwork(
@@ -635,6 +678,7 @@ public partial class GalleryWindow : Window
     {
         if (_loaded)
         {
+            NotifyForegroundInteractionStarted();
             ApplyFilter();
         }
     }
@@ -658,6 +702,7 @@ public partial class GalleryWindow : Window
             return;
         }
 
+        NotifyForegroundInteractionStarted();
         _filter = nextFilter;
         AllFilterButton.IsChecked = _filter == GalleryFilter.All;
         UrlFilterButton.IsChecked = _filter == GalleryFilter.Url;
@@ -798,6 +843,7 @@ public partial class GalleryWindow : Window
 
     private async Task ApplyLanguageSelection(string language)
     {
+        NotifyForegroundInteractionStarted();
         _languageRefreshCancellation?.Cancel();
         _languageRefreshCancellation?.Dispose();
         _languageRefreshCancellation = new CancellationTokenSource();
@@ -1971,6 +2017,7 @@ public partial class GalleryWindow : Window
             return;
         }
 
+        NotifyForegroundInteractionStarted();
         _dateRange = dateRange;
         UpdateIntegratedFilterControls();
         ApplyFilter();
@@ -1990,6 +2037,7 @@ public partial class GalleryWindow : Window
             return;
         }
 
+        NotifyForegroundInteractionStarted();
         _sortMode = sortMode;
         SortPopup.IsOpen = false;
         UpdateSortControls();
@@ -2010,6 +2058,7 @@ public partial class GalleryWindow : Window
             return;
         }
 
+        NotifyForegroundInteractionStarted();
         if (value == "All")
         {
             _sourceApps.Clear();
@@ -2031,12 +2080,16 @@ public partial class GalleryWindow : Window
         object sender,
         RoutedEventArgs e)
     {
+        NotifyForegroundInteractionStarted();
         _sourceApps.Clear();
         _dateRange = GalleryDateRange.All;
         UpdateIntegratedFilterControls();
         ApplyFilter();
         SaveFilterPreferences();
     }
+
+    private void NotifyForegroundInteractionStarted() =>
+        ForegroundInteractionStarted?.Invoke(this, EventArgs.Empty);
 
     private void UpdateIntegratedFilterControls()
     {
@@ -3152,8 +3205,8 @@ public sealed record GalleryItemViewModel(
     string DateLabel,
     string StatusLabel,
     string Initial,
-    ImageSource? Thumbnail,
-    ImageSource? SiteIcon,
+    GalleryArtworkReference? ThumbnailReference,
+    GalleryArtworkReference? SiteIconReference,
     GalleryArtworkReference? DetailThumbnailReference,
     bool HasPrimaryArtwork,
     bool HasSiteIcon,
@@ -3171,6 +3224,33 @@ public sealed record GalleryItemViewModel(
     private string _statusLabel = StatusLabel;
     private string _initial = Initial;
     private string _collectionBadgeText = CollectionBadgeText;
+    private int _thumbnailLoadStarted;
+
+    public ImageSource? Thumbnail
+    {
+        get
+        {
+            if (ThumbnailReference is null)
+            {
+                return null;
+            }
+
+            if (!ThumbnailReference.PreferBackgroundLoad ||
+                ThumbnailReference.IsValueCreated)
+            {
+                return ThumbnailReference.Value;
+            }
+
+            if (Interlocked.Exchange(ref _thumbnailLoadStarted, 1) == 0)
+            {
+                _ = LoadThumbnailInBackgroundAsync();
+            }
+
+            return null;
+        }
+    }
+
+    public ImageSource? SiteIcon => SiteIconReference?.Value;
 
     public ImageSource? DetailThumbnail =>
         DetailThumbnailReference?.Value ?? Thumbnail;
@@ -3274,6 +3354,30 @@ public sealed record GalleryItemViewModel(
         PropertyChanged?.Invoke(
             this,
             new PropertyChangedEventArgs(propertyName));
+
+    private async Task LoadThumbnailInBackgroundAsync()
+    {
+        try
+        {
+            if (ThumbnailReference is not null)
+            {
+                _ = await ThumbnailReference.LoadAsync();
+            }
+        }
+        catch (Exception)
+        {
+        }
+
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            await dispatcher.InvokeAsync(() =>
+                OnPropertyChanged(nameof(Thumbnail)));
+            return;
+        }
+
+        OnPropertyChanged(nameof(Thumbnail));
+    }
 }
 
 internal sealed record GalleryItemLocalizedText(

@@ -24,6 +24,13 @@ public sealed class LocalFolderSyncRuntimeService(
     Action? storeRecoveryStarted = null)
 {
     private const int ExportBatchSize = 200;
+    private readonly object _readableStoreGate = new();
+    private ReadableFolderSyncObjectStore? _readableStore;
+    private string? _readableStoreDirectory;
+    private int _readableStoreCreationCount;
+
+    internal int ReadableStoreCreationCount =>
+        Volatile.Read(ref _readableStoreCreationCount);
 
     public async Task<LocalFolderSyncRunResult> RunOnceAsync(
         string deviceId,
@@ -49,7 +56,7 @@ public sealed class LocalFolderSyncRuntimeService(
 
         return await RunOnceAsync(
             deviceId,
-            new ReadableFolderSyncObjectStore(selectedDirectory),
+            GetReadableStore(selectedDirectory, storeReset),
             cancellationToken,
             storeReset);
     }
@@ -63,6 +70,34 @@ public sealed class LocalFolderSyncRuntimeService(
             new LocalFolderSyncObjectStore(selectedDirectory),
             cancellationToken,
             storeReset: false);
+
+    private ReadableFolderSyncObjectStore GetReadableStore(
+        string selectedDirectory,
+        bool forceRefresh)
+    {
+        var fullDirectory = Path.GetFullPath(selectedDirectory);
+        var pathComparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        lock (_readableStoreGate)
+        {
+            if (!forceRefresh &&
+                _readableStore is not null &&
+                string.Equals(
+                    _readableStoreDirectory,
+                    fullDirectory,
+                    pathComparison))
+            {
+                return _readableStore;
+            }
+
+            _readableStore = new ReadableFolderSyncObjectStore(
+                fullDirectory);
+            _readableStoreDirectory = fullDirectory;
+            Interlocked.Increment(ref _readableStoreCreationCount);
+            return _readableStore;
+        }
+    }
 
     private async Task<LocalFolderSyncRunResult> RunOnceAsync(
         string deviceId,

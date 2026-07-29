@@ -83,6 +83,28 @@ public sealed class LocalFolderSyncObjectStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task RepeatedListingReusesHeadersForUnchangedFiles()
+    {
+        var store = new LocalFolderSyncObjectStore(_root);
+        const string key =
+            "devices/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/" +
+            "operations/00000000000000000001-" +
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.json";
+        byte[] content = [1, 2, 3];
+        await store.PutIfAbsentAsync(
+            key,
+            content,
+            ComputeSha256(content));
+
+        _ = await store.ListAsync("devices/", null, 10);
+        var readsAfterFirstListing = store.HeaderFileReadCount;
+        _ = await store.ListAsync("devices/", null, 10);
+
+        Assert.Equal(1, readsAfterFirstListing);
+        Assert.Equal(readsAfterFirstListing, store.HeaderFileReadCount);
+    }
+
+    [Fact]
     public async Task RepeatedPutAcceptsSameContentAndRejectsConflict()
     {
         var store = new LocalFolderSyncObjectStore(_root);

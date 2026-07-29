@@ -7,10 +7,61 @@ namespace Sentory.App.Tests;
 public sealed class GalleryItemViewModelTests
 {
     [Fact]
+    public void MissingCardThumbnailDoesNotBlockTheBindingGetter()
+    {
+        using var loadStarted = new ManualResetEventSlim();
+        using var allowLoad = new ManualResetEventSlim();
+        ImageSource expected = new DrawingImage();
+        var reference = new GalleryArtworkReference(
+            () =>
+            {
+                loadStarted.Set();
+                allowLoad.Wait();
+                return expected;
+            },
+            preferBackgroundLoad: true);
+        var viewModel = new GalleryItemViewModel(
+            null!,
+            true,
+            false,
+            "title",
+            "subtitle",
+            "type",
+            "date",
+            "status",
+            "T",
+            reference,
+            null,
+            null,
+            true,
+            false,
+            Stretch.Uniform,
+            new Thickness(8),
+            string.Empty,
+            false,
+            [],
+            new GalleryItemSelectionState(false, false));
+
+        Assert.Null(viewModel.Thumbnail);
+        Assert.True(loadStarted.Wait(TimeSpan.FromSeconds(2)));
+        allowLoad.Set();
+        Assert.True(SpinWait.SpinUntil(
+            () => reference.IsValueCreated,
+            TimeSpan.FromSeconds(2)));
+        Assert.Same(expected, viewModel.Thumbnail);
+    }
+
+    [Fact]
     public void AppliesLocalizedTextWithoutReplacingArtworkOrSelectionState()
     {
         var selectionState = new GalleryItemSelectionState(false, false);
-        ImageSource? thumbnail = null;
+        var loads = 0;
+        ImageSource thumbnail = new DrawingImage();
+        var thumbnailReference = new GalleryArtworkReference(() =>
+        {
+            loads++;
+            return thumbnail;
+        });
         var viewModel = new GalleryItemViewModel(
             null!,
             false,
@@ -21,7 +72,7 @@ public sealed class GalleryItemViewModelTests
             "old date",
             "old status",
             "O",
-            thumbnail,
+            thumbnailReference,
             null,
             null,
             false,
@@ -32,6 +83,7 @@ public sealed class GalleryItemViewModelTests
             false,
             [],
             selectionState);
+        Assert.Equal(0, loads);
         var changedProperties = new List<string?>();
         ((INotifyPropertyChanged)viewModel).PropertyChanged +=
             (_, args) => changedProperties.Add(args.PropertyName);
@@ -53,6 +105,7 @@ public sealed class GalleryItemViewModelTests
         Assert.Equal("N", viewModel.Initial);
         Assert.Equal("new badge", viewModel.CollectionBadgeText);
         Assert.Same(thumbnail, viewModel.Thumbnail);
+        Assert.Equal(1, loads);
         Assert.Same(selectionState, viewModel.SelectionState);
         Assert.Contains(nameof(GalleryItemViewModel.Title), changedProperties);
         Assert.Contains(

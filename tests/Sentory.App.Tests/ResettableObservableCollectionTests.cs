@@ -57,4 +57,38 @@ public sealed class ResettableObservableCollectionTests
             NotifyCollectionChangedAction.Reset,
             actions);
     }
+
+    [Fact]
+    public void ReconcileAllUsesSingleResetForLargeDisjointChange()
+    {
+        var collection = new ResettableObservableCollection<int>();
+        collection.ReplaceAll(Enumerable.Range(0, 80));
+        var actions = new List<NotifyCollectionChangedAction>();
+        collection.CollectionChanged += (_, eventArgs) =>
+            actions.Add(eventArgs.Action);
+
+        collection.ReconcileAll(Enumerable.Range(100, 40));
+
+        Assert.Equal(Enumerable.Range(100, 40), collection);
+        Assert.Equal(
+            [NotifyCollectionChangedAction.Reset],
+            actions);
+    }
+
+    [Fact]
+    public void ReconcileAllUsesSingleResetForLargeFilteredSubset()
+    {
+        var collection = new ResettableObservableCollection<int>();
+        collection.ReplaceAll(Enumerable.Range(0, 80));
+        var actions = new List<NotifyCollectionChangedAction>();
+        collection.CollectionChanged += (_, eventArgs) =>
+            actions.Add(eventArgs.Action);
+
+        collection.ReconcileAll(Enumerable.Range(0, 40));
+
+        Assert.Equal(Enumerable.Range(0, 40), collection);
+        Assert.Equal(
+            [NotifyCollectionChangedAction.Reset],
+            actions);
+    }
 }

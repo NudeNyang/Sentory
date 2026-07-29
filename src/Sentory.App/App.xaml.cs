@@ -68,6 +68,9 @@ public partial class App : System.Windows.Application
     private Task? _ocrTask;
     private readonly SemaphoreSlim _syncWakeSignal = new(0, 1);
     private readonly SyncRuntimeStatusTracker _syncStatusTracker = new();
+    private readonly BackgroundSyncInteractionGate _syncInteractionGate =
+        new(TimeSpan.FromSeconds(2));
+    private LocalFolderSyncRuntimeService? _folderSyncRuntimeService;
     private Task? _syncTask;
     private readonly WindowsStartupManager _startupManager = new();
     private readonly DiscordAccessibilityLauncher _discordLauncher = new();
@@ -1738,6 +1741,8 @@ public partial class App : System.Windows.Application
             _galleryWindow.StartupChanged +=
                 SynchronizeDiscordStartupRegistrationAsync;
             _galleryWindow.LanguageChanged += (_, _) => UpdatePauseUi();
+            _galleryWindow.ForegroundInteractionStarted += (_, _) =>
+                _syncInteractionGate.NotifyForegroundInteraction();
             _galleryWindow.AutoFavoriteSettingsChanged +=
                 ApplyAutomaticFavoriteSettings;
             _galleryWindow.SyncConfigurationChanged += (_, _) =>
@@ -2097,9 +2102,26 @@ public partial class App : System.Windows.Application
     {
         try
         {
+            // Let the first gallery frame and capture workers settle before
+            // cloud-folder enumeration starts competing for disk and CPU.
+            await Task.Delay(TimeSpan.FromSeconds(8), cancellationToken);
             while (true)
             {
-                await RunConfiguredSyncOnceAsync(cancellationToken);
+                var completed = await _syncInteractionGate
+                    .RunWhenQuietAsync(
+                        RunConfiguredSyncOnceAsync,
+                        cancellationToken);
+                if (!completed)
+                {
+                    _syncStatusTracker.Update(
+                        SyncRuntimeState.Waiting,
+                        DateTimeOffset.UtcNow);
+                    _diagnosticsLog?.Write(
+                        "cloud-sync-deferred-for-ui",
+                        "Paused cloud-folder work while the gallery view was changing");
+                    continue;
+                }
+
                 await _syncWakeSignal.WaitAsync(
                     TimeSpan.FromSeconds(30),
                     cancellationToken);
@@ -2165,13 +2187,14 @@ public partial class App : System.Windows.Application
                     "Requeued local items after repairing a mismatched sync device binding");
             }
 
-            var result = await new LocalFolderSyncRuntimeService(
+            _folderSyncRuntimeService ??= new LocalFolderSyncRuntimeService(
                 _paths,
                 _repository,
                 _settingsStore,
                 () => _syncStatusTracker.Update(
                     SyncRuntimeState.Recovering,
-                    DateTimeOffset.UtcNow)).RunOnceAsync(
+                    DateTimeOffset.UtcNow));
+            var result = await _folderSyncRuntimeService.RunOnceAsync(
                     deviceId,
                     selectedDirectory,
                     cancellationToken);

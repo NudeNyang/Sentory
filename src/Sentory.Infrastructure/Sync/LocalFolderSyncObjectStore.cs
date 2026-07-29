@@ -16,6 +16,12 @@ public sealed class LocalFolderSyncObjectStore : ISyncObjectStore
     private readonly string _selectedDirectory;
     private readonly string _objectsDirectory;
     private readonly string _temporaryDirectory;
+    private readonly Dictionary<string, CachedObjectHeader> _headerCache =
+        new(OperatingSystem.IsWindows()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal);
+    private readonly object _headerCacheGate = new();
+    private int _headerFileReadCount;
 
     public LocalFolderSyncObjectStore(string selectedDirectory)
         : this(
@@ -53,6 +59,9 @@ public sealed class LocalFolderSyncObjectStore : ISyncObjectStore
 
     public string StoreDirectory { get; }
 
+    internal int HeaderFileReadCount =>
+        Volatile.Read(ref _headerFileReadCount);
+
     public async Task<SyncObjectPage> ListAsync(
         string prefix,
         string? continuationToken,
@@ -82,7 +91,7 @@ public sealed class LocalFolderSyncObjectStore : ISyncObjectStore
                     continue;
                 }
 
-                var header = await TryReadCompleteHeaderAsync(
+                var header = await GetCompleteHeaderAsync(
                     path,
                     cancellationToken);
                 if (header is not null)
@@ -240,7 +249,7 @@ public sealed class LocalFolderSyncObjectStore : ISyncObjectStore
             }
 
             EnsureNotSymbolicLink(path);
-            return await TryReadCompleteHeaderAsync(
+            return await GetCompleteHeaderAsync(
                 path,
                 cancellationToken) is not null;
         }
@@ -488,6 +497,74 @@ public sealed class LocalFolderSyncObjectStore : ISyncObjectStore
             : null;
     }
 
+    private async Task<ObjectHeader?> GetCompleteHeaderAsync(
+        string path,
+        CancellationToken cancellationToken)
+    {
+        var fingerprint = ReadFingerprint(path);
+        if (fingerprint is null)
+        {
+            lock (_headerCacheGate)
+            {
+                _headerCache.Remove(path);
+            }
+
+            return null;
+        }
+
+        lock (_headerCacheGate)
+        {
+            if (_headerCache.TryGetValue(path, out var cached) &&
+                cached.Fingerprint == fingerprint)
+            {
+                return cached.Header;
+            }
+        }
+
+        Interlocked.Increment(ref _headerFileReadCount);
+        var header = await TryReadCompleteHeaderAsync(
+            path,
+            cancellationToken);
+        var completedFingerprint = ReadFingerprint(path);
+        lock (_headerCacheGate)
+        {
+            if (header is not null &&
+                completedFingerprint == fingerprint)
+            {
+                _headerCache[path] = new CachedObjectHeader(
+                    fingerprint.Value,
+                    header);
+            }
+            else
+            {
+                _headerCache.Remove(path);
+            }
+        }
+
+        return header;
+    }
+
+    private static ObjectFileFingerprint? ReadFingerprint(string path)
+    {
+        try
+        {
+            var file = new FileInfo(path);
+            return file.Exists
+                ? new ObjectFileFingerprint(
+                    file.Length,
+                    file.LastWriteTimeUtc.Ticks)
+                : null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
     private static async Task<ObjectHeader?> TryReadHeaderAsync(
         FileStream stream,
         CancellationToken cancellationToken)
@@ -709,6 +786,14 @@ public sealed class LocalFolderSyncObjectStore : ISyncObjectStore
     private sealed record ObjectHeader(
         long ContentLength,
         string Sha256);
+
+    private readonly record struct ObjectFileFingerprint(
+        long Length,
+        long LastWriteTimeUtcTicks);
+
+    private sealed record CachedObjectHeader(
+        ObjectFileFingerprint Fingerprint,
+        ObjectHeader Header);
 
     private sealed record StoredValue(
         string Sha256,

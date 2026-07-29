@@ -158,6 +158,7 @@ public sealed class LocalFolderSyncIntegrationTests : IDisposable
         Assert.Equal(1, destination.Cycle.Projection.Projected);
         Assert.Equal(0, destination.Export.Exported);
         Assert.Equal(0, destinationRepeated.Export.Exported);
+        Assert.Equal(1, runtimeB.ReadableStoreCreationCount);
         Assert.Equal(0, sourceRepeated.Cycle.Transfer.Downloaded);
         Assert.Equal(
             1,
