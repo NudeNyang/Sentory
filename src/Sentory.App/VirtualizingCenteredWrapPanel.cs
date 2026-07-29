@@ -152,13 +152,44 @@ public sealed class VirtualizingCenteredWrapPanel : VirtualizingPanel
         ItemsChangedEventArgs args)
     {
         base.OnItemsChanged(sender, args);
-        if (args.Action == NotifyCollectionChangedAction.Reset &&
-            InternalChildren.Count > 0)
+        switch (args.Action)
         {
-            RemoveInternalChildRange(0, InternalChildren.Count);
+            case NotifyCollectionChangedAction.Remove:
+            case NotifyCollectionChangedAction.Replace:
+                RemoveChangedContainers(
+                    args.Position,
+                    args.ItemUICount);
+                break;
+            case NotifyCollectionChangedAction.Move:
+                RemoveChangedContainers(
+                    args.OldPosition,
+                    args.ItemUICount);
+                break;
+            case NotifyCollectionChangedAction.Reset
+                when InternalChildren.Count > 0:
+                RemoveInternalChildRange(0, InternalChildren.Count);
+                break;
         }
 
         InvalidateMeasure();
+    }
+
+    private void RemoveChangedContainers(
+        GeneratorPosition position,
+        int itemUiCount)
+    {
+        if (position.Index < 0 || itemUiCount <= 0)
+        {
+            return;
+        }
+
+        var removableCount = Math.Min(
+            itemUiCount,
+            InternalChildren.Count - position.Index);
+        if (removableCount > 0)
+        {
+            RemoveInternalChildRange(position.Index, removableCount);
+        }
     }
 
     protected override void BringIndexIntoView(int index)

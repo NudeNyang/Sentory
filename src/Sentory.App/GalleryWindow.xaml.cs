@@ -601,7 +601,7 @@ public partial class GalleryWindow : Window
         var viewModels = _allItems.ToDictionary(
             item => item.Item.ItemId);
 
-        _visibleItems.ReplaceAll(orderedItems.Select(
+        _visibleItems.ReconcileAll(orderedItems.Select(
             item => viewModels[item.ItemId]));
 
         UpdateSelectionControls();

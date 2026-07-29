@@ -7,6 +7,57 @@ namespace Sentory.App;
 internal sealed class ResettableObservableCollection<T> :
     ObservableCollection<T>
 {
+    public void ReconcileAll(
+        IEnumerable<T> items,
+        IEqualityComparer<T>? comparer = null)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        comparer ??= EqualityComparer<T>.Default;
+        var replacement = items as IReadOnlyList<T> ?? items.ToArray();
+        var unmatched = replacement.ToList();
+
+        for (var currentIndex = Count - 1;
+             currentIndex >= 0;
+             currentIndex--)
+        {
+            var replacementIndex = unmatched.FindIndex(item =>
+                comparer.Equals(this[currentIndex], item));
+            if (replacementIndex >= 0)
+            {
+                unmatched.RemoveAt(replacementIndex);
+            }
+            else
+            {
+                RemoveAt(currentIndex);
+            }
+        }
+
+        for (var targetIndex = 0;
+             targetIndex < replacement.Count;
+             targetIndex++)
+        {
+            var desiredItem = replacement[targetIndex];
+            if (targetIndex < Count &&
+                comparer.Equals(this[targetIndex], desiredItem))
+            {
+                continue;
+            }
+
+            var currentIndex = IndexOf(
+                desiredItem,
+                targetIndex + 1,
+                comparer);
+            if (currentIndex >= 0)
+            {
+                Move(currentIndex, targetIndex);
+            }
+            else
+            {
+                Insert(targetIndex, desiredItem);
+            }
+        }
+    }
+
     public void ReplaceAll(IEnumerable<T> items)
     {
         ArgumentNullException.ThrowIfNull(items);
@@ -23,5 +74,21 @@ internal sealed class ResettableObservableCollection<T> :
         OnPropertyChanged(new PropertyChangedEventArgs("Item[]"));
         OnCollectionChanged(new NotifyCollectionChangedEventArgs(
             NotifyCollectionChangedAction.Reset));
+    }
+
+    private int IndexOf(
+        T item,
+        int startIndex,
+        IEqualityComparer<T> comparer)
+    {
+        for (var index = startIndex; index < Count; index++)
+        {
+            if (comparer.Equals(this[index], item))
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 }

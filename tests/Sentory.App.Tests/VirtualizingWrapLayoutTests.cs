@@ -116,6 +116,68 @@ public sealed class VirtualizingWrapLayoutTests
         });
     }
 
+    [Fact]
+    public void FilteringReusesRealizedContainersForItemsThatRemainVisible()
+    {
+        RunOnSta(() =>
+        {
+            var items = new ResettableObservableCollection<int>();
+            items.ReconcileAll(Enumerable.Range(0, 40));
+            var panelFactory = new FrameworkElementFactory(
+                typeof(VirtualizingCenteredWrapPanel));
+            panelFactory.SetValue(
+                VirtualizingCenteredWrapPanel.ItemWidthProperty,
+                268d);
+            panelFactory.SetValue(
+                VirtualizingCenteredWrapPanel.ItemHeightProperty,
+                336d);
+            panelFactory.SetValue(
+                VirtualizingCenteredWrapPanel.CacheRowsProperty,
+                2);
+            var itemsControl = new ItemsControl
+            {
+                ItemsSource = items,
+                ItemsPanel = new ItemsPanelTemplate(panelFactory)
+            };
+            VirtualizingPanel.SetIsVirtualizing(itemsControl, true);
+            VirtualizingPanel.SetVirtualizationMode(
+                itemsControl,
+                VirtualizationMode.Recycling);
+            var scrollViewer = new ScrollViewer
+            {
+                Width = 1100,
+                Height = 700,
+                HorizontalScrollBarVisibility =
+                    ScrollBarVisibility.Disabled,
+                VerticalScrollBarVisibility =
+                    ScrollBarVisibility.Hidden,
+                Content = itemsControl
+            };
+
+            scrollViewer.Measure(new Size(1100, 700));
+            scrollViewer.Arrange(new Rect(0, 0, 1100, 700));
+            scrollViewer.UpdateLayout();
+            var panel = FindDescendant<VirtualizingCenteredWrapPanel>(
+                itemsControl);
+
+            Assert.NotNull(panel);
+            var originalContainer = FindDirectContainer(panel, 2);
+            Assert.NotNull(originalContainer);
+
+            items.ReconcileAll(Enumerable.Range(0, 40).Where(
+                value => value % 2 == 0));
+            scrollViewer.UpdateLayout();
+            panel.UpdateLayout();
+
+            Assert.Same(
+                originalContainer,
+                FindDirectContainer(panel, 2));
+            Assert.All(
+                panel.GetRealizedDataItems().Cast<int>(),
+                value => Assert.Equal(0, value % 2));
+        });
+    }
+
     private static T? FindDescendant<T>(DependencyObject current)
         where T : DependencyObject
     {
@@ -133,6 +195,25 @@ public sealed class VirtualizingWrapLayoutTests
             if (descendant is not null)
             {
                 return descendant;
+            }
+        }
+
+        return null;
+    }
+
+    private static FrameworkElement? FindDirectContainer(
+        VirtualizingCenteredWrapPanel panel,
+        int dataItem)
+    {
+        for (var index = 0;
+             index < VisualTreeHelper.GetChildrenCount(panel);
+             index++)
+        {
+            if (VisualTreeHelper.GetChild(panel, index) is FrameworkElement
+                { DataContext: int value } element &&
+                value == dataItem)
+            {
+                return element;
             }
         }
 
