@@ -98,6 +98,20 @@ public sealed class DiscordConfirmationEvaluatorTests
                 inputCandidateCount));
     }
 
+    [Theory]
+    [InlineData(0x100040, true)]
+    [InlineData(0x110040, true)]
+    [InlineData(0x108040, false)]
+    [InlineData(0x100000, false)]
+    public void MessageListMayBeOffscreenWhileWatchingAScreenShare(
+        int state,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            DiscordAccessibilityWorker.IsMessageListState(state));
+    }
+
     [Fact]
     public void InvalidatesTargetCacheWhenDiscordChannelTitleChanges()
     {

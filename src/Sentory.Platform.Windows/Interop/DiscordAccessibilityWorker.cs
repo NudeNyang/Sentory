@@ -24,6 +24,7 @@ public static class DiscordAccessibilityWorker
     private const int RoleSystemText = 42;
     private const int RoleSystemPushButton = 43;
     private const int MessageListState = 1_048_640;
+    private const int StateSystemOffscreen = 0x0001_0000;
     private const int VisibleListItemState = 64;
     private const int MaximumTraversalDepth = 60;
     private const int MaximumTraversalNodes = 5_000;
@@ -246,6 +247,7 @@ public static class DiscordAccessibilityWorker
         var requireMatchingUrlInput = RequiresMatchingUrlInput(request);
         TargetResolution resolved;
         string unavailableSignal;
+        string targetDiagnostics;
         var resolutionAttempt = 0;
         while (!TryResolveTargets(
                    request,
@@ -253,14 +255,16 @@ public static class DiscordAccessibilityWorker
                    requireMatchingUrlInput,
                    targetCache,
                    out resolved,
-                   out unavailableSignal))
+                   out unavailableSignal,
+                   out targetDiagnostics))
         {
             resolutionAttempt++;
             if (resolutionAttempt >= MaximumTargetResolutionAttempts ||
                 !ShouldRetryTargetResolution(request, unavailableSignal))
             {
                 return DiscordConfirmationResponse.Unavailable(
-                    unavailableSignal);
+                    unavailableSignal,
+                    targetDiagnostics);
             }
 
             await Task.Delay(180, cancellationToken);
@@ -822,10 +826,12 @@ public static class DiscordAccessibilityWorker
         bool requireMatchingUrlInput,
         WorkerTargetCache cache,
         out TargetResolution resolution,
-        out string unavailableSignal)
+        out string unavailableSignal,
+        out string targetDiagnostics)
     {
         resolution = null!;
         unavailableSignal = "message-list-unavailable";
+        targetDiagnostics = "target-search:not-run";
         var windowTitle = GetWindowTitle(
             new nint(request.MainWindowHandle));
 
@@ -839,6 +845,7 @@ public static class DiscordAccessibilityWorker
                     cache.MessageList!,
                     null,
                     true);
+                targetDiagnostics = "target-search:cache-hit";
                 return true;
             }
 
@@ -854,6 +861,7 @@ public static class DiscordAccessibilityWorker
                     cache.MessageList!,
                     cachedInput,
                     true);
+                targetDiagnostics = "target-search:cache-hit";
                 return true;
             }
 
@@ -879,6 +887,9 @@ public static class DiscordAccessibilityWorker
                     refreshedMessageList,
                     refreshedInput,
                     false);
+                targetDiagnostics = CreateTargetSearchDiagnostics(
+                    "cache-refresh",
+                    refreshed);
                 return true;
             }
 
@@ -890,6 +901,7 @@ public static class DiscordAccessibilityWorker
                 out var accessibleRoot))
         {
             unavailableSignal = "renderer-accessibility-root-unavailable";
+            targetDiagnostics = "renderer:accessible=false";
             return false;
         }
 
@@ -897,6 +909,9 @@ public static class DiscordAccessibilityWorker
             accessibleRoot,
             expectedUrls,
             requireMatchingUrlInput);
+        targetDiagnostics = CreateTargetSearchDiagnostics(
+            "renderer",
+            targets);
         if (!TrySelectTargets(
                 targets,
                 requireMatchingUrlInput,
@@ -920,6 +935,15 @@ public static class DiscordAccessibilityWorker
             false);
         return true;
     }
+
+    private static string CreateTargetSearchDiagnostics(
+        string rootLabel,
+        TargetSearchResult result) =>
+        $"{rootLabel}:nodes={result.VisitedNodeCount}," +
+        $"lists={result.ListStates.Count}," +
+        $"states={string.Join('|', result.ListStates.Select(state => $"0x{state:X}"))}," +
+        $"messages={result.MessageLists.Count}," +
+        $"inputs={result.InputCandidates.Count}";
 
     private static bool TrySelectTargets(
         TargetSearchResult targets,
@@ -956,8 +980,8 @@ public static class DiscordAccessibilityWorker
         AccessibleTarget messageList) =>
         SafeRole(messageList.Accessible, messageList.ChildId) ==
             RoleSystemList &&
-        SafeState(messageList.Accessible, messageList.ChildId) ==
-            MessageListState &&
+        IsMessageListState(
+            SafeState(messageList.Accessible, messageList.ChildId)) &&
         GetDirectListItems(messageList).Count > 0;
 
     private static bool TryValidateRequest(
@@ -1112,6 +1136,7 @@ public static class DiscordAccessibilityWorker
             ref nodeCount,
             requireMatchingUrlInput,
             0);
+        result.VisitedNodeCount = nodeCount;
         return result;
     }
 
@@ -1144,10 +1169,14 @@ public static class DiscordAccessibilityWorker
             result.InputCandidates.Add(target);
         }
 
-        if (role == RoleSystemList &&
-            SafeState(target.Accessible, target.ChildId) == MessageListState)
+        if (role == RoleSystemList)
         {
-            result.MessageLists.Add(target);
+            var state = SafeState(target.Accessible, target.ChildId);
+            result.ListStates.Add(state);
+            if (IsMessageListState(state))
+            {
+                result.MessageLists.Add(target);
+            }
         }
 
         var nested = ToAccessible(target);
@@ -1182,6 +1211,9 @@ public static class DiscordAccessibilityWorker
         int inputCandidateCount) =>
         messageListCount > 0 &&
         (!requireMatchingUrlInput || inputCandidateCount > 0);
+
+    internal static bool IsMessageListState(int state) =>
+        (state & ~StateSystemOffscreen) == MessageListState;
 
     private static IReadOnlyList<string> FindExpectedUrls(
         AccessibleTarget root,
@@ -1940,6 +1972,10 @@ public static class DiscordAccessibilityWorker
         public List<AccessibleTarget> InputCandidates { get; } = [];
 
         public List<AccessibleTarget> MessageLists { get; } = [];
+
+        public HashSet<int> ListStates { get; } = [];
+
+        public int VisitedNodeCount { get; set; }
     }
 
     [DllImport("oleacc.dll")]
