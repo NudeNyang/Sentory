@@ -43,3 +43,14 @@ test("app info typography matches the WPF font sizes and weights", () => {
     }
   }
 });
+
+test("app info profile links never add an underline on hover", () => {
+  assert.doesNotMatch(
+    css,
+    /\.app-info-card\s+\.app-links\s+a:hover\s*\{[^}]*text-decoration:\s*underline/,
+  );
+  assert.match(
+    css,
+    /\.app-info-card\s+\.app-links\s+a(?:,\s*\.app-info-card\s+\.app-links\s+a:hover)?\s*\{[^}]*text-decoration:\s*none/,
+  );
+});
