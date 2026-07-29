@@ -287,12 +287,17 @@ public static class DiscordAccessibilityWorker
         if (request.ContentKind ==
             DiscordConfirmationContentKind.AttachmentDiscovery)
         {
+            var baselineAttachmentUrls = baselineMessages
+                .Where(IsVisibleOwnedImageMessage)
+                .SelectMany(ExtractAttachmentUrls)
+                .ToList();
             return await DiscoverAttachmentsAsync(
                 request,
                 accessibleRoot,
                 messageList,
                 baselineMessageCount,
                 baselineFingerprints,
+                baselineAttachmentUrls,
                 resolved.CacheHit,
                 cancellationToken);
         }
@@ -549,6 +554,7 @@ public static class DiscordAccessibilityWorker
         AccessibleTarget messageList,
         int baselineMessageCount,
         IReadOnlySet<string> baselineFingerprints,
+        IReadOnlyList<string> baselineAttachmentUrls,
         bool cacheHit,
         CancellationToken cancellationToken)
     {
@@ -578,10 +584,9 @@ public static class DiscordAccessibilityWorker
                 .Where(IsVisibleOwnedImageMessage)
                 .ToList();
             ownedImageSeen |= ownedImages.Count > 0;
-            var attachmentUrls = ownedImages
-                .SelectMany(ExtractAttachmentUrls)
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
+            var attachmentUrls = DiscordAttachmentUrlExtractor.SelectNew(
+                ownedImages.SelectMany(ExtractAttachmentUrls),
+                baselineAttachmentUrls);
             if (attachmentUrls.Count > 0)
             {
                 return new DiscordConfirmationResponse(
