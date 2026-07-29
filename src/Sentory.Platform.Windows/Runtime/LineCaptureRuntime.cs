@@ -19,8 +19,11 @@ public enum LineNativeDropRegistrationResult
 public sealed class LineCaptureRuntime : ICaptureRuntime
 {
     private const int MaximumActiveCandidates = 8;
+    private static readonly TimeSpan NativeDropBaselineMaximumAge =
+        TimeSpan.FromSeconds(10);
 
     private readonly INativeWindowApi _native;
+    private readonly IKakaoDropWindowApi _dropWindows;
     private readonly LineContextValidator _validator;
     private readonly LowLevelPasteHook _keyboardHook;
     private readonly LowLevelMouseHook _mouseHook;
@@ -41,11 +44,10 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
     private readonly CancellationTokenSource _cancellation = new();
     private readonly object _candidateGate = new();
     private readonly List<CandidateRegistration> _candidates = [];
-    private readonly HashSet<string> _activeUrls =
-        new(StringComparer.Ordinal);
-    private readonly HashSet<string> _activeImageHashes =
-        new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<ValidatedLineContext> _pendingNativeDropContexts = [];
     private readonly LineRecentSendSignals _recentSendSignals = new();
+    private readonly LineNativeDropBaselineCache _nativeDropBaselineCache =
+        new(NativeDropBaselineMaximumAge);
     private Task? _worker;
     private volatile bool _paused;
     private DateTimeOffset _lastIssueReportedAt = DateTimeOffset.MinValue;
@@ -57,6 +59,7 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
     {
         var native = new NativeWindowApi();
         _native = native;
+        _dropWindows = native;
         _validator = new LineContextValidator(native);
         _keyboardHook = new LowLevelPasteHook(native, acceptInjectedInput);
         _mouseHook = new LowLevelMouseHook(native, acceptInjectedInput);
@@ -86,6 +89,7 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
             if (value)
             {
                 CancelActiveCandidates();
+                _nativeDropBaselineCache.Clear();
             }
         }
     }
@@ -182,28 +186,51 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
 
     private void OnPointerDown(object? sender, PointerTrigger trigger)
     {
-        if (_paused || trigger.ForegroundProcessId == 0 ||
-            !string.Equals(
-                _native.GetProcessName(trigger.ForegroundProcessId),
-                LineContextValidator.ProcessName,
-                StringComparison.OrdinalIgnoreCase))
+        if (_paused)
         {
             return;
         }
 
-        var hasContext = _validator.TryValidate(
+        var pointWindow = _dropWindows.GetWindowAtPoint(
+            trigger.ScreenX,
+            trigger.ScreenY);
+        var pointRoot = _native.GetRootWindow(pointWindow);
+        var pointProcessId = pointRoot == nint.Zero
+            ? 0
+            : _native.GetProcessId(pointRoot);
+        var pointProcessName = pointProcessId == 0
+            ? null
+            : _native.GetProcessName(pointProcessId);
+        var pointIsLine = IsLineProcessName(pointProcessName);
+        var foregroundIsLine = IsLineProcess(trigger.ForegroundProcessId);
+        if (!pointIsLine && !foregroundIsLine)
+        {
+            return;
+        }
+
+        // WM_LBUTTONDOWN 시점에는 새로 누른 창보다 직전 foreground가
+        // 보고될 수 있다. 실제 포인터 아래 LINE 창을 우선해야, 사진
+        // 미리보기를 잠시 둔 뒤 누르는 전송 버튼도 놓치지 않는다.
+        var pointerProcessId = pointIsLine
+            ? pointProcessId
+            : trigger.ForegroundProcessId;
+        var pendingImageContext = FindLatestPendingImageContext(
+            pointerProcessId,
+            trigger.OccurredAt);
+
+        var hasValidatedContext = _validator.TryValidate(
                 new PasteTrigger(
                     trigger.EventId,
-                    trigger.ForegroundWindow,
-                    trigger.ForegroundWindow,
-                    trigger.ForegroundProcessId,
+                    pointIsLine ? pointRoot : trigger.ForegroundWindow,
+                    pointIsLine ? pointRoot : trigger.ForegroundWindow,
+                    pointerProcessId,
                     _native.GetClipboardSequenceNumber(),
                     trigger.OccurredAt,
                     trigger.Injected),
-                out var context);
-        var root = hasContext
-            ? context.MainWindow
-            : _native.GetRootWindow(trigger.ForegroundWindow);
+                out var validatedContext);
+        var context = pendingImageContext ??
+                      (hasValidatedContext ? validatedContext : null);
+        var root = context?.MainWindow ?? nint.Zero;
         if (root == nint.Zero)
         {
             return;
@@ -213,22 +240,34 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
             _pointerSendVerifier.IsPotentialSendControl(
                 trigger.ScreenX,
                 trigger.ScreenY,
-                trigger.ForegroundProcessId,
+                pointerProcessId,
                 root);
-        var foregroundRoot = _native.GetRootWindow(trigger.ForegroundWindow);
+        var pointerSurfaceRoot = pointIsLine
+            ? pointRoot
+            : _native.GetRootWindow(trigger.ForegroundWindow);
+        var pointerSurfaceBounds = _native.GetWindowBounds(
+            pointerSurfaceRoot != nint.Zero
+                ? pointerSurfaceRoot
+                : root);
+        var withinImageDialogRegion = pendingImageContext is not null &&
+                                      LineImageDialogSendButtonPolicy.IsWithin(
+                                          pointerSurfaceBounds,
+                                          trigger.ScreenX,
+                                          trigger.ScreenY);
         var imageDialogRegionFallback = !verifiedSendControl &&
-                                        HasPendingImageCandidate(
-                                            trigger.ForegroundProcessId,
-                                            trigger.OccurredAt) &&
-                                        LineImageDialogSendButtonPolicy.IsWithin(
-                                            _native.GetWindowBounds(
-                                                foregroundRoot != nint.Zero
-                                                    ? foregroundRoot
-                                                    : root),
-                                            trigger.ScreenX,
-                                            trigger.ScreenY);
+                                        withinImageDialogRegion;
         if (!verifiedSendControl && !imageDialogRegionFallback)
         {
+            if (pendingImageContext is not null)
+            {
+                ReportRejectedPointer(
+                    trigger,
+                    pointerSurfaceBounds,
+                    pointIsLine,
+                    foregroundIsLine,
+                    pointProcessName);
+            }
+
             return;
         }
 
@@ -238,84 +277,184 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
 
         var composer = _composerTextReader.Read(
             root,
-            trigger.ForegroundProcessId);
+            pointerProcessId);
 
         lock (_candidateGate)
         {
-            if (hasContext)
+            if (context is not null)
             {
                 _recentSendSignals.Observe(
                     context.ContextHash,
                     trigger.OccurredAt,
-                    composer.IsAvailable ? composer.Text : null);
+                    composer.IsAvailable ? composer.Text : null,
+                    withinImageDialogRegion);
             }
 
             _recentSendSignals.ObserveProcess(
-                trigger.ForegroundProcessId,
+                pointerProcessId,
                 trigger.OccurredAt,
-                composer.IsAvailable ? composer.Text : null);
+                composer.IsAvailable ? composer.Text : null,
+                withinImageDialogRegion);
         }
 
-        var observed = hasContext
-            ? MarkSendObserved(
-                root,
+        var observed = pendingImageContext is not null
+            ? MarkCandidateSendObserved(
+                pendingImageContext.EventId,
                 trigger.OccurredAt,
                 inputKind,
-                composer)
-            : MarkSendObservedByProcess(
-                trigger.ForegroundProcessId,
+                composer,
+                withinImageDialogRegion)
+            : context is not null
+                ? MarkSendObserved(
+                    root,
+                    trigger.OccurredAt,
+                    inputKind,
+                    composer,
+                    withinImageDialogRegion)
+                : MarkSendObservedByProcess(
+                pointerProcessId,
                 trigger.OccurredAt,
                 imageDialogRegionFallback
                     ? "pointer-region-fallback"
                     : "pointer-fallback",
-                composer);
+                composer,
+                withinImageDialogRegion);
         if (observed == 0)
         {
             _diagnostic?.Invoke(
                 "line-send-input-buffered",
-                $"kind={(hasContext ? inputKind : imageDialogRegionFallback ? "pointer-region-fallback" : "pointer-fallback")} candidates=0");
+                $"kind={(context is not null ? inputKind : imageDialogRegionFallback ? "pointer-region-fallback" : "pointer-fallback")} candidates=0");
         }
     }
 
-    private bool HasPendingImageCandidate(
+    private bool IsLineProcess(uint processId) =>
+        processId != 0 &&
+        IsLineProcessName(_native.GetProcessName(processId));
+
+    private static bool IsLineProcessName(string? processName) =>
+        string.Equals(
+            processName,
+            LineContextValidator.ProcessName,
+            StringComparison.OrdinalIgnoreCase);
+
+    private ValidatedLineContext? FindLatestPendingImageContext(
         uint processId,
         DateTimeOffset occurredAt)
     {
         lock (_candidateGate)
         {
-            return _candidates.Any(candidate =>
-                candidate.Context.ProcessId == processId &&
-                candidate.Context.OccurredAt <= occurredAt &&
-                candidate.Images.Count > 0 &&
-                !candidate.Cancellation.IsCancellationRequested);
+            var candidateContext = _candidates
+                .Where(candidate =>
+                    candidate.Context.ProcessId == processId &&
+                    candidate.Context.OccurredAt <= occurredAt &&
+                    candidate.Images.Count > 0 &&
+                    !candidate.IsSendObserved() &&
+                    !candidate.Cancellation.IsCancellationRequested)
+                .OrderByDescending(candidate => candidate.Context.OccurredAt)
+                .Select(candidate => candidate.Context)
+                .FirstOrDefault();
+            return candidateContext ??
+                   _pendingNativeDropContexts
+                       .Where(context =>
+                           context.ProcessId == processId &&
+                           context.OccurredAt <= occurredAt)
+                       .OrderByDescending(context => context.OccurredAt)
+                       .FirstOrDefault();
         }
+    }
+
+    private void ReportRejectedPointer(
+        PointerTrigger trigger,
+        WindowBounds bounds,
+        bool pointIsLine,
+        bool foregroundIsLine,
+        string? pointProcessName)
+    {
+        var xPermille = bounds.Width > 0
+            ? (trigger.ScreenX - bounds.Left) * 1000 / bounds.Width
+            : -1;
+        var yPermille = bounds.Height > 0
+            ? (trigger.ScreenY - bounds.Top) * 1000 / bounds.Height
+            : -1;
+        _diagnostic?.Invoke(
+            "line-send-pointer-rejected",
+            $"reason=unverified pointLine={pointIsLine} foregroundLine={foregroundIsLine} pointProcess={NormalizeProcessDiagnostic(pointProcessName)} xPermille={xPermille} yPermille={yPermille}");
+    }
+
+    private static string NormalizeProcessDiagnostic(string? processName) =>
+        IsLineProcessName(processName)
+            ? LineContextValidator.ProcessName
+            : string.IsNullOrWhiteSpace(processName)
+                ? "none"
+                : "other";
+
+    private int MarkCandidateSendObserved(
+        Guid eventId,
+        DateTimeOffset occurredAt,
+        string inputKind,
+        LineComposerTextSnapshot composer,
+        bool imageDialogSendObserved = false)
+    {
+        var observed = 0;
+        var rejected = 0;
+        lock (_candidateGate)
+        {
+            var candidate = _candidates.FirstOrDefault(candidate =>
+                candidate.Context.EventId == eventId &&
+                candidate.Context.OccurredAt <= occurredAt &&
+                !candidate.Cancellation.IsCancellationRequested);
+            if (candidate is not null)
+            {
+                if (!CanApplySendEvidence(candidate, composer))
+                {
+                    rejected = 1;
+                }
+                else if (candidate.MarkSendObserved(
+                             imageDialogSendObserved))
+                {
+                    observed = 1;
+                }
+            }
+        }
+
+        ReportRejectedSendEvidence(inputKind, rejected, composer.IsAvailable);
+        if (observed > 0)
+        {
+            _diagnostic?.Invoke(
+                "line-send-input-observed",
+                $"kind={inputKind} candidates=1");
+        }
+
+        return observed;
     }
 
     private int MarkSendObserved(
         nint mainWindow,
         DateTimeOffset occurredAt,
         string inputKind,
-        LineComposerTextSnapshot composer)
+        LineComposerTextSnapshot composer,
+        bool imageDialogSendObserved = false)
     {
         var observed = 0;
         var rejected = 0;
         lock (_candidateGate)
         {
-            foreach (var candidate in _candidates.Where(candidate =>
-                         candidate.Context.MainWindow == mainWindow &&
-                         candidate.Context.OccurredAt <= occurredAt &&
-                         !candidate.Cancellation.IsCancellationRequested))
+            var candidates = _candidates.Where(candidate =>
+                    candidate.Context.MainWindow == mainWindow &&
+                    candidate.Context.OccurredAt <= occurredAt &&
+                    !candidate.IsSendObserved() &&
+                    !candidate.Cancellation.IsCancellationRequested)
+                .ToArray();
+            rejected = candidates.Count(candidate =>
+                !CanApplySendEvidence(candidate, composer));
+            var candidate = MessengerSendCandidatePolicy.SelectLatestEligible(
+                candidates,
+                candidate => CanApplySendEvidence(candidate, composer),
+                candidate => candidate.Context.OccurredAt);
+            if (candidate?.MarkSendObserved(
+                    imageDialogSendObserved) == true)
             {
-                if (!CanApplySendEvidence(candidate, composer))
-                {
-                    rejected++;
-                    continue;
-                }
-
-                if (candidate.MarkSendObserved())
-                {
-                    observed++;
-                }
+                observed = 1;
             }
         }
 
@@ -335,27 +474,29 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
         uint processId,
         DateTimeOffset occurredAt,
         string inputKind,
-        LineComposerTextSnapshot composer)
+        LineComposerTextSnapshot composer,
+        bool imageDialogSendObserved = false)
     {
         var observed = 0;
         var rejected = 0;
         lock (_candidateGate)
         {
-            foreach (var candidate in _candidates.Where(candidate =>
-                         candidate.Context.ProcessId == processId &&
-                         candidate.Context.OccurredAt <= occurredAt &&
-                         !candidate.Cancellation.IsCancellationRequested))
+            var candidates = _candidates.Where(candidate =>
+                    candidate.Context.ProcessId == processId &&
+                    candidate.Context.OccurredAt <= occurredAt &&
+                    !candidate.IsSendObserved() &&
+                    !candidate.Cancellation.IsCancellationRequested)
+                .ToArray();
+            rejected = candidates.Count(candidate =>
+                !CanApplySendEvidence(candidate, composer));
+            var candidate = MessengerSendCandidatePolicy.SelectLatestEligible(
+                candidates,
+                candidate => CanApplySendEvidence(candidate, composer),
+                candidate => candidate.Context.OccurredAt);
+            if (candidate?.MarkSendObserved(
+                    imageDialogSendObserved) == true)
             {
-                if (!CanApplySendEvidence(candidate, composer))
-                {
-                    rejected++;
-                    continue;
-                }
-
-                if (candidate.MarkSendObserved())
-                {
-                    observed++;
-                }
+                observed = 1;
             }
         }
 
@@ -436,19 +577,31 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
             return LineNativeDropRegistrationResult.UnsupportedFiles;
         }
 
+        lock (_candidateGate)
+        {
+            _pendingNativeDropContexts.Add(context);
+        }
+
         try
         {
-            var baseline = preDropBaseline ??
-                           await _accessibility.TryCaptureAsync(
-                               context,
-                               requireFocusedComposer: false,
-                               allowImageSendDialog: true,
-                               _cancellation.Token);
-            if (baseline is null)
+            var baseline = preDropBaseline;
+            if (baseline is null &&
+                _nativeDropBaselineCache.TryGetLastKnown(
+                    target,
+                    DateTimeOffset.UtcNow,
+                    out var lastKnown,
+                    out var lastKnownAge))
             {
-                return LineNativeDropRegistrationResult
-                    .ConversationUnavailable;
+                baseline = lastKnown;
+                _diagnostic?.Invoke(
+                    "line-drop-baseline-cache-recovered",
+                    $"ageMs={(long)lastKnownAge.TotalMilliseconds} messages={lastKnown.MessageIds.Count}");
             }
+
+            baseline ??= new LineAccessibilitySnapshot(
+                string.Empty,
+                new HashSet<string>(StringComparer.Ordinal),
+                IsUnanchored: true);
 
             var images = await Task.Run(
                 () => ClipboardImageCodec.TryReadFiles(imagePaths),
@@ -482,6 +635,14 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
             ReportIssue(exception);
             return LineNativeDropRegistrationResult.Failed;
         }
+        finally
+        {
+            lock (_candidateGate)
+            {
+                _pendingNativeDropContexts.RemoveAll(pending =>
+                    pending.EventId == context.EventId);
+            }
+        }
     }
 
     private async Task ProcessTriggersAsync(CancellationToken cancellationToken)
@@ -505,6 +666,56 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
             LineDropTarget target,
             DateTimeOffset occurredAt)
     {
+        if (_nativeDropBaselineCache.TryGet(
+                target,
+                DateTimeOffset.UtcNow,
+                out var cached,
+                out var age))
+        {
+            _diagnostic?.Invoke(
+                "line-drop-baseline-cache-used",
+                $"ageMs={(int)age.TotalMilliseconds} messages={cached.MessageIds.Count}");
+            return cached;
+        }
+
+        var current = await CaptureNativeDropBaselineAsync(
+            target,
+            occurredAt,
+            reportDiagnostics: true);
+        if (current is not null)
+        {
+            return current;
+        }
+
+        if (_nativeDropBaselineCache.TryGetLastKnown(
+                target,
+                DateTimeOffset.UtcNow,
+                out var lastKnown,
+                out age))
+        {
+            _diagnostic?.Invoke(
+                "line-drop-baseline-cache-recovered",
+                $"ageMs={(long)age.TotalMilliseconds} messages={lastKnown.MessageIds.Count}");
+            return lastKnown;
+        }
+
+        return null;
+    }
+
+    internal async Task RefreshNativeDropBaselineAsync(
+        LineDropTarget target,
+        DateTimeOffset occurredAt) =>
+        _ = await CaptureNativeDropBaselineAsync(
+            target,
+            occurredAt,
+            reportDiagnostics: false);
+
+    private async Task<LineAccessibilitySnapshot?>
+        CaptureNativeDropBaselineAsync(
+            LineDropTarget target,
+            DateTimeOffset occurredAt,
+            bool reportDiagnostics)
+    {
         if (_paused || !_validator.TryValidate(
                 target,
                 _native.GetClipboardSequenceNumber(),
@@ -516,11 +727,21 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
 
         try
         {
-            return await _accessibility.TryCaptureAsync(
+            var snapshot = await _accessibility.TryCaptureAsync(
                 context,
                 requireFocusedComposer: false,
                 allowImageSendDialog: false,
-                _cancellation.Token);
+                _cancellation.Token,
+                reportDiagnostics);
+            if (snapshot is not null)
+            {
+                _nativeDropBaselineCache.Observe(
+                    target,
+                    snapshot,
+                    DateTimeOffset.UtcNow);
+            }
+
+            return snapshot;
         }
         catch (OperationCanceledException)
             when (_cancellation.IsCancellationRequested)
@@ -601,25 +822,30 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
         {
             _candidates.RemoveAll(candidate => candidate.Task.IsCompleted);
             var candidateUrls = urls
-                .Where(url => !_activeUrls.Contains(url.Value))
+                .DistinctBy(url => url.Value, StringComparer.Ordinal)
                 .ToList();
             var candidateImages = images
-                .Where(image => !_activeImageHashes.Contains(image.Sha256))
+                .DistinctBy(
+                    image => image.Sha256,
+                    StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            var payloadSignature =
+                MessengerCandidateDuplicatePolicy.CreatePayloadSignature(
+                    candidateUrls,
+                    candidateImages);
             if ((candidateUrls.Count == 0 && candidateImages.Count == 0) ||
-                _candidates.Count >= MaximumActiveCandidates)
+                _candidates.Count >= MaximumActiveCandidates ||
+                _candidates.Any(candidate =>
+                    !candidate.Cancellation.IsCancellationRequested &&
+                    MessengerCandidateDuplicatePolicy.IsDuplicateBurst(
+                        candidate.Context.ContextHash,
+                        candidate.Context.OccurredAt,
+                        candidate.PayloadSignature,
+                        context.ContextHash,
+                        context.OccurredAt,
+                        payloadSignature)))
             {
                 return false;
-            }
-
-            foreach (var url in candidateUrls)
-            {
-                _activeUrls.Add(url.Value);
-            }
-
-            foreach (var image in candidateImages)
-            {
-                _activeImageHashes.Add(image.Sha256);
             }
 
             var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
@@ -631,20 +857,23 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
                 candidateUrls,
                 candidateImages,
                 nativeDrop,
+                payloadSignature,
                 cancellation);
             _candidates.Add(registration);
-            if (_recentSendSignals.CanApply(
+            if (_recentSendSignals.TryGetApplicable(
                     context.ContextHash,
                     context.ProcessId,
                     context.OccurredAt,
                     DateTimeOffset.UtcNow,
                     candidateUrls,
-                    candidateImages.Count > 0))
+                    candidateImages.Count > 0,
+                    out var recentSendSignal))
             {
-                registration.MarkSendObserved();
+                registration.MarkSendObserved(
+                    recentSendSignal.ImageDialogSendObserved);
                 _diagnostic?.Invoke(
                     "line-send-input-replayed",
-                    "kind=keyboard candidates=1");
+                    $"kind=buffered candidates=1 imageDialog={recentSendSignal.ImageDialogSendObserved}");
             }
 
             registration.Task = Task.Run(() => RunCandidateAsync(registration));
@@ -664,10 +893,22 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
                     registration.Images.Count > 0,
                     TimeSpan.FromMinutes(2)),
                 registration.IsSendObserved,
+                registration.IsImageDialogSendObserved,
                 registration.Cancellation.Token);
             if (!response.Confirmed || _paused)
             {
                 return;
+            }
+
+            if (response.ObservedSnapshot is not null)
+            {
+                _nativeDropBaselineCache.Observe(
+                    new LineDropTarget(
+                        registration.Context.MainWindow,
+                        registration.Context.ProcessId,
+                        default),
+                    response.ObservedSnapshot,
+                    DateTimeOffset.UtcNow);
             }
 
             var signals = new List<string>(response.Signals)
@@ -735,15 +976,6 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
             lock (_candidateGate)
             {
                 _candidates.Remove(registration);
-                foreach (var url in registration.Urls)
-                {
-                    _activeUrls.Remove(url.Value);
-                }
-
-                foreach (var image in registration.Images)
-                {
-                    _activeImageHashes.Remove(image.Sha256);
-                }
             }
 
             registration.Cancellation.Dispose();
@@ -826,9 +1058,11 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
         IReadOnlyList<NormalizedUrl> urls,
         IReadOnlyList<ClipboardImageSnapshot> images,
         bool nativeDrop,
+        string payloadSignature,
         CancellationTokenSource cancellation)
     {
         private int _sendObserved;
+        private int _imageDialogSendObserved;
 
         public ValidatedLineContext Context { get; } = context;
         public LineAccessibilitySnapshot Baseline { get; } = baseline;
@@ -836,13 +1070,24 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
         public IReadOnlyList<NormalizedUrl> Urls { get; } = urls;
         public IReadOnlyList<ClipboardImageSnapshot> Images { get; } = images;
         public bool NativeDrop { get; } = nativeDrop;
+        public string PayloadSignature { get; } = payloadSignature;
         public CancellationTokenSource Cancellation { get; } = cancellation;
         public Task Task { get; set; } = Task.CompletedTask;
 
-        public bool MarkSendObserved() =>
-            Interlocked.Exchange(ref _sendObserved, 1) == 0;
+        public bool MarkSendObserved(bool imageDialogSendObserved = false)
+        {
+            if (imageDialogSendObserved)
+            {
+                Interlocked.Exchange(ref _imageDialogSendObserved, 1);
+            }
+
+            return Interlocked.Exchange(ref _sendObserved, 1) == 0;
+        }
 
         public bool IsSendObserved() =>
             Volatile.Read(ref _sendObserved) == 1;
+
+        public bool IsImageDialogSendObserved() =>
+            Volatile.Read(ref _imageDialogSendObserved) == 1;
     }
 }

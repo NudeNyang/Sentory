@@ -114,7 +114,7 @@ public sealed class WeChatDropOverlayRuntime : IDisposable
                     _native,
                     _dropWindows,
                     cursor,
-                    WeChatContextValidator.IsSupportedProcessName)
+                    WeChatContextValidator.IsSupportedDropSurfaceProcessName)
                     ? _locator.FindAt(
                         cursor.X,
                         cursor.Y,

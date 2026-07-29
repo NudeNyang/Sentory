@@ -5,7 +5,8 @@ namespace Sentory.Platform.Windows.Runtime;
 
 internal readonly record struct LineRecentSendSignal(
     DateTimeOffset SentAt,
-    string? ComposerText);
+    string? ComposerText,
+    bool ImageDialogSendObserved = false);
 
 internal sealed class LineRecentSendSignals
 {
@@ -20,8 +21,12 @@ internal sealed class LineRecentSendSignals
     public void Observe(
         string contextHash,
         DateTimeOffset sentAt,
-        string? composerText) =>
-        _signals[contextHash] = new LineRecentSendSignal(sentAt, composerText);
+        string? composerText,
+        bool imageDialogSendObserved = false) =>
+        _signals[contextHash] = new LineRecentSendSignal(
+            sentAt,
+            composerText,
+            imageDialogSendObserved);
 
     public void ObserveProcess(uint processId, DateTimeOffset sentAt) =>
         ObserveProcess(processId, sentAt, composerText: null);
@@ -29,10 +34,12 @@ internal sealed class LineRecentSendSignals
     public void ObserveProcess(
         uint processId,
         DateTimeOffset sentAt,
-        string? composerText) =>
+        string? composerText,
+        bool imageDialogSendObserved = false) =>
         _processSignals[processId] = new LineRecentSendSignal(
             sentAt,
-            composerText);
+            composerText,
+            imageDialogSendObserved);
 
     public bool CanApply(
         string contextHash,
@@ -71,6 +78,36 @@ internal sealed class LineRecentSendSignals
         return _processSignals.TryGetValue(processId, out var process) &&
                IsApplicable(process, pastedAt, observedAt) &&
                HasMatchingContent(process, urls, hasImages);
+    }
+
+    public bool TryGetApplicable(
+        string contextHash,
+        uint processId,
+        DateTimeOffset pastedAt,
+        DateTimeOffset observedAt,
+        IReadOnlyList<NormalizedUrl> urls,
+        bool hasImages,
+        out LineRecentSendSignal signal)
+    {
+        RemoveExpired(observedAt);
+        if (_signals.TryGetValue(contextHash, out var exact) &&
+            IsApplicable(exact, pastedAt, observedAt) &&
+            HasMatchingContent(exact, urls, hasImages))
+        {
+            signal = exact;
+            return true;
+        }
+
+        if (_processSignals.TryGetValue(processId, out var process) &&
+            IsApplicable(process, pastedAt, observedAt) &&
+            HasMatchingContent(process, urls, hasImages))
+        {
+            signal = process;
+            return true;
+        }
+
+        signal = default;
+        return false;
     }
 
     private bool CanApplyProcess(

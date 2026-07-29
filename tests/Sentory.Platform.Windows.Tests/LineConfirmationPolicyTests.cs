@@ -212,6 +212,61 @@ public sealed class LineConfirmationPolicyTests
     }
 
     [Fact]
+    public void ImageDialogSendAcceptsVirtualizedReplacementMessages()
+    {
+        var baseline = new LineAccessibilitySnapshot(
+            string.Empty,
+            new HashSet<string>(["old-one", "old-two"]));
+
+        Assert.True(LineImageConfirmationPolicy.CanConfirm(
+            baseline,
+            string.Empty,
+            [
+                new LineAccessibleMessage("new-one", string.Empty),
+                new LineAccessibleMessage("new-two", string.Empty)
+            ],
+            explicitSendObserved: true,
+            imageDialogSendObserved: true));
+    }
+
+    [Fact]
+    public void GenericSendDoesNotBypassConversationOverlap()
+    {
+        var baseline = new LineAccessibilitySnapshot(
+            string.Empty,
+            new HashSet<string>(["old-one", "old-two"]));
+
+        Assert.False(LineImageConfirmationPolicy.CanConfirm(
+            baseline,
+            string.Empty,
+            [new LineAccessibleMessage("new-one", string.Empty)],
+            explicitSendObserved: true,
+            imageDialogSendObserved: false));
+    }
+
+    [Fact]
+    public void UnanchoredImageDropRequiresImageDialogSendAndMessages()
+    {
+        var baseline = new LineAccessibilitySnapshot(
+            string.Empty,
+            new HashSet<string>(),
+            IsUnanchored: true);
+
+        Assert.True(LineImageConfirmationPolicy.CanConfirm(
+            baseline,
+            string.Empty,
+            [new LineAccessibleMessage("sent", string.Empty)],
+            explicitSendObserved: true,
+            imageDialogSendObserved: true));
+        Assert.False(LineImageConfirmationPolicy.CanConfirm(
+            baseline,
+            string.Empty,
+            [new LineAccessibleMessage("sent", string.Empty)],
+            explicitSendObserved: false,
+            imageDialogSendObserved: true));
+    }
+
+    [Fact]
     public void ConversationChangeRequiresTwoAvailableDistinctIdentities()
     {
         var identified = new LineAccessibilitySnapshot(

@@ -68,6 +68,8 @@ public interface IDiscordConfirmationClient
 public interface IDiscordWorkerLifecycle
 {
     event EventHandler? RecoveryRequired;
+
+    bool TryRecycle();
 }
 
 internal enum DiscordCandidateDecision

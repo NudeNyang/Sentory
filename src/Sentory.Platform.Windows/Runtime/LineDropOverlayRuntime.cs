@@ -9,6 +9,8 @@ public sealed class LineDropOverlayRuntime : IDisposable
         TimeSpan.FromMilliseconds(16);
     private static readonly TimeSpan ExplorerOriginMaximumAge =
         TimeSpan.FromMilliseconds(150);
+    private static readonly TimeSpan IdleBaselineRefreshInterval =
+        TimeSpan.FromSeconds(2);
     private const int ReleaseTargetGraceFrames = 48;
 
     private readonly INativeWindowApi _native;
@@ -27,6 +29,8 @@ public sealed class LineDropOverlayRuntime : IDisposable
     private DateTimeOffset _releasedAt;
     private nint _preDropBaselineWindow;
     private Task<LineAccessibilitySnapshot?>? _preDropBaselineTask;
+    private Task? _idleBaselineRefreshTask;
+    private DateTimeOffset _nextIdleBaselineRefreshAt;
 
     public LineDropOverlayRuntime(
         LineCaptureRuntime captureRuntime,
@@ -91,11 +95,15 @@ public sealed class LineDropOverlayRuntime : IDisposable
         {
             CompleteDrag(cursor);
             RememberPointerUp(cursor);
+            BeginIdleBaselineRefresh();
             return;
         }
 
         if (!_leftWasDown && _releaseTargetGraceFrames > 0)
         {
+            _diagnostic?.Invoke(
+                "line-drop-cancelled",
+                "reason=next-drag-started-during-release-grace");
             ResetDrag();
         }
 
@@ -163,6 +171,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
             paths,
             DateTimeOffset.UtcNow);
         _dropState.Begin(start, paths);
+        BeginPreDropBaselineCaptureFromVisibleWindow();
         _diagnostic?.Invoke(
             "line-drop-selection-observed",
             $"files={paths.Length}");
@@ -179,6 +188,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
         }
 
         _dropState.Begin(start, paths);
+        BeginPreDropBaselineCaptureFromVisibleWindow();
         _diagnostic?.Invoke(
             "line-drop-selection-observed",
             $"files={paths.Count}, source=shared");
@@ -207,10 +217,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
 
         _dropState.Observe(
             cursor,
-            _locator.FindAt(
-                cursor.X,
-                cursor.Y,
-                requireTopmost: true));
+            _locator.FindReleaseAt(cursor.X, cursor.Y));
         if (_dropState.TryTakeCompleted(out var target, out var paths))
         {
             var releasedAt = _releasedAt;
@@ -266,9 +273,14 @@ public sealed class LineDropOverlayRuntime : IDisposable
         _diagnostic?.Invoke(
             "line-drop-released",
             $"files={paths.Count}, window=0x{target.MainWindow.ToInt64():X}, mode=passive");
-        var preDropBaseline = preDropBaselineTask is null
-            ? null
-            : await preDropBaselineTask;
+        var preDropBaseline =
+            LinePreDropBaselinePolicy.TryGetCompleted(preDropBaselineTask);
+        if (preDropBaselineTask is { IsCompleted: false })
+        {
+            _diagnostic?.Invoke(
+                "line-drop-baseline-pending",
+                "registration=immediate");
+        }
         var result = await _captureRuntime.RegisterNativeDroppedFilesAsync(
             target,
             paths,
@@ -302,6 +314,37 @@ public sealed class LineDropOverlayRuntime : IDisposable
             _captureRuntime.TryCaptureNativeDropBaselineAsync(
                 target,
                 DateTimeOffset.UtcNow);
+    }
+
+    private void BeginPreDropBaselineCaptureFromVisibleWindow()
+    {
+        var target = _locator.FindVisibleMainWindow();
+        if (target is not null)
+        {
+            BeginPreDropBaselineCapture(target);
+        }
+    }
+
+    private void BeginIdleBaselineRefresh()
+    {
+        if (_dropState.IsTracking ||
+            _releaseTargetGraceFrames > 0 ||
+            _idleBaselineRefreshTask is { IsCompleted: false } ||
+            DateTimeOffset.UtcNow < _nextIdleBaselineRefreshAt)
+        {
+            return;
+        }
+
+        var target = _locator.FindVisibleMainWindow();
+        if (target is null)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        _nextIdleBaselineRefreshAt = now + IdleBaselineRefreshInterval;
+        _idleBaselineRefreshTask =
+            _captureRuntime.RefreshNativeDropBaselineAsync(target, now);
     }
 
     public void Dispose()

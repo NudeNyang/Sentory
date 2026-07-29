@@ -35,7 +35,21 @@ internal sealed class LinePassiveDropState(
         var y = cursor.Y - _start.Y;
         _activated |= Math.Sqrt((x * x) + (y * y)) >=
                       minimumDragDistance;
-        _target = _activated ? target : null;
+        if (!_activated)
+        {
+            return;
+        }
+
+        if (target is not null)
+        {
+            _target = target;
+            return;
+        }
+
+        if (_target is null || !Contains(_target.Bounds, cursor))
+        {
+            _target = null;
+        }
     }
 
     public bool TryTakeCompleted(
@@ -61,4 +75,12 @@ internal sealed class LinePassiveDropState(
         _target = null;
         _activated = false;
     }
+
+    private static bool Contains(
+        WindowBounds bounds,
+        (int X, int Y) cursor) =>
+        cursor.X >= bounds.Left &&
+        cursor.X < bounds.Right &&
+        cursor.Y >= bounds.Top &&
+        cursor.Y < bounds.Bottom;
 }

@@ -38,6 +38,18 @@ public sealed class WeChatDropTargetLocatorTests
     }
 
     [Fact]
+    public void AcceptsWeChatHelperUploadSurfaceAboveMainWindow()
+    {
+        var native = new FakeNative { HasWeChatHelperSurface = true };
+        var locator = new WeChatDropTargetLocator(native, native);
+
+        var target = locator.FindAt(450, 300, requireTopmost: true);
+
+        Assert.NotNull(target);
+        Assert.Equal(native.Main, target.MainWindow);
+    }
+
+    [Fact]
     public void ReleaseAcceptsForegroundWeChatBehindTransientDragSurface()
     {
         var native = new FakeNative { HasTransientDragSurface = true };
@@ -68,6 +80,7 @@ public sealed class WeChatDropTargetLocatorTests
         public uint ProcessId { get; } = 84;
         public bool IsOccluded { get; set; }
         public bool HasWeChatDragSurface { get; set; }
+        public bool HasWeChatHelperSurface { get; set; }
         public bool HasTransientDragSurface { get; set; }
         public bool IsForegroundOtherApp { get; set; }
 
@@ -75,13 +88,23 @@ public sealed class WeChatDropTargetLocatorTests
             IsForegroundOtherApp ? new nint(99) : Main;
         public nint GetFocusedWindow(nint foregroundWindow) => nint.Zero;
         public nint GetRootWindow(nint window) =>
-            window == new nint(98) || window == new nint(99)
+            window == new nint(97) ||
+            window == new nint(98) ||
+            window == new nint(99)
                 ? window
                 : Main;
         public uint GetProcessId(nint window) =>
-            window == new nint(99) ? 999u : ProcessId;
+            window == new nint(97)
+                ? 777u
+                : window == new nint(99)
+                    ? 999u
+                    : ProcessId;
         public string? GetProcessName(uint processId) =>
-            processId == 999 ? "notepad" : "Weixin";
+            processId == 777
+                ? "WeChatAppEx"
+                : processId == 999
+                    ? "notepad"
+                    : "Weixin";
         public string GetClassName(nint window) => "Qt51514QWindowIcon";
         public int GetControlId(nint window) => 0;
         public nint GetOwnerWindow(nint window) => nint.Zero;
@@ -105,6 +128,8 @@ public sealed class WeChatDropTargetLocatorTests
                 ? new nint(99)
                 : HasTransientDragSurface
                     ? new nint(99)
+                    : HasWeChatHelperSurface
+                        ? new nint(97)
                     : HasWeChatDragSurface
                         ? new nint(98)
                         : Main;

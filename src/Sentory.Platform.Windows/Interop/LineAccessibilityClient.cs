@@ -103,7 +103,8 @@ internal static class LineImageDialogSendButtonPolicy
 internal sealed record LineAccessibilitySnapshot(
     string ConversationIdentity,
     IReadOnlySet<string> MessageIds,
-    bool ImageSendDialogFocused = false);
+    bool ImageSendDialogFocused = false,
+    bool IsUnanchored = false);
 
 internal sealed record LineConfirmationRequest(
     ValidatedLineContext Context,
@@ -115,7 +116,8 @@ internal sealed record LineConfirmationRequest(
 internal sealed record LineConfirmationResponse(
     bool Confirmed,
     DateTimeOffset? ConfirmedAt,
-    IReadOnlyList<string> Signals);
+    IReadOnlyList<string> Signals,
+    LineAccessibilitySnapshot? ObservedSnapshot = null);
 
 internal sealed record LineAccessibleMessage(
     string Id,
@@ -127,11 +129,13 @@ internal interface ILineAccessibilityClient
         ValidatedLineContext context,
         bool requireFocusedComposer,
         bool allowImageSendDialog,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        bool reportDiagnostics = true);
 
     Task<LineConfirmationResponse> WaitForConfirmationAsync(
         LineConfirmationRequest request,
         Func<bool> explicitSendObserved,
+        Func<bool> imageDialogSendObserved,
         CancellationToken cancellationToken);
 }
 
@@ -353,6 +357,31 @@ internal static class LineConversationMatchPolicy
             StringComparison.Ordinal);
 }
 
+internal static class LineImageConfirmationPolicy
+{
+    public static bool CanConfirm(
+        LineAccessibilitySnapshot baseline,
+        string currentIdentity,
+        IReadOnlyCollection<LineAccessibleMessage> currentMessages,
+        bool explicitSendObserved,
+        bool imageDialogSendObserved)
+    {
+        if (!explicitSendObserved ||
+            !imageDialogSendObserved ||
+            currentMessages.Count == 0 ||
+            LineConversationMatchPolicy.HasConversationChanged(
+                baseline,
+                currentIdentity))
+        {
+            return false;
+        }
+
+        return baseline.IsUnanchored ||
+               currentMessages.Any(message =>
+                   !baseline.MessageIds.Contains(message.Id));
+    }
+}
+
 internal sealed class LineAccessibilityClient(
     Action<string, string>? diagnostic = null) : ILineAccessibilityClient
 {
@@ -376,18 +405,21 @@ internal sealed class LineAccessibilityClient(
         ValidatedLineContext context,
         bool requireFocusedComposer,
         bool allowImageSendDialog,
-        CancellationToken cancellationToken) =>
+        CancellationToken cancellationToken,
+        bool reportDiagnostics = true) =>
         Task.Run(
             () => TryCapture(
                 context,
                 requireFocusedComposer,
                 allowImageSendDialog,
-                cancellationToken),
+                cancellationToken,
+                reportDiagnostics),
             cancellationToken);
 
     public async Task<LineConfirmationResponse> WaitForConfirmationAsync(
         LineConfirmationRequest request,
         Func<bool> explicitSendObserved,
+        Func<bool> imageDialogSendObserved,
         CancellationToken cancellationToken)
     {
         var startedAt = DateTimeOffset.UtcNow;
@@ -412,10 +444,16 @@ internal sealed class LineAccessibilityClient(
                                        out var selectedIdentity)
                         ? selectedIdentity
                         : string.Empty;
-                    if (LineConversationMatchPolicy.IsSameConversation(
+                    var observedSnapshot = new LineAccessibilitySnapshot(
+                        identity,
+                        messages.Select(message => message.Id)
+                            .ToHashSet(StringComparer.Ordinal));
+                    var sameConversation =
+                        LineConversationMatchPolicy.IsSameConversation(
                             request.Baseline,
                             identity,
-                            messages))
+                            messages);
+                    if (sameConversation)
                     {
                         foreach (var message in messages.Where(message =>
                                      !request.Baseline.MessageIds.Contains(
@@ -446,8 +484,31 @@ internal sealed class LineAccessibilityClient(
                                     request.HasImages
                                         ? "line-image-message"
                                         : "line-url-match"
-                                ]);
+                                ],
+                                observedSnapshot);
                         }
+                    }
+                    else if (request.HasImages &&
+                             LineImageConfirmationPolicy.CanConfirm(
+                                 request.Baseline,
+                                 identity,
+                                 messages,
+                                 explicitSendObserved(),
+                                 imageDialogSendObserved()))
+                    {
+                        diagnostic?.Invoke(
+                            "line-send-confirmed",
+                            $"urls=0 images=1 mode=image-dialog-message-change");
+                        return new LineConfirmationResponse(
+                            true,
+                            DateTimeOffset.UtcNow,
+                            [
+                                "line-accessibility",
+                                "line-message-list-changed",
+                                "line-explicit-send-input",
+                                "line-image-dialog-send"
+                            ],
+                            observedSnapshot);
                     }
                     else if (LineConversationMatchPolicy.HasConversationChanged(
                                  request.Baseline,
@@ -489,7 +550,8 @@ internal sealed class LineAccessibilityClient(
         ValidatedLineContext context,
         bool requireFocusedComposer,
         bool allowImageSendDialog,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool reportDiagnostics)
     {
         cancellationToken.ThrowIfCancellationRequested();
         try
@@ -508,22 +570,30 @@ internal sealed class LineAccessibilityClient(
                  (!allowImageSendDialog ||
                   !focus.IsImageSendDialogUsable)))
             {
-                diagnostic?.Invoke(
-                    "line-context-rejected",
-                    messageView is null
-                        ? "reason=message-view-unavailable"
-                        : composer is null
-                            ? "reason=message-composer-unavailable"
-                            : CreateFocusDiagnostic(focus!));
+                if (reportDiagnostics)
+                {
+                    diagnostic?.Invoke(
+                        "line-context-rejected",
+                        messageView is null
+                            ? "reason=message-view-unavailable"
+                            : composer is null
+                                ? "reason=message-composer-unavailable"
+                                : CreateFocusDiagnostic(focus!));
+                }
+
                 return null;
             }
 
             var list = FindMessageList(messageView);
             if (list is null)
             {
-                diagnostic?.Invoke(
-                    "line-context-rejected",
-                    "reason=message-list-unavailable");
+                if (reportDiagnostics)
+                {
+                    diagnostic?.Invoke(
+                        "line-context-rejected",
+                        "reason=message-list-unavailable");
+                }
+
                 return null;
             }
 
@@ -537,11 +607,15 @@ internal sealed class LineAccessibilityClient(
                     identityAvailable,
                     messages.Count))
             {
-                diagnostic?.Invoke(
-                    "line-context-rejected",
-                    conversationPanel is null
-                        ? $"reason=conversation-panel-unavailable messages={messages.Count} imageDialog={focus?.IsImageSendDialogUsable == true}"
-                        : "reason=selected-conversation-unavailable");
+                if (reportDiagnostics)
+                {
+                    diagnostic?.Invoke(
+                        "line-context-rejected",
+                        conversationPanel is null
+                            ? $"reason=conversation-panel-unavailable messages={messages.Count} imageDialog={focus?.IsImageSendDialogUsable == true}"
+                            : "reason=selected-conversation-unavailable");
+                }
+
                 return null;
             }
 
@@ -550,9 +624,13 @@ internal sealed class LineAccessibilityClient(
                 messages.Select(message => message.Id)
                     .ToHashSet(StringComparer.Ordinal),
                 focus?.IsImageSendDialogUsable == true);
-            diagnostic?.Invoke(
-                "line-context-ready",
-                $"messages={snapshot.MessageIds.Count} identity={identityAvailable} imageDialog={snapshot.ImageSendDialogFocused}");
+            if (reportDiagnostics)
+            {
+                diagnostic?.Invoke(
+                    "line-context-ready",
+                    $"messages={snapshot.MessageIds.Count} identity={identityAvailable} imageDialog={snapshot.ImageSendDialogFocused}");
+            }
+
             return snapshot;
         }
         catch (Exception exception)
@@ -560,9 +638,13 @@ internal sealed class LineAccessibilityClient(
                   InvalidOperationException or
                   ArgumentException)
         {
-            diagnostic?.Invoke(
-                "line-context-failed",
-                $"type={exception.GetType().Name}");
+            if (reportDiagnostics)
+            {
+                diagnostic?.Invoke(
+                    "line-context-failed",
+                    $"type={exception.GetType().Name}");
+            }
+
             return null;
         }
     }

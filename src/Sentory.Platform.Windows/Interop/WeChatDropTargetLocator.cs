@@ -95,9 +95,10 @@ public sealed class WeChatDropTargetLocator(
         var rootAtPoint = native.GetRootWindow(windowAtPoint);
         return rootAtPoint == mainWindow ||
                (rootAtPoint != nint.Zero &&
-                native.GetProcessId(rootAtPoint) == weChatProcessId &&
-                WeChatContextValidator.IsSupportedProcessName(
-                    native.GetProcessName(weChatProcessId)));
+                (native.GetProcessId(rootAtPoint) == weChatProcessId ||
+                 WeChatContextValidator.IsSupportedDropSurfaceProcessName(
+                     native.GetProcessName(
+                         native.GetProcessId(rootAtPoint)))));
     }
 
     private static bool Contains(WindowBounds bounds, int x, int y) =>

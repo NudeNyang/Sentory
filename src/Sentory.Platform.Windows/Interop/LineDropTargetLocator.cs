@@ -7,7 +7,75 @@ public sealed class LineDropTargetLocator(
     public LineDropTarget? FindAt(
         int cursorX,
         int cursorY,
-        bool requireTopmost = false)
+        bool requireTopmost = false) =>
+        FindAt(
+            cursorX,
+            cursorY,
+            requireTopmost,
+            allowForegroundFallback: false);
+
+    public LineDropTarget? FindReleaseAt(int cursorX, int cursorY) =>
+        FindAt(
+            cursorX,
+            cursorY,
+            requireTopmost: true,
+            allowForegroundFallback: true);
+
+    private LineDropTarget? FindAt(
+        int cursorX,
+        int cursorY,
+        bool requireTopmost,
+        bool allowForegroundFallback)
+    {
+        foreach (var target in FindVisibleMainWindows())
+        {
+            if (!Contains(target.Bounds, cursorX, cursorY))
+            {
+                continue;
+            }
+
+            if (requireTopmost &&
+                !IsTopmostOrLineOwnedSurface(
+                    target.MainWindow,
+                    target.ProcessId,
+                    cursorX,
+                    cursorY) &&
+                !(allowForegroundFallback &&
+                  IsForegroundLineSurface(
+                      target.MainWindow,
+                      target.ProcessId)))
+            {
+                continue;
+            }
+
+            return target;
+        }
+
+        return null;
+    }
+
+    private bool IsForegroundLineSurface(
+        nint mainWindow,
+        uint lineProcessId)
+    {
+        var foregroundRoot = native.GetRootWindow(
+            native.GetForegroundWindow());
+        return foregroundRoot == mainWindow ||
+               (foregroundRoot != nint.Zero &&
+                native.GetProcessId(foregroundRoot) == lineProcessId &&
+                string.Equals(
+                    native.GetProcessName(lineProcessId),
+                    LineContextValidator.ProcessName,
+                    StringComparison.OrdinalIgnoreCase));
+    }
+
+    public LineDropTarget? FindVisibleMainWindow() =>
+        FindVisibleMainWindows()
+            .OrderByDescending(target =>
+                (long)target.Bounds.Width * target.Bounds.Height)
+            .FirstOrDefault();
+
+    private IEnumerable<LineDropTarget> FindVisibleMainWindows()
     {
         foreach (var root in dropWindows.EnumerateTopLevelWindows())
         {
@@ -31,27 +99,13 @@ public sealed class LineDropTargetLocator(
             }
 
             var bounds = native.GetWindowBounds(root);
-            if (!Contains(bounds, cursorX, cursorY) ||
-                bounds.Width < 320 ||
-                bounds.Height < 320)
+            if (bounds.Width < 320 || bounds.Height < 320)
             {
                 continue;
             }
 
-            if (requireTopmost &&
-                !IsTopmostOrLineOwnedSurface(
-                    root,
-                    processId,
-                    cursorX,
-                    cursorY))
-            {
-                continue;
-            }
-
-            return new LineDropTarget(root, processId, bounds);
+            yield return new LineDropTarget(root, processId, bounds);
         }
-
-        return null;
     }
 
     private bool IsTopmostOrLineOwnedSurface(

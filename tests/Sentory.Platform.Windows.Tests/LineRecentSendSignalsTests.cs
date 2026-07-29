@@ -70,6 +70,28 @@ public sealed class LineRecentSendSignalsTests
     }
 
     [Fact]
+    public void ReplaysImageDialogEvidenceAfterCandidateRegistrationDelay()
+    {
+        var signals = new LineRecentSendSignals();
+        var droppedAt = DateTimeOffset.UtcNow;
+        signals.Observe(
+            "same-window",
+            droppedAt.AddMilliseconds(80),
+            composerText: null,
+            imageDialogSendObserved: true);
+
+        Assert.True(signals.TryGetApplicable(
+            "same-window",
+            42,
+            droppedAt,
+            droppedAt.AddMilliseconds(1500),
+            [],
+            hasImages: true,
+            out var signal));
+        Assert.True(signal.ImageDialogSendObserved);
+    }
+
+    [Fact]
     public void ReplaysSameProcessSendWhenPhotoDialogHasNoOwner()
     {
         var signals = new LineRecentSendSignals();

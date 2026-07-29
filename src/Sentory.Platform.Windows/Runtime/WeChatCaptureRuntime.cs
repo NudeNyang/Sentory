@@ -51,10 +51,6 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
     private readonly CancellationTokenSource _cancellation = new();
     private readonly object _candidateGate = new();
     private readonly List<CandidateRegistration> _candidates = [];
-    private readonly HashSet<string> _activeUrls =
-        new(StringComparer.Ordinal);
-    private readonly HashSet<string> _activeImageHashes =
-        new(StringComparer.OrdinalIgnoreCase);
     private readonly WeChatRecentSendSignals _recentSendSignals = new();
     private Task? _worker;
     private volatile bool _paused;
@@ -262,21 +258,21 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
         var rejected = 0;
         lock (_candidateGate)
         {
-            foreach (var candidate in _candidates.Where(candidate =>
-                         candidate.Context.MainWindow == mainWindow &&
-                         candidate.Context.OccurredAt <= occurredAt &&
-                         !candidate.Cancellation.IsCancellationRequested))
+            var candidates = _candidates.Where(candidate =>
+                    candidate.Context.MainWindow == mainWindow &&
+                    candidate.Context.OccurredAt <= occurredAt &&
+                    !candidate.IsSendObserved() &&
+                    !candidate.Cancellation.IsCancellationRequested)
+                .ToArray();
+            rejected = candidates.Count(candidate =>
+                !CanApplySendEvidence(candidate, composer));
+            var candidate = MessengerSendCandidatePolicy.SelectLatestEligible(
+                candidates,
+                candidate => CanApplySendEvidence(candidate, composer),
+                candidate => candidate.Context.OccurredAt);
+            if (candidate?.MarkSendObserved() == true)
             {
-                if (!CanApplySendEvidence(candidate, composer))
-                {
-                    rejected++;
-                    continue;
-                }
-
-                if (candidate.MarkSendObserved())
-                {
-                    observed++;
-                }
+                observed = 1;
             }
         }
 
@@ -301,21 +297,21 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
         var rejected = 0;
         lock (_candidateGate)
         {
-            foreach (var candidate in _candidates.Where(candidate =>
-                         candidate.Context.ProcessId == processId &&
-                         candidate.Context.OccurredAt <= occurredAt &&
-                         !candidate.Cancellation.IsCancellationRequested))
+            var candidates = _candidates.Where(candidate =>
+                    candidate.Context.ProcessId == processId &&
+                    candidate.Context.OccurredAt <= occurredAt &&
+                    !candidate.IsSendObserved() &&
+                    !candidate.Cancellation.IsCancellationRequested)
+                .ToArray();
+            rejected = candidates.Count(candidate =>
+                !CanApplySendEvidence(candidate, composer));
+            var candidate = MessengerSendCandidatePolicy.SelectLatestEligible(
+                candidates,
+                candidate => CanApplySendEvidence(candidate, composer),
+                candidate => candidate.Context.OccurredAt);
+            if (candidate?.MarkSendObserved() == true)
             {
-                if (!CanApplySendEvidence(candidate, composer))
-                {
-                    rejected++;
-                    continue;
-                }
-
-                if (candidate.MarkSendObserved())
-                {
-                    observed++;
-                }
+                observed = 1;
             }
         }
 
@@ -514,25 +510,30 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
         {
             _candidates.RemoveAll(candidate => candidate.Task.IsCompleted);
             var candidateUrls = urls
-                .Where(url => !_activeUrls.Contains(url.Value))
+                .DistinctBy(url => url.Value, StringComparer.Ordinal)
                 .ToList();
             var candidateImages = images
-                .Where(image => !_activeImageHashes.Contains(image.Sha256))
+                .DistinctBy(
+                    image => image.Sha256,
+                    StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            var payloadSignature =
+                MessengerCandidateDuplicatePolicy.CreatePayloadSignature(
+                    candidateUrls,
+                    candidateImages);
             if ((candidateUrls.Count == 0 && candidateImages.Count == 0) ||
-                _candidates.Count >= MaximumActiveCandidates)
+                _candidates.Count >= MaximumActiveCandidates ||
+                _candidates.Any(candidate =>
+                    !candidate.Cancellation.IsCancellationRequested &&
+                    MessengerCandidateDuplicatePolicy.IsDuplicateBurst(
+                        candidate.Context.ContextHash,
+                        candidate.Context.OccurredAt,
+                        candidate.PayloadSignature,
+                        context.ContextHash,
+                        context.OccurredAt,
+                        payloadSignature)))
             {
                 return false;
-            }
-
-            foreach (var url in candidateUrls)
-            {
-                _activeUrls.Add(url.Value);
-            }
-
-            foreach (var image in candidateImages)
-            {
-                _activeImageHashes.Add(image.Sha256);
             }
 
             var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
@@ -544,6 +545,7 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
                 candidateUrls,
                 candidateImages,
                 nativeDrop,
+                payloadSignature,
                 cancellation);
             _candidates.Add(registration);
             if (_recentSendSignals.CanApply(
@@ -644,15 +646,6 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
             lock (_candidateGate)
             {
                 _candidates.Remove(registration);
-                foreach (var url in registration.Urls)
-                {
-                    _activeUrls.Remove(url.Value);
-                }
-
-                foreach (var image in registration.Images)
-                {
-                    _activeImageHashes.Remove(image.Sha256);
-                }
             }
 
             registration.Cancellation.Dispose();
@@ -735,6 +728,7 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
         IReadOnlyList<NormalizedUrl> urls,
         IReadOnlyList<ClipboardImageSnapshot> images,
         bool nativeDrop,
+        string payloadSignature,
         CancellationTokenSource cancellation)
     {
         private int _sendObserved;
@@ -745,6 +739,7 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
         public IReadOnlyList<NormalizedUrl> Urls { get; } = urls;
         public IReadOnlyList<ClipboardImageSnapshot> Images { get; } = images;
         public bool NativeDrop { get; } = nativeDrop;
+        public string PayloadSignature { get; } = payloadSignature;
         public CancellationTokenSource Cancellation { get; } = cancellation;
         public Task Task { get; set; } = Task.CompletedTask;
 

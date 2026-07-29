@@ -36,7 +36,7 @@ public sealed class LinePassiveDropStateTests
         var outside = new LinePassiveDropState();
         outside.Begin((10, 10), ["one.png"]);
         outside.Observe((40, 40), Target);
-        outside.Observe((50, 50), null);
+        outside.Observe((950, 50), null);
         Assert.False(outside.TryTakeCompleted(out _, out _));
     }
 
@@ -52,6 +52,20 @@ public sealed class LinePassiveDropStateTests
         state.Observe((40, 40), Target);
 
         Assert.True(state.TryTakeCompleted(out _, out var paths));
+        Assert.Equal(["one.png"], paths);
+    }
+
+    [Fact]
+    public void KeepsRecentTargetWhilePreviewCoversLineAtRelease()
+    {
+        var state = new LinePassiveDropState();
+        state.Begin((100, 100), ["one.png"]);
+        state.Observe((450, 300), Target);
+
+        state.Observe((450, 300), null);
+
+        Assert.True(state.TryTakeCompleted(out var target, out var paths));
+        Assert.Equal(Target, target);
         Assert.Equal(["one.png"], paths);
     }
 }

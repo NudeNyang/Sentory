@@ -136,6 +136,26 @@ public sealed class DiscordDetectionStatusTrackerTests
         Assert.False(plan.ReportIssue);
     }
 
+    [Theory]
+    [InlineData(CaptureRuntimeState.Connecting, true, false, true)]
+    [InlineData(CaptureRuntimeState.Connecting, true, true, false)]
+    [InlineData(CaptureRuntimeState.Connecting, false, false, false)]
+    [InlineData(CaptureRuntimeState.Recovering, true, false, false)]
+    [InlineData(CaptureRuntimeState.ReconnectRequired, true, false, false)]
+    public void RecyclesAStaleWorkerOnceBeforeContinuingOrEscalating(
+        CaptureRuntimeState state,
+        bool lifecycleAvailable,
+        bool recycleAlreadyAttempted,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            DiscordCaptureRuntime.ShouldRecycleWorker(
+                state,
+                lifecycleAvailable,
+                recycleAlreadyAttempted));
+    }
+
     [Fact]
     public void DefinitiveAccessibilityFailureSurvivesAWindowTransition()
     {

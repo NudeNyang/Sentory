@@ -240,6 +240,32 @@ public sealed class DiscordWorkerClient :
         }
     }
 
+    public bool TryRecycle()
+    {
+        lock (_processGate)
+        {
+            if (_disposed)
+            {
+                return false;
+            }
+
+            var process = _process;
+            _process = null;
+            DisposeProcess(process);
+            foreach (var pair in _pending.ToArray())
+            {
+                if (_pending.TryRemove(pair.Key, out var completion))
+                {
+                    completion.TrySetResult(
+                        DiscordConfirmationResponse.Unavailable(
+                            "worker-recycled"));
+                }
+            }
+
+            return true;
+        }
+    }
+
     private static bool IsRunning(Process process)
     {
         try

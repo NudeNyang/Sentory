@@ -19,10 +19,18 @@ public sealed record WeChatDropTarget(
 public sealed class WeChatContextValidator(INativeWindowApi native)
 {
     private static readonly string[] ProcessNames = ["Weixin", "WeChat"];
+    private const string DropSurfaceProcessName = "WeChatAppEx";
 
     public static bool IsSupportedProcessName(string? processName) =>
         processName is not null &&
         ProcessNames.Contains(processName, StringComparer.OrdinalIgnoreCase);
+
+    public static bool IsSupportedDropSurfaceProcessName(string? processName) =>
+        IsSupportedProcessName(processName) ||
+        string.Equals(
+            processName,
+            DropSurfaceProcessName,
+            StringComparison.OrdinalIgnoreCase);
 
     public static bool IsSupportedMainWindowClass(string className)
     {

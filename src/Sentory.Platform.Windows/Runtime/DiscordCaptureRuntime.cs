@@ -65,10 +65,6 @@ public sealed class DiscordCaptureRuntime :
     private readonly List<CandidateRegistration> _candidates = [];
     private readonly List<AttachmentDiscoveryRegistration>
         _attachmentDiscoveries = [];
-    private readonly HashSet<string> _activeUrls =
-        new(StringComparer.Ordinal);
-    private readonly HashSet<string> _activeImageHashes =
-        new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, DateTimeOffset> _recentSendSignals =
         new(StringComparer.Ordinal);
     private readonly Dictionary<string, Task> _draftImageMonitors =
@@ -461,25 +457,30 @@ public sealed class DiscordCaptureRuntime :
         {
             _candidates.RemoveAll(candidate => candidate.Task.IsCompleted);
             var candidateUrls = urls
-                .Where(url => !_activeUrls.Contains(url.Value))
+                .DistinctBy(url => url.Value, StringComparer.Ordinal)
                 .ToList();
             var candidateImages = images
-                .Where(image => !_activeImageHashes.Contains(image.Sha256))
+                .DistinctBy(
+                    image => image.Sha256,
+                    StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            var payloadSignature =
+                MessengerCandidateDuplicatePolicy.CreatePayloadSignature(
+                    candidateUrls,
+                    candidateImages);
             if ((candidateUrls.Count == 0 && candidateImages.Count == 0) ||
-                _candidates.Count >= MaximumActiveCandidates)
+                _candidates.Count >= MaximumActiveCandidates ||
+                _candidates.Any(candidate =>
+                    !candidate.Cancellation.IsCancellationRequested &&
+                    MessengerCandidateDuplicatePolicy.IsDuplicateBurst(
+                        candidate.Context.ContextHash,
+                        candidate.Context.OccurredAt,
+                        candidate.PayloadSignature,
+                        context.ContextHash,
+                        context.OccurredAt,
+                        payloadSignature)))
             {
                 return false;
-            }
-
-            foreach (var url in candidateUrls)
-            {
-                _activeUrls.Add(url.Value);
-            }
-
-            foreach (var image in candidateImages)
-            {
-                _activeImageHashes.Add(image.Sha256);
             }
 
             var cancellation = CancellationTokenSource.CreateLinkedTokenSource(
@@ -489,6 +490,7 @@ public sealed class DiscordCaptureRuntime :
                 context.EventId,
                 candidateUrls,
                 candidateImages,
+                payloadSignature,
                 cancellation);
             registration.Task = Task.Run(() => RunCandidateAsync(registration));
             _candidates.Add(registration);
@@ -632,16 +634,6 @@ public sealed class DiscordCaptureRuntime :
         {
             lock (_candidateGate)
             {
-                foreach (var url in registration.Urls)
-                {
-                    _activeUrls.Remove(url.Value);
-                }
-
-                foreach (var image in registration.Images)
-                {
-                    _activeImageHashes.Remove(image.Sha256);
-                }
-
                 _candidates.Remove(registration);
             }
 
@@ -681,6 +673,7 @@ public sealed class DiscordCaptureRuntime :
                 ? CaptureRuntimeState.Recovering
                 : CaptureRuntimeState.Connecting);
         var attemptsThisCycle = 15;
+        var workerRecycleAttempted = false;
         while (true)
         {
             var lastUnavailableState = CaptureRuntimeState.Connecting;
@@ -748,7 +741,29 @@ public sealed class DiscordCaptureRuntime :
             if (restartBurst)
             {
                 attemptsThisCycle = 15;
+                workerRecycleAttempted = false;
                 continue;
+            }
+
+            if (ShouldRecycleWorker(
+                    lastUnavailableState,
+                    _workerLifecycle is not null,
+                    workerRecycleAttempted))
+            {
+                workerRecycleAttempted = true;
+                _statusTracker.Publish(CaptureRuntimeState.Recovering);
+                if (_workerLifecycle!.TryRecycle())
+                {
+                    DiscordCaptureTrace.Write(
+                        "worker-recycled",
+                        "reason=target-refresh-exhausted");
+                    attemptsThisCycle = 15;
+                    continue;
+                }
+
+                DiscordCaptureTrace.Write(
+                    "worker-recycle-skipped",
+                    "reason=lifecycle-unavailable");
             }
 
             var plan = PlanWarmupExhaustion(
@@ -876,6 +891,14 @@ public sealed class DiscordCaptureRuntime :
                     ? TimeSpan.FromSeconds(5)
                     : TimeSpan.FromSeconds(30));
     }
+
+    internal static bool ShouldRecycleWorker(
+        CaptureRuntimeState lastState,
+        bool workerLifecycleAvailable,
+        bool recycleAlreadyAttempted) =>
+        lastState == CaptureRuntimeState.Connecting &&
+        workerLifecycleAvailable &&
+        !recycleAlreadyAttempted;
 
     internal static CaptureRuntimeState MergeUnavailableState(
         CaptureRuntimeState current,
@@ -1480,6 +1503,7 @@ public sealed class DiscordCaptureRuntime :
         Guid eventId,
         IReadOnlyList<NormalizedUrl> urls,
         IReadOnlyList<ClipboardImageSnapshot> images,
+        string payloadSignature,
         CancellationTokenSource cancellation)
     {
         public ValidatedDiscordContext Context { get; } = context;
@@ -1489,6 +1513,8 @@ public sealed class DiscordCaptureRuntime :
         public IReadOnlyList<NormalizedUrl> Urls { get; } = urls;
 
         public IReadOnlyList<ClipboardImageSnapshot> Images { get; } = images;
+
+        public string PayloadSignature { get; } = payloadSignature;
 
         public bool HasImages => Images.Count > 0;
 

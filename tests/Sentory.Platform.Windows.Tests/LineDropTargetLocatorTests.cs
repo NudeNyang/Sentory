@@ -17,6 +17,18 @@ public sealed class LineDropTargetLocatorTests
     }
 
     [Fact]
+    public void FindsVisibleLineWindowBeforeCursorReachesIt()
+    {
+        var native = new FakeNative();
+        var locator = new LineDropTargetLocator(native, native);
+
+        var target = locator.FindVisibleMainWindow();
+
+        Assert.NotNull(target);
+        Assert.Equal(native.Main, target.MainWindow);
+    }
+
+    [Fact]
     public void RejectsCursorOutsideWindow()
     {
         var native = new FakeNative();
@@ -46,6 +58,31 @@ public sealed class LineDropTargetLocatorTests
         Assert.Equal(native.Main, target.MainWindow);
     }
 
+    [Fact]
+    public void ReleaseAcceptsForegroundLineBehindTransientDragSurface()
+    {
+        var native = new FakeNative { HasTransientDragSurface = true };
+        var locator = new LineDropTargetLocator(native, native);
+
+        var target = locator.FindReleaseAt(450, 300);
+
+        Assert.NotNull(target);
+        Assert.Equal(native.Main, target.MainWindow);
+    }
+
+    [Fact]
+    public void ReleaseRejectsTransientSurfaceWhenLineIsNotForeground()
+    {
+        var native = new FakeNative
+        {
+            HasTransientDragSurface = true,
+            IsForegroundOtherApp = true
+        };
+        var locator = new LineDropTargetLocator(native, native);
+
+        Assert.Null(locator.FindReleaseAt(450, 300));
+    }
+
     private sealed class FakeNative :
         INativeWindowApi,
         IKakaoDropWindowApi
@@ -54,8 +91,11 @@ public sealed class LineDropTargetLocatorTests
         public uint ProcessId { get; } = 84;
         public bool IsOccluded { get; set; }
         public bool HasLineDragSurface { get; set; }
+        public bool HasTransientDragSurface { get; set; }
+        public bool IsForegroundOtherApp { get; set; }
 
-        public nint GetForegroundWindow() => Main;
+        public nint GetForegroundWindow() =>
+            IsForegroundOtherApp ? new nint(99) : Main;
         public nint GetFocusedWindow(nint foregroundWindow) => Main;
         public nint GetRootWindow(nint window) =>
             window == new nint(98) || window == new nint(99)
@@ -84,7 +124,7 @@ public sealed class LineDropTargetLocatorTests
         public bool IsWindowMinimized(nint window) => false;
         public (int X, int Y) GetCursorPosition() => (450, 300);
         public nint GetWindowAtPoint(int x, int y) =>
-            IsOccluded
+            IsOccluded || HasTransientDragSurface
                 ? new nint(99)
                 : HasLineDragSurface
                     ? new nint(98)
