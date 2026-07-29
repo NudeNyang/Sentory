@@ -117,26 +117,58 @@
 
     <div id="detail-layer" class="modal-layer" hidden>
       <section class="detail-dialog" role="dialog" aria-modal="true" aria-labelledby="detail-title">
-        <button id="detail-close" class="detail-close fluent" type="button" aria-label="알림 닫기">&#xE711;</button>
-        <div class="detail-heading">
-          <span id="detail-type"></span>
-          <strong id="detail-favorite-mark" hidden>★ 즐겨찾기</strong>
-          <h2 id="detail-title">Sentory 항목 상세</h2>
+        <div class="detail-titlebar">
+          <span id="detail-window-title">Sentory 항목 상세</span>
+          <button id="detail-close" class="detail-close fluent" type="button" aria-label="알림 닫기">&#xE711;</button>
         </div>
-        <div class="detail-content">
-          <div id="detail-artwork" class="detail-artwork"></div>
-          <div class="detail-info">
-            <p id="detail-description"></p>
-            <dl>
-              <div><dt>저장 횟수</dt><dd id="detail-capture-count"></dd></div>
-              <div><dt>복사 횟수</dt><dd id="detail-copy-count"></dd></div>
-              <div><dt>마지막 출처</dt><dd id="detail-source"></dd></div>
-              <div><dt>마지막 저장</dt><dd id="detail-date"></dd></div>
-            </dl>
-            <p id="detail-delivery" class="detail-delivery"></p>
+        <div class="detail-window-body">
+          <div class="detail-heading">
+            <span id="detail-type"></span>
+            <strong id="detail-favorite-mark" hidden>★ 즐겨찾기</strong>
+            <h2 id="detail-title">Sentory 항목 상세</h2>
+          </div>
+          <div class="detail-content">
+            <button id="detail-artwork" class="detail-artwork" type="button"></button>
+            <div class="detail-info">
+              <p id="detail-description"></p>
+
+              <section id="detail-photo-section" class="detail-media-section" hidden>
+                <h3 id="detail-photo-heading">사진</h3>
+                <div class="detail-media-row">
+                  <span id="detail-photo-name"></span>
+                  <button id="detail-photo-copy" class="detail-media-copy fluent" type="button">&#xE8C8;</button>
+                </div>
+                <div id="detail-photo-navigation" class="detail-navigation" hidden>
+                  <button id="detail-photo-previous" type="button">&#x2039;</button>
+                  <div id="detail-photo-dots" class="detail-page-dots"></div>
+                  <button id="detail-photo-next" type="button">&#x203A;</button>
+                </div>
+              </section>
+
+              <section id="detail-link-section" class="detail-media-section" hidden>
+                <h3 id="detail-link-heading">링크</h3>
+                <div class="detail-media-row">
+                  <span id="detail-link-value"></span>
+                  <button id="detail-link-copy" class="detail-media-copy fluent" type="button">&#xE8C8;</button>
+                </div>
+                <div id="detail-link-navigation" class="detail-navigation" hidden>
+                  <button id="detail-link-previous" type="button">&#x2039;</button>
+                  <div id="detail-link-dots" class="detail-page-dots"></div>
+                  <button id="detail-link-next" type="button">&#x203A;</button>
+                </div>
+              </section>
+
+              <dl class="detail-stat-grid">
+                <div><dt>저장 횟수</dt><dd id="detail-capture-count"></dd></div>
+                <div><dt>복사 횟수</dt><dd id="detail-copy-count"></dd></div>
+                <div><dt>마지막 출처</dt><dd id="detail-source"></dd></div>
+                <div><dt>마지막 저장</dt><dd id="detail-date"></dd></div>
+              </dl>
+              <p id="detail-delivery" class="detail-delivery"></p>
+            </div>
           </div>
         </div>
-        <div class="detail-actions">
+        <div class="detail-actions" hidden>
           <button id="detail-delete" class="danger-text" type="button">삭제</button>
           <span></span>
           <button id="detail-open" type="button">원본 열기</button>

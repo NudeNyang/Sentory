@@ -5,7 +5,7 @@ const ROW_HEIGHT = 336;
 const TOP_PADDING = 20;
 const BOTTOM_PADDING = 28;
 const MINIMUM_SIDE_PADDING = 14;
-const OVERSCAN_ROWS = 2;
+const OVERSCAN_ROWS = 3;
 const PAGE_SIZE = 80;
 const SEARCH_DELAY_MS = 110;
 const SOURCES = ["Discord", "KakaoTalk", "Slack", "WhatsApp", "Telegram", "Line", "WeChat"];
@@ -34,7 +34,7 @@ const TRANSLATIONS = {
     copyCount: n => `복사 ${n}회`, selectedCount: n => `${n}개 선택`, visibleSelect: "전체 선택",
     clearSelection: "선택 취소", deleteSelected: "선택 항목 삭제", emptyFiltered: "검색 결과가 없습니다", emptyFilteredDescription: "다른 검색어나 필터로 다시 찾아보세요.", empty: "아직 보관된 항목이 없습니다", emptyDescription: "메신저에 URL이나 사진을 붙여넣어 보세요.",
     items: n => `${n.toLocaleString("ko-KR")}개`, loading: "보관함을 불러오는 중", loadFailed: "보관함을 불러오지 못했습니다",
-    close: "알림 닫기", detail: "Sentory 항목 상세", favoriteMarked: "★ 즐겨찾기", captureCount: "저장 횟수", copyCountLabel: "복사 횟수", messageSource: "마지막 출처", savedAt: "마지막 저장",
+    close: "알림 닫기", detail: "Sentory 항목 상세", favoriteMarked: "★ 즐겨찾기", captureCount: "저장 횟수", copyCountLabel: "복사 횟수", messageSource: "마지막 출처", savedAt: "마지막 저장", photos: "사진", collectionLinks: "링크", previousPhoto: "이전 사진", nextPhoto: "다음 사진", copyCurrentPhoto: "현재 사진 복사", previousLink: "이전 링크", nextLink: "다음 링크", collectionItems: n => `항목 ${n.toLocaleString("ko-KR")}개`, collectionTitle: (photos, links) => `사진 ${photos.toLocaleString("ko-KR")}개 · 링크 ${links.toLocaleString("ko-KR")}개`,
     times: n => `${n.toLocaleString("ko-KR")}회`, openPhoto: "사진 열기", openLink: "링크 열기", copyPhoto: "사진 복사", copyUrl: "URL 복사", copyCollection: "묶음 복사", delete: "삭제", openOriginal: "원본 열기", cancel: "취소", deleteQuestion: n => n === 1 ? "항목을 삭제할까요?" : `선택한 ${n.toLocaleString("ko-KR")}개 항목을 삭제할까요?`,
     deleteWarning: n => n === 1 ? "이 항목을 보관함에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다." : "선택한 항목과 저장된 사진 파일을 보관함에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다.", deleted: n => `${n.toLocaleString("ko-KR")}개 항목을 삭제했습니다.`,
     repairQuestion: "Discord를 다시 연결할까요?", repairWarning: "Discord를 접근성 모드로 다시 시작합니다. 작성 중인 메시지와 진행 중인 통화가 종료될 수 있습니다.", restart: "다시 시작",
@@ -75,7 +75,7 @@ const TRANSLATIONS = {
     favoriteAddAction: "Add to favorites", favoriteRemoveAction: "Remove from favorites", savedOnInput: "Saved on paste", savedOnSend: "Saved on send", copyCount: n => `Copied ${n} times`, selectedCount: n => `${n} selected`,
     visibleSelect: "Select all", clearSelection: "Clear selection", deleteSelected: "Delete selected", emptyFiltered: "No results found", emptyFilteredDescription: "Try another search term or filter.",
     empty: "Nothing saved yet", emptyDescription: "Paste a URL or photo into a messenger.", items: n => `${n.toLocaleString("en-US")} items`, loading: "Loading library", loadFailed: "Could not load the library",
-    close: "Dismiss notification", detail: "Sentory Item Details", favoriteMarked: "★ Favorite", captureCount: "Times saved", copyCountLabel: "Times copied", messageSource: "Latest source", savedAt: "Last saved", times: n => `${n.toLocaleString("en-US")}`, openPhoto: "Open photo", openLink: "Open link", copyPhoto: "Copy photo", copyUrl: "Copy URL", copyCollection: "Copy collection",
+    close: "Dismiss notification", detail: "Sentory Item Details", favoriteMarked: "★ Favorite", captureCount: "Times saved", copyCountLabel: "Times copied", messageSource: "Latest source", savedAt: "Last saved", photos: "Photos", collectionLinks: "Links", previousPhoto: "Previous photo", nextPhoto: "Next photo", copyCurrentPhoto: "Copy current photo", previousLink: "Previous link", nextLink: "Next link", collectionItems: n => `${n.toLocaleString("en-US")} items`, collectionTitle: (photos, links) => `${photos.toLocaleString("en-US")} photos · ${links.toLocaleString("en-US")} links`, times: n => `${n.toLocaleString("en-US")}`, openPhoto: "Open photo", openLink: "Open link", copyPhoto: "Copy photo", copyUrl: "Copy URL", copyCollection: "Copy collection",
     delete: "Delete", openOriginal: "Open original", cancel: "Cancel", deleteQuestion: n => n === 1 ? "Delete this item?" : `Delete ${n} selected items?`,
     deleteWarning: n => n === 1 ? "This item will be removed from the library.\nThis cannot be undone." : "The selected items and saved photo files will be removed from the library.\nThis cannot be undone.", deleted: n => `Deleted ${n} items.`, repairQuestion: "Reconnect Discord?",
     repairWarning: "Discord will restart in accessibility mode. Draft messages and active calls may be ended.", restart: "Restart", repairing: "Recovering worker",
@@ -114,7 +114,7 @@ TRANSLATIONS["ja-JP"] = {
   detected: "検出準備完了", disabled: "使用しない", disabledSource: source => `${source === "KakaoTalk" ? "カカオトーク" : source} 検出を使用していません`, detectionPaused: "検出一時停止中", connecting: "接続準備中", recovering: "ワーカーを復旧中", reconnect: "Discord の再接続が必要", repair: "再接続", discordDetection: "Discord 検出",
   savedOnInput: "入力時に保存", savedOnSend: "送信時に保存", photoCopied: "写真をコピーしました。", urlCopied: "URL をコピーしました。", collectionCopied: "まとめた項目をクリップボードにコピーしました。", addFavorite: "お気に入りに追加しました。", removeFavorite: "お気に入りから削除しました。", favoriteAddAction: "お気に入りに追加", favoriteRemoveAction: "お気に入りから削除",
   selectedCount: n => `${n.toLocaleString("ja-JP")}件選択`, visibleSelect: "すべて選択", clearSelection: "選択を解除", deleteSelected: "選択項目を削除", emptyFiltered: "検索結果がありません", emptyFilteredDescription: "別の検索語やフィルターをお試しください。", empty: "まだ保存された項目はありません", emptyDescription: "メッセンジャーに URL や写真を貼り付けてみてください。", loading: "ライブラリを読み込み中", loadFailed: "ライブラリを読み込めませんでした",
-  close: "通知を閉じる", detail: "Sentory 項目の詳細", favoriteMarked: "★ お気に入り", captureCount: "保存回数", copyCountLabel: "コピー回数", messageSource: "最後の送信元", savedAt: "最終保存", times: n => `${n.toLocaleString("ja-JP")}回`, openPhoto: "写真を開く", openLink: "リンクを開く", copyPhoto: "写真をコピー", copyUrl: "URL をコピー", copyCollection: "まとめてコピー", delete: "削除", openOriginal: "元を開く", cancel: "キャンセル",
+  close: "通知を閉じる", detail: "Sentory 項目の詳細", favoriteMarked: "★ お気に入り", captureCount: "保存回数", copyCountLabel: "コピー回数", messageSource: "最後の送信元", savedAt: "最終保存", photos: "写真", collectionLinks: "リンク", previousPhoto: "前の写真", nextPhoto: "次の写真", copyCurrentPhoto: "現在の写真をコピー", previousLink: "前のリンク", nextLink: "次のリンク", collectionItems: n => `${n.toLocaleString("ja-JP")}件`, collectionTitle: (photos, links) => `写真 ${photos.toLocaleString("ja-JP")}件・リンク ${links.toLocaleString("ja-JP")}件`, times: n => `${n.toLocaleString("ja-JP")}回`, openPhoto: "写真を開く", openLink: "リンクを開く", copyPhoto: "写真をコピー", copyUrl: "URL をコピー", copyCollection: "まとめてコピー", delete: "削除", openOriginal: "元を開く", cancel: "キャンセル",
   deleteQuestion: n => n === 1 ? "この項目を削除しますか？" : `選択した ${n.toLocaleString("ja-JP")}件を削除しますか？`, deleteWarning: n => n === 1 ? "この項目をライブラリから削除します。\nこの操作は元に戻せません。" : "選択した項目と保存された写真ファイルをライブラリから削除します。\nこの操作は元に戻せません。", deleted: n => `${n.toLocaleString("ja-JP")}件を削除しました。`,
   repairQuestion: "Discord を再接続しますか？", repairWarning: "Discord をアクセシビリティモードで再起動します。作成中のメッセージや通話が終了する場合があります。", restart: "再起動", repaired: "Discord を接続復旧モードで再起動しました。",
   discordPhotoSaved: "Discord で写真の送信を確認して保存しました。", discordUrlSaved: "Discord で URL の送信を確認して保存しました。", discordUrlsSaved: n => `Discord で URL ${n.toLocaleString("ja-JP")}件の送信を確認して保存しました。`, discordCollectionSaved: "Discord の複数項目を1つのまとめとして保存しました。",
@@ -138,7 +138,7 @@ TRANSLATIONS["zh-CN"] = {
   detected: "检测已就绪", disabled: "未使用", disabledSource: source => `${source === "WeChat" ? "微信" : source} 检测已关闭`, detectionPaused: "检测已暂停", connecting: "正在准备连接", recovering: "正在恢复工作进程", reconnect: "需要重新连接 Discord", repair: "重新连接", discordDetection: "Discord 检测",
   savedOnInput: "粘贴时保存", savedOnSend: "发送时保存", photoCopied: "图片已复制。", urlCopied: "URL 已复制。", collectionCopied: "组合项目已复制到剪贴板。", addFavorite: "已添加到收藏。", removeFavorite: "已从收藏中移除。", favoriteAddAction: "添加到收藏", favoriteRemoveAction: "从收藏中移除",
   selectedCount: n => `已选择 ${n.toLocaleString("zh-CN")} 项`, visibleSelect: "全选", clearSelection: "取消选择", deleteSelected: "删除所选项目", emptyFiltered: "没有搜索结果", emptyFilteredDescription: "请尝试其他关键词或筛选条件。", empty: "尚未保存任何项目", emptyDescription: "请在聊天应用中粘贴链接或图片。", loading: "正在加载收藏库", loadFailed: "无法加载收藏库",
-  close: "关闭通知", detail: "Sentory 项目详情", favoriteMarked: "★ 已收藏", captureCount: "保存次数", copyCountLabel: "复制次数", messageSource: "最近来源", savedAt: "最后保存", times: n => `${n.toLocaleString("zh-CN")} 次`, openPhoto: "打开图片", openLink: "打开链接", copyPhoto: "复制图片", copyUrl: "复制 URL", copyCollection: "复制组合", delete: "删除", openOriginal: "打开原文件", cancel: "取消",
+  close: "关闭通知", detail: "Sentory 项目详情", favoriteMarked: "★ 已收藏", captureCount: "保存次数", copyCountLabel: "复制次数", messageSource: "最近来源", savedAt: "最后保存", photos: "图片", collectionLinks: "链接", previousPhoto: "上一张图片", nextPhoto: "下一张图片", copyCurrentPhoto: "复制当前图片", previousLink: "上一个链接", nextLink: "下一个链接", collectionItems: n => `${n.toLocaleString("zh-CN")} 项`, collectionTitle: (photos, links) => `${photos.toLocaleString("zh-CN")} 张图片 · ${links.toLocaleString("zh-CN")} 个链接`, times: n => `${n.toLocaleString("zh-CN")} 次`, openPhoto: "打开图片", openLink: "打开链接", copyPhoto: "复制图片", copyUrl: "复制 URL", copyCollection: "复制组合", delete: "删除", openOriginal: "打开原文件", cancel: "取消",
   deleteQuestion: n => n === 1 ? "要删除此项目吗？" : `要删除所选的 ${n.toLocaleString("zh-CN")} 个项目吗？`, deleteWarning: n => n === 1 ? "将从收藏库中删除此项目。\n此操作无法撤销。" : "将从收藏库中删除所选项目及保存的图片文件。\n此操作无法撤销。", deleted: n => `已删除 ${n.toLocaleString("zh-CN")} 个项目。`,
   repairQuestion: "要重新连接 Discord 吗？", repairWarning: "Discord 将以无障碍模式重启。正在编辑的消息和通话可能会结束。", restart: "重新启动", repaired: "Discord 已以连接恢复模式重新启动。",
   discordPhotoSaved: "已保存经确认在 Discord 中发送的图片。", discordUrlSaved: "已保存经确认在 Discord 中发送的 URL。", discordUrlsSaved: n => `已保存 ${n.toLocaleString("zh-CN")} 个经确认在 Discord 中发送的 URL。`, discordCollectionSaved: "已将 Discord 中发送的多个项目保存为一个组合。",
@@ -178,6 +178,9 @@ const state = {
   autoScrollFrame: 0,
   autoScrollPausedUntil: 0,
   detailItem: null,
+  detailPhotoIndex: 0,
+  detailLinkIndex: 0,
+  detailArtworkTarget: null,
   suppressCardClick: false,
   toastTimer: 0,
   settings: null,
@@ -213,12 +216,29 @@ const selectVisibleButton = document.querySelector("#select-visible");
 const clearSelectionButton = document.querySelector("#clear-selection");
 const deleteSelectedButton = document.querySelector("#delete-selected");
 const detailLayer = document.querySelector("#detail-layer");
+const detailWindowTitle = document.querySelector("#detail-window-title");
 const detailClose = document.querySelector("#detail-close");
 const detailType = document.querySelector("#detail-type");
 const detailFavoriteMark = document.querySelector("#detail-favorite-mark");
 const detailTitle = document.querySelector("#detail-title");
 const detailArtwork = document.querySelector("#detail-artwork");
 const detailDescription = document.querySelector("#detail-description");
+const detailPhotoSection = document.querySelector("#detail-photo-section");
+const detailPhotoHeading = document.querySelector("#detail-photo-heading");
+const detailPhotoName = document.querySelector("#detail-photo-name");
+const detailPhotoCopy = document.querySelector("#detail-photo-copy");
+const detailPhotoNavigation = document.querySelector("#detail-photo-navigation");
+const detailPhotoPrevious = document.querySelector("#detail-photo-previous");
+const detailPhotoNext = document.querySelector("#detail-photo-next");
+const detailPhotoDots = document.querySelector("#detail-photo-dots");
+const detailLinkSection = document.querySelector("#detail-link-section");
+const detailLinkHeading = document.querySelector("#detail-link-heading");
+const detailLinkValue = document.querySelector("#detail-link-value");
+const detailLinkCopy = document.querySelector("#detail-link-copy");
+const detailLinkNavigation = document.querySelector("#detail-link-navigation");
+const detailLinkPrevious = document.querySelector("#detail-link-previous");
+const detailLinkNext = document.querySelector("#detail-link-next");
+const detailLinkDots = document.querySelector("#detail-link-dots");
 const detailCaptureCount = document.querySelector("#detail-capture-count");
 const detailCopyCount = document.querySelector("#detail-copy-count");
 const detailSource = document.querySelector("#detail-source");
@@ -377,7 +397,22 @@ function applyLocalizedUi(language) {
   clearSelectionButton.textContent = t("clearSelection");
   deleteSelectedButton.textContent = t("deleteSelected");
   detailClose.setAttribute("aria-label", t("close"));
+  detailWindowTitle.textContent = t("detail");
   detailFavoriteMark.textContent = t("favoriteMarked");
+  detailPhotoHeading.textContent = t("photos");
+  detailPhotoCopy.title = t("copyCurrentPhoto");
+  detailPhotoCopy.setAttribute("aria-label", t("copyCurrentPhoto"));
+  detailPhotoPrevious.title = t("previousPhoto");
+  detailPhotoPrevious.setAttribute("aria-label", t("previousPhoto"));
+  detailPhotoNext.title = t("nextPhoto");
+  detailPhotoNext.setAttribute("aria-label", t("nextPhoto"));
+  detailLinkHeading.textContent = t("collectionLinks");
+  detailLinkCopy.title = t("copyUrl");
+  detailLinkCopy.setAttribute("aria-label", t("copyUrl"));
+  detailLinkPrevious.title = t("previousLink");
+  detailLinkPrevious.setAttribute("aria-label", t("previousLink"));
+  detailLinkNext.title = t("nextLink");
+  detailLinkNext.setAttribute("aria-label", t("nextLink"));
   detailCaptureCount.closest("div").querySelector("dt").textContent = t("captureCount");
   detailCopyCount.closest("div").querySelector("dt").textContent = t("copyCountLabel");
   detailSource.closest("div").querySelector("dt").textContent = t("messageSource");
@@ -643,11 +678,11 @@ function resetGallery({ announce = false, preserveScroll = false } = {}) {
   const previousScrollTop = preserveScroll ? scroller.scrollTop : 0;
   state.generation += 1;
   state.pendingPages.clear();
+  state.renderRevision += 1;
   scroller.scrollTop = previousScrollTop;
   if (!state.hasLoaded) {
     state.items = new Array(PAGE_SIZE);
     state.total = PAGE_SIZE;
-    state.renderRevision += 1;
     state.renderedRange = "";
     measureGrid();
     renderVisibleCards();
@@ -716,7 +751,6 @@ async function loadPage(offset, generation, isInitial = false) {
         if (target < state.items.length) state.items[target] = snapshot.items[index];
       }
       evictDistantPages();
-      state.renderRevision += 1;
       state.renderedRange = "";
       measureGrid();
       renderVisibleCards();
@@ -805,16 +839,31 @@ function renderVisibleCards() {
   if (rangeKey === state.renderedRange) return;
   state.renderedRange = rangeKey;
 
-  const fragment = document.createDocumentFragment();
   const start = firstRow * state.columns;
   const end = Math.min(state.total, lastRow * state.columns);
   ensurePagesForRange(start, end);
+  const existing = new Map(
+    [...virtualSpace.querySelectorAll(".card[data-virtual-index]")]
+      .map(card => [Number(card.dataset.virtualIndex), card]));
+  const cards = [];
   for (let index = start; index < end; index += 1) {
-    fragment.append(state.items[index]
-      ? createCard(state.items[index], index)
-      : createSkeletonCard(index));
+    const item = state.items[index];
+    const reusable = existing.get(index);
+    if (canReuseVirtualCard(reusable, item)) {
+      positionCard(reusable, index);
+      cards.push(reusable);
+    } else {
+      cards.push(item ? createCard(item, index) : createSkeletonCard(index));
+    }
   }
-  virtualSpace.replaceChildren(fragment);
+  virtualSpace.replaceChildren(...cards);
+}
+
+function canReuseVirtualCard(card, item) {
+  if (!card || Number(card.dataset.renderRevision) !== state.renderRevision) return false;
+  return item
+    ? card.dataset.itemId === item.itemId && !card.classList.contains("skeleton")
+    : card.classList.contains("skeleton");
 }
 
 function positionCard(card, index) {
@@ -827,6 +876,8 @@ function positionCard(card, index) {
 function createSkeletonCard(index) {
   const card = document.createElement("article");
   card.className = "card skeleton";
+  card.dataset.virtualIndex = String(index);
+  card.dataset.renderRevision = String(state.renderRevision);
   card.setAttribute("aria-hidden", "true");
   positionCard(card, index);
   const artwork = document.createElement("div");
@@ -843,6 +894,8 @@ function createCard(item, index) {
   const card = document.createElement("article");
   card.className = `card${state.selectedIds.has(item.itemId) ? " selected" : ""}`;
   card.dataset.itemId = item.itemId;
+  card.dataset.virtualIndex = String(index);
+  card.dataset.renderRevision = String(state.renderRevision);
   positionCard(card, index);
   card.setAttribute("aria-label", `${localizedType(item)}, ${item.title}, ${localizedDate(item.lastCapturedAt)}`);
   card.addEventListener("click", () => {
@@ -874,6 +927,12 @@ function createCard(item, index) {
     if (state.selectionMode) toggleSelection(item.itemId);
     else void openItem(item.itemId);
   });
+  if (item.kind === "Collection" && item.memberCount > 0) {
+    const badge = document.createElement("span");
+    badge.className = "collection-badge";
+    badge.textContent = t("collectionItems", item.memberCount);
+    artwork.append(badge);
+  }
 
   const copyButton = document.createElement("button");
   copyButton.className = "copy-button fluent";
@@ -979,6 +1038,11 @@ async function showDetails(itemId) {
   detailTitle.textContent = t("loading");
   detailType.textContent = "";
   detailDescription.textContent = "";
+  detailPhotoSection.hidden = true;
+  detailLinkSection.hidden = true;
+  state.detailPhotoIndex = 0;
+  state.detailLinkIndex = 0;
+  state.detailArtworkTarget = null;
   detailArtwork.replaceChildren();
   try {
     const detail = await tauriCore().invoke("gallery_item", { itemId });
@@ -993,10 +1057,16 @@ async function showDetails(itemId) {
 
 function populateDetails(detail) {
   const card = detail.card;
+  const photos = getDetailPhotos(detail);
+  const links = getDetailLinks(detail);
   detailType.textContent = localizedType(card);
   detailFavoriteMark.hidden = !card.isFavorite;
-  detailTitle.textContent = card.title;
-  detailDescription.textContent = card.subtitle;
+  detailTitle.textContent = card.kind === "Collection"
+    ? t("collectionTitle", photos.length, links.length)
+    : card.title;
+  detailDescription.textContent = card.kind === "Collection"
+    ? t("collectionItems", (detail.members ?? []).length)
+    : card.subtitle;
   detailCaptureCount.textContent = t("times", card.captureCount);
   detailCopyCount.textContent = t("times", card.copyCount);
   detailSource.textContent = sourceLabel(card.sourceApp);
@@ -1004,19 +1074,129 @@ function populateDetails(detail) {
   detailDelivery.textContent = localizedStatus(card);
   detailOpen.textContent = t(card.kind === "Image" ? "openPhoto" : "openLink");
   detailCopy.textContent = t(card.kind === "Image" ? "copyPhoto" : card.kind === "Collection" ? "copyCollection" : "copyUrl");
-  detailArtwork.replaceChildren(createDetailArtwork(detail));
+  detailPhotoSection.hidden = photos.length === 0;
+  detailPhotoNavigation.hidden = photos.length <= 1;
+  detailLinkSection.hidden = links.length === 0;
+  detailLinkNavigation.hidden = links.length <= 1;
+  if (links.length > 0) {
+    state.detailLinkIndex = Math.min(state.detailLinkIndex, links.length - 1);
+    updateDetailLinkRow(links);
+  }
+  if (photos.length > 0) {
+    state.detailPhotoIndex = Math.min(state.detailPhotoIndex, photos.length - 1);
+    showDetailPhoto(state.detailPhotoIndex, false);
+  } else if (links.length > 0) {
+    showDetailLink(state.detailLinkIndex);
+  }
+  else detailArtwork.replaceChildren(createUrlFallback(card));
 }
 
-function createDetailArtwork(detail) {
-  const card = detail.card;
-  const source = card.kind === "Image" ? detail.contentPath : card.artworkPath;
-  if (source) {
-    const image = document.createElement("img");
-    image.alt = "";
-    image.src = tauriCore().convertFileSrc(source);
-    return image;
+function getDetailPhotos(detail = state.detailItem) {
+  if (!detail) return [];
+  if (detail.card.kind === "Image") {
+    return detail.contentPath
+      ? [{ position: null, title: detail.card.title, contentPath: detail.contentPath }]
+      : [];
   }
-  return createUrlFallback(card);
+  return (detail.members ?? [])
+    .filter(member => member.kind === "Image" && member.contentPath)
+    .map(member => ({
+      position: member.position,
+      title: member.title,
+      contentPath: member.contentPath,
+    }));
+}
+
+function getDetailLinks(detail = state.detailItem) {
+  if (!detail) return [];
+  if (detail.card.kind === "Url") {
+    return detail.card.originalUrl
+      ? [{
+          position: null,
+          title: detail.card.originalUrl,
+          originalUrl: detail.card.originalUrl,
+          domain: detail.card.domain,
+          artworkPath: detail.card.artworkPath,
+        }]
+      : [];
+  }
+  return (detail.members ?? [])
+    .filter(member => member.kind === "Url" && member.originalUrl)
+    .map(member => ({
+      position: member.position,
+      title: member.title,
+      originalUrl: member.originalUrl,
+      domain: member.domain,
+      artworkPath: null,
+    }));
+}
+
+function showDetailPhoto(requestedIndex, animate = true) {
+  const photos = getDetailPhotos();
+  if (photos.length === 0) return;
+  state.detailPhotoIndex = (requestedIndex % photos.length + photos.length) % photos.length;
+  const photo = photos[state.detailPhotoIndex];
+  const nodes = [];
+  if (photos.length > 2) nodes.push(createDetailImage(
+    photos[(state.detailPhotoIndex + 2) % photos.length].contentPath,
+    "detail-stack-back"));
+  if (photos.length > 1) nodes.push(createDetailImage(
+    photos[(state.detailPhotoIndex + 1) % photos.length].contentPath,
+    "detail-stack-back detail-stack-back-one"));
+  const main = createDetailImage(photo.contentPath, "detail-main-artwork");
+  nodes.push(main);
+  detailArtwork.replaceChildren(...nodes);
+  if (animate) main.animate([{ opacity: 0.3 }, { opacity: 1 }], { duration: 170, easing: "ease-out" });
+  detailArtwork.title = t("openPhoto");
+  detailPhotoName.textContent = photo.title;
+  detailPhotoName.title = photo.title;
+  state.detailArtworkTarget = { kind: "Image", memberPosition: photo.position };
+  updateDetailPageDots(detailPhotoDots, photos.length, state.detailPhotoIndex);
+}
+
+function showDetailLink(requestedIndex) {
+  const links = getDetailLinks();
+  if (links.length === 0) return;
+  state.detailLinkIndex = (requestedIndex % links.length + links.length) % links.length;
+  const link = links[state.detailLinkIndex];
+  updateDetailLinkRow(links);
+  if (link.artworkPath) {
+    detailArtwork.replaceChildren(createDetailImage(link.artworkPath, "detail-main-artwork"));
+  } else {
+    detailArtwork.replaceChildren(createUrlFallback({
+      title: link.title,
+      domain: link.domain,
+    }));
+  }
+  detailArtwork.title = t("openLink");
+  state.detailArtworkTarget = { kind: "Url", memberPosition: link.position };
+}
+
+function updateDetailLinkRow(links = getDetailLinks()) {
+  if (links.length === 0) return;
+  const link = links[state.detailLinkIndex];
+  detailLinkValue.textContent = link.originalUrl;
+  detailLinkValue.title = link.originalUrl;
+  updateDetailPageDots(detailLinkDots, links.length, state.detailLinkIndex);
+}
+
+function createDetailImage(path, className) {
+  const image = document.createElement("img");
+  image.alt = "";
+  image.className = className;
+  image.decoding = "async";
+  image.src = tauriCore().convertFileSrc(path);
+  return image;
+}
+
+function updateDetailPageDots(container, count, selectedIndex) {
+  const dots = [];
+  for (let index = 0; index < count; index += 1) {
+    const dot = document.createElement("i");
+    dot.classList.toggle("active", index === selectedIndex);
+    dots.push(dot);
+  }
+  container.replaceChildren(...dots);
 }
 
 async function copyItem(itemId, button = null) {
@@ -1084,6 +1264,65 @@ async function openItem(itemId) {
     await tauriCore().invoke("gallery_open", { itemId });
   } catch (error) {
     showToast(t("openOriginalFailed"));
+  }
+}
+
+async function openDetailArtwork() {
+  if (!state.detailItem || !state.detailArtworkTarget) return;
+  try {
+    if (state.detailArtworkTarget.memberPosition === null) {
+      await tauriCore().invoke("gallery_open", {
+        itemId: state.detailItem.card.itemId,
+      });
+    } else {
+      await tauriCore().invoke("gallery_detail_target_open", {
+        itemId: state.detailItem.card.itemId,
+        memberPosition: state.detailArtworkTarget.memberPosition,
+      });
+    }
+  } catch {
+    showToast(t("openOriginalFailed"));
+  }
+}
+
+async function copyCurrentDetailPhoto() {
+  if (!state.detailItem) return;
+  const photo = getDetailPhotos()[state.detailPhotoIndex];
+  if (!photo) return;
+  if (state.detailItem.card.kind === "Image" && photo.position === null) {
+    await copyItem(state.detailItem.card.itemId, detailPhotoCopy);
+    return;
+  }
+  await copyDetailTarget(photo.position, detailPhotoCopy, "photoCopied");
+}
+
+async function copyCurrentDetailLink() {
+  const link = getDetailLinks()[state.detailLinkIndex];
+  if (!link) return;
+  await copyDetailTarget(link.position, detailLinkCopy, "urlCopied");
+}
+
+async function copyDetailTarget(memberPosition, button, successKey) {
+  if (!state.detailItem) return;
+  const previous = button.innerHTML;
+  button.disabled = true;
+  button.innerHTML = "&#xE895;";
+  try {
+    await tauriCore().invoke("gallery_detail_target_copy", {
+      itemId: state.detailItem.card.itemId,
+      memberPosition,
+    });
+    button.innerHTML = "&#xE73E;";
+    showToast(t(successKey));
+  } catch {
+    button.innerHTML = "&#xE783;";
+    showToast(t("copyFailedShort"));
+  } finally {
+    window.setTimeout(() => {
+      if (!button.isConnected) return;
+      button.disabled = false;
+      button.innerHTML = previous;
+    }, 850);
   }
 }
 
@@ -1455,8 +1694,20 @@ detailOpen.addEventListener("click", () => {
   if (state.detailItem) void openItem(state.detailItem.card.itemId);
 });
 detailArtwork.addEventListener("click", () => {
-  if (state.detailItem) void openItem(state.detailItem.card.itemId);
+  void openDetailArtwork();
 });
+detailPhotoCopy.addEventListener("click", event => {
+  event.stopPropagation();
+  void copyCurrentDetailPhoto();
+});
+detailPhotoPrevious.addEventListener("click", () => showDetailPhoto(state.detailPhotoIndex - 1));
+detailPhotoNext.addEventListener("click", () => showDetailPhoto(state.detailPhotoIndex + 1));
+detailLinkCopy.addEventListener("click", event => {
+  event.stopPropagation();
+  void copyCurrentDetailLink();
+});
+detailLinkPrevious.addEventListener("click", () => showDetailLink(state.detailLinkIndex - 1));
+detailLinkNext.addEventListener("click", () => showDetailLink(state.detailLinkIndex + 1));
 detailDelete.addEventListener("click", () => {
   if (state.detailItem) void deleteItems([state.detailItem.card.itemId]);
 });

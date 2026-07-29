@@ -74,6 +74,57 @@ public sealed class GalleryCardProjectionTests : IDisposable
         Assert.Equal("contain", card.ArtworkMode);
     }
 
+    [Fact]
+    public void CreateDetail_PreservesCollectionMemberOrderAndValidatedPaths()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var imagePath = CreateFile("images/collection-photo.png");
+        var item = new CapturedItemSummary(
+            Guid.NewGuid(),
+            ContentKind.Collection,
+            "collection",
+            "collection",
+            string.Empty,
+            SourceApp.Discord,
+            CaptureMethod.DiscordConfirmedSend,
+            DeliveryStatus.Confirmed,
+            1,
+            1,
+            DateTimeOffset.Now,
+            DateTimeOffset.Now,
+            Members:
+            [
+                new CapturedCollectionMember(
+                    0,
+                    ContentKind.Url,
+                    "https://example.com/item",
+                    "https://example.com/item",
+                    "example.com",
+                    null,
+                    null,
+                    null,
+                    0,
+                    0),
+                new CapturedCollectionMember(
+                    1,
+                    ContentKind.Image,
+                    "collection-photo.png",
+                    "collection-photo.png",
+                    string.Empty,
+                    Path.GetRelativePath(_root, imagePath),
+                    "HASH",
+                    "image/png",
+                    100,
+                    80)
+            ]);
+
+        var detail = GalleryCardProjection.CreateDetail(item, paths);
+
+        Assert.Equal([0, 1], detail.Members.Select(member => member.Position));
+        Assert.Equal("https://example.com/item", detail.Members[0].OriginalUrl);
+        Assert.Equal(imagePath, detail.Members[1].ContentPath);
+    }
+
     private string CreateFile(string relativePath)
     {
         var path = Path.Combine(_root, relativePath);

@@ -293,6 +293,39 @@ async fn gallery_copy(
 }
 
 #[tauri::command]
+async fn gallery_detail_target_open(
+    app: AppHandle,
+    engine: State<'_, EngineClient>,
+    item_id: String,
+    member_position: Option<i32>,
+) -> Result<(), String> {
+    let detail = engine
+        .request(&app, "gallery-item", serde_json::json!(item_id))
+        .await?;
+    let (_, target) = resolve_detail_target(&detail, member_position)?;
+    open::that_detached(target)
+        .map_err(|error| format!("원본을 열지 못했습니다: {error}"))
+}
+
+#[tauri::command]
+async fn gallery_detail_target_copy(
+    app: AppHandle,
+    engine: State<'_, EngineClient>,
+    item_id: String,
+    member_position: Option<i32>,
+) -> Result<(), String> {
+    let detail = engine
+        .request(&app, "gallery-item", serde_json::json!(item_id))
+        .await?;
+    let clipboard_detail = detail.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        copy_detail_target_to_clipboard(&clipboard_detail, member_position)
+    })
+    .await
+    .map_err(|error| format!("클립보드 작업을 기다리지 못했습니다: {error}"))?
+}
+
+#[tauri::command]
 async fn settings_get(
     app: AppHandle,
     engine: State<'_, EngineClient>,
@@ -475,6 +508,10 @@ fn copy_detail_to_clipboard(detail: &serde_json::Value) -> Result<(), String> {
         .get("kind")
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| "항목 종류를 읽지 못했습니다.".to_string())?;
+    if kind == "Collection" {
+        let payload = collection_clipboard_payload(detail)?;
+        return copy_collection_to_clipboard(&payload);
+    }
     let mut clipboard = arboard::Clipboard::new()
         .map_err(|error| format!("클립보드를 열지 못했습니다: {error}"))?;
     if kind == "Image" {
@@ -484,31 +521,6 @@ fn copy_detail_to_clipboard(detail: &serde_json::Value) -> Result<(), String> {
             .ok_or_else(|| "사진 원본을 찾지 못했습니다.".to_string())?;
         return copy_image(&mut clipboard, path);
     }
-    if kind == "Collection" {
-        let members = detail
-            .get("members")
-            .and_then(serde_json::Value::as_array)
-            .ok_or_else(|| "모음 항목을 읽지 못했습니다.".to_string())?;
-        if let Some(path) = members.iter().find_map(|member| {
-            member
-                .get("contentPath")
-                .and_then(serde_json::Value::as_str)
-        }) {
-            return copy_image(&mut clipboard, path);
-        }
-        let links = members
-            .iter()
-            .filter_map(|member| member.get("originalUrl").and_then(serde_json::Value::as_str))
-            .filter(|value| !value.is_empty())
-            .collect::<Vec<_>>()
-            .join("\r\n");
-        if links.is_empty() {
-            return Err("복사할 모음 원본이 없습니다.".to_string());
-        }
-        return clipboard
-            .set_text(links)
-            .map_err(|error| format!("링크를 복사하지 못했습니다: {error}"));
-    }
     let url = card
         .get("originalUrl")
         .and_then(serde_json::Value::as_str)
@@ -517,6 +529,223 @@ fn copy_detail_to_clipboard(detail: &serde_json::Value) -> Result<(), String> {
     clipboard
         .set_text(url)
         .map_err(|error| format!("링크를 복사하지 못했습니다: {error}"))
+}
+
+#[derive(Debug, PartialEq)]
+struct CollectionClipboardPayload {
+    urls: Vec<String>,
+    image_paths: Vec<String>,
+}
+
+fn collection_clipboard_payload(
+    detail: &serde_json::Value,
+) -> Result<CollectionClipboardPayload, String> {
+    let members = detail
+        .get("members")
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| "묶음 항목을 읽지 못했습니다.".to_string())?;
+    let mut urls = Vec::new();
+    let mut image_paths = Vec::new();
+    for member in members {
+        match member.get("kind").and_then(serde_json::Value::as_str) {
+            Some("Image") => {
+                let Some(path) = member
+                    .get("contentPath")
+                    .and_then(serde_json::Value::as_str)
+                    .filter(|value| !value.is_empty() && std::path::Path::new(value).is_file())
+                else {
+                    continue;
+                };
+                if !image_paths
+                    .iter()
+                    .any(|existing: &String| existing.eq_ignore_ascii_case(path))
+                {
+                    image_paths.push(path.to_owned());
+                }
+            }
+            Some("Url") => {
+                let Some(url) = member
+                    .get("originalUrl")
+                    .and_then(serde_json::Value::as_str)
+                    .filter(|value| !value.trim().is_empty())
+                else {
+                    continue;
+                };
+                if !urls.iter().any(|existing| existing == url) {
+                    urls.push(url.to_owned());
+                }
+            }
+            _ => {}
+        }
+    }
+    if urls.is_empty() && image_paths.is_empty() {
+        return Err("복사할 묶음 원본이 없습니다.".to_string());
+    }
+    Ok(CollectionClipboardPayload { urls, image_paths })
+}
+
+#[cfg(target_os = "windows")]
+fn copy_collection_to_clipboard(payload: &CollectionClipboardPayload) -> Result<(), String> {
+    use clipboard_win::options::NoClear;
+
+    let mut last_error = None;
+    let mut clipboard = None;
+    for attempt in 0..5 {
+        match clipboard_win::Clipboard::new() {
+            Ok(opened) => {
+                clipboard = Some(opened);
+                break;
+            }
+            Err(error) => {
+                last_error = Some(format!("{error:?}"));
+                if attempt < 4 {
+                    std::thread::sleep(std::time::Duration::from_millis(35));
+                }
+            }
+        }
+    }
+    let _clipboard = clipboard.ok_or_else(|| {
+        format!(
+            "클립보드를 열지 못했습니다: {}",
+            last_error.unwrap_or_else(|| "알 수 없는 오류".to_string())
+        )
+    })?;
+    clipboard_win::raw::empty()
+        .map_err(|error| format!("클립보드를 비우지 못했습니다: {error:?}"))?;
+    if !payload.urls.is_empty() {
+        clipboard_win::raw::set_string_with(&payload.urls.join("\r\n"), NoClear)
+            .map_err(|error| format!("묶음 링크를 복사하지 못했습니다: {error:?}"))?;
+    }
+    if !payload.image_paths.is_empty() {
+        clipboard_win::raw::set_file_list(&payload.image_paths)
+            .map_err(|error| format!("묶음 사진을 복사하지 못했습니다: {error:?}"))?;
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn copy_collection_to_clipboard(_payload: &CollectionClipboardPayload) -> Result<(), String> {
+    Err("묶음 파일 복사는 Windows에서만 지원합니다.".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn collection_clipboard_payload_keeps_all_existing_images_and_unique_links() {
+        let root = std::env::temp_dir().join(format!(
+            "sentory-tauri-collection-clipboard-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root).expect("임시 폴더를 만들어야 합니다.");
+        let image_paths = (0..9)
+            .map(|index| {
+                let path = root.join(format!("photo-{index}.png"));
+                std::fs::write(&path, [index as u8]).expect("임시 사진을 만들어야 합니다.");
+                path
+            })
+            .collect::<Vec<_>>();
+        let missing = root.join("missing.png");
+        let mut members = image_paths
+            .iter()
+            .map(|path| serde_json::json!({
+                "kind": "Image",
+                "contentPath": path.to_string_lossy()
+            }))
+            .collect::<Vec<_>>();
+        members.extend([
+            serde_json::json!({
+                "kind": "Image",
+                "contentPath": image_paths[0].to_string_lossy()
+            }),
+            serde_json::json!({ "kind": "Url", "originalUrl": "https://example.com" }),
+            serde_json::json!({ "kind": "Url", "originalUrl": "https://example.com" }),
+            serde_json::json!({ "kind": "Url", "originalUrl": "https://openai.com" }),
+            serde_json::json!({ "kind": "Image", "contentPath": missing.to_string_lossy() }),
+        ]);
+        let detail = serde_json::json!({ "members": members });
+
+        let payload = collection_clipboard_payload(&detail)
+            .expect("복사 가능한 묶음 페이로드를 만들어야 합니다.");
+
+        assert_eq!(
+            payload.urls,
+            ["https://example.com", "https://openai.com"]
+        );
+        assert_eq!(
+            payload.image_paths,
+            image_paths
+                .iter()
+                .map(|path| path.to_string_lossy().into_owned())
+                .collect::<Vec<_>>()
+        );
+        std::fs::remove_dir_all(root).expect("임시 폴더를 정리해야 합니다.");
+    }
+}
+
+fn resolve_detail_target(
+    detail: &serde_json::Value,
+    member_position: Option<i32>,
+) -> Result<(&str, String), String> {
+    if let Some(position) = member_position {
+        let member = detail
+            .get("members")
+            .and_then(serde_json::Value::as_array)
+            .and_then(|members| {
+                members.iter().find(|member| {
+                    member.get("position").and_then(serde_json::Value::as_i64)
+                        == Some(i64::from(position))
+                })
+            })
+            .ok_or_else(|| "묶음 항목을 찾지 못했습니다.".to_string())?;
+        let kind = member
+            .get("kind")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| "묶음 항목 종류를 읽지 못했습니다.".to_string())?;
+        let target = if kind == "Image" {
+            member.get("contentPath")
+        } else {
+            member.get("originalUrl")
+        }
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "묶음 원본을 찾지 못했습니다.".to_string())?;
+        return Ok((kind, target.to_owned()));
+    }
+
+    let card = detail
+        .get("card")
+        .ok_or_else(|| "항목 정보를 읽지 못했습니다.".to_string())?;
+    let kind = card
+        .get("kind")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "항목 종류를 읽지 못했습니다.".to_string())?;
+    let target = if kind == "Image" {
+        detail.get("contentPath")
+    } else {
+        card.get("originalUrl")
+    }
+    .and_then(serde_json::Value::as_str)
+    .filter(|value| !value.is_empty())
+    .ok_or_else(|| "원본을 찾지 못했습니다.".to_string())?;
+    Ok((kind, target.to_owned()))
+}
+
+fn copy_detail_target_to_clipboard(
+    detail: &serde_json::Value,
+    member_position: Option<i32>,
+) -> Result<(), String> {
+    let (kind, target) = resolve_detail_target(detail, member_position)?;
+    let mut clipboard = arboard::Clipboard::new()
+        .map_err(|error| format!("클립보드를 열지 못했습니다: {error}"))?;
+    if kind == "Image" {
+        copy_image(&mut clipboard, &target)
+    } else {
+        clipboard
+            .set_text(target)
+            .map_err(|error| format!("링크를 복사하지 못했습니다: {error}"))
+    }
 }
 
 fn copy_image(clipboard: &mut arboard::Clipboard, path: &str) -> Result<(), String> {
@@ -934,6 +1163,8 @@ fn main() {
             gallery_delete,
             gallery_open,
             gallery_copy,
+            gallery_detail_target_open,
+            gallery_detail_target_copy,
             settings_get,
             settings_update,
             discord_repair,

@@ -3003,6 +3003,7 @@ name = "sentory-tauri"
 version = "2.0.0"
 dependencies = [
  "arboard",
+ "clipboard-win",
  "image",
  "open",
  "serde",

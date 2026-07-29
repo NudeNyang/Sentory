@@ -1,15 +1,23 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
+using Xunit.Abstractions;
 
 namespace Sentory.Infrastructure.Tests;
 
 public sealed class GalleryPageRepositoryTests : IDisposable
 {
+    private readonly ITestOutputHelper _output;
     private readonly string _root = Path.Combine(
         Path.GetTempPath(),
         "sentory-gallery-page-tests",
         Guid.NewGuid().ToString("N"));
+
+    public GalleryPageRepositoryTests(ITestOutputHelper output)
+    {
+        _output = output;
+    }
 
     [Fact]
     public async Task GalleryPageAppliesPagingFiltersAndSortInSql()
@@ -95,6 +103,71 @@ public sealed class GalleryPageRepositoryTests : IDisposable
         Assert.NotNull(loaded);
         Assert.Equal("middle.example", loaded.Domain);
         Assert.Null(await repository.GetGalleryItemAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task GalleryPageKeepsPagedQueriesBoundedAtFiveHundredAndTwoThousandItems()
+    {
+        var repository = new SqliteCaptureRepository(
+            SentoryDataPaths.ForRoot(_root));
+        await repository.InitializeAsync();
+        var now = new DateTimeOffset(2026, 7, 29, 18, 0, 0, TimeSpan.FromHours(9));
+
+        for (var index = 0; index < 2_000; index++)
+        {
+            var source = index % 2 == 0 ? SourceApp.Discord : SourceApp.Slack;
+            await repository.UpsertUrlAsync(CreateUrl(
+                $"https://perf-{index:D4}.example/item",
+                source,
+                now.AddSeconds(-index)));
+
+            if (index is 499 or 1_999)
+            {
+                var expectedTotal = index + 1;
+                var newest = await MeasurePageAsync(
+                    repository,
+                    $"{expectedTotal} newest",
+                    Request(now, limit: 80));
+                Assert.Equal(expectedTotal, newest.Total);
+                Assert.Equal(80, newest.Items.Count);
+
+                var searched = await MeasurePageAsync(
+                    repository,
+                    $"{expectedTotal} search",
+                    Request(now, search: $"perf-{index:D4}"));
+                Assert.Equal(1, searched.Total);
+                Assert.Single(searched.Items);
+
+                var discord = await MeasurePageAsync(
+                    repository,
+                    $"{expectedTotal} source",
+                    Request(
+                        now,
+                        limit: 80,
+                        sources: new HashSet<SourceApp> { SourceApp.Discord }));
+                Assert.Equal((expectedTotal + 1) / 2, discord.Total);
+                Assert.Equal(80, discord.Items.Count);
+
+                var oldest = await MeasurePageAsync(
+                    repository,
+                    $"{expectedTotal} oldest",
+                    Request(now, limit: 80, sort: GallerySortMode.Oldest));
+                Assert.Equal(expectedTotal, oldest.Total);
+                Assert.Equal(80, oldest.Items.Count);
+            }
+        }
+    }
+
+    private async Task<GalleryPageResult> MeasurePageAsync(
+        SqliteCaptureRepository repository,
+        string label,
+        GalleryPageRequest request)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var page = await repository.GetGalleryPageAsync(request);
+        stopwatch.Stop();
+        _output.WriteLine("{0}: {1:F1} ms", label, stopwatch.Elapsed.TotalMilliseconds);
+        return page;
     }
 
     private static GalleryPageRequest Request(

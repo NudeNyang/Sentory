@@ -229,6 +229,7 @@ public sealed record GalleryItemDetailDto(
     IReadOnlyList<GalleryMemberDto> Members);
 
 public sealed record GalleryMemberDto(
+    int Position,
     string Kind,
     string Title,
     string OriginalUrl,
@@ -264,6 +265,7 @@ public sealed record GalleryCardDto(
     bool IsFavorite,
     int CopyCount,
     int CaptureCount,
+    int MemberCount,
     DateTimeOffset? LastCopiedAt);
 
 public static class GalleryCardProjection
@@ -320,6 +322,7 @@ public static class GalleryCardProjection
             item.IsFavorite,
             item.CopyCount,
             item.CaptureCount,
+            members.Count,
             item.LastCopiedAt);
     }
 
@@ -329,6 +332,7 @@ public static class GalleryCardProjection
     {
         var members = (item.Members ?? [])
             .Select(member => new GalleryMemberDto(
+                member.Position,
                 member.Kind.ToString(),
                 member.Kind == ContentKind.Image
                     ? OcrTitleGenerator.CreateBestDisplayTitle(
