@@ -80,7 +80,7 @@ internal sealed class LineRecentSendSignals
                HasMatchingContent(process, urls, hasImages);
     }
 
-    public bool TryGetApplicable(
+    public bool TryTakeApplicable(
         string contextHash,
         uint processId,
         DateTimeOffset pastedAt,
@@ -95,6 +95,7 @@ internal sealed class LineRecentSendSignals
             HasMatchingContent(exact, urls, hasImages))
         {
             signal = exact;
+            RemoveAliases(exact.SentAt);
             return true;
         }
 
@@ -103,12 +104,16 @@ internal sealed class LineRecentSendSignals
             HasMatchingContent(process, urls, hasImages))
         {
             signal = process;
+            RemoveAliases(process.SentAt);
             return true;
         }
 
         signal = default;
         return false;
     }
+
+    public bool TryConsume(DateTimeOffset sentAt) =>
+        RemoveAliases(sentAt);
 
     private bool CanApplyProcess(
         uint processId,
@@ -158,5 +163,27 @@ internal sealed class LineRecentSendSignals
         {
             _processSignals.Remove(processId);
         }
+    }
+
+    private bool RemoveAliases(DateTimeOffset sentAt)
+    {
+        var removed = false;
+        foreach (var contextHash in _signals
+                     .Where(pair => pair.Value.SentAt == sentAt)
+                     .Select(pair => pair.Key)
+                     .ToArray())
+        {
+            removed |= _signals.Remove(contextHash);
+        }
+
+        foreach (var processId in _processSignals
+                     .Where(pair => pair.Value.SentAt == sentAt)
+                     .Select(pair => pair.Key)
+                     .ToArray())
+        {
+            removed |= _processSignals.Remove(processId);
+        }
+
+        return removed;
     }
 }

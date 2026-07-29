@@ -459,7 +459,9 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
                 {
                     rejected = 1;
                 }
-                else if (candidate.MarkSendObserved(
+                else if (!candidate.IsSendObserved() &&
+                         _recentSendSignals.TryConsume(occurredAt) &&
+                         candidate.MarkSendObserved(
                              imageDialogSendObserved))
                 {
                     observed = 1;
@@ -501,8 +503,10 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
                 candidates,
                 candidate => CanApplySendEvidence(candidate, composer),
                 candidate => candidate.Context.OccurredAt);
-            if (candidate?.MarkSendObserved(
-                    imageDialogSendObserved) == true)
+            if (candidate is not null &&
+                _recentSendSignals.TryConsume(occurredAt) &&
+                candidate.MarkSendObserved(
+                    imageDialogSendObserved))
             {
                 observed = 1;
             }
@@ -543,8 +547,10 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
                 candidates,
                 candidate => CanApplySendEvidence(candidate, composer),
                 candidate => candidate.Context.OccurredAt);
-            if (candidate?.MarkSendObserved(
-                    imageDialogSendObserved) == true)
+            if (candidate is not null &&
+                _recentSendSignals.TryConsume(occurredAt) &&
+                candidate.MarkSendObserved(
+                    imageDialogSendObserved))
             {
                 observed = 1;
             }
@@ -910,7 +916,7 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
                 payloadSignature,
                 cancellation);
             _candidates.Add(registration);
-            if (_recentSendSignals.TryGetApplicable(
+            if (_recentSendSignals.TryTakeApplicable(
                     context.ContextHash,
                     context.ProcessId,
                     context.OccurredAt,

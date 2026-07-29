@@ -80,7 +80,7 @@ public sealed class LineRecentSendSignalsTests
             composerText: null,
             imageDialogSendObserved: true);
 
-        Assert.True(signals.TryGetApplicable(
+        Assert.True(signals.TryTakeApplicable(
             "same-window",
             42,
             droppedAt,
@@ -89,6 +89,14 @@ public sealed class LineRecentSendSignalsTests
             hasImages: true,
             out var signal));
         Assert.True(signal.ImageDialogSendObserved);
+        Assert.False(signals.TryTakeApplicable(
+            "same-window",
+            42,
+            droppedAt,
+            droppedAt.AddMilliseconds(1501),
+            [],
+            hasImages: true,
+            out _));
     }
 
     [Fact]
@@ -143,5 +151,62 @@ public sealed class LineRecentSendSignalsTests
             droppedAt.AddMilliseconds(500),
             [url],
             hasImages: false));
+    }
+
+    [Fact]
+    public void ImmediateCandidateConsumptionPreventsRegistrationReplay()
+    {
+        var signals = new LineRecentSendSignals();
+        var droppedAt = DateTimeOffset.UtcNow;
+        var sentAt = droppedAt.AddMilliseconds(80);
+        signals.Observe(
+            "same-window",
+            sentAt,
+            composerText: null,
+            imageDialogSendObserved: true);
+        signals.ObserveProcess(
+            42,
+            sentAt,
+            composerText: null,
+            imageDialogSendObserved: true);
+
+        Assert.True(signals.TryConsume(sentAt));
+
+        Assert.False(signals.TryTakeApplicable(
+            "same-window",
+            42,
+            droppedAt,
+            droppedAt.AddMilliseconds(1500),
+            [],
+            hasImages: true,
+            out _));
+    }
+
+    [Fact]
+    public void TakingContextSignalAlsoConsumesSameProcessAlias()
+    {
+        var signals = new LineRecentSendSignals();
+        var droppedAt = DateTimeOffset.UtcNow;
+        var sentAt = droppedAt.AddMilliseconds(80);
+        signals.Observe("same-window", sentAt);
+        signals.ObserveProcess(42, sentAt);
+
+        Assert.True(signals.TryTakeApplicable(
+            "same-window",
+            42,
+            droppedAt,
+            droppedAt.AddMilliseconds(500),
+            [],
+            hasImages: true,
+            out _));
+
+        Assert.False(signals.TryTakeApplicable(
+            "other-window",
+            42,
+            droppedAt,
+            droppedAt.AddMilliseconds(501),
+            [],
+            hasImages: true,
+            out _));
     }
 }
