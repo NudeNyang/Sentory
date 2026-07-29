@@ -54,6 +54,46 @@ async fn gallery_list(
 }
 
 #[tauri::command]
+async fn gallery_page(
+    app: AppHandle,
+    request: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let request_json = serde_json::to_string(&request)
+        .map_err(|error| format!("갤러리 요청을 만들지 못했습니다: {error}"))?;
+    append_diagnostic("gallery-page-request", &request_json);
+    run_sidecar_json(&app, &["gallery-page", &request_json]).await
+}
+
+async fn run_sidecar_json(
+    app: &AppHandle,
+    args: &[&str],
+) -> Result<serde_json::Value, String> {
+    let sidecar = app
+        .shell()
+        .sidecar("sentory-engine")
+        .map_err(|error| format!("C# 엔진 실행 파일을 찾지 못했습니다: {error}"))?;
+    let output = sidecar
+        .args(args)
+        .output()
+        .await
+        .map_err(|error| format!("C# 엔진을 실행하지 못했습니다: {error}"))?;
+    if !output.status.success() {
+        let error = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+        append_diagnostic(
+            "gallery-sidecar-failed",
+            &format!("status={:?} detail={}", output.status.code(), error),
+        );
+        return Err(if error.is_empty() {
+            format!("C# 엔진이 종료 코드 {:?}로 끝났습니다.", output.status.code())
+        } else {
+            error
+        });
+    }
+    serde_json::from_slice::<serde_json::Value>(&output.stdout)
+        .map_err(|error| format!("C# 엔진 응답을 읽지 못했습니다: {error}"))
+}
+
+#[tauri::command]
 fn ui_diagnostic(event: String, detail: String) {
     append_diagnostic(
         &event.chars().take(48).collect::<String>(),
@@ -91,7 +131,11 @@ fn diagnostic_path() -> Option<PathBuf> {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![gallery_list, ui_diagnostic])
+        .invoke_handler(tauri::generate_handler![
+            gallery_list,
+            gallery_page,
+            ui_diagnostic
+        ])
         .run(tauri::generate_context!())
         .expect("Sentory Tauri UI를 실행하지 못했습니다.");
 }

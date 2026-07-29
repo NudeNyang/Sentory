@@ -1,6 +1,8 @@
 using Sentory.Core;
 using Sentory.Engine.Bridge;
 using Sentory.Infrastructure.Data;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Sentory.Engine.Bridge.Tests;
 
@@ -48,6 +50,28 @@ public sealed class GalleryCardProjectionTests : IDisposable
         {
             File.Delete(outside);
         }
+    }
+
+    [Fact]
+    public void Create_UsesExistingWpfCardThumbnailInsteadOfOriginalImage()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var imagePath = CreateFile("images/photo.png");
+        var info = new FileInfo(imagePath);
+        var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+            $"{info.FullName}|{info.Length}|{info.LastWriteTimeUtc.Ticks}")))
+            .ToLowerInvariant();
+        var thumbnailPath = CreateFile(
+            $"cache/gallery-card-thumbnails/v3/{key}.jpg");
+        var item = CreateImage(
+            Path.GetRelativePath(_root, imagePath),
+            "photo.png",
+            "사진");
+
+        var card = GalleryCardProjection.Create(item, paths);
+
+        Assert.Equal(thumbnailPath, card.ArtworkPath);
+        Assert.Equal("contain", card.ArtworkMode);
     }
 
     private string CreateFile(string relativePath)

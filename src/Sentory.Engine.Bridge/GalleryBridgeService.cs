@@ -1,6 +1,8 @@
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
 using Sentory.Infrastructure.Ocr;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Sentory.Engine.Bridge;
 
@@ -8,9 +10,9 @@ public sealed class GalleryBridgeService(
     ICaptureRepository repository,
     SentoryDataPaths paths)
 {
-    public const int ProtocolVersion = 1;
-    public const int DefaultPageSize = 500;
-    public const int MaximumPageSize = 2_000;
+    public const int ProtocolVersion = 2;
+    public const int DefaultPageSize = 80;
+    public const int MaximumPageSize = 200;
 
     public async Task<GallerySnapshotDto> GetGalleryAsync(
         int limit,
@@ -26,7 +28,92 @@ public sealed class GalleryBridgeService(
             items.Select(item => GalleryCardProjection.Create(item, paths))
                 .ToArray());
     }
+
+    public async Task<GallerySnapshotDto> GetGalleryPageAsync(
+        GalleryPageRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (repository is not IGalleryPageRepository pages)
+        {
+            throw new NotSupportedException(
+                "현재 C# 엔진은 갤러리 페이지 조회를 지원하지 않습니다.");
+        }
+
+        var kind = ParseOptionalEnum<ContentKind>(request.Kind, nameof(request.Kind));
+        var dateRange = ParseEnum<GalleryDateRange>(
+            request.DateRange,
+            GalleryDateRange.All,
+            nameof(request.DateRange));
+        var sortMode = ParseEnum<GallerySortMode>(
+            request.SortMode,
+            GallerySortMode.Newest,
+            nameof(request.SortMode));
+        var sources = (request.SourceApps ?? [])
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => ParseEnum<SourceApp>(value, null, nameof(request.SourceApps)))
+            .ToHashSet();
+        var page = await pages.GetGalleryPageAsync(
+            new GalleryPageRequest(
+                new GalleryQueryOptions(
+                    kind,
+                    request.SearchText ?? string.Empty,
+                    dateRange,
+                    sortMode,
+                    request.FavoritesOnly,
+                    sources),
+                Math.Max(0, request.Offset),
+                Math.Clamp(request.Limit, 1, MaximumPageSize),
+                DateTimeOffset.Now),
+            cancellationToken);
+        return new GallerySnapshotDto(
+            ProtocolVersion,
+            page.Total,
+            page.Items.Select(item => GalleryCardProjection.Create(item, paths))
+                .ToArray());
+    }
+
+    private static TEnum? ParseOptionalEnum<TEnum>(
+        string? value,
+        string parameterName)
+        where TEnum : struct, Enum
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+        return ParseEnum<TEnum>(value, null, parameterName);
+    }
+
+    private static TEnum ParseEnum<TEnum>(
+        string? value,
+        TEnum? fallback,
+        string parameterName)
+        where TEnum : struct, Enum
+    {
+        if (string.IsNullOrWhiteSpace(value) && fallback is { } defaultValue)
+        {
+            return defaultValue;
+        }
+        if (Enum.TryParse<TEnum>(value, ignoreCase: true, out var parsed))
+        {
+            return parsed;
+        }
+        throw new ArgumentException(
+            $"지원하지 않는 {parameterName} 값입니다: {value}",
+            parameterName);
+    }
 }
+
+public sealed record GalleryPageRequestDto(
+    int Offset,
+    int Limit,
+    string? Kind,
+    string? SearchText,
+    string? DateRange,
+    string? SortMode,
+    bool FavoritesOnly,
+    IReadOnlyList<string>? SourceApps);
 
 public sealed record GallerySnapshotDto(
     int ProtocolVersion,
@@ -41,13 +128,17 @@ public sealed record GalleryCardDto(
     string TypeLabel,
     string DateLabel,
     string StatusLabel,
+    string OriginalUrl,
     string Domain,
     string SourceApp,
     DateTimeOffset LastCapturedAt,
     string? ArtworkPath,
     string ArtworkMode,
+    string? SiteIconPath,
     bool IsFavorite,
-    int CopyCount);
+    int CopyCount,
+    int CaptureCount,
+    DateTimeOffset? LastCopiedAt);
 
 public static class GalleryCardProjection
 {
@@ -92,13 +183,17 @@ public static class GalleryCardProjection
             item.DeliveryStatus == DeliveryStatus.NotObserved
                 ? "입력 시 저장됨"
                 : "전송 시 저장됨",
+            item.OriginalUrl,
             item.Domain,
             item.LastSourceApp.ToString(),
             item.LastCapturedAt,
             artwork.Path,
             artwork.Mode,
+            ResolveStoredPath(item.SiteIconPath, paths),
             item.IsFavorite,
-            item.CopyCount);
+            item.CopyCount,
+            item.CaptureCount,
+            item.LastCopiedAt);
     }
 
     private static (string? Path, string Mode) ResolveArtwork(
@@ -133,7 +228,34 @@ public static class GalleryCardProjection
             mode = "icon";
         }
 
-        return (ResolveStoredPath(relativePath, paths), mode);
+        var resolved = ResolveStoredPath(relativePath, paths);
+        if (resolved is not null && mode == "contain")
+        {
+            resolved = ResolveExistingCardThumbnail(resolved, paths) ?? resolved;
+        }
+        return (resolved, mode);
+    }
+
+    internal static string? ResolveExistingCardThumbnail(
+        string sourcePath,
+        SentoryDataPaths paths)
+    {
+        var source = new FileInfo(Path.GetFullPath(sourcePath));
+        if (!source.Exists)
+        {
+            return null;
+        }
+        var cacheKey = Convert.ToHexString(SHA256.HashData(
+            Encoding.UTF8.GetBytes(
+                $"{source.FullName}|{source.Length}|{source.LastWriteTimeUtc.Ticks}")))
+            .ToLowerInvariant();
+        var cachePath = Path.Combine(
+            paths.RootDirectory,
+            "cache",
+            "gallery-card-thumbnails",
+            "v3",
+            $"{cacheKey}.jpg");
+        return File.Exists(cachePath) ? Path.GetFullPath(cachePath) : null;
     }
 
     internal static string? ResolveStoredPath(

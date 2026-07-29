@@ -194,7 +194,7 @@ button { color: inherit; }
 }
 
 .tabs { gap: 4px; }
-.tools { gap: 4px; }
+.tools { position: relative; gap: 4px; }
 
 .tab,
 .toolbar-button {
@@ -254,6 +254,60 @@ button { color: inherit; }
   text-align: center;
 }
 
+.popup {
+  position: absolute;
+  z-index: 80;
+  top: 40px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 10px 28px rgba(41, 39, 34, 0.12);
+}
+
+.popup[hidden] { display: none; }
+.filter-menu { right: 220px; width: 430px; padding: 10px; }
+.sort-menu { right: 106px; width: 184px; }
+
+.popup-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 4px 5px;
+  font-size: 13px;
+}
+
+.popup-heading button,
+.menu-options button {
+  height: 36px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.popup-heading button { height: 28px; padding-inline: 8px; }
+.popup-heading button:hover,
+.menu-options button:hover { background: var(--status-background); color: var(--text); }
+.menu-options button.selected { background: var(--status-background); color: var(--accent); font-weight: 600; }
+
+.filter-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.filter-columns::before { grid-column: 2; grid-row: 1; background: var(--line); content: ""; }
+.filter-columns > div:first-child { grid-column: 1; grid-row: 1; }
+.filter-columns > div:last-child { grid-column: 3; grid-row: 1; }
+.filter-columns h2 { margin: 6px 11px 3px; color: var(--soft); font-size: 11px; font-weight: 600; }
+.menu-options { display: grid; }
+
 .gallery-region { position: relative; min-height: 0; background: var(--window); }
 
 .status {
@@ -298,6 +352,13 @@ button { color: inherit; }
   content-visibility: auto;
   cursor: pointer;
 }
+
+.card.skeleton { cursor: default; }
+.card.skeleton:hover { border-color: var(--line); transform: none; }
+.skeleton-artwork { width: 230px; height: 160px; margin: 10px 10px 0; border-radius: 12px; background: var(--skeleton); }
+.skeleton-line { height: 11px; margin: 14px 16px 0; border-radius: 6px; background: var(--skeleton); }
+.skeleton-line.short { width: 42%; }
+.skeleton-line.medium { width: 68%; margin-top: 10px; }
 
 .card:hover {
   border-color: var(--card-hover);

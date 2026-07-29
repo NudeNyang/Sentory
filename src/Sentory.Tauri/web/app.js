@@ -6,10 +6,13 @@ const TOP_PADDING = 20;
 const BOTTOM_PADDING = 28;
 const MINIMUM_SIDE_PADDING = 14;
 const OVERSCAN_ROWS = 2;
+const PAGE_SIZE = 80;
+const SEARCH_DELAY_MS = 110;
+const SOURCES = ["Discord", "KakaoTalk", "Slack", "Telegram", "Line", "WeChat", "WhatsApp"];
 
 const state = {
-  allItems: [],
-  visibleItems: [],
+  items: new Array(PAGE_SIZE),
+  total: PAGE_SIZE,
   kind: "all",
   sources: new Set(),
   dateRange: "All",
@@ -19,8 +22,13 @@ const state = {
   gridLeft: MINIMUM_SIDE_PADDING,
   renderedRange: "",
   renderQueued: false,
+  renderRevision: 0,
+  generation: 0,
+  pendingPages: new Map(),
+  hasLoaded: false,
   imageDiagnosticCount: 0,
   scrollTimer: 0,
+  searchTimer: 0,
 };
 
 const scroller = document.querySelector("#scroller");
@@ -30,8 +38,13 @@ const status = document.querySelector("#status");
 const search = document.querySelector("#search");
 const filterButton = document.querySelector("#filter");
 const filterCount = document.querySelector("#filter-count");
+const filterMenu = document.querySelector("#filter-menu");
+const filterReset = document.querySelector("#filter-reset");
+const sourceOptions = document.querySelector("#source-options");
+const dateOptions = document.querySelector("#date-options");
 const sortButton = document.querySelector("#sort");
 const sortLabel = document.querySelector("#sort-label");
+const sortMenu = document.querySelector("#sort-menu");
 const refreshButton = document.querySelector("#refresh");
 const themeButton = document.querySelector("#theme");
 const scrollThumb = document.querySelector(".scroll-indicator-thumb");
@@ -42,92 +55,121 @@ function tauriCore() {
   return core;
 }
 
-async function loadGallery() {
-  setStatus("C# 엔진에서 보관함을 읽는 중…");
-  refreshButton.disabled = true;
-  try {
-    const snapshot = await tauriCore().invoke("gallery_list", { limit: 500 });
-    if (snapshot.protocolVersion !== 1 || !Array.isArray(snapshot.items)) {
-      throw new Error("지원하지 않는 C# 엔진 응답입니다.");
-    }
-    state.allItems = snapshot.items.map(item => ({
-      ...item,
-      searchText: `${item.title} ${item.subtitle} ${item.domain}`.toLocaleLowerCase(),
-    }));
-    document.title = `Sentory · ${snapshot.total.toLocaleString()}개`;
-    void tauriCore().invoke("ui_diagnostic", {
-      event: "gallery-loaded",
-      detail: `total=${snapshot.total} artwork=${snapshot.items.filter(item => item.artworkPath).length}`,
-    });
-    applyFilters(true);
-    setStatus(`${snapshot.total.toLocaleString()}개 항목 · C# 엔진 연결됨`);
-    window.setTimeout(() => status.classList.add("hidden"), 1400);
-  } catch (error) {
-    document.title = "Sentory · 연결 오류";
-    void tauriCore().invoke("ui_diagnostic", {
-      event: "gallery-load-failed",
-      detail: error instanceof Error ? error.message : String(error),
-    });
-    setStatus(error instanceof Error ? error.message : String(error), true);
-    state.allItems = [];
-    applyFilters(true);
-  } finally {
-    refreshButton.disabled = false;
-  }
+function buildRequest(offset) {
+  return {
+    offset,
+    limit: PAGE_SIZE,
+    kind: state.kind === "Image" || state.kind === "Url" ? state.kind : null,
+    searchText: state.query,
+    dateRange: state.dateRange,
+    sortMode: state.sort,
+    favoritesOnly: state.kind === "favorite",
+    sourceApps: [...state.sources],
+  };
 }
 
-function applyFilters(resetScroll) {
-  const query = state.query.trim().toLocaleLowerCase();
-  const cutoff = dateCutoff(state.dateRange);
-  state.visibleItems = state.allItems
-    .filter(item => {
-      if (state.kind === "favorite" && !item.isFavorite) return false;
-      if (state.kind !== "all" && state.kind !== "favorite" && item.kind !== state.kind) return false;
-      if (state.sources.size > 0 && !state.sources.has(item.sourceApp)) return false;
-      if (cutoff && new Date(item.lastCapturedAt) < cutoff) return false;
-      return !query || item.searchText.includes(query);
-    })
-    .sort(compareItems);
-  if (resetScroll) scroller.scrollTop = 0;
+function resetGallery({ announce = false } = {}) {
+  state.generation += 1;
+  state.pendingPages.clear();
+  state.items = new Array(state.hasLoaded ? Math.max(1, state.total) : PAGE_SIZE);
+  state.total = state.items.length;
+  state.renderRevision += 1;
   state.renderedRange = "";
+  scroller.scrollTop = 0;
   measureGrid();
   renderVisibleCards();
-  updateFilterCount();
+  if (announce) setStatus("보관함을 갱신하는 중…");
+  void loadPage(0, state.generation, true);
 }
 
-function compareItems(left, right) {
-  switch (state.sort) {
-    case "Oldest":
-      return left.lastCapturedAt.localeCompare(right.lastCapturedAt);
-    case "MostCopied":
-      return right.copyCount - left.copyCount || right.lastCapturedAt.localeCompare(left.lastCapturedAt);
-    case "Name":
-      return left.title.localeCompare(right.title, undefined, { sensitivity: "base" });
-    default:
-      return right.lastCapturedAt.localeCompare(left.lastCapturedAt);
+async function loadPage(offset, generation, isInitial = false) {
+  const pageOffset = Math.max(0, Math.floor(offset / PAGE_SIZE) * PAGE_SIZE);
+  if (state.pendingPages.has(pageOffset)) return state.pendingPages.get(pageOffset);
+  const task = (async () => {
+    try {
+      const snapshot = await tauriCore().invoke("gallery_page", {
+        request: buildRequest(pageOffset),
+      });
+      if (generation !== state.generation) return;
+      if (snapshot.protocolVersion !== 2 || !Array.isArray(snapshot.items)) {
+        throw new Error("지원하지 않는 C# 엔진 응답입니다.");
+      }
+
+      if (isInitial) {
+        state.total = snapshot.total;
+        state.items = new Array(snapshot.total);
+        state.hasLoaded = true;
+        document.title = `Sentory · ${snapshot.total.toLocaleString()}개`;
+      }
+      for (let index = 0; index < snapshot.items.length; index += 1) {
+        const target = pageOffset + index;
+        if (target < state.items.length) state.items[target] = snapshot.items[index];
+      }
+      state.renderRevision += 1;
+      state.renderedRange = "";
+      measureGrid();
+      renderVisibleCards();
+
+      if (isInitial) {
+        setStatus(`${snapshot.total.toLocaleString()}개 항목 · C# 엔진 연결됨`);
+        window.setTimeout(() => status.classList.add("hidden"), 1000);
+      }
+      void tauriCore().invoke("ui_diagnostic", {
+        event: "gallery-page-loaded",
+        detail: `offset=${pageOffset} count=${snapshot.items.length} total=${snapshot.total}`,
+      });
+    } catch (error) {
+      if (generation !== state.generation) return;
+      if (isInitial) {
+        state.total = 0;
+        state.items = [];
+        state.hasLoaded = true;
+        state.renderRevision += 1;
+        document.title = "Sentory · 연결 오류";
+        measureGrid();
+        renderVisibleCards();
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      setStatus(message, true);
+      void tauriCore().invoke("ui_diagnostic", { event: "gallery-page-failed", detail: message });
+    } finally {
+      if (generation === state.generation) state.pendingPages.delete(pageOffset);
+      refreshButton.disabled = false;
+    }
+  })();
+  state.pendingPages.set(pageOffset, task);
+  return task;
+}
+
+function ensurePagesForRange(start, end) {
+  if (!state.hasLoaded) return;
+  const firstPage = Math.floor(start / PAGE_SIZE) * PAGE_SIZE;
+  const lastPage = Math.floor(Math.max(start, end - 1) / PAGE_SIZE) * PAGE_SIZE;
+  for (let offset = firstPage; offset <= lastPage; offset += PAGE_SIZE) {
+    const pageEnd = Math.min(state.items.length, offset + PAGE_SIZE);
+    let missing = false;
+    for (let index = offset; index < pageEnd; index += 1) {
+      if (state.items[index] === undefined) {
+        missing = true;
+        break;
+      }
+    }
+    if (missing) void loadPage(offset, state.generation);
   }
-}
-
-function dateCutoff(range) {
-  const now = new Date();
-  if (range === "Today") return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (range === "Last7Days") return new Date(now.getTime() - 7 * 86400000);
-  if (range === "Last30Days") return new Date(now.getTime() - 30 * 86400000);
-  return null;
 }
 
 function measureGrid() {
   const available = Math.max(CELL_WIDTH, scroller.clientWidth - MINIMUM_SIDE_PADDING * 2);
   state.columns = Math.max(1, Math.floor(available / CELL_WIDTH));
   state.gridLeft = Math.max(MINIMUM_SIDE_PADDING, (scroller.clientWidth - state.columns * CELL_WIDTH) / 2);
-  const rows = Math.ceil(state.visibleItems.length / state.columns);
+  const rows = Math.ceil(state.total / state.columns);
   virtualSpace.style.height = `${Math.max(scroller.clientHeight, TOP_PADDING + rows * ROW_HEIGHT + BOTTOM_PADDING)}px`;
   updateScrollIndicator();
 }
 
 function renderVisibleCards() {
   state.renderQueued = false;
-  if (state.visibleItems.length === 0) {
+  if (state.total === 0) {
     virtualSpace.replaceChildren(createEmptyState());
     state.renderedRange = "empty";
     return;
@@ -135,29 +177,51 @@ function renderVisibleCards() {
 
   const firstRow = Math.max(0, Math.floor((scroller.scrollTop - TOP_PADDING) / ROW_HEIGHT) - OVERSCAN_ROWS);
   const visibleRows = Math.ceil(scroller.clientHeight / ROW_HEIGHT) + OVERSCAN_ROWS * 2;
-  const totalRows = Math.ceil(state.visibleItems.length / state.columns);
+  const totalRows = Math.ceil(state.total / state.columns);
   const lastRow = Math.min(totalRows, firstRow + visibleRows);
-  const rangeKey = `${firstRow}:${lastRow}:${state.columns}:${state.visibleItems.length}`;
+  const rangeKey = `${firstRow}:${lastRow}:${state.columns}:${state.total}:${state.renderRevision}`;
   if (rangeKey === state.renderedRange) return;
   state.renderedRange = rangeKey;
 
   const fragment = document.createDocumentFragment();
   const start = firstRow * state.columns;
-  const end = Math.min(state.visibleItems.length, lastRow * state.columns);
+  const end = Math.min(state.total, lastRow * state.columns);
+  ensurePagesForRange(start, end);
   for (let index = start; index < end; index += 1) {
-    fragment.append(createCard(state.visibleItems[index], index));
+    fragment.append(state.items[index]
+      ? createCard(state.items[index], index)
+      : createSkeletonCard(index));
   }
   virtualSpace.replaceChildren(fragment);
 }
 
-function createCard(item, index) {
+function positionCard(card, index) {
   const row = Math.floor(index / state.columns);
   const column = index % state.columns;
+  card.style.left = `${state.gridLeft + column * CELL_WIDTH + (CELL_WIDTH - CARD_WIDTH) / 2}px`;
+  card.style.top = `${TOP_PADDING + row * ROW_HEIGHT + (ROW_HEIGHT - CARD_HEIGHT) / 2}px`;
+}
+
+function createSkeletonCard(index) {
+  const card = document.createElement("article");
+  card.className = "card skeleton";
+  card.setAttribute("aria-hidden", "true");
+  positionCard(card, index);
+  const artwork = document.createElement("div");
+  artwork.className = "skeleton-artwork";
+  const short = document.createElement("div");
+  short.className = "skeleton-line short";
+  const medium = document.createElement("div");
+  medium.className = "skeleton-line medium";
+  card.append(artwork, short, medium);
+  return card;
+}
+
+function createCard(item, index) {
   const card = document.createElement("article");
   card.className = "card";
   card.dataset.itemId = item.itemId;
-  card.style.left = `${state.gridLeft + column * CELL_WIDTH + (CELL_WIDTH - CARD_WIDTH) / 2}px`;
-  card.style.top = `${TOP_PADDING + row * ROW_HEIGHT + (ROW_HEIGHT - CARD_HEIGHT) / 2}px`;
+  positionCard(card, index);
   card.setAttribute("aria-label", `${item.typeLabel}, ${item.title}, ${item.dateLabel}`);
 
   const artwork = document.createElement("div");
@@ -192,7 +256,14 @@ function createCard(item, index) {
   const meta = document.createElement("div");
   meta.className = "card-meta";
   const type = document.createElement("strong");
-  type.textContent = item.typeLabel;
+  if (item.siteIconPath) {
+    const icon = document.createElement("img");
+    icon.className = "card-site-icon";
+    icon.alt = "";
+    icon.src = tauriCore().convertFileSrc(item.siteIconPath);
+    type.append(icon);
+  }
+  type.append(document.createTextNode(item.typeLabel));
   const date = document.createElement("span");
   date.textContent = item.dateLabel;
   meta.append(type, date);
@@ -246,7 +317,9 @@ function createUrlFallback(item) {
 function createEmptyState() {
   const empty = document.createElement("p");
   empty.className = "empty";
-  empty.textContent = state.allItems.length === 0 ? "아직 표시할 항목이 없어." : "조건에 맞는 항목이 없어.";
+  empty.textContent = state.query || state.kind !== "all" || state.sources.size > 0 || state.dateRange !== "All"
+    ? "조건에 맞는 항목이 없어."
+    : "아직 표시할 항목이 없어.";
   return empty;
 }
 
@@ -282,10 +355,42 @@ function setStatus(message, isError = false) {
   status.classList.remove("hidden");
 }
 
-function updateFilterCount() {
+function updateFilterUi() {
   const count = state.sources.size + (state.dateRange === "All" ? 0 : 1);
   filterCount.hidden = count === 0;
   filterCount.textContent = String(count);
+  for (const button of sourceOptions.querySelectorAll("button")) {
+    button.classList.toggle("selected", state.sources.has(button.dataset.source));
+  }
+  for (const button of dateOptions.querySelectorAll("button")) {
+    button.classList.toggle("selected", state.dateRange === button.dataset.date);
+  }
+}
+
+function togglePopup(target, trigger) {
+  const willOpen = target.hidden;
+  filterMenu.hidden = true;
+  sortMenu.hidden = true;
+  filterButton.setAttribute("aria-expanded", "false");
+  sortButton.setAttribute("aria-expanded", "false");
+  if (willOpen) {
+    target.hidden = false;
+    trigger.setAttribute("aria-expanded", "true");
+  }
+}
+
+for (const source of SOURCES) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.dataset.source = source;
+  button.textContent = source === "KakaoTalk" ? "카카오톡" : source === "Line" ? "LINE" : source;
+  button.addEventListener("click", () => {
+    if (state.sources.has(source)) state.sources.delete(source);
+    else state.sources.add(source);
+    updateFilterUi();
+    resetGallery();
+  });
+  sourceOptions.append(button);
 }
 
 for (const tab of document.querySelectorAll(".tab")) {
@@ -293,24 +398,56 @@ for (const tab of document.querySelectorAll(".tab")) {
     document.querySelector(".tab.active")?.classList.remove("active");
     tab.classList.add("active");
     state.kind = tab.dataset.kind;
-    applyFilters(true);
+    resetGallery();
   });
 }
 
 search.addEventListener("input", () => {
-  state.query = search.value;
-  applyFilters(true);
+  window.clearTimeout(state.searchTimer);
+  state.searchTimer = window.setTimeout(() => {
+    state.query = search.value;
+    resetGallery();
+  }, SEARCH_DELAY_MS);
 });
 
-sortButton.addEventListener("click", () => {
-  state.sort = state.sort === "Newest" ? "Oldest" : "Newest";
-  sortLabel.textContent = state.sort === "Newest" ? "정렬 최신순" : "정렬 오래된순";
-  applyFilters(true);
+filterButton.addEventListener("click", () => togglePopup(filterMenu, filterButton));
+sortButton.addEventListener("click", () => togglePopup(sortMenu, sortButton));
+
+filterReset.addEventListener("click", () => {
+  state.sources.clear();
+  state.dateRange = "All";
+  updateFilterUi();
+  resetGallery();
 });
 
-filterButton.addEventListener("click", () => {
-  setStatus("필터 메뉴는 SQL 페이지 조회 단계에서 연결할 예정이야.");
-  window.setTimeout(() => status.classList.add("hidden"), 1400);
+dateOptions.addEventListener("click", event => {
+  const button = event.target.closest("button[data-date]");
+  if (!button) return;
+  state.dateRange = button.dataset.date;
+  updateFilterUi();
+  resetGallery();
+});
+
+sortMenu.addEventListener("click", event => {
+  const button = event.target.closest("button[data-sort]");
+  if (!button) return;
+  state.sort = button.dataset.sort;
+  sortLabel.textContent = button.textContent;
+  for (const option of sortMenu.querySelectorAll("button")) option.classList.toggle("selected", option === button);
+  sortMenu.hidden = true;
+  sortButton.setAttribute("aria-expanded", "false");
+  resetGallery();
+});
+
+document.addEventListener("pointerdown", event => {
+  if (!filterMenu.hidden && !filterMenu.contains(event.target) && !filterButton.contains(event.target)) {
+    filterMenu.hidden = true;
+    filterButton.setAttribute("aria-expanded", "false");
+  }
+  if (!sortMenu.hidden && !sortMenu.contains(event.target) && !sortButton.contains(event.target)) {
+    sortMenu.hidden = true;
+    sortButton.setAttribute("aria-expanded", "false");
+  }
 });
 
 themeButton.addEventListener("click", () => {
@@ -319,9 +456,10 @@ themeButton.addEventListener("click", () => {
   themeButton.querySelector("span").innerHTML = dark ? "&#xE706;" : "&#xE708;";
   themeButton.title = dark ? "라이트 테마로 전환" : "다크 테마로 전환";
   themeButton.setAttribute("aria-label", themeButton.title);
+  localStorage.setItem("sentory-theme", dark ? "dark" : "light");
 });
 
-refreshButton.addEventListener("click", loadGallery);
+refreshButton.addEventListener("click", () => resetGallery({ announce: true }));
 scroller.addEventListener("scroll", () => {
   requestRender();
   updateScrollIndicator();
@@ -336,4 +474,7 @@ new ResizeObserver(() => {
   requestRender();
 }).observe(scroller);
 
-loadGallery();
+const savedTheme = localStorage.getItem("sentory-theme");
+if (savedTheme === "dark") themeButton.click();
+updateFilterUi();
+resetGallery();

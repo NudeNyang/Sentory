@@ -26,6 +26,23 @@ public sealed record GalleryQueryOptions(
     bool FavoritesOnly = false,
     IReadOnlySet<SourceApp>? SourceApps = null);
 
+public sealed record GalleryPageRequest(
+    GalleryQueryOptions Options,
+    int Offset,
+    int Limit,
+    DateTimeOffset Now);
+
+public sealed record GalleryPageResult(
+    int Total,
+    IReadOnlyList<CapturedItemSummary> Items);
+
+public interface IGalleryPageRepository
+{
+    Task<GalleryPageResult> GetGalleryPageAsync(
+        GalleryPageRequest request,
+        CancellationToken cancellationToken = default);
+}
+
 public static class GalleryQuery
 {
     public static IReadOnlyList<CapturedItemSummary> Apply(

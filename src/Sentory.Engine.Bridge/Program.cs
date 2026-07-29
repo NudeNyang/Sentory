@@ -9,6 +9,7 @@ internal static class Program
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
@@ -27,20 +28,32 @@ internal static class Program
                 return 0;
             }
 
-            if (command != "gallery-list")
+            if (command is not ("gallery-list" or "gallery-page"))
             {
                 Console.Error.WriteLine(
-                    "사용법: sentory-engine health | gallery-list [limit]");
+                    "사용법: sentory-engine health | gallery-list [limit] | " +
+                    "gallery-page <request-json>");
                 return 2;
             }
 
-            var limit = ParseLimit(args.ElementAtOrDefault(1));
             var paths = SentoryDataPaths.FromEnvironmentOrCurrentUser(
                 Environment.GetEnvironmentVariable("SENTORY_DATA_ROOT"));
             var repository = new SqliteCaptureRepository(paths);
             await repository.InitializeAsync();
             var service = new GalleryBridgeService(repository, paths);
-            await WriteJsonAsync(await service.GetGalleryAsync(limit));
+            if (command == "gallery-page")
+            {
+                var request = JsonSerializer.Deserialize<GalleryPageRequestDto>(
+                    args.ElementAtOrDefault(1) ?? "{}",
+                    JsonOptions) ?? throw new ArgumentException(
+                    "갤러리 페이지 요청을 읽지 못했습니다.");
+                await WriteJsonAsync(await service.GetGalleryPageAsync(request));
+            }
+            else
+            {
+                var limit = ParseLimit(args.ElementAtOrDefault(1));
+                await WriteJsonAsync(await service.GetGalleryAsync(limit));
+            }
             return 0;
         }
         catch (Exception exception)

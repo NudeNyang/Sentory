@@ -64,6 +64,35 @@
               <span>설정</span>
             </button>
             <button id="refresh" class="visually-hidden" type="button">새로 고침</button>
+            <section id="filter-menu" class="popup filter-menu" hidden aria-label="필터">
+              <div class="popup-heading">
+                <strong>필터</strong>
+                <button id="filter-reset" type="button">초기화</button>
+              </div>
+              <div class="filter-columns">
+                <div>
+                  <h2>메신저</h2>
+                  <div id="source-options" class="menu-options"></div>
+                </div>
+                <div>
+                  <h2>기간</h2>
+                  <div id="date-options" class="menu-options">
+                    <button type="button" data-date="All">전체 기간</button>
+                    <button type="button" data-date="Today">오늘</button>
+                    <button type="button" data-date="Last7Days">최근 7일</button>
+                    <button type="button" data-date="Last30Days">최근 30일</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <section id="sort-menu" class="popup sort-menu menu-options" hidden aria-label="정렬">
+              <button type="button" data-sort="Newest">정렬 최신순</button>
+              <button type="button" data-sort="Oldest">정렬 오래된순</button>
+              <button type="button" data-sort="MostCaptured">가장 많이 저장한 순</button>
+              <button type="button" data-sort="MostCopied">가장 많이 복사한 순</button>
+              <button type="button" data-sort="RecentlyCopied">최근 복사한 순</button>
+              <button type="button" data-sort="Name">이름순</button>
+            </section>
           </div>
         </div>
       </header>
