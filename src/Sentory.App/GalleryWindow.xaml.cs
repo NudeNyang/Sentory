@@ -119,10 +119,6 @@ public partial class GalleryWindow : Window
         SyncRuntimeStatusTracker syncStatusTracker)
     {
         InitializeComponent();
-        _useWebGallery = WebGalleryRendererPolicy.IsEnabled(
-            SentoryBuildIdentity.IsDeveloperBuild,
-            Environment.GetEnvironmentVariable(
-                WebGalleryRendererPolicy.EnvironmentVariable));
         _repository = repository;
         _copyUsageRecorder = new CopyUsageRecorder(repository);
         _paths = paths;
@@ -147,10 +143,6 @@ public partial class GalleryWindow : Window
         RestoreWindowPlacement();
         ApplyTheme(_isDarkTheme);
         GalleryItems.ItemsSource = _visibleItems;
-        if (_useWebGallery)
-        {
-            SelectModeButton.IsEnabled = false;
-        }
         BuildSourceOptions();
         UpdateSortControls();
         UpdateIntegratedFilterControls();
@@ -190,14 +182,10 @@ public partial class GalleryWindow : Window
         }
 
         _loaded = true;
-        await InitializeWebGalleryAsync();
         await RefreshAsync();
-        if (!IsWebGalleryActive)
-        {
-            await Dispatcher.InvokeAsync(
-                UpdateGalleryScrollIndicator,
-                DispatcherPriority.Loaded);
-        }
+        await Dispatcher.InvokeAsync(
+            UpdateGalleryScrollIndicator,
+            DispatcherPriority.Loaded);
     }
 
     public async Task RefreshAsync()
@@ -226,7 +214,7 @@ public partial class GalleryWindow : Window
     public async Task RefreshAfterCaptureAsync()
     {
         await RefreshAsync();
-        ScrollWebGalleryToTop();
+        GalleryScrollViewer.ScrollToTop();
     }
 
     public void SetDiscordRepairNeeded(bool needed)
@@ -667,7 +655,6 @@ public partial class GalleryWindow : Window
             _visibleItems.Count == 0
                 ? ViewState.Empty
                 : ViewState.Content);
-        PushWebGalleryReset();
     }
 
     private void UpdateEmptyStateText()
@@ -910,7 +897,6 @@ public partial class GalleryWindow : Window
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            PushWebGalleryReset();
             LanguageChanged?.Invoke(this, EventArgs.Empty);
         }
         catch (OperationCanceledException)
@@ -2341,7 +2327,6 @@ public partial class GalleryWindow : Window
         ThemeIcon.Text = dark ? "\uE706" : "\uE708";
         UpdateThemeButtonLabel();
         ApplyTitleBarTheme();
-        PushWebGalleryTheme();
     }
 
     private void UpdateThemeButtonLabel()
@@ -3113,21 +3098,13 @@ public partial class GalleryWindow : Window
     private void SetViewState(ViewState state)
     {
         var contentVisible = state == ViewState.Content;
-        var webContentPending =
-            contentVisible && IsWebGalleryActive && !_webGalleryReady;
-        var webContentVisible =
-            contentVisible && IsWebGalleryActive && _webGalleryReady;
-        var wpfContentVisible = contentVisible && !IsWebGalleryActive;
-        GalleryWebView.Visibility = webContentVisible
+        GalleryScrollViewer.Visibility = contentVisible
             ? Visibility.Visible
             : Visibility.Collapsed;
-        GalleryScrollViewer.Visibility = wpfContentVisible
+        GalleryScrollIndicator.Visibility = contentVisible
             ? Visibility.Visible
             : Visibility.Collapsed;
-        GalleryScrollIndicator.Visibility = wpfContentVisible
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-        if (wpfContentVisible)
+        if (contentVisible)
         {
             Dispatcher.BeginInvoke(
                 UpdateGalleryScrollIndicator,
@@ -3142,9 +3119,7 @@ public partial class GalleryWindow : Window
         }
 
         LoadingPanel.Visibility =
-            state == ViewState.Loading || webContentPending
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            state == ViewState.Loading ? Visibility.Visible : Visibility.Collapsed;
         EmptyPanel.Visibility =
             state == ViewState.Empty ? Visibility.Visible : Visibility.Collapsed;
         ErrorPanel.Visibility =
@@ -3172,7 +3147,6 @@ public partial class GalleryWindow : Window
         _feedbackCancellation?.Cancel();
         _feedbackCancellation?.Dispose();
         _scrollIndicatorHideTimer.Stop();
-        DisposeWebGallery();
         base.OnClosing(e);
     }
 

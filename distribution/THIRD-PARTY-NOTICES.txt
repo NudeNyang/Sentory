@@ -57,12 +57,6 @@ code is distributed under GNU GPL v3 only (GPL-3.0-only).
     License: MIT
     https://github.com/dotnet/runtime
 
-11. Microsoft Edge WebView2 SDK 1.0.4078.44
-    Copyright © Microsoft Corporation
-    License: Microsoft WebView2 SDK License (BSD-3-Clause-style)
-    https://www.nuget.org/packages/Microsoft.Web.WebView2
-    A complete copy is included at licenses/Microsoft-WebView2.txt.
-
 MIT License
 -----------
 
