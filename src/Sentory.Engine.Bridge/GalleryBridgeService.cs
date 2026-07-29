@@ -29,6 +29,18 @@ public sealed class GalleryBridgeService(
                 .ToArray());
     }
 
+    public async Task<GalleryRevisionDto> GetRevisionAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var latest = (await repository.GetRecentAsync(1, cancellationToken))
+            .FirstOrDefault();
+        return latest is null
+            ? new GalleryRevisionDto(null, null)
+            : new GalleryRevisionDto(
+                latest.ItemId.ToString("N"),
+                latest.LastCapturedAt);
+    }
+
     public async Task<GallerySnapshotDto> GetGalleryPageAsync(
         GalleryPageRequestDto request,
         CancellationToken cancellationToken = default)
@@ -228,6 +240,10 @@ public sealed record GallerySnapshotDto(
     int ProtocolVersion,
     int Total,
     IReadOnlyList<GalleryCardDto> Items);
+
+public sealed record GalleryRevisionDto(
+    string? LatestItemId,
+    DateTimeOffset? LastCapturedAt);
 
 public sealed record GalleryCardDto(
     string ItemId,

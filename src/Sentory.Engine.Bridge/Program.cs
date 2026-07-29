@@ -28,23 +28,35 @@ internal static class Program
                 return 0;
             }
 
+            var paths = SentoryDataPaths.FromEnvironmentOrCurrentUser(
+                Environment.GetEnvironmentVariable("SENTORY_DATA_ROOT"));
+            var repository = new SqliteCaptureRepository(paths);
+            await repository.InitializeAsync();
+            var service = new GalleryBridgeService(repository, paths);
+
+            if (command == "serve")
+            {
+                using var input = new StreamReader(Console.OpenStandardInput());
+                using var output = new StreamWriter(Console.OpenStandardOutput())
+                {
+                    AutoFlush = true
+                };
+                await new BridgeServer(service).RunAsync(input, output);
+                return 0;
+            }
+
             if (command is not ("gallery-list" or "gallery-page" or
                 "gallery-item" or "gallery-favorite" or "gallery-delete" or
                 "gallery-copy-record"))
             {
                 Console.Error.WriteLine(
-                    "사용법: sentory-engine health | gallery-list [limit] | " +
+                    "사용법: sentory-engine health | serve | gallery-list [limit] | " +
                     "gallery-page <request-json> | gallery-item <id> | " +
                     "gallery-favorite <id> <true|false> | gallery-delete <ids-json> | " +
                     "gallery-copy-record <id>");
                 return 2;
             }
 
-            var paths = SentoryDataPaths.FromEnvironmentOrCurrentUser(
-                Environment.GetEnvironmentVariable("SENTORY_DATA_ROOT"));
-            var repository = new SqliteCaptureRepository(paths);
-            await repository.InitializeAsync();
-            var service = new GalleryBridgeService(repository, paths);
             if (command == "gallery-page")
             {
                 var request = JsonSerializer.Deserialize<GalleryPageRequestDto>(
@@ -100,7 +112,7 @@ internal static class Program
         await JsonSerializer.SerializeAsync(
             Console.OpenStandardOutput(),
             value,
-            JsonOptions);
+            BridgeServer.JsonOptions);
         await Console.Out.WriteLineAsync();
     }
 }

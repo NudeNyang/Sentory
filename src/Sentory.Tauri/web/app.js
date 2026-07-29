@@ -104,18 +104,43 @@ function buildRequest(offset) {
   };
 }
 
-function resetGallery({ announce = false } = {}) {
+function resetGallery({ announce = false, preserveScroll = false } = {}) {
+  const previousScrollTop = preserveScroll ? scroller.scrollTop : 0;
   state.generation += 1;
   state.pendingPages.clear();
   state.items = new Array(state.hasLoaded ? Math.max(1, state.total) : PAGE_SIZE);
   state.total = state.items.length;
   state.renderRevision += 1;
   state.renderedRange = "";
-  scroller.scrollTop = 0;
+  scroller.scrollTop = previousScrollTop;
   measureGrid();
   renderVisibleCards();
   if (announce) setStatus("보관함을 갱신하는 중…");
   void loadPage(0, state.generation, true);
+}
+
+async function connectEngineEvents() {
+  const listen = window.__TAURI__?.event?.listen;
+  if (!listen) return;
+  await listen("gallery-changed", () => {
+    const preserveScroll = scroller.scrollTop > ROW_HEIGHT;
+    resetGallery({ preserveScroll });
+    if (preserveScroll) showToast("새 항목을 보관함에 반영했어.");
+  });
+  await listen("engine-status", event => {
+    const engineState = event.payload?.state;
+    if (engineState === "connecting") {
+      setStatus("C# 엔진을 준비하는 중…");
+    } else if (engineState === "recovering") {
+      setStatus("워커 연결을 복구하는 중…");
+    } else if (engineState === "ready" &&
+               (status.textContent.includes("C# 엔진") ||
+                status.textContent.includes("워커 연결"))) {
+      status.classList.add("hidden");
+    } else if (engineState === "error") {
+      setStatus(event.payload?.message || "C# 엔진 연결을 복구하지 못했어.", true);
+    }
+  });
 }
 
 async function loadPage(offset, generation, isInitial = false) {
@@ -906,4 +931,5 @@ const savedTheme = localStorage.getItem("sentory-theme");
 if (savedTheme === "dark") themeButton.click();
 updateFilterUi();
 updateSelectionUi();
+void connectEngineEvents();
 resetGallery();

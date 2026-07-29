@@ -489,6 +489,8 @@ body.selection-mode .favorite { display: none; }
 
 .subtitle {
   display: -webkit-box;
+  min-height: 0;
+  max-height: 34px;
   margin: 5px 0 0;
   overflow: hidden;
   color: var(--muted);
@@ -496,9 +498,16 @@ body.selection-mode .favorite { display: none; }
   line-height: 17px;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
-.card-footer { align-self: end; gap: 7px; }
+.card-footer {
+  position: relative;
+  z-index: 1;
+  align-self: end;
+  gap: 7px;
+  background: var(--surface);
+}
 
 .status-chip {
   height: 28px;
