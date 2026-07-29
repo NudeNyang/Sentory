@@ -1,0 +1,221 @@
+:root {
+  color-scheme: light;
+  --window: #e9e4dc;
+  --surface: #f7f3ec;
+  --status: #e2ddd5;
+  --text: #292722;
+  --muted: #6d6861;
+  --soft: #89827a;
+  --line: #cec7bc;
+  --accent: #756655;
+  --danger: #b85a52;
+  --shadow: rgb(39 34 29 / 24%);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --window: #27241f;
+  --surface: #332f29;
+  --status: #403b34;
+  --text: #f2ede5;
+  --muted: #c9c0b5;
+  --soft: #a99f94;
+  --line: #575047;
+  --accent: #c0ad96;
+  --danger: #e1847b;
+  --shadow: rgb(0 0 0 / 42%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  color: var(--text);
+  font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+button {
+  font: inherit;
+}
+
+.tray-card {
+  margin: 10px;
+  padding: 10px;
+  border: 1px solid var(--accent);
+  border-radius: 15px;
+  background: var(--surface);
+  box-shadow: 0 5px 20px var(--shadow);
+}
+
+.tray-header {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 6px 8px 10px;
+}
+
+.tray-title {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.tray-status {
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.3;
+}
+
+.tray-detection {
+  display: grid;
+  grid-template-columns: 8px auto 1fr;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  margin: 0 4px 5px;
+  padding: 0 10px;
+  border-radius: 9px;
+  background: var(--status);
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.tray-detection[hidden] {
+  display: none;
+}
+
+.tray-detection strong {
+  overflow: hidden;
+  color: var(--accent);
+  font-weight: 600;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tray-detection-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #639278;
+}
+
+.tray-separator {
+  height: 1px;
+  margin: 5px 6px;
+  background: var(--line);
+}
+
+.tray-action {
+  display: grid;
+  grid-template-columns: 27px minmax(0, 1fr) auto;
+  align-items: center;
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  text-align: left;
+  cursor: default;
+}
+
+.tray-action[hidden] {
+  display: none;
+}
+
+.tray-action:hover,
+.tray-action:focus-visible {
+  background: var(--status);
+  outline: none;
+}
+
+.tray-action:active {
+  background: color-mix(in srgb, var(--status) 72%, var(--accent));
+}
+
+.tray-icon,
+.tray-check {
+  color: var(--muted);
+  font-family: "Segoe Fluent Icons", "Segoe MDL2 Assets", sans-serif;
+  font-size: 14px;
+}
+
+.tray-action-label,
+.tray-subtitle,
+.tray-helper {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tray-action-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.tray-subtitle,
+.tray-helper {
+  color: var(--soft);
+  font-size: 10px;
+}
+
+.tray-helper {
+  margin-left: 10px;
+}
+
+.tray-check {
+  width: 18px;
+  text-align: center;
+  transition: opacity 80ms ease;
+}
+
+.tray-check.off {
+  opacity: 0;
+}
+
+.tray-mini-switch {
+  position: relative;
+  width: 34px;
+  height: 19px;
+  border-radius: 10px;
+  background: var(--status);
+}
+
+.tray-mini-switch span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--soft);
+  transition: transform 100ms ease, background 100ms ease;
+}
+
+.tray-mini-switch.on {
+  background: color-mix(in srgb, var(--accent) 24%, var(--status));
+}
+
+.tray-mini-switch.on span {
+  background: var(--accent);
+  transform: translateX(15px);
+}
+
+.tray-danger,
+.tray-danger .tray-icon {
+  color: var(--danger);
+}

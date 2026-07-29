@@ -5,10 +5,12 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
-use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 use tauri::async_runtime::Receiver;
-use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{
+    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, State, WebviewUrl,
+    WebviewWindowBuilder, WindowEvent,
+};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 use tokio::sync::Mutex;
@@ -17,22 +19,41 @@ use tokio::time::{interval, Duration};
 const MAXIMUM_GALLERY_ITEMS: u16 = 2_000;
 const STARTUP_REGISTRY_PATH: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 const STARTUP_VALUE_NAME: &str = "Sentory";
+const TRAY_MENU_WIDTH: f64 = 286.0;
+const TRAY_MENU_BASE_HEIGHT: f64 = 374.0;
+const TRAY_MENU_OPTIONAL_ROW_HEIGHT: f64 = 42.0;
 
 #[derive(Default)]
 struct AppLifecycleState {
     exiting: AtomicBool,
 }
 
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TrayMenuSnapshot {
+    status_label: String,
+    open_label: String,
+    double_click_label: String,
+    pause_label: String,
+    resume_label: String,
+    startup_label: String,
+    discord_label: String,
+    discord_detection_label: String,
+    accessibility_label: String,
+    discord_status_label: String,
+    repair_label: String,
+    open_data_label: String,
+    exit_label: String,
+    paused: bool,
+    startup_enabled: bool,
+    discord_enabled: bool,
+    show_discord_status: bool,
+    show_discord_repair: bool,
+    dark: bool,
+}
+
 struct TrayMenuState {
-    open: MenuItem<tauri::Wry>,
-    pause: MenuItem<tauri::Wry>,
-    startup: CheckMenuItem<tauri::Wry>,
-    discord: CheckMenuItem<tauri::Wry>,
-    repair: MenuItem<tauri::Wry>,
-    open_data: MenuItem<tauri::Wry>,
-    exit: MenuItem<tauri::Wry>,
-    pause_label: StdMutex<String>,
-    resume_label: StdMutex<String>,
+    snapshot: StdMutex<TrayMenuSnapshot>,
     detecting_tooltip: StdMutex<String>,
     paused_tooltip: StdMutex<String>,
     detection_off_tooltip: StdMutex<String>,
@@ -66,14 +87,19 @@ impl EngineClient {
         for attempt in 0..=1 {
             let mut process = self.process.lock().await;
             if process.is_none() {
-                let _ = app.emit("engine-status", serde_json::json!({
-                    "state": if attempt == 0 { "connecting" } else { "recovering" }
-                }));
+                let _ = app.emit(
+                    "engine-status",
+                    serde_json::json!({
+                        "state": if attempt == 0 { "connecting" } else { "recovering" }
+                    }),
+                );
                 *process = Some(spawn_engine(app)?);
             }
 
             let result = send_engine_request(
-                process.as_mut().expect("엔진 프로세스가 초기화되어야 합니다."),
+                process
+                    .as_mut()
+                    .expect("엔진 프로세스가 초기화되어야 합니다."),
                 request_id,
                 command,
                 &payload,
@@ -121,7 +147,9 @@ impl EngineClient {
         .await
         {
             let detail = match error {
-                EngineCallError::Restartable(message) | EngineCallError::Request(message) => message,
+                EngineCallError::Restartable(message) | EngineCallError::Request(message) => {
+                    message
+                }
             };
             append_diagnostic("engine-shutdown-failed", &detail);
             let _ = running.child.kill();
@@ -153,26 +181,31 @@ async fn send_engine_request(
         "command": command,
         "payload": payload
     }))
-    .map_err(|error| EngineCallError::Request(
-        format!("C# 엔진 요청을 만들지 못했습니다: {error}")))?;
+    .map_err(|error| {
+        EngineCallError::Request(format!("C# 엔진 요청을 만들지 못했습니다: {error}"))
+    })?;
     request.push(b'\n');
-    process
-        .child
-        .write(&request)
-        .map_err(|error| EngineCallError::Restartable(
-            format!("C# 엔진에 요청을 보내지 못했습니다: {error}")))?;
+    process.child.write(&request).map_err(|error| {
+        EngineCallError::Restartable(format!("C# 엔진에 요청을 보내지 못했습니다: {error}"))
+    })?;
 
     while let Some(event) = process.receiver.recv().await {
         match event {
             CommandEvent::Stdout(line) => {
-                let response = serde_json::from_slice::<serde_json::Value>(&line)
-                    .map_err(|error| EngineCallError::Restartable(
-                        format!("C# 엔진 응답을 읽지 못했습니다: {error}")))?;
+                let response =
+                    serde_json::from_slice::<serde_json::Value>(&line).map_err(|error| {
+                        EngineCallError::Restartable(format!(
+                            "C# 엔진 응답을 읽지 못했습니다: {error}"
+                        ))
+                    })?;
                 if response.get("id").and_then(serde_json::Value::as_u64) != Some(request_id) {
                     continue;
                 }
                 if response.get("ok").and_then(serde_json::Value::as_bool) == Some(true) {
-                    return Ok(response.get("result").cloned().unwrap_or(serde_json::Value::Null));
+                    return Ok(response
+                        .get("result")
+                        .cloned()
+                        .unwrap_or(serde_json::Value::Null));
                 }
                 let message = response
                     .get("error")
@@ -181,10 +214,9 @@ async fn send_engine_request(
                     .to_string();
                 return Err(EngineCallError::Request(message));
             }
-            CommandEvent::Stderr(line) => append_diagnostic(
-                "engine-stderr",
-                String::from_utf8_lossy(&line).trim(),
-            ),
+            CommandEvent::Stderr(line) => {
+                append_diagnostic("engine-stderr", String::from_utf8_lossy(&line).trim())
+            }
             CommandEvent::Error(error) => {
                 return Err(EngineCallError::Restartable(error));
             }
@@ -231,7 +263,9 @@ async fn gallery_item(
     engine: State<'_, EngineClient>,
     item_id: String,
 ) -> Result<serde_json::Value, String> {
-    engine.request(&app, "gallery-item", serde_json::json!(item_id)).await
+    engine
+        .request(&app, "gallery-item", serde_json::json!(item_id))
+        .await
 }
 
 #[tauri::command]
@@ -256,7 +290,9 @@ async fn gallery_delete(
     engine: State<'_, EngineClient>,
     item_ids: Vec<String>,
 ) -> Result<serde_json::Value, String> {
-    engine.request(&app, "gallery-delete", serde_json::json!(item_ids)).await
+    engine
+        .request(&app, "gallery-delete", serde_json::json!(item_ids))
+        .await
 }
 
 #[tauri::command]
@@ -268,10 +304,9 @@ async fn gallery_open(
     let detail = engine
         .request(&app, "gallery-item", serde_json::json!(item_id))
         .await?;
-    let target = resolve_open_target(&detail)
-        .ok_or_else(|| "열 수 있는 원본이 없습니다.".to_string())?;
-    open::that_detached(target)
-        .map_err(|error| format!("원본을 열지 못했습니다: {error}"))
+    let target =
+        resolve_open_target(&detail).ok_or_else(|| "열 수 있는 원본이 없습니다.".to_string())?;
+    open::that_detached(target).map_err(|error| format!("원본을 열지 못했습니다: {error}"))
 }
 
 #[tauri::command]
@@ -283,14 +318,13 @@ async fn gallery_reveal(
     let detail = engine
         .request(&app, "gallery-item", serde_json::json!(item_id))
         .await?;
-    let target = resolve_open_target(&detail)
-        .ok_or_else(|| "열 수 있는 원본이 없습니다.".to_string())?;
+    let target =
+        resolve_open_target(&detail).ok_or_else(|| "열 수 있는 원본이 없습니다.".to_string())?;
     let path = std::path::Path::new(&target);
     if path.is_file() {
         return reveal_file_in_explorer(path);
     }
-    open::that_detached(target)
-        .map_err(|error| format!("원본 링크를 열지 못했습니다: {error}"))
+    open::that_detached(target).map_err(|error| format!("원본 링크를 열지 못했습니다: {error}"))
 }
 
 #[cfg(target_os = "windows")]
@@ -307,8 +341,7 @@ fn reveal_file_in_explorer(path: &std::path::Path) -> Result<(), String> {
     let parent = path
         .parent()
         .ok_or_else(|| "원본 폴더를 찾지 못했습니다.".to_string())?;
-    open::that_detached(parent)
-        .map_err(|error| format!("원본 폴더를 열지 못했습니다: {error}"))
+    open::that_detached(parent).map_err(|error| format!("원본 폴더를 열지 못했습니다: {error}"))
 }
 
 #[tauri::command]
@@ -340,8 +373,7 @@ async fn gallery_detail_target_open(
         .request(&app, "gallery-item", serde_json::json!(item_id))
         .await?;
     let (_, target) = resolve_detail_target(&detail, member_position)?;
-    open::that_detached(target)
-        .map_err(|error| format!("원본을 열지 못했습니다: {error}"))
+    open::that_detached(target).map_err(|error| format!("원본을 열지 못했습니다: {error}"))
 }
 
 #[tauri::command]
@@ -367,7 +399,9 @@ async fn settings_get(
     app: AppHandle,
     engine: State<'_, EngineClient>,
 ) -> Result<serde_json::Value, String> {
-    engine.request(&app, "settings-get", serde_json::Value::Null).await
+    engine
+        .request(&app, "settings-get", serde_json::Value::Null)
+        .await
 }
 
 #[tauri::command]
@@ -384,7 +418,9 @@ async fn discord_repair(
     app: AppHandle,
     engine: State<'_, EngineClient>,
 ) -> Result<serde_json::Value, String> {
-    engine.request(&app, "discord-repair", serde_json::Value::Null).await
+    engine
+        .request(&app, "discord-repair", serde_json::Value::Null)
+        .await
 }
 
 #[tauri::command]
@@ -405,7 +441,9 @@ async fn data_statistics(
     app: AppHandle,
     engine: State<'_, EngineClient>,
 ) -> Result<serde_json::Value, String> {
-    engine.request(&app, "data-statistics", serde_json::Value::Null).await
+    engine
+        .request(&app, "data-statistics", serde_json::Value::Null)
+        .await
 }
 
 #[tauri::command]
@@ -423,7 +461,9 @@ async fn data_cleanup(
     app: AppHandle,
     engine: State<'_, EngineClient>,
 ) -> Result<serde_json::Value, String> {
-    engine.request(&app, "data-cleanup", serde_json::Value::Null).await
+    engine
+        .request(&app, "data-cleanup", serde_json::Value::Null)
+        .await
 }
 
 #[tauri::command]
@@ -437,15 +477,13 @@ async fn open_data_directory(
         .as_str()
         .ok_or_else(|| "데이터 폴더 경로를 읽지 못했습니다.".to_string())?
         .to_string();
-    open::that_detached(path)
-        .map_err(|error| format!("데이터 폴더를 열지 못했습니다: {error}"))
+    open::that_detached(path).map_err(|error| format!("데이터 폴더를 열지 못했습니다: {error}"))
 }
 
 fn is_allowed_external_url(url: &str) -> bool {
     matches!(
         url,
-        "https://x.com/NudeNyang_VRC" |
-        "https://github.com/NudeNyang/Sentory"
+        "https://x.com/NudeNyang_VRC" | "https://github.com/NudeNyang/Sentory"
     )
 }
 
@@ -454,13 +492,13 @@ fn open_external_url(url: String) -> Result<(), String> {
     if !is_allowed_external_url(&url) {
         return Err("허용되지 않은 외부 주소입니다.".to_string());
     }
-    open::that_detached(url)
-        .map_err(|error| format!("외부 링크를 열지 못했습니다: {error}"))
+    open::that_detached(url).map_err(|error| format!("외부 링크를 열지 못했습니다: {error}"))
 }
 
 #[tauri::command]
 fn license_text() -> String {
-    const DIVIDER: &str = "\n\n========================================================================\n\n";
+    const DIVIDER: &str =
+        "\n\n========================================================================\n\n";
     [
         include_str!("../../../../LICENSE.txt"),
         include_str!("../../../../distribution/THIRD-PARTY-NOTICES.txt"),
@@ -525,7 +563,9 @@ async fn update_check(
     app: AppHandle,
     engine: State<'_, EngineClient>,
 ) -> Result<serde_json::Value, String> {
-    engine.request(&app, "update-check", serde_json::Value::Null).await
+    engine
+        .request(&app, "update-check", serde_json::Value::Null)
+        .await
 }
 
 #[tauri::command]
@@ -547,9 +587,7 @@ async fn startup_set(
             serde_json::json!({ "startWithWindows": enabled }),
         )
         .await?;
-    if let Some(tray) = app.try_state::<TrayMenuState>() {
-        let _ = tray.startup.set_checked(enabled);
-    }
+    update_tray_snapshot(&app, |snapshot| snapshot.startup_enabled = enabled);
     Ok(settings)
 }
 
@@ -557,11 +595,16 @@ async fn startup_set(
 #[tauri::command]
 fn tray_configure(
     app: AppHandle,
+    status_label: String,
     open_label: String,
+    double_click_label: String,
     pause_label: String,
     resume_label: String,
     startup_label: String,
     discord_label: String,
+    discord_detection_label: String,
+    accessibility_label: String,
+    discord_status_label: String,
     repair_label: String,
     open_data_label: String,
     exit_label: String,
@@ -572,23 +615,54 @@ fn tray_configure(
     detection_enabled: bool,
     startup_enabled: bool,
     discord_enabled: bool,
+    show_discord_status: bool,
+    show_discord_repair: bool,
+    dark: bool,
 ) -> Result<(), String> {
     let tray = app.state::<TrayMenuState>();
-    tray.open.set_text(open_label).map_err(|error| error.to_string())?;
-    tray.startup.set_text(startup_label).map_err(|error| error.to_string())?;
-    tray.discord.set_text(discord_label).map_err(|error| error.to_string())?;
-    tray.repair.set_text(repair_label).map_err(|error| error.to_string())?;
-    tray.open_data.set_text(open_data_label).map_err(|error| error.to_string())?;
-    tray.exit.set_text(exit_label).map_err(|error| error.to_string())?;
-    *tray.pause_label.lock().map_err(|_| "트레이 문구 잠금을 사용할 수 없습니다.")? = pause_label;
-    *tray.resume_label.lock().map_err(|_| "트레이 문구 잠금을 사용할 수 없습니다.")? = resume_label;
-    *tray.detecting_tooltip.lock().map_err(|_| "트레이 문구 잠금을 사용할 수 없습니다.")? = detecting_tooltip;
-    *tray.paused_tooltip.lock().map_err(|_| "트레이 문구 잠금을 사용할 수 없습니다.")? = paused_tooltip;
-    *tray.detection_off_tooltip.lock().map_err(|_| "트레이 문구 잠금을 사용할 수 없습니다.")? = detection_off_tooltip;
-    tray.detection_enabled.store(detection_enabled, Ordering::Release);
-    tray.startup.set_checked(startup_enabled).map_err(|error| error.to_string())?;
-    tray.discord.set_checked(discord_enabled).map_err(|error| error.to_string())?;
+    {
+        let mut snapshot = tray
+            .snapshot
+            .lock()
+            .map_err(|_| "트레이 상태 잠금을 사용할 수 없습니다.")?;
+        *snapshot = TrayMenuSnapshot {
+            status_label,
+            open_label,
+            double_click_label,
+            pause_label,
+            resume_label,
+            startup_label,
+            discord_label,
+            discord_detection_label,
+            accessibility_label,
+            discord_status_label,
+            repair_label,
+            open_data_label,
+            exit_label,
+            paused,
+            startup_enabled,
+            discord_enabled,
+            show_discord_status,
+            show_discord_repair,
+            dark,
+        };
+    }
+    *tray
+        .detecting_tooltip
+        .lock()
+        .map_err(|_| "트레이 문구 잠금을 사용할 수 없습니다.")? = detecting_tooltip;
+    *tray
+        .paused_tooltip
+        .lock()
+        .map_err(|_| "트레이 문구 잠금을 사용할 수 없습니다.")? = paused_tooltip;
+    *tray
+        .detection_off_tooltip
+        .lock()
+        .map_err(|_| "트레이 문구 잠금을 사용할 수 없습니다.")? = detection_off_tooltip;
+    tray.detection_enabled
+        .store(detection_enabled, Ordering::Release);
     update_pause_menu(&app, &serde_json::json!({ "detectionPaused": paused }));
+    emit_tray_state(&app);
     Ok(())
 }
 
@@ -760,9 +834,13 @@ mod tests {
     #[test]
     fn app_info_links_only_allow_the_project_profiles() {
         assert!(is_allowed_external_url("https://x.com/NudeNyang_VRC"));
-        assert!(is_allowed_external_url("https://github.com/NudeNyang/Sentory"));
+        assert!(is_allowed_external_url(
+            "https://github.com/NudeNyang/Sentory"
+        ));
         assert!(!is_allowed_external_url("https://example.com"));
-        assert!(!is_allowed_external_url("https://github.com/NudeNyang/Sentory/issues"));
+        assert!(!is_allowed_external_url(
+            "https://github.com/NudeNyang/Sentory/issues"
+        ));
     }
 
     #[test]
@@ -806,10 +884,12 @@ mod tests {
         let missing = root.join("missing.png");
         let mut members = image_paths
             .iter()
-            .map(|path| serde_json::json!({
-                "kind": "Image",
-                "contentPath": path.to_string_lossy()
-            }))
+            .map(|path| {
+                serde_json::json!({
+                    "kind": "Image",
+                    "contentPath": path.to_string_lossy()
+                })
+            })
             .collect::<Vec<_>>();
         members.extend([
             serde_json::json!({
@@ -826,10 +906,7 @@ mod tests {
         let payload = collection_clipboard_payload(&detail)
             .expect("복사 가능한 묶음 페이로드를 만들어야 합니다.");
 
-        assert_eq!(
-            payload.urls,
-            ["https://example.com", "https://openai.com"]
-        );
+        assert_eq!(payload.urls, ["https://example.com", "https://openai.com"]);
         assert_eq!(
             payload.image_paths,
             image_paths
@@ -965,6 +1042,28 @@ fn show_main_window(app: &AppHandle) {
     }
 }
 
+fn emit_tray_state(app: &AppHandle) {
+    let Some(tray) = app.try_state::<TrayMenuState>() else {
+        return;
+    };
+    let Ok(snapshot) = tray.snapshot.lock().map(|value| value.clone()) else {
+        return;
+    };
+    if let Some(window) = app.get_webview_window("tray-menu") {
+        let _ = window.emit("tray-state", snapshot);
+    }
+}
+
+fn update_tray_snapshot(app: &AppHandle, update: impl FnOnce(&mut TrayMenuSnapshot)) {
+    let Some(tray) = app.try_state::<TrayMenuState>() else {
+        return;
+    };
+    if let Ok(mut snapshot) = tray.snapshot.lock() {
+        update(&mut snapshot);
+    }
+    emit_tray_state(app);
+}
+
 fn update_pause_menu(app: &AppHandle, status: &serde_json::Value) {
     let Some(tray) = app.try_state::<TrayMenuState>() else {
         return;
@@ -973,115 +1072,193 @@ fn update_pause_menu(app: &AppHandle, status: &serde_json::Value) {
         .get("detectionPaused")
         .and_then(serde_json::Value::as_bool)
         .unwrap_or(false);
-    let label = if paused {
-        tray.resume_label.lock().ok().map(|value| value.clone())
-    } else {
-        tray.pause_label.lock().ok().map(|value| value.clone())
-    };
-    if let Some(label) = label {
-        let _ = tray.pause.set_text(label);
+    if let Ok(mut snapshot) = tray.snapshot.lock() {
+        snapshot.paused = paused;
     }
     let tooltip = if paused {
         tray.paused_tooltip.lock().ok().map(|value| value.clone())
     } else if tray.detection_enabled.load(Ordering::Acquire) {
-        tray.detecting_tooltip.lock().ok().map(|value| value.clone())
+        tray.detecting_tooltip
+            .lock()
+            .ok()
+            .map(|value| value.clone())
     } else {
-        tray.detection_off_tooltip.lock().ok().map(|value| value.clone())
+        tray.detection_off_tooltip
+            .lock()
+            .ok()
+            .map(|value| value.clone())
     };
     if let (Some(icon), Some(tooltip)) = (app.tray_by_id("sentory"), tooltip) {
         let _ = icon.set_tooltip(Some(tooltip));
     }
+    emit_tray_state(app);
+}
+
+fn create_tray_menu_window(app: &tauri::App) -> tauri::Result<()> {
+    WebviewWindowBuilder::new(app, "tray-menu", WebviewUrl::App("tray.html".into()))
+        .title("Sentory")
+        .inner_size(TRAY_MENU_WIDTH, TRAY_MENU_BASE_HEIGHT)
+        .resizable(false)
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .focused(false)
+        .visible(false)
+        .build()?;
+    Ok(())
 }
 
 fn create_tray(app: &tauri::App) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "보관함 열기", true, None::<&str>)?;
-    let pause = MenuItem::with_id(app, "pause", "감지 일시정지", true, None::<&str>)?;
-    let startup = CheckMenuItem::with_id(
-        app,
-        "startup",
-        "Windows 시작 시 실행",
-        true,
-        read_startup_enabled().unwrap_or(false),
-        None::<&str>,
-    )?;
-    let discord = CheckMenuItem::with_id(
-        app,
-        "discord",
-        "Discord 자동 연결",
-        true,
-        true,
-        None::<&str>,
-    )?;
-    let repair = MenuItem::with_id(
-        app,
-        "repair",
-        "Discord 재시작 후 연결",
-        true,
-        None::<&str>,
-    )?;
-    let open_data = MenuItem::with_id(
-        app,
-        "open-data",
-        "데이터 폴더 열기",
-        true,
-        None::<&str>,
-    )?;
-    let exit = MenuItem::with_id(app, "exit", "Sentory 종료", true, None::<&str>)?;
-    let first_separator = PredefinedMenuItem::separator(app)?;
-    let second_separator = PredefinedMenuItem::separator(app)?;
-    let menu = Menu::with_items(
-        app,
-        &[
-            &open,
-            &pause,
-            &first_separator,
-            &startup,
-            &discord,
-            &repair,
-            &open_data,
-            &second_separator,
-            &exit,
-        ],
-    )?;
+    let startup_enabled = read_startup_enabled().unwrap_or(false);
     app.manage(TrayMenuState {
-        open,
-        pause,
-        startup,
-        discord,
-        repair,
-        open_data,
-        exit,
-        pause_label: StdMutex::new("감지 일시정지".to_string()),
-        resume_label: StdMutex::new("감지 다시 시작".to_string()),
+        snapshot: StdMutex::new(TrayMenuSnapshot {
+            status_label: "상태: 감지 준비 완료".to_string(),
+            open_label: "보관함 열기".to_string(),
+            double_click_label: "더블클릭".to_string(),
+            pause_label: "감지 일시정지".to_string(),
+            resume_label: "감지 다시 시작".to_string(),
+            startup_label: "Windows 시작 시 실행".to_string(),
+            discord_label: "Discord 자동 연결".to_string(),
+            discord_detection_label: "Discord 감지".to_string(),
+            accessibility_label: "접근성 모드로 시작".to_string(),
+            discord_status_label: "감지 준비 완료".to_string(),
+            repair_label: "Discord 재시작 후 연결".to_string(),
+            open_data_label: "데이터 폴더 열기".to_string(),
+            exit_label: "Sentory 종료".to_string(),
+            paused: false,
+            startup_enabled,
+            discord_enabled: true,
+            show_discord_status: false,
+            show_discord_repair: false,
+            dark: false,
+        }),
         detecting_tooltip: StdMutex::new("Sentory - 메신저 감지 중".to_string()),
         paused_tooltip: StdMutex::new("Sentory - 감지 일시정지됨".to_string()),
         detection_off_tooltip: StdMutex::new("Sentory - 메신저 감지 꺼짐".to_string()),
         detection_enabled: AtomicBool::new(true),
     });
     TrayIconBuilder::with_id("sentory")
-        .menu(&menu)
-        .show_menu_on_left_click(false)
         .tooltip("Sentory - 메신저 감지 중")
-        .icon(app.default_window_icon().expect("Sentory 아이콘이 필요합니다.").clone())
-        .on_menu_event(handle_tray_menu_event)
-        .on_tray_icon_event(|tray, event| {
-            if matches!(
-                event,
-                TrayIconEvent::DoubleClick {
-                    button: MouseButton::Left,
-                    ..
-                }
-            ) {
-                show_main_window(tray.app_handle());
-            }
+        .icon(
+            app.default_window_icon()
+                .expect("Sentory 아이콘이 필요합니다.")
+                .clone(),
+        )
+        .on_tray_icon_event(|tray, event| match event {
+            TrayIconEvent::DoubleClick {
+                button: MouseButton::Left,
+                ..
+            } => show_main_window(tray.app_handle()),
+            TrayIconEvent::Click {
+                position,
+                button: MouseButton::Right,
+                button_state: MouseButtonState::Up,
+                ..
+            } => show_tray_menu(tray.app_handle(), position),
+            _ => {}
         })
         .build(app)?;
     Ok(())
 }
 
-fn handle_tray_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
-    match event.id().as_ref() {
-        "open" => show_main_window(app),
+fn clamp_tray_menu_position(
+    cursor_x: f64,
+    cursor_y: f64,
+    window_width: f64,
+    window_height: f64,
+    work_left: f64,
+    work_top: f64,
+    work_width: f64,
+    work_height: f64,
+    inset: f64,
+) -> (i32, i32) {
+    let work_right = work_left + work_width;
+    let work_bottom = work_top + work_height;
+    let left = (cursor_x - window_width + inset)
+        .max(work_left)
+        .min(work_right - window_width);
+    let top = (cursor_y - window_height + inset)
+        .max(work_top)
+        .min(work_bottom - window_height);
+    (left.round() as i32, top.round() as i32)
+}
+
+fn show_tray_menu(app: &AppHandle, position: tauri::PhysicalPosition<f64>) {
+    let Some(window) = app.get_webview_window("tray-menu") else {
+        return;
+    };
+    let (show_status, show_repair) = app
+        .try_state::<TrayMenuState>()
+        .and_then(|tray| {
+            tray.snapshot
+                .lock()
+                .ok()
+                .map(|snapshot| (snapshot.show_discord_status, snapshot.show_discord_repair))
+        })
+        .unwrap_or((false, false));
+    let logical_height = TRAY_MENU_BASE_HEIGHT
+        + if show_status {
+            TRAY_MENU_OPTIONAL_ROW_HEIGHT
+        } else {
+            0.0
+        }
+        + if show_repair {
+            TRAY_MENU_OPTIONAL_ROW_HEIGHT
+        } else {
+            0.0
+        };
+    let _ = window.set_size(LogicalSize::new(TRAY_MENU_WIDTH, logical_height));
+    if let Ok(Some(monitor)) = window.monitor_from_point(position.x, position.y) {
+        let scale = monitor.scale_factor();
+        let work_area = monitor.work_area();
+        let (left, top) = clamp_tray_menu_position(
+            position.x,
+            position.y,
+            TRAY_MENU_WIDTH * scale,
+            logical_height * scale,
+            work_area.position.x as f64,
+            work_area.position.y as f64,
+            work_area.size.width as f64,
+            work_area.size.height as f64,
+            12.0 * scale,
+        );
+        let _ = window.set_position(PhysicalPosition::new(left, top));
+    }
+    emit_tray_state(app);
+    let _ = window.show();
+    let _ = window.set_focus();
+}
+
+fn hide_tray_menu(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("tray-menu") {
+        let _ = window.hide();
+    }
+}
+
+#[tauri::command]
+fn tray_state_get(tray: State<'_, TrayMenuState>) -> Result<TrayMenuSnapshot, String> {
+    tray.snapshot
+        .lock()
+        .map(|snapshot| snapshot.clone())
+        .map_err(|_| "트레이 상태를 읽지 못했습니다.".to_string())
+}
+
+#[tauri::command]
+fn tray_hide(app: AppHandle) {
+    hide_tray_menu(&app);
+}
+
+#[tauri::command]
+async fn tray_action(
+    app: AppHandle,
+    engine: State<'_, EngineClient>,
+    action: String,
+) -> Result<(), String> {
+    hide_tray_menu(&app);
+    match action.as_str() {
+        "open" => show_main_window(&app),
         "exit" => {
             app.state::<AppLifecycleState>()
                 .exiting
@@ -1089,97 +1266,61 @@ fn handle_tray_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
             app.exit(0);
         }
         "pause" => {
-            let handle = app.clone();
-            tauri::async_runtime::spawn(async move {
-                let engine = handle.state::<EngineClient>();
-                if let Ok(status) = engine
-                    .request(&handle, "runtime-pause-toggle", serde_json::Value::Null)
-                    .await
-                {
-                    update_pause_menu(&handle, &status);
-                    let _ = handle.emit("runtime-status", status);
-                }
-            });
+            let status = engine
+                .request(&app, "runtime-pause-toggle", serde_json::Value::Null)
+                .await?;
+            update_pause_menu(&app, &status);
+            let _ = app.emit("runtime-status", status);
         }
         "startup" => {
-            let handle = app.clone();
-            tauri::async_runtime::spawn(async move {
-                let enabled = !read_startup_enabled().unwrap_or(false);
-                if write_startup_enabled(enabled).is_ok() {
-                    let engine = handle.state::<EngineClient>();
-                    if let Ok(settings) = engine
-                        .request(
-                            &handle,
-                            "settings-update",
-                            serde_json::json!({ "startWithWindows": enabled }),
-                        )
-                        .await
-                    {
-                        if let Some(tray) = handle.try_state::<TrayMenuState>() {
-                            let _ = tray.startup.set_checked(enabled);
-                        }
-                        let _ = handle.emit("settings-changed", settings);
-                    }
-                }
-            });
+            let enabled = !read_startup_enabled().unwrap_or(false);
+            write_startup_enabled(enabled)?;
+            let settings = engine
+                .request(
+                    &app,
+                    "settings-update",
+                    serde_json::json!({ "startWithWindows": enabled }),
+                )
+                .await?;
+            update_tray_snapshot(&app, |snapshot| snapshot.startup_enabled = enabled);
+            let _ = app.emit("settings-changed", settings);
         }
         "discord" => {
-            let handle = app.clone();
-            tauri::async_runtime::spawn(async move {
-                let engine = handle.state::<EngineClient>();
-                if let Ok(settings) = engine
-                    .request(&handle, "settings-get", serde_json::Value::Null)
-                    .await
-                {
-                    let enabled = !settings
-                        .get("sources")
-                        .and_then(|sources| sources.get("Discord"))
-                        .and_then(serde_json::Value::as_bool)
-                        .unwrap_or(true);
-                    if let Ok(updated) = engine
-                        .request(
-                            &handle,
-                            "settings-update",
-                            serde_json::json!({ "discordSupportEnabled": enabled }),
-                        )
-                        .await
-                    {
-                        if let Some(tray) = handle.try_state::<TrayMenuState>() {
-                            let _ = tray.discord.set_checked(enabled);
-                        }
-                        let _ = handle.emit("settings-changed", updated);
-                    }
-                }
-            });
+            let settings = engine
+                .request(&app, "settings-get", serde_json::Value::Null)
+                .await?;
+            let enabled = !settings
+                .get("sources")
+                .and_then(|sources| sources.get("Discord"))
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(true);
+            let updated = engine
+                .request(
+                    &app,
+                    "settings-update",
+                    serde_json::json!({ "discordSupportEnabled": enabled }),
+                )
+                .await?;
+            update_tray_snapshot(&app, |snapshot| snapshot.discord_enabled = enabled);
+            let _ = app.emit("settings-changed", updated);
         }
         "repair" => {
-            let handle = app.clone();
-            tauri::async_runtime::spawn(async move {
-                let engine = handle.state::<EngineClient>();
-                if let Ok(status) = engine
-                    .request(&handle, "discord-repair", serde_json::Value::Null)
-                    .await
-                {
-                    let _ = handle.emit("runtime-status", status);
-                }
-            });
+            let status = engine
+                .request(&app, "discord-repair", serde_json::Value::Null)
+                .await?;
+            let _ = app.emit("runtime-status", status);
         }
         "open-data" => {
-            let handle = app.clone();
-            tauri::async_runtime::spawn(async move {
-                let engine = handle.state::<EngineClient>();
-                if let Ok(path) = engine
-                    .request(&handle, "data-directory", serde_json::Value::Null)
-                    .await
-                {
-                    if let Some(path) = path.as_str() {
-                        let _ = open::that_detached(path);
-                    }
-                }
-            });
+            let path = engine
+                .request(&app, "data-directory", serde_json::Value::Null)
+                .await?;
+            if let Some(path) = path.as_str() {
+                open::that_detached(path).map_err(|error| error.to_string())?;
+            }
         }
-        _ => {}
+        _ => return Err(format!("알 수 없는 트레이 동작입니다: {action}")),
     }
+    Ok(())
 }
 
 #[cfg(windows)]
@@ -1211,11 +1352,8 @@ fn write_startup_enabled(enabled: bool) -> Result<(), String> {
     if enabled {
         let executable = std::env::current_exe()
             .map_err(|error| format!("실행 파일 경로를 확인하지 못했습니다: {error}"))?;
-        key.set_value(
-            STARTUP_VALUE_NAME,
-            &format!("\"{}\"", executable.display()),
-        )
-        .map_err(|error| format!("자동 실행 설정을 변경하지 못했습니다: {error}"))
+        key.set_value(STARTUP_VALUE_NAME, &format!("\"{}\"", executable.display()))
+            .map_err(|error| format!("자동 실행 설정을 변경하지 못했습니다: {error}"))
     } else {
         match key.delete_value(STARTUP_VALUE_NAME) {
             Ok(()) => Ok(()),
@@ -1242,6 +1380,7 @@ fn main() {
         .manage(AppLifecycleState::default())
         .manage(engine)
         .setup(move |app| {
+            create_tray_menu_window(app)?;
             create_tray(app)?;
             if let Some(window) = app.get_webview_window("main") {
                 let _ = apply_window_title_bar(&window, false);
@@ -1269,7 +1408,10 @@ fn main() {
                         .await
                     {
                         Ok(revision) => {
-                            if last_revision.as_ref().is_some_and(|previous| previous != &revision) {
+                            if last_revision
+                                .as_ref()
+                                .is_some_and(|previous| previous != &revision)
+                            {
                                 let _ = handle.emit("gallery-changed", revision.clone());
                             }
                             last_revision = Some(revision);
@@ -1284,12 +1426,19 @@ fn main() {
                             if let Some(status) = poll.get("status") {
                                 let _ = handle.emit("runtime-status", status.clone());
                             }
-                            if let Some(events) = poll.get("events").and_then(serde_json::Value::as_array) {
+                            if let Some(events) =
+                                poll.get("events").and_then(serde_json::Value::as_array)
+                            {
                                 for event in events {
-                                    let Some(event_type) = event.get("type").and_then(serde_json::Value::as_str) else {
+                                    let Some(event_type) =
+                                        event.get("type").and_then(serde_json::Value::as_str)
+                                    else {
                                         continue;
                                     };
-                                    let payload = event.get("payload").cloned().unwrap_or(serde_json::Value::Null);
+                                    let payload = event
+                                        .get("payload")
+                                        .cloned()
+                                        .unwrap_or(serde_json::Value::Null);
                                     let event_name = match event_type {
                                         "captured" => "capture-event",
                                         "runtime-issue" => "runtime-issue",
@@ -1308,6 +1457,9 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            if window.label() == "tray-menu" && matches!(event, WindowEvent::Focused(false)) {
+                let _ = window.hide();
+            }
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let lifecycle = window.app_handle().state::<AppLifecycleState>();
                 if !lifecycle.exiting.load(Ordering::Acquire) {
@@ -1342,6 +1494,9 @@ fn main() {
             startup_get,
             startup_set,
             tray_configure,
+            tray_state_get,
+            tray_action,
+            tray_hide,
             ui_diagnostic
         ])
         .build(tauri::generate_context!())
@@ -1351,4 +1506,23 @@ fn main() {
             tauri::async_runtime::block_on(shutdown_engine.stop());
         }
     });
+}
+
+#[cfg(test)]
+mod tray_menu_tests {
+    use super::clamp_tray_menu_position;
+
+    #[test]
+    fn tray_menu_stays_inside_the_monitor_work_area() {
+        assert_eq!(
+            clamp_tray_menu_position(1910.0, 1070.0, 286.0, 374.0, 0.0, 0.0, 1920.0, 1040.0, 12.0,),
+            (1634, 666)
+        );
+        assert_eq!(
+            clamp_tray_menu_position(
+                -1910.0, 20.0, 286.0, 374.0, -1920.0, 0.0, 1920.0, 1040.0, 12.0,
+            ),
+            (-1920, 0)
+        );
+    }
 }

@@ -57,7 +57,7 @@ const TRANSLATIONS = {
     deleteAll: "모두 삭제", cleanupCancelled: "정리를 취소했습니다.", cleanupComplete: n => `${n.toLocaleString("ko-KR")}개 항목을 정리했습니다.`, cleanupPartial: n => `${n.toLocaleString("ko-KR")}개를 정리했지만 일부 사진 파일은 다음 실행 때 다시 정리합니다.`, cleanupFailed: "데이터를 정리하지 못했습니다.", checkingCleanup: "삭제 대상을 확인하고 있습니다...",
     appInfo: "앱 정보", version: value => `버전 ${value}`, developmentVersion: "개발 버전", checkForUpdates: "수동 업데이트 확인", checkForUpdatesDescription: "자동 확인 대기 시간과 관계없이 새 버전을 확인합니다", checkNow: "지금 확인", checkingForUpdates: "업데이트를 확인하고 있습니다.", appIsUpToDate: "현재 최신 버전을 사용하고 있습니다.", updateReady: version => `${version} 업데이트를 설치할 수 있습니다.`, updateCheckFailed: "업데이트를 확인하지 못했습니다. 네트워크 연결을 확인해 주세요.",
     copyrightNotice: "Copyright © 2026 NudeNyang", licenseSummary: "GNU GPL v3에 따라 이용 가능", viewLicense: "라이선스 보기", licenseHeading: "라이선스 및 제3자 고지", licenseDescription: "Sentory의 배포 조건과 포함된 오픈소스 구성 요소", openLibrary: "보관함 열기", pauseDetection: "감지 일시정지", resumeDetection: "감지 다시 시작", discordAutoConnect: "Discord 자동 연결", discordReconnect: "Discord 재시작 후 연결", exitSentory: "Sentory 종료",
-    trayDetecting: "Sentory - 메신저 감지 중", trayPaused: "Sentory - 감지 일시정지됨", trayDetectionOff: "Sentory - 메신저 감지 꺼짐",
+    trayDetecting: "Sentory - 메신저 감지 중", trayPaused: "Sentory - 감지 일시정지됨", trayDetectionOff: "Sentory - 메신저 감지 꺼짐", trayStatus: status => `상태: ${status}`, doubleClick: "더블클릭", accessibilityMode: "접근성 모드로 시작",
     discordNotRunning: "Discord 미실행", discordRecoveryIssue: "Discord 연결 복구가 필요합니다. 설정에서 다시 연결해 주세요.", discordRepairFailed: "Discord 연결을 복구하지 못했습니다. Discord를 종료한 뒤 다시 시도해 주세요.", captureIssue: "일부 입력을 처리하지 못했습니다. 감지는 계속됩니다.", favoriteChangeFailed: "즐겨찾기를 변경하지 못했습니다.", copyFailedShort: "복사 실패", copyHistorySaveFailed: "복사했지만 사용 기록을 저장하지 못했습니다.", openOriginalFailed: "원본을 열지 못했습니다.", deleteSelectedFailed: "선택한 항목을 삭제하지 못했습니다.",
     themeApplied: mode => mode === "Dark" ? "다크 모드를 적용했습니다." : mode === "System" ? "시스템 테마 모드를 적용했습니다." : "라이트 모드를 적용했습니다.", themeSaveFailed: "테마 설정을 저장하지 못했습니다.", languageApplied: "언어를 변경했습니다.", languageSaveFailed: "언어 설정을 저장하지 못했습니다.",
     sourceEnabled: source => `${source === "KakaoTalk" ? "카카오톡" : source === "Line" ? "LINE" : source} 감지를 켰습니다.`, sourceDisabled: source => `${source === "KakaoTalk" ? "카카오톡" : source === "Line" ? "LINE" : source} 감지를 껐습니다.`, sourceSettingFailed: source => `${source === "KakaoTalk" ? "카카오톡" : source === "Line" ? "LINE" : source} 감지 설정을 저장하지 못했습니다.`,
@@ -98,7 +98,7 @@ const TRANSLATIONS = {
     deleteAll: "Delete all", cleanupCancelled: "Cleanup cancelled.", cleanupComplete: n => `Cleaned up ${n.toLocaleString("en-US")} items.`, cleanupPartial: n => `Cleaned up ${n.toLocaleString("en-US")} items; some photo files will be retried next time.`, cleanupFailed: "Could not clean up the data.", checkingCleanup: "Checking items to delete...",
     appInfo: "About", version: value => `Version ${value}`, developmentVersion: "Development build", checkForUpdates: "Manual update check", checkForUpdatesDescription: "Check for a new version without waiting for the automatic interval", checkNow: "Check now", checkingForUpdates: "Checking for updates.", appIsUpToDate: "Sentory is up to date.", updateReady: version => `Update ${version} is ready to install.`, updateCheckFailed: "Could not check for updates. Check your network connection.",
     copyrightNotice: "Copyright © 2026 NudeNyang", licenseSummary: "Licensed under GNU GPL v3", viewLicense: "View license", licenseHeading: "Licenses and third-party notices", licenseDescription: "Distribution terms and included open-source components", openLibrary: "Open library", pauseDetection: "Pause detection", resumeDetection: "Resume detection", discordAutoConnect: "Discord auto-connect", discordReconnect: "Restart and reconnect Discord", exitSentory: "Exit Sentory",
-    trayDetecting: "Sentory - Detecting messengers", trayPaused: "Sentory - Detection paused", trayDetectionOff: "Sentory - Detection off",
+    trayDetecting: "Sentory - Detecting messengers", trayPaused: "Sentory - Detection paused", trayDetectionOff: "Sentory - Detection off", trayStatus: status => `Status: ${status}`, doubleClick: "Double-click", accessibilityMode: "Starts in accessibility mode",
     discordNotRunning: "Discord is not running", discordRecoveryIssue: "Discord needs to be reconnected. Reconnect it in Settings.", discordRepairFailed: "Could not repair the Discord connection. Exit Discord and try again.", captureIssue: "Some input could not be processed. Detection is continuing.", favoriteChangeFailed: "Could not update favorites.", copyFailedShort: "Copy failed", copyHistorySaveFailed: "Copied, but the usage history could not be saved.", openOriginalFailed: "Could not open the original.", deleteSelectedFailed: "Could not delete the selected items.",
     themeApplied: mode => mode === "Dark" ? "Dark mode applied." : mode === "System" ? "System theme mode applied." : "Light mode applied.", themeSaveFailed: "Could not save the theme setting.", languageApplied: "Language changed.", languageSaveFailed: "Could not save the language setting.",
     sourceEnabled: source => `${source} detection is on.`, sourceDisabled: source => `${source} detection is off.`, sourceSettingFailed: source => `Could not save the ${source} detection setting.`,
@@ -125,7 +125,7 @@ TRANSLATIONS["ja-JP"] = {
   autoCleanup: "自動整理", autoCleanupDefault: "初期設定では使用しません", cleanupOff: "自動整理を使用しない", cleanup7: "7日を基準に整理", cleanup30: "30日を基準に整理", cleanup90: "90日を基準に整理", cleanup180: "180日を基準に整理", autoCleanupDisabled: "自動整理を使用しません。", autoCleanupSaved: n => `${n}日基準の自動整理を保存しました。`, autoCleanupSaveFailed: "自動整理設定を保存できませんでした。", saveSettings: "設定を保存",
   openDataFolder: "データフォルダーを開く", openDataFolderFailed: "データフォルダーを開けませんでした。", deleteNonFavorites: "お気に入り以外をすべて削除", allNonFavoriteItems: "お気に入り以外のすべての項目", nothingToCleanup: "整理する項目はありません。", cleanupHeading: "項目を整理しますか？", cleanupMessage: (total, links, photos, size) => `お気に入り以外のすべての項目 ${total.toLocaleString("ja-JP")}件を削除しますか？\n\nリンク ${links.toLocaleString("ja-JP")}件 · 写真 ${photos.toLocaleString("ja-JP")}件 (${size})\nお気に入りは削除されません。`, deleteAll: "すべて削除", cleanupCancelled: "整理をキャンセルしました。", cleanupComplete: n => `${n.toLocaleString("ja-JP")}件を整理しました。`, cleanupPartial: n => `${n.toLocaleString("ja-JP")}件を整理しましたが、一部の写真ファイルは次回再試行します。`, cleanupFailed: "データを整理できませんでした。", checkingCleanup: "削除対象を確認しています...",
   appInfo: "アプリ情報", version: value => `バージョン ${value}`, developmentVersion: "開発版", checkForUpdates: "手動アップデート確認", checkForUpdatesDescription: "自動確認の待機時間に関係なく新しいバージョンを確認します", checkNow: "今すぐ確認", checkingForUpdates: "アップデートを確認しています。", appIsUpToDate: "現在、最新バージョンを使用しています。", updateReady: version => `${version} アップデートをインストールできます。`, updateCheckFailed: "アップデートを確認できませんでした。ネットワーク接続を確認してください。", copyrightNotice: "Copyright © 2026 NudeNyang", licenseSummary: "GNU GPL v3 に基づいて利用できます", viewLicense: "ライセンスを見る", licenseHeading: "ライセンスと第三者表記", licenseDescription: "Sentory の配布条件と同梱オープンソース構成要素", openLibrary: "ライブラリを開く", pauseDetection: "検出を一時停止", resumeDetection: "検出を再開", discordAutoConnect: "Discord 自動接続", discordReconnect: "Discord を再起動して接続", exitSentory: "Sentory を終了",
-  trayDetecting: "Sentory - メッセンジャー検出中", trayPaused: "Sentory - 検出一時停止", trayDetectionOff: "Sentory - メッセンジャー検出オフ", discordNotRunning: "Discord は実行されていません", discordRecoveryIssue: "Discord の接続復旧が必要です。設定から再接続してください。", discordRepairFailed: "Discord 接続を復旧できませんでした。Discord を終了して再試行してください。", captureIssue: "一部の入力を処理できませんでした。検出は継続しています。", favoriteChangeFailed: "お気に入りを変更できませんでした。", copyFailedShort: "コピー失敗", copyHistorySaveFailed: "コピーしましたが、使用履歴を保存できませんでした。", openOriginalFailed: "元のデータを開けませんでした。", deleteSelectedFailed: "選択した項目を削除できませんでした。",
+  trayDetecting: "Sentory - メッセンジャー検出中", trayPaused: "Sentory - 検出一時停止", trayDetectionOff: "Sentory - メッセンジャー検出オフ", trayStatus: status => `状態: ${status}`, doubleClick: "ダブルクリック", accessibilityMode: "アクセシビリティモードで開始", discordNotRunning: "Discord は実行されていません", discordRecoveryIssue: "Discord の接続復旧が必要です。設定から再接続してください。", discordRepairFailed: "Discord 接続を復旧できませんでした。Discord を終了して再試行してください。", captureIssue: "一部の入力を処理できませんでした。検出は継続しています。", favoriteChangeFailed: "お気に入りを変更できませんでした。", copyFailedShort: "コピー失敗", copyHistorySaveFailed: "コピーしましたが、使用履歴を保存できませんでした。", openOriginalFailed: "元のデータを開けませんでした。", deleteSelectedFailed: "選択した項目を削除できませんでした。",
   themeApplied: mode => mode === "Dark" ? "ダークモードを適用しました。" : mode === "System" ? "システムテーマモードを適用しました。" : "ライトモードを適用しました。", themeSaveFailed: "テーマ設定を保存できませんでした。", languageApplied: "言語を変更しました。", languageSaveFailed: "言語設定を保存できませんでした。", sourceEnabled: source => `${source === "KakaoTalk" ? "カカオトーク" : source} 検出をオンにしました。`, sourceDisabled: source => `${source === "KakaoTalk" ? "カカオトーク" : source} 検出をオフにしました。`, sourceSettingFailed: source => `${source === "KakaoTalk" ? "カカオトーク" : source} 検出設定を保存できませんでした。`,
 };
 TRANSLATIONS["zh-CN"] = {
@@ -149,7 +149,7 @@ TRANSLATIONS["zh-CN"] = {
   autoCleanup: "自动清理", autoCleanupDefault: "默认关闭", cleanupOff: "不使用自动清理", cleanup7: "清理超过 7 天的项目", cleanup30: "清理超过 30 天的项目", cleanup90: "清理超过 90 天的项目", cleanup180: "清理超过 180 天的项目", autoCleanupDisabled: "自动清理已关闭。", autoCleanupSaved: n => `已保存按 ${n} 天自动清理的设置。`, autoCleanupSaveFailed: "无法保存自动清理设置。", saveSettings: "保存设置",
   openDataFolder: "打开数据文件夹", openDataFolderFailed: "无法打开数据文件夹。", deleteNonFavorites: "删除除收藏外的所有项目", allNonFavoriteItems: "所有非收藏项目", nothingToCleanup: "没有可清理的项目。", cleanupHeading: "要清理项目吗？", cleanupMessage: (total, links, photos, size) => `要删除 ${total.toLocaleString("zh-CN")} 个所有非收藏项目吗？\n\n链接 ${links.toLocaleString("zh-CN")} · 图片 ${photos.toLocaleString("zh-CN")}（${size}）\n收藏项目不会被删除。`, deleteAll: "全部删除", cleanupCancelled: "已取消清理。", cleanupComplete: n => `已清理 ${n.toLocaleString("zh-CN")} 个项目。`, cleanupPartial: n => `已清理 ${n.toLocaleString("zh-CN")} 个项目；部分图片文件将在下次启动时重试。`, cleanupFailed: "无法清理数据。", checkingCleanup: "正在检查要删除的项目…",
   appInfo: "应用信息", version: value => `版本 ${value}`, developmentVersion: "开发版本", checkForUpdates: "手动检查更新", checkForUpdatesDescription: "无需等待自动检查间隔即可检查新版本", checkNow: "立即检查", checkingForUpdates: "正在检查更新。", appIsUpToDate: "当前已是最新版本。", updateReady: version => `可以安装 ${version} 更新。`, updateCheckFailed: "无法检查更新，请检查网络连接。", copyrightNotice: "Copyright © 2026 NudeNyang", licenseSummary: "依据 GNU GPL v3 使用", viewLicense: "查看许可协议", licenseHeading: "许可证与第三方声明", licenseDescription: "Sentory 的分发条款及所含开源组件", openLibrary: "打开收藏库", pauseDetection: "暂停检测", resumeDetection: "恢复检测", discordAutoConnect: "Discord 自动连接", discordReconnect: "重启并重新连接 Discord", exitSentory: "退出 Sentory",
-  trayDetecting: "Sentory - 正在检测聊天应用", trayPaused: "Sentory - 检测已暂停", trayDetectionOff: "Sentory - 聊天应用检测已关闭", discordNotRunning: "Discord 未运行", discordRecoveryIssue: "需要恢复 Discord 连接。请在设置中重新连接。", discordRepairFailed: "无法恢复 Discord 连接。请退出 Discord 后重试。", captureIssue: "部分输入无法处理，检测仍在继续。", favoriteChangeFailed: "无法更新收藏。", copyFailedShort: "复制失败", copyHistorySaveFailed: "已复制，但无法保存使用记录。", openOriginalFailed: "无法打开原文件。", deleteSelectedFailed: "无法删除所选项目。",
+  trayDetecting: "Sentory - 正在检测聊天应用", trayPaused: "Sentory - 检测已暂停", trayDetectionOff: "Sentory - 聊天应用检测已关闭", trayStatus: status => `状态：${status}`, doubleClick: "双击", accessibilityMode: "以辅助功能模式启动", discordNotRunning: "Discord 未运行", discordRecoveryIssue: "需要恢复 Discord 连接。请在设置中重新连接。", discordRepairFailed: "无法恢复 Discord 连接。请退出 Discord 后重试。", captureIssue: "部分输入无法处理，检测仍在继续。", favoriteChangeFailed: "无法更新收藏。", copyFailedShort: "复制失败", copyHistorySaveFailed: "已复制，但无法保存使用记录。", openOriginalFailed: "无法打开原文件。", deleteSelectedFailed: "无法删除所选项目。",
   themeApplied: mode => mode === "Dark" ? "已应用深色模式。" : mode === "System" ? "已应用系统主题模式。" : "已应用浅色模式。", themeSaveFailed: "无法保存主题设置。", languageApplied: "语言已更改。", languageSaveFailed: "无法保存语言设置。", sourceEnabled: source => `已开启 ${source} 检测。`, sourceDisabled: source => `已关闭 ${source} 检测。`, sourceSettingFailed: source => `无法保存 ${source} 检测设置。`,
 };
 
@@ -323,6 +323,7 @@ function applyThemeMode(mode) {
   themeSetting.value = mode || "Light";
   syncEnhancedSelect(themeSetting);
   void tauriCore().invoke("window_theme_set", { dark }).catch(() => {});
+  void configureTray();
 }
 
 function localizedType(item) {
@@ -678,22 +679,42 @@ async function loadDataStatistics() {
 async function configureTray() {
   if (!state.settings) return;
   try {
+    const detectionEnabled = Object.values(state.settings.sources || {}).some(Boolean);
+    const paused = Boolean(state.runtimeStatus?.detectionPaused);
+    const overallStatus = paused ? t("detectionPaused") : detectionEnabled ? t("detected") : t("disabled");
+    const discordRuntime = sourceRuntimeLabel("Discord");
+    const showDiscordRepair = Boolean(
+      state.settings.sources?.Discord
+      && state.runtimeStatus?.discordState === "ReconnectRequired",
+    );
     await tauriCore().invoke("tray_configure", {
+      statusLabel: t("trayStatus", overallStatus),
       openLabel: t("openLibrary"),
+      doubleClickLabel: t("doubleClick"),
       pauseLabel: t("pauseDetection"),
       resumeLabel: t("resumeDetection"),
       startupLabel: t("windowsStartup"),
       discordLabel: t("discordAutoConnect"),
+      discordDetectionLabel: t("discordDetection"),
+      accessibilityLabel: t("accessibilityMode"),
+      discordStatusLabel: discordRuntime.text,
       repairLabel: t("discordReconnect"),
       openDataLabel: t("openDataFolder"),
       exitLabel: t("exitSentory"),
       detectingTooltip: t("trayDetecting"),
       pausedTooltip: t("trayPaused"),
       detectionOffTooltip: t("trayDetectionOff"),
-      paused: Boolean(state.runtimeStatus?.detectionPaused),
-      detectionEnabled: Object.values(state.settings.sources || {}).some(Boolean),
+      paused,
+      detectionEnabled,
       startupEnabled: state.startupEnabled,
       discordEnabled: Boolean(state.settings.sources?.Discord),
+      showDiscordStatus: Boolean(
+        state.settings.sources?.Discord
+        && state.runtimeStatus?.discordRunning
+        && discordRuntime.tone !== "ready",
+      ),
+      showDiscordRepair,
+      dark: document.documentElement.dataset.theme === "dark",
     });
   } catch {
     // The gallery remains usable if Windows has not created the tray yet.
