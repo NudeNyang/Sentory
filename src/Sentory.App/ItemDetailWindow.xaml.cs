@@ -53,10 +53,10 @@ public partial class ItemDetailWindow : Window
         _openLink = openLink;
         _detailImages = item.IsCollection
             ? item.CollectionImages
-            : item.IsImage && item.Thumbnail is not null
+            : item.IsImage && item.DetailThumbnailReference is not null
                 ? [new GalleryImageViewModel(
                     item.Item.ContentPath,
-                    item.Thumbnail,
+                    item.DetailThumbnailReference,
                     item.Title,
                     item.Item.Sha256)]
                 : [];
@@ -123,9 +123,12 @@ public partial class ItemDetailWindow : Window
         SavedAtText.Text = item.Item.LastCapturedAt.LocalDateTime
             .ToString("yyyy. M. d. HH:mm");
         DeliveryText.Text = item.StatusLabel;
-        if (item.Thumbnail is not null)
+        var initialArtwork = item.IsImage
+            ? item.DetailThumbnail
+            : item.Thumbnail;
+        if (initialArtwork is not null)
         {
-            ArtworkImageBrush.ImageSource = item.Thumbnail;
+            ArtworkImageBrush.ImageSource = initialArtwork;
             ArtworkImageBrush.Stretch = item.ThumbnailStretch;
             ArtworkImage.Visibility = Visibility.Visible;
             ArtworkFallback.Visibility = Visibility.Collapsed;

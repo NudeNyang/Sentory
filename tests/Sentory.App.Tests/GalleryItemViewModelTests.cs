@@ -23,6 +23,7 @@ public sealed class GalleryItemViewModelTests
             "O",
             thumbnail,
             null,
+            null,
             false,
             false,
             Stretch.Uniform,

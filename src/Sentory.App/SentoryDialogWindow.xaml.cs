@@ -6,6 +6,7 @@ namespace Sentory.App;
 public partial class SentoryDialogWindow : Window
 {
     private DispatcherTimer? _countdownTimer;
+    private bool _accepted;
 
     private SentoryDialogWindow(
         string heading,
@@ -25,9 +26,19 @@ public partial class SentoryDialogWindow : Window
             danger ? "DangerBrush" : "AccentBrush");
         SourceInitialized += (_, _) =>
             SentoryTheme.ApplyTitleBar(this, isDarkTheme);
+        PreviewKeyDown += (_, args) =>
+        {
+            if (args.Key != System.Windows.Input.Key.Escape)
+            {
+                return;
+            }
+
+            args.Handled = true;
+            Close();
+        };
     }
 
-    public static bool Confirm(
+    public static async Task<bool> ConfirmAsync(
         Window? owner,
         string heading,
         string message,
@@ -50,10 +61,13 @@ public partial class SentoryDialogWindow : Window
             dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
 
-        return dialog.ShowDialog() == true;
+        await ModelessOwnedWindowSession.ShowAsync(
+            dialog,
+            blockOwnerInput: true);
+        return dialog._accepted;
     }
 
-    public static bool ConfirmWithCountdown(
+    public static async Task<bool> ConfirmWithCountdownAsync(
         Window? owner,
         string heading,
         Func<int, string> messageFactory,
@@ -82,10 +96,13 @@ public partial class SentoryDialogWindow : Window
         }
 
         dialog.StartCountdown(countdownSeconds, messageFactory);
-        return dialog.ShowDialog() == true;
+        await ModelessOwnedWindowSession.ShowAsync(
+            dialog,
+            blockOwnerInput: true);
+        return dialog._accepted;
     }
 
-    public static void ShowMessage(
+    public static async Task ShowMessageAsync(
         Window? owner,
         string heading,
         string message,
@@ -108,14 +125,18 @@ public partial class SentoryDialogWindow : Window
             dialog.WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
 
-        _ = dialog.ShowDialog();
+        await ModelessOwnedWindowSession.ShowAsync(
+            dialog,
+            blockOwnerInput: true);
     }
 
-    private void ConfirmButton_Click(object sender, RoutedEventArgs e) =>
-        DialogResult = true;
+    private void ConfirmButton_Click(object sender, RoutedEventArgs e)
+    {
+        _accepted = true;
+        Close();
+    }
 
-    private void CancelButton_Click(object sender, RoutedEventArgs e) =>
-        DialogResult = false;
+    private void CancelButton_Click(object sender, RoutedEventArgs e) => Close();
 
     private void StartCountdown(
         int seconds,
@@ -131,7 +152,8 @@ public partial class SentoryDialogWindow : Window
                 if (remainingSeconds <= 0)
                 {
                     _countdownTimer?.Stop();
-                    DialogResult = true;
+                    _accepted = true;
+                    Close();
                     return;
                 }
 

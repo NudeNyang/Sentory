@@ -23,6 +23,7 @@ public partial class LicenseWindow : Window
             LicenseScrollIndicator,
             LicenseScrollIndicatorThumb,
             LicenseScrollIndicatorThumbTransform);
+        OwnedPopupDismissBehavior.Enable(this);
         LicenseText.Text = ReadLicenseText();
         SourceInitialized += (_, _) =>
             SentoryTheme.ApplyTitleBar(this, isDarkTheme);

@@ -45,8 +45,12 @@ public partial class GalleryWindow : Window
         _sourceOptionButtons = [];
     private readonly Dictionary<string, System.Windows.Controls.TextBlock>
         _sourceOptionChecks = [];
-    private readonly FileBackedWeakLruCache<ImageSource> _thumbnailCache =
+    private readonly FileBackedWeakLruCache<ImageSource> _cardArtworkCache =
         new(1024);
+    private readonly FileBackedWeakLruCache<ImageSource> _siteIconCache =
+        new(256);
+    private readonly FileBackedWeakLruCache<ImageSource> _detailArtworkCache =
+        new(128);
     private GalleryFilter _filter = GalleryFilter.All;
     private GalleryDateRange _dateRange = GalleryDateRange.All;
     private GallerySortMode _sortMode = GallerySortMode.Newest;
@@ -335,23 +339,42 @@ public partial class GalleryWindow : Window
         var collectionImages = isCollection
             ? members
                 .Where(member => member.Kind == ContentKind.Image)
-                .Select(member => new GalleryImageViewModel(
-                    member.ContentPath,
-                    LoadThumbnail(member.ContentPath),
-                    GetPhotoName(
+                .Select(member => new
+                {
+                    Member = member,
+                    Artwork = CreateArtworkReference(
                         member.ContentPath,
-                        member.OcrDisplayName,
-                        member.OriginalUrl),
-                    member.Sha256))
-                .Where(image => image.Thumbnail is not null)
+                        _detailArtworkCache,
+                        GalleryArtworkDecodePolicy.DetailWidth)
+                })
+                .Where(entry => entry.Artwork is not null)
+                .Select(entry => new GalleryImageViewModel(
+                    entry.Member.ContentPath,
+                    entry.Artwork!,
+                    GetPhotoName(
+                        entry.Member.ContentPath,
+                        entry.Member.OcrDisplayName,
+                        entry.Member.OriginalUrl),
+                    entry.Member.Sha256))
                 .ToArray()
             : [];
-        var collectionArtwork = collectionImages.FirstOrDefault()?.Thumbnail;
+        var collectionArtwork = isCollection
+            ? LoadArtwork(
+                collectionImages.FirstOrDefault()?.ContentPath,
+                _cardArtworkCache,
+                GalleryArtworkDecodePolicy.CardWidth)
+            : null;
         var collectionLinkPreview = isCollection
-            ? LoadThumbnail(item.PreviewImagePath)
+            ? LoadArtwork(
+                item.PreviewImagePath,
+                _cardArtworkCache,
+                GalleryArtworkDecodePolicy.CardWidth)
             : null;
         var collectionLinkIcon = isCollection
-            ? LoadThumbnail(item.SiteIconPath)
+            ? LoadArtwork(
+                item.SiteIconPath,
+                _siteIconCache,
+                GalleryArtworkDecodePolicy.SiteIconWidth)
             : null;
         var collectionPreview = collectionArtwork ??
             collectionLinkPreview ??
@@ -363,11 +386,26 @@ public partial class GalleryWindow : Window
         var thumbnail = isCollection
             ? collectionPreview
             : isImage
-                ? LoadThumbnail(item.ContentPath)
-                : LoadThumbnail(item.PreviewImagePath);
+                ? LoadArtwork(
+                    item.ContentPath,
+                    _cardArtworkCache,
+                    GalleryArtworkDecodePolicy.CardWidth)
+                : LoadArtwork(
+                    item.PreviewImagePath,
+                    _cardArtworkCache,
+                    GalleryArtworkDecodePolicy.CardWidth);
         var siteIcon = isImage || isCollection
             ? null
-            : LoadThumbnail(item.SiteIconPath);
+            : LoadArtwork(
+                item.SiteIconPath,
+                _siteIconCache,
+                GalleryArtworkDecodePolicy.SiteIconWidth);
+        var detailThumbnail = isImage
+            ? CreateArtworkReference(
+                item.ContentPath,
+                _detailArtworkCache,
+                GalleryArtworkDecodePolicy.DetailWidth)
+            : null;
         return new GalleryItemViewModel(
             item,
             isImage,
@@ -380,6 +418,7 @@ public partial class GalleryWindow : Window
             localizedText.Initial,
             thumbnail,
             siteIcon,
+            detailThumbnail,
             thumbnail is not null,
             siteIcon is not null,
             isImage || collectionArtwork is not null || collectionUsesSiteIcon
@@ -454,7 +493,10 @@ public partial class GalleryWindow : Window
                 : string.Empty);
     }
 
-    private ImageSource? LoadThumbnail(string? relativePath)
+    private GalleryArtworkReference? CreateArtworkReference(
+        string? relativePath,
+        FileBackedWeakLruCache<ImageSource> cache,
+        int decodePixelWidth)
     {
         var absolutePath = ResolveContentPath(relativePath);
         if (absolutePath is null || !File.Exists(absolutePath))
@@ -462,12 +504,21 @@ public partial class GalleryWindow : Window
             return null;
         }
 
-        return _thumbnailCache.GetOrAdd(
-            absolutePath,
-            LoadThumbnailFromFile);
+        return new GalleryArtworkReference(() =>
+            cache.GetOrAdd(
+                absolutePath,
+                path => LoadThumbnailFromFile(path, decodePixelWidth)));
     }
 
-    private static ImageSource? LoadThumbnailFromFile(string absolutePath)
+    private ImageSource? LoadArtwork(
+        string? relativePath,
+        FileBackedWeakLruCache<ImageSource> cache,
+        int decodePixelWidth) =>
+        CreateArtworkReference(relativePath, cache, decodePixelWidth)?.Value;
+
+    private static ImageSource? LoadThumbnailFromFile(
+        string absolutePath,
+        int decodePixelWidth)
     {
         try
         {
@@ -475,7 +526,7 @@ public partial class GalleryWindow : Window
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
             image.UriSource = new Uri(absolutePath, UriKind.Absolute);
-            image.DecodePixelWidth = 480;
+            image.DecodePixelWidth = decodePixelWidth;
             image.EndInit();
             image.Freeze();
             return image;
@@ -972,7 +1023,7 @@ public partial class GalleryWindow : Window
                 "SelectedFavoritesWarningFormat",
                 favoriteCount)
             : string.Empty;
-        if (!SentoryDialogWindow.Confirm(
+        if (!await SentoryDialogWindow.ConfirmAsync(
                 this,
                 SentoryLocalization.Format(
                     "DeleteSelectedHeadingFormat",
@@ -2788,7 +2839,12 @@ public partial class GalleryWindow : Window
                 preview.PreviewImagePath is null);
         }
 
-        var image = LoadThumbnail(cached.RelativePath);
+        var image = LoadArtwork(
+            cached.RelativePath,
+            cached.IsSiteIcon ? _siteIconCache : _detailArtworkCache,
+            cached.IsSiteIcon
+                ? GalleryArtworkDecodePolicy.SiteIconWidth
+                : GalleryArtworkDecodePolicy.DetailWidth);
         return image is null
             ? null
             : new GalleryLinkArtwork(
@@ -2912,7 +2968,7 @@ public partial class GalleryWindow : Window
         var favoriteWarning = item.Item.IsFavorite
             ? SentoryLocalization.Text("FavoriteDeleteWarning")
             : string.Empty;
-        if (!SentoryDialogWindow.Confirm(
+        if (!await SentoryDialogWindow.ConfirmAsync(
                 this,
                 SentoryLocalization.Text("DeleteItemHeading"),
                 SentoryLocalization.Text("DeleteItemMessage") +
@@ -3100,6 +3156,7 @@ public sealed record GalleryItemViewModel(
     string Initial,
     ImageSource? Thumbnail,
     ImageSource? SiteIcon,
+    GalleryArtworkReference? DetailThumbnailReference,
     bool HasPrimaryArtwork,
     bool HasSiteIcon,
     Stretch ThumbnailStretch,
@@ -3116,6 +3173,9 @@ public sealed record GalleryItemViewModel(
     private string _statusLabel = StatusLabel;
     private string _initial = Initial;
     private string _collectionBadgeText = CollectionBadgeText;
+
+    public ImageSource? DetailThumbnail =>
+        DetailThumbnailReference?.Value ?? Thumbnail;
 
     public string Title => _title;
 
@@ -3279,9 +3339,12 @@ public sealed class GalleryItemSelectionState : INotifyPropertyChanged
 
 public sealed record GalleryImageViewModel(
     string? ContentPath,
-    ImageSource? Thumbnail,
+    GalleryArtworkReference ArtworkReference,
     string DisplayName,
-    string? Sha256);
+    string? Sha256)
+{
+    public ImageSource? Thumbnail => ArtworkReference.Value;
+}
 
 public sealed record GalleryLinkArtwork(
     ImageSource Image,

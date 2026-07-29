@@ -96,7 +96,6 @@
                     Background="{DynamicResource SurfaceBrush}"
                     Foreground="{DynamicResource TextBrush}"
                     Style="{StaticResource DialogButtonStyle}"
-                    IsCancel="True"
                     Click="CancelButton_Click" />
             <Button x:Name="ConfirmButton"
                     Margin="8,0,0,0"

@@ -191,7 +191,7 @@ public partial class App : System.Windows.Application
             {
                 if (!RequestGalleryFromRunningInstance())
                 {
-                    SentoryDialogWindow.ShowMessage(
+                    await SentoryDialogWindow.ShowMessageAsync(
                         null,
                         SentoryLocalization.Text("AlreadyRunningHeading"),
                         SentoryLocalization.Text("AlreadyRunningMessage"),
@@ -411,7 +411,7 @@ public partial class App : System.Windows.Application
                 exception);
             if (!isInstallationVerification)
             {
-                SentoryDialogWindow.ShowMessage(
+                await SentoryDialogWindow.ShowMessageAsync(
                 null,
                 SentoryLocalization.Text("StartupFailedHeading"),
                     exception.Message,
@@ -659,7 +659,7 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        var accepted = SentoryDialogWindow.Confirm(
+        var accepted = await SentoryDialogWindow.ConfirmAsync(
             owner ?? _galleryWindow,
             SentoryLocalization.Text("UpdateAvailableHeading"),
             SentoryLocalization.Format(
@@ -729,7 +729,7 @@ public partial class App : System.Windows.Application
         catch (Exception exception)
         {
             _diagnosticsLog?.Write("update-apply-failed", "Update download or apply failed", exception);
-            SentoryDialogWindow.ShowMessage(
+            await SentoryDialogWindow.ShowMessageAsync(
                 _galleryWindow,
                 SentoryLocalization.Text("UpdateFailedHeading"),
                 SentoryLocalization.Text("UpdateFailedMessage"),
@@ -1515,7 +1515,7 @@ public partial class App : System.Windows.Application
         }
 
         var dark = GetSavedDarkTheme();
-        if (!SentoryDialogWindow.Confirm(
+        if (!await SentoryDialogWindow.ConfirmAsync(
                 _galleryWindow,
                 SentoryLocalization.Text("ReconnectConfirmHeading"),
                 SentoryLocalization.Text("ReconnectConfirmMessage"),
@@ -1621,7 +1621,7 @@ public partial class App : System.Windows.Application
             _diagnosticsLog?.Write(
                 "discord-auto-restart-prompted",
                 $"processId={processId} countdownSeconds=15");
-            var restart = SentoryDialogWindow.ConfirmWithCountdown(
+            var restart = await SentoryDialogWindow.ConfirmWithCountdownAsync(
                 _galleryWindow,
                 SentoryLocalization.Text("AutomaticReconnectHeading"),
                 seconds => SentoryLocalization.Format(

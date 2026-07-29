@@ -882,7 +882,7 @@ public partial class DataManagementWindow : Window
         }
     }
 
-    private void ViewLicenseButton_Click(
+    private async void ViewLicenseButton_Click(
         object sender,
         RoutedEventArgs e)
     {
@@ -893,7 +893,7 @@ public partial class DataManagementWindow : Window
         _suppressBackgroundDismiss = true;
         try
         {
-            window.ShowDialog();
+            await ModelessOwnedWindowSession.ShowAsync(window);
         }
         finally
         {
@@ -1020,7 +1020,7 @@ public partial class DataManagementWindow : Window
                 preview.UrlItems,
                 preview.ImageItems,
                 FormatBytes(preview.ImageBytes));
-            if (!SentoryDialogWindow.Confirm(
+            if (!await SentoryDialogWindow.ConfirmAsync(
                     this,
                     SentoryLocalization.Text("CleanupConfirmHeading"),
                     message,
