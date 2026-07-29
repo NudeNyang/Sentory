@@ -114,16 +114,21 @@ public sealed class WhatsAppCaptureRuntime : ICaptureRuntime
             _recentSendSignals.Observe(
                 context.ContextHash,
                 context.OccurredAt);
+            _recentSendSignals.ObserveProcess(
+                context.ProcessId,
+                context.OccurredAt);
         }
 
-        MarkSendObserved(
+        var observed = MarkSendObserved(
             context.MainWindow,
             context.OccurredAt,
             "keyboard");
+        ReportBufferedSend("keyboard", observed);
     }
 
     private void OnPointerDown(object? sender, PointerTrigger trigger)
     {
+        ExplorerPointerDownOriginTracker.ObserveShared(_native, trigger);
         if (_paused || trigger.ForegroundProcessId == 0 ||
             !string.Equals(
                 _native.GetProcessName(trigger.ForegroundProcessId),
@@ -153,10 +158,41 @@ public sealed class WhatsAppCaptureRuntime : ICaptureRuntime
             return;
         }
 
-        MarkSendObserved(root, trigger.OccurredAt, "pointer");
+        var focused = _native.GetFocusedWindow(root);
+        var hasContext = _validator.TryValidate(
+            new PasteTrigger(
+                trigger.EventId,
+                root,
+                focused,
+                trigger.ForegroundProcessId,
+                _native.GetClipboardSequenceNumber(),
+                trigger.OccurredAt,
+                trigger.Injected),
+            out var context);
+        lock (_candidateGate)
+        {
+            if (hasContext)
+            {
+                _recentSendSignals.Observe(
+                    context.ContextHash,
+                    trigger.OccurredAt);
+            }
+
+            _recentSendSignals.ObserveProcess(
+                trigger.ForegroundProcessId,
+                trigger.OccurredAt);
+        }
+
+        var observed = MarkSendObserved(
+            root,
+            trigger.OccurredAt,
+            hasContext ? "pointer" : "pointer-fallback");
+        ReportBufferedSend(
+            hasContext ? "pointer" : "pointer-fallback",
+            observed);
     }
 
-    private void MarkSendObserved(
+    private int MarkSendObserved(
         nint mainWindow,
         DateTimeOffset occurredAt,
         string inputKind)
@@ -172,7 +208,9 @@ public sealed class WhatsAppCaptureRuntime : ICaptureRuntime
                     !candidate.IsSendObserved() &&
                     !candidate.Cancellation.IsCancellationRequested,
                 candidate => candidate.Context.OccurredAt);
-            if (candidate?.MarkSendObserved() == true)
+            if (candidate is not null &&
+                _recentSendSignals.TryConsume(occurredAt) &&
+                candidate.MarkSendObserved())
             {
                 observed = 1;
             }
@@ -183,6 +221,18 @@ public sealed class WhatsAppCaptureRuntime : ICaptureRuntime
             _diagnostic?.Invoke(
                 "whatsapp-send-input-observed",
                 $"kind={inputKind} candidates={observed}");
+        }
+
+        return observed;
+    }
+
+    private void ReportBufferedSend(string inputKind, int observed)
+    {
+        if (observed == 0)
+        {
+            _diagnostic?.Invoke(
+                "whatsapp-send-input-buffered",
+                $"kind={inputKind} candidates=0");
         }
     }
 
@@ -383,8 +433,9 @@ public sealed class WhatsAppCaptureRuntime : ICaptureRuntime
                 payloadSignature,
                 cancellation);
             _candidates.Add(registration);
-            if (_recentSendSignals.CanApply(
+            if (_recentSendSignals.TryTakeApplicable(
                     context.ContextHash,
+                    context.ProcessId,
                     context.OccurredAt,
                     DateTimeOffset.UtcNow))
             {

@@ -165,6 +165,7 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
 
     private void OnPointerDown(object? sender, PointerTrigger trigger)
     {
+        ExplorerPointerDownOriginTracker.ObserveShared(_native, trigger);
         if (_paused || trigger.ForegroundProcessId == 0 ||
             !WeChatContextValidator.IsSupportedProcessName(
                 _native.GetProcessName(trigger.ForegroundProcessId)))
@@ -270,7 +271,9 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
                 candidates,
                 candidate => CanApplySendEvidence(candidate, composer),
                 candidate => candidate.Context.OccurredAt);
-            if (candidate?.MarkSendObserved() == true)
+            if (candidate is not null &&
+                _recentSendSignals.TryConsume(occurredAt) &&
+                candidate.MarkSendObserved())
             {
                 observed = 1;
             }
@@ -309,7 +312,9 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
                 candidates,
                 candidate => CanApplySendEvidence(candidate, composer),
                 candidate => candidate.Context.OccurredAt);
-            if (candidate?.MarkSendObserved() == true)
+            if (candidate is not null &&
+                _recentSendSignals.TryConsume(occurredAt) &&
+                candidate.MarkSendObserved())
             {
                 observed = 1;
             }
@@ -548,7 +553,7 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
                 payloadSignature,
                 cancellation);
             _candidates.Add(registration);
-            if (_recentSendSignals.CanApply(
+            if (_recentSendSignals.TryTakeApplicable(
                     context.ContextHash,
                     context.ProcessId,
                     context.OccurredAt,

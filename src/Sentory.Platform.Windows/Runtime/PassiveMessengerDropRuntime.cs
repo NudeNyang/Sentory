@@ -142,6 +142,7 @@ internal sealed class PassiveMessengerDropRuntime<TTarget> : IDisposable
 
         var explorer = FindExplorerAt(cursor);
         var start = cursor;
+        var usedPointerHookOrigin = false;
         if (explorer == nint.Zero &&
             _dragOrigin.TryGet(
                 DateTimeOffset.UtcNow,
@@ -150,6 +151,17 @@ internal sealed class PassiveMessengerDropRuntime<TTarget> : IDisposable
         {
             explorer = recentExplorer;
             start = recentPosition;
+        }
+
+        if (explorer == nint.Zero &&
+            ExplorerPointerDownOriginTracker.TryGetShared(
+                DateTimeOffset.UtcNow,
+                out var pointerExplorer,
+                out var pointerPosition))
+        {
+            explorer = pointerExplorer;
+            start = pointerPosition;
+            usedPointerHookOrigin = true;
         }
 
         if (explorer == nint.Zero)
@@ -175,7 +187,8 @@ internal sealed class PassiveMessengerDropRuntime<TTarget> : IDisposable
         _dropState.Begin(start, paths);
         _diagnostic?.Invoke(
             $"{_diagnosticPrefix}-drop-selection-observed",
-            $"files={paths.Length}");
+            $"files={paths.Length}" +
+            (usedPointerHookOrigin ? ", source=pointer-hook" : string.Empty));
     }
 
     private void CompleteDrag((int X, int Y) cursor)

@@ -148,6 +148,7 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
 
         var explorer = FindExplorerAt(cursor);
         var start = cursor;
+        var usedPointerHookOrigin = false;
         if (explorer == nint.Zero &&
             _dragOrigin.TryGet(
                 DateTimeOffset.UtcNow,
@@ -156,6 +157,17 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
         {
             explorer = recentExplorer;
             start = recentPosition;
+        }
+
+        if (explorer == nint.Zero &&
+            ExplorerPointerDownOriginTracker.TryGetShared(
+                DateTimeOffset.UtcNow,
+                out var pointerExplorer,
+                out var pointerPosition))
+        {
+            explorer = pointerExplorer;
+            start = pointerPosition;
+            usedPointerHookOrigin = true;
         }
 
         if (explorer == nint.Zero)
@@ -180,7 +192,8 @@ public sealed class TelegramDropOverlayRuntime : IDisposable
         _dropState.Begin(start, paths);
         _diagnostic?.Invoke(
             "telegram-drop-selection-observed",
-            $"files={paths.Length}");
+            $"files={paths.Length}" +
+            (usedPointerHookOrigin ? ", source=pointer-hook" : string.Empty));
     }
 
     private bool TryJoinSharedExplorerDrag(bool includeEnded = false)

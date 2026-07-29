@@ -186,6 +186,7 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
 
     private void OnPointerDown(object? sender, PointerTrigger trigger)
     {
+        ExplorerPointerDownOriginTracker.ObserveShared(_native, trigger);
         if (_paused)
         {
             return;

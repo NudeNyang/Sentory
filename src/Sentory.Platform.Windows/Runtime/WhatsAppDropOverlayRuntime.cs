@@ -136,6 +136,7 @@ public sealed class WhatsAppDropOverlayRuntime : IDisposable
 
         var explorer = FindExplorerAt(cursor);
         var start = cursor;
+        var usedPointerHookOrigin = false;
         if (explorer == nint.Zero &&
             _hasPointerUpSample &&
             Distance(_lastPointerUpPosition, cursor) <=
@@ -143,6 +144,17 @@ public sealed class WhatsAppDropOverlayRuntime : IDisposable
         {
             explorer = _lastPointerUpExplorer;
             start = _lastPointerUpPosition;
+        }
+
+        if (explorer == nint.Zero &&
+            ExplorerPointerDownOriginTracker.TryGetShared(
+                DateTimeOffset.UtcNow,
+                out var pointerExplorer,
+                out var pointerPosition))
+        {
+            explorer = pointerExplorer;
+            start = pointerPosition;
+            usedPointerHookOrigin = true;
         }
 
         if (explorer == nint.Zero)
@@ -167,7 +179,8 @@ public sealed class WhatsAppDropOverlayRuntime : IDisposable
         _dropState.Begin(start, paths);
         _diagnostic?.Invoke(
             "whatsapp-drop-selection-observed",
-            $"files={paths.Length}");
+            $"files={paths.Length}" +
+            (usedPointerHookOrigin ? ", source=pointer-hook" : string.Empty));
     }
 
     private bool TryJoinSharedExplorerDrag(bool includeEnded = false)

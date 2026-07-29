@@ -51,6 +51,37 @@ internal sealed class WeChatRecentSendSignals
                HasMatchingContent(process, urls, hasImages);
     }
 
+    public bool TryTakeApplicable(
+        string contextHash,
+        uint processId,
+        DateTimeOffset pastedAt,
+        DateTimeOffset observedAt,
+        IReadOnlyList<NormalizedUrl> urls,
+        bool hasImages)
+    {
+        RemoveExpired(observedAt);
+        if (_signals.TryGetValue(contextHash, out var exact) &&
+            IsApplicable(exact, pastedAt, observedAt) &&
+            HasMatchingContent(exact, urls, hasImages))
+        {
+            RemoveAliases(exact.SentAt);
+            return true;
+        }
+
+        if (_processSignals.TryGetValue(processId, out var process) &&
+            IsApplicable(process, pastedAt, observedAt) &&
+            HasMatchingContent(process, urls, hasImages))
+        {
+            RemoveAliases(process.SentAt);
+            return true;
+        }
+
+        return false;
+    }
+
+    public bool TryConsume(DateTimeOffset sentAt) =>
+        RemoveAliases(sentAt);
+
     private static bool IsApplicable(
         WeChatRecentSendSignal signal,
         DateTimeOffset pastedAt,
@@ -89,5 +120,27 @@ internal sealed class WeChatRecentSendSignals
         {
             _processSignals.Remove(processId);
         }
+    }
+
+    private bool RemoveAliases(DateTimeOffset sentAt)
+    {
+        var removed = false;
+        foreach (var contextHash in _signals
+                     .Where(pair => pair.Value.SentAt == sentAt)
+                     .Select(pair => pair.Key)
+                     .ToArray())
+        {
+            removed |= _signals.Remove(contextHash);
+        }
+
+        foreach (var processId in _processSignals
+                     .Where(pair => pair.Value.SentAt == sentAt)
+                     .Select(pair => pair.Key)
+                     .ToArray())
+        {
+            removed |= _processSignals.Remove(processId);
+        }
+
+        return removed;
     }
 }

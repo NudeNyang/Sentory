@@ -156,6 +156,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
 
         var explorer = FindExplorerAt(cursor);
         var start = cursor;
+        var usedPointerHookOrigin = false;
         if (explorer == nint.Zero &&
             _dragOrigin.TryGet(
                 DateTimeOffset.UtcNow,
@@ -164,6 +165,17 @@ public sealed class LineDropOverlayRuntime : IDisposable
         {
             explorer = recentExplorer;
             start = recentPosition;
+        }
+
+        if (explorer == nint.Zero &&
+            ExplorerPointerDownOriginTracker.TryGetShared(
+                DateTimeOffset.UtcNow,
+                out var pointerExplorer,
+                out var pointerPosition))
+        {
+            explorer = pointerExplorer;
+            start = pointerPosition;
+            usedPointerHookOrigin = true;
         }
 
         if (explorer == nint.Zero)
@@ -189,7 +201,8 @@ public sealed class LineDropOverlayRuntime : IDisposable
         BeginPreDropBaselineCaptureFromVisibleWindow();
         _diagnostic?.Invoke(
             "line-drop-selection-observed",
-            $"files={paths.Length}");
+            $"files={paths.Length}" +
+            (usedPointerHookOrigin ? ", source=pointer-hook" : string.Empty));
     }
 
     private bool TryJoinSharedExplorerDrag(bool includeEnded = false)

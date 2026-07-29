@@ -52,4 +52,42 @@ public sealed class WhatsAppRecentSendSignalsTests
             pastedAt,
             sentAt.AddMinutes(3)));
     }
+
+    [Fact]
+    public void TakingSignalConsumesContextAndProcessAliases()
+    {
+        var signals = new WhatsAppRecentSendSignals();
+        var droppedAt = DateTimeOffset.UtcNow;
+        var sentAt = droppedAt.AddMilliseconds(80);
+        signals.Observe("main-window", sentAt);
+        signals.ObserveProcess(42, sentAt);
+
+        Assert.True(signals.TryTakeApplicable(
+            "main-window",
+            42,
+            droppedAt,
+            droppedAt.AddMilliseconds(500)));
+        Assert.False(signals.TryTakeApplicable(
+            "other-window",
+            42,
+            droppedAt,
+            droppedAt.AddMilliseconds(501)));
+    }
+
+    [Fact]
+    public void ImmediateConsumptionPreventsRegistrationReplay()
+    {
+        var signals = new WhatsAppRecentSendSignals();
+        var droppedAt = DateTimeOffset.UtcNow;
+        var sentAt = droppedAt.AddMilliseconds(80);
+        signals.Observe("main-window", sentAt);
+        signals.ObserveProcess(42, sentAt);
+
+        Assert.True(signals.TryConsume(sentAt));
+        Assert.False(signals.TryTakeApplicable(
+            "main-window",
+            42,
+            droppedAt,
+            droppedAt.AddMilliseconds(500)));
+    }
 }

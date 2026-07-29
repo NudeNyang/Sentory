@@ -160,6 +160,7 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
 
     private void OnPointerDown(object? sender, PointerTrigger trigger)
     {
+        ExplorerPointerDownOriginTracker.ObserveShared(_native, trigger);
         if (_paused || trigger.ForegroundProcessId == 0 ||
             !string.Equals(
                 _native.GetProcessName(trigger.ForegroundProcessId),
@@ -248,7 +249,9 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
                     !candidate.IsSendObserved() &&
                     !candidate.Cancellation.IsCancellationRequested,
                 candidate => candidate.Context.OccurredAt);
-            if (candidate?.MarkSendObserved() == true)
+            if (candidate is not null &&
+                _recentSendSignals.TryConsume(occurredAt) &&
+                candidate.MarkSendObserved())
             {
                 observed = 1;
             }
@@ -280,7 +283,9 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
                     !candidate.IsSendObserved() &&
                     !candidate.Cancellation.IsCancellationRequested,
                 candidate => candidate.Context.OccurredAt);
-            if (candidate?.MarkSendObserved() == true)
+            if (candidate is not null &&
+                _recentSendSignals.TryConsume(occurredAt) &&
+                candidate.MarkSendObserved())
             {
                 observed = 1;
             }
@@ -531,7 +536,7 @@ public sealed class TelegramCaptureRuntime : ICaptureRuntime
                 payloadSignature,
                 cancellation);
             _candidates.Add(registration);
-            if (_recentSendSignals.CanApply(
+            if (_recentSendSignals.TryTakeApplicable(
                     context.ContextHash,
                     context.ProcessId,
                     context.OccurredAt,
