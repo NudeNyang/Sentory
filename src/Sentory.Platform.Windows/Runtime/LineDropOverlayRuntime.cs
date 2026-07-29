@@ -20,6 +20,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
     private readonly LineCaptureRuntime _captureRuntime;
     private readonly Action<string, string>? _diagnostic;
     private readonly DispatcherTimer _timer;
+    private readonly LineIdleBaselineRefreshScheduler _idleBaselineRefresh;
     private readonly LinePassiveDropState _dropState = new();
     private readonly RecentExplorerDragOrigin _dragOrigin =
         new(ExplorerOriginMaximumAge);
@@ -30,8 +31,6 @@ public sealed class LineDropOverlayRuntime : IDisposable
     private DateTimeOffset _releasedAt;
     private nint _preDropBaselineWindow;
     private Task<LineAccessibilitySnapshot?>? _preDropBaselineTask;
-    private Task? _idleBaselineRefreshTask;
-    private DateTimeOffset _nextIdleBaselineRefreshAt;
 
     public LineDropOverlayRuntime(
         LineCaptureRuntime captureRuntime,
@@ -56,6 +55,12 @@ public sealed class LineDropOverlayRuntime : IDisposable
         _selectionReader = selectionReader;
         _captureRuntime = captureRuntime;
         _diagnostic = diagnostic;
+        _idleBaselineRefresh = new LineIdleBaselineRefreshScheduler(
+            IdleBaselineRefreshInterval,
+            RefreshIdleBaselineAsync,
+            exception => _diagnostic?.Invoke(
+                "line-drop-baseline-refresh-failed",
+                $"type={exception.GetType().Name}"));
         _timer = new DispatcherTimer(
             PollInterval,
             DispatcherPriority.Input,
@@ -370,13 +375,16 @@ public sealed class LineDropOverlayRuntime : IDisposable
     private void BeginIdleBaselineRefresh()
     {
         if (_dropState.IsTracking ||
-            _releaseTargetGraceFrames > 0 ||
-            _idleBaselineRefreshTask is { IsCompleted: false } ||
-            DateTimeOffset.UtcNow < _nextIdleBaselineRefreshAt)
+            _releaseTargetGraceFrames > 0)
         {
             return;
         }
 
+        _idleBaselineRefresh.TryStart(DateTimeOffset.UtcNow);
+    }
+
+    private async Task RefreshIdleBaselineAsync()
+    {
         var target = _locator.FindVisibleMainWindow();
         if (target is null)
         {
@@ -384,9 +392,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
         }
 
         var now = DateTimeOffset.UtcNow;
-        _nextIdleBaselineRefreshAt = now + IdleBaselineRefreshInterval;
-        _idleBaselineRefreshTask =
-            _captureRuntime.RefreshNativeDropBaselineAsync(target, now);
+        await _captureRuntime.RefreshNativeDropBaselineAsync(target, now);
     }
 
     public void Dispose()
