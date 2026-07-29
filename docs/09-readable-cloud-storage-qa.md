@@ -2,7 +2,7 @@
 
 ## 현재 준비 상태
 
-- 작업 폴더의 `Sentory.exe`는 `1.4.3+developers` 평문 v2 검수판이다.
+- 이 절차는 1.5.0에 포함된 평문 v2 동기화 형식의 실사용 검수 기록이다.
 - 동기화 폴더는 `C:\Users\awds4\Documents\Sentory-googleDrive`다.
 - 현재 Google Drive에는 사진 21개와 링크 16개가 올라가 있다.
 - 기존 `Sentory Sync/v1`의 59개 파일은 이전 전후 바이트가 같게 보존돼 있다.

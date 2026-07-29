@@ -43,6 +43,9 @@ Sentory는 메신저에서 주고받은 링크와 사진을 따로 모아 두는
 - 라이트·다크 테마와 한국어·영어·일본어·중국어 UI
 - 새 설치에서 기본 활성화되는 Windows 시작 시 자동 실행과 트레이 메뉴
 - GitHub Releases를 이용한 사전 다운로드형 업데이트와 보관함의 수동 설치 버튼
+- OneDrive, Google Drive, Dropbox, MEGA 또는 직접 고른 폴더를 이용한
+  Windows 컴퓨터 간 보관함 동기화
+- 여러 화면에 걸친 선택 드래그의 가장자리 자동 스크롤과 드래그 중 마우스 휠
 
 ## 데이터 저장
 
@@ -58,12 +61,21 @@ Sentory가 운영하는 서버로 보관 데이터를 보내지 않으며 분석
 검색을 위해 Sentory 데이터베이스에 저장됩니다. 자세한 내용은
 [개인정보 및 로컬 데이터 안내](./docs/privacy.md)를 확인해 주세요.
 
+설정에서 컴퓨터 간 동기화를 켜면 사용자가 고른 클라우드 동기화 폴더에 사진은
+일반 이미지 파일로, 링크는 읽을 수 있는 TXT로 저장됩니다. 이 기능은 Sentory
+서버를 거치지 않으며 해당 클라우드 서비스의 데스크톱 앱이 파일을 전송합니다.
+사진·링크 추가와 삭제, 즐겨찾기, 복사 횟수는 같은 폴더를 연결한 Windows
+컴퓨터끼리 맞춰집니다.
+
 ## 다운로드
 
-현재 정식 버전은 **1.4.3**입니다. Windows 10/11 64비트에서 사용할 수 있으며,
+현재 정식 버전은 **1.5.0**입니다. Windows 10/11 64비트에서 사용할 수 있으며,
 [Releases](https://github.com/NudeNyang/Sentory/releases)에서 PC에 맞는 파일을
 내려받으면 됩니다. macOS와 Linux 버전도 계획하고 있지만 아직 배포 일정은
 정해지지 않았습니다.
+
+새 메신저 지원과 동기화, 연속 사진 전송 개선을 포함한 전체 변경 내용은
+[1.5.0 릴리즈 노트](./docs/releases/1.5.0.md)에 정리되어 있습니다.
 
 | 사용 환경 | 설치형 | 포터블 |
 | --- | --- | --- |
@@ -82,8 +94,9 @@ SmartScreen 경고가 나타날 수 있습니다. 이 저장소의 공식 Releas
 ## 처음 사용하기
 
 1. Sentory를 실행합니다. 보관함 창과 작업 표시줄 아이콘이 함께 나타납니다.
-2. 카카오톡 개별 채팅창에 링크나 사진을 붙여넣습니다. Discord와 Slack에서는
-   붙여넣거나 탐색기에서 드롭한 내용을 실제로 전송해야 저장됩니다.
+2. 지원 메신저의 채팅 입력창에 링크나 사진을 붙여넣거나 탐색기에서 사진을
+   드롭합니다. Discord, Slack, WhatsApp, Telegram, LINE과 WeChat에서는
+   내용을 실제로 전송해야 저장됩니다.
 3. 보관함에서 카드를 열어 내용을 확인하거나 다시 복사합니다.
 
 새로 설치한 Sentory는 Windows 자동 실행이 기본으로 켜집니다. 원하지 않으면
@@ -102,7 +115,9 @@ Sentory는 실행 중인 Discord와 자동으로 연결을 준비합니다. 새 
 
 ## 알아둘 점
 
-Discord, Slack이나 카카오톡의 화면 구조가 바뀌면 감지가 일시적으로 멈출 수 있습니다.
+지원 메신저의 화면 구조가 바뀌면 감지가 일시적으로 멈출 수 있습니다.
+메신저의 `+` 버튼으로 파일 선택창을 여는 업로드는 감지를 보장하지 않으므로,
+사진은 채팅 입력창에 붙여넣거나 탐색기에서 드롭해 주세요.
 Windows on ARM용 파일은 빌드와 실행 파일 구조 검증을 마쳤지만 실제 ARM64
 장치에서의 최종 검수는 남아 있습니다.
 
@@ -121,7 +136,7 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 1.4.3
+.\scripts\Publish-Release.ps1 -Version 1.5.0
 ```
 
 배포 스크립트는 Windows x64·ARM64 설치형과 포터블 패키지, SHA-256 확인값,

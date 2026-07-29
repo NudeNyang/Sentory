@@ -43,6 +43,9 @@ supported messenger can be enabled or disabled separately in settings.
 - Use light or dark mode with Korean, English, Japanese, and Chinese interfaces
 - Start with Windows by default on new installations and manage the setting from the tray menu
 - Download verified updates in the background and install them from inside the app
+- Sync the library between Windows computers through OneDrive, Google Drive, Dropbox,
+  MEGA, or a folder selected manually
+- Auto-scroll at the library edges during range selection and use the mouse wheel while dragging
 
 ## Data storage
 
@@ -58,12 +61,21 @@ request to the website behind that link. Image OCR runs locally on Windows, and 
 recognized text is stored in the Sentory database for search. See the
 [privacy and local data notice](./privacy.md) for details.
 
+When sync between computers is enabled, photos are written as regular image files and
+links as readable TXT files inside the cloud folder you select. Sentory does not relay
+this data through a Sentory-operated server; the desktop client for your cloud provider
+transfers the files. Adds, deletes, favorites, and copy counts are reconciled between
+Windows computers connected to the same folder.
+
 ## Download
 
-The current stable version is **1.4.3**. It runs on 64-bit Windows 10 and 11. Download
+The current stable version is **1.5.0**. It runs on 64-bit Windows 10 and 11. Download
 the package for your PC from
 [Releases](https://github.com/NudeNyang/Sentory/releases). macOS and Linux versions
 are planned, but there is no release schedule yet.
+
+See the [Sentory 1.5.0 release notes](./releases/1.5.0.md) for the full list of new
+messenger support, sync features, and consecutive-send fixes.
 
 | System | Installer | Portable |
 | --- | --- | --- |
@@ -81,8 +93,9 @@ Release, and compare its SHA-256 value with the accompanying `.sha256` file if n
 ## Getting started
 
 1. Run Sentory. The library window and taskbar icon appear together.
-2. Paste a link or image into an individual KakaoTalk chat. In Discord and Slack, send
-   pasted or Explorer-dropped content before Sentory saves it.
+2. Paste a link or image into a supported chat, or drop an image from Explorer. In
+   Discord, Slack, WhatsApp, Telegram, LINE, and WeChat, send the content before
+   Sentory saves it.
 3. Open a card in the library to review, open, or copy its contents.
 
 New installations enable Start with Windows by default. You can turn it off from
@@ -100,7 +113,9 @@ argument, or is still loading a chat, continues without an unnecessary restart.
 
 ## Good to know
 
-Detection may temporarily stop if Discord, Slack, or KakaoTalk changes its interface. The
+Detection may temporarily stop if a supported messenger changes its interface. Uploads
+opened through a messenger's `+` file picker are not guaranteed to be detected; paste
+an image into the chat input or drop it from Explorer instead. The
 Windows on ARM packages have passed cross-build and executable architecture checks,
 but final testing on a physical ARM64 device is still pending.
 
@@ -119,7 +134,7 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 1.4.3
+.\scripts\Publish-Release.ps1 -Version 1.5.0
 ```
 
 The release script creates Windows x64 and ARM64 installers, portable packages,

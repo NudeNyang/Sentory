@@ -16,9 +16,13 @@
 - [공개 배포 절차](./05-release-and-distribution.md)
 - [성능 점검](./06-performance-audit.md)
 - [클라우드 동기화 설계와 구현 순서](./07-cloud-sync-design.md)
+- [읽을 수 있는 클라우드 저장 형식](./08-readable-cloud-storage.md)
+- [평문 클라우드 동기화 검수 안내](./09-readable-cloud-storage-qa.md)
+- [WebView2 갤러리 전환 로드맵](./10-webview2-gallery-roadmap.md)
 
 ## 릴리즈 기록
 
+- [1.5.0](./releases/1.5.0.md)
 - [1.4.3](./releases/1.4.3.md)
 - [1.4.2](./releases/1.4.2.md)
 - [1.4.1](./releases/1.4.1.md)
