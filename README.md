@@ -2,7 +2,7 @@
 
 [한국어](./README.md) | [English](./docs/README.en.md)
 
-<img width="2166" height="1547" alt="image" src="https://github.com/user-attachments/assets/989ecb23-eb72-43cf-8165-c43b2e2ba9dc" />
+<img width="2114" height="1578" alt="222" src="https://github.com/user-attachments/assets/66584bb8-b329-4371-9a69-42eea6056a8d" />
 
 > 이야기 속, 흩어진 순간들을 한 곳에
 
