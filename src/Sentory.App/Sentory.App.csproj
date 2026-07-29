@@ -6,18 +6,22 @@
     <ProjectReference Include="..\Sentory.Platform.Windows\Sentory.Platform.Windows.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
     <AssemblyName>Sentory</AssemblyName>
     <RootNamespace>Sentory.App</RootNamespace>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
-    <Version>1.5.0</Version>
-    <AssemblyVersion>1.5.0.0</AssemblyVersion>
-    <FileVersion>1.5.0.0</FileVersion>
+    <Version>1.6.0</Version>
+    <AssemblyVersion>1.6.0.0</AssemblyVersion>
+    <FileVersion>1.6.0.0</FileVersion>
     <SentoryBuildFlavor Condition="'$(SentoryBuildFlavor)' == ''">Developer</SentoryBuildFlavor>
-    <InformationalVersion Condition="'$(SentoryBuildFlavor)' == 'Public'">1.5.0</InformationalVersion>
-    <InformationalVersion Condition="'$(SentoryBuildFlavor)' == 'Developer'">1.5.0+developers</InformationalVersion>
+    <InformationalVersion Condition="'$(SentoryBuildFlavor)' == 'Public'">1.6.0</InformationalVersion>
+    <InformationalVersion Condition="'$(SentoryBuildFlavor)' == 'Developer'">1.6.0+developers</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Authors>NudeNyang</Authors>
     <Company>NudeNyang</Company>
@@ -37,6 +41,12 @@
   </Target>
 
   <ItemGroup>
+    <EmbeddedResource Include="GalleryWeb\index.html"
+                      LogicalName="Sentory.GalleryWeb.index.html" />
+    <EmbeddedResource Include="GalleryWeb\gallery.css"
+                      LogicalName="Sentory.GalleryWeb.gallery.css" />
+    <EmbeddedResource Include="GalleryWeb\gallery.js"
+                      LogicalName="Sentory.GalleryWeb.gallery.js" />
     <EmbeddedResource Include="..\..\LICENSE.txt"
                       Link="Resources\LICENSE.txt"
                       LogicalName="Sentory.LICENSE.txt" />
