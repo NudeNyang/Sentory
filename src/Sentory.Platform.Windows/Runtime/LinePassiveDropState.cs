@@ -8,6 +8,7 @@ internal sealed class LinePassiveDropState(
     private (int X, int Y) _start;
     private string[] _paths = [];
     private LineDropTarget? _target;
+    private LineDropTarget? _fallbackTarget;
     private bool _activated;
 
     public bool IsTracking => _paths.Length > 0;
@@ -46,9 +47,22 @@ internal sealed class LinePassiveDropState(
             return;
         }
 
-        if (_target is null || !Contains(_target.Bounds, cursor))
+        if (_target is not null && Contains(_target.Bounds, cursor))
         {
-            _target = null;
+            return;
+        }
+
+        _target = _fallbackTarget is not null &&
+                  Contains(_fallbackTarget.Bounds, cursor)
+            ? _fallbackTarget
+            : null;
+    }
+
+    public void RememberFallbackTarget(LineDropTarget target)
+    {
+        if (IsTracking)
+        {
+            _fallbackTarget = target;
         }
     }
 
@@ -73,6 +87,7 @@ internal sealed class LinePassiveDropState(
     {
         _paths = [];
         _target = null;
+        _fallbackTarget = null;
         _activated = false;
     }
 

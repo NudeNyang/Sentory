@@ -226,7 +226,8 @@ public sealed class LineDropOverlayRuntime : IDisposable
         {
             _leftWasDown = false;
             SharedExplorerImageDragSession.Current.End(
-                _lastSharedDragGeneration);
+                _lastSharedDragGeneration,
+                DateTimeOffset.UtcNow);
             _releaseTargetGraceFrames = ReleaseTargetGraceFrames;
             _releasedAt = DateTimeOffset.UtcNow;
         }
@@ -348,6 +349,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
         var target = _locator.FindVisibleMainWindow();
         if (target is not null)
         {
+            _dropState.RememberFallbackTarget(target);
             BeginPreDropBaselineCapture(target);
         }
     }

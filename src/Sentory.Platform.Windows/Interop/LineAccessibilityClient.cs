@@ -94,7 +94,7 @@ internal static class LineImageDialogSendButtonPolicy
         int screenY) =>
         bounds.Width >= 240 &&
         bounds.Height >= 180 &&
-        screenX >= bounds.Left + bounds.Width * 0.5 &&
+        screenX >= bounds.Left + bounds.Width * 0.4 &&
         screenX < bounds.Right &&
         screenY >= bounds.Top + bounds.Height * 0.65 &&
         screenY < bounds.Bottom;

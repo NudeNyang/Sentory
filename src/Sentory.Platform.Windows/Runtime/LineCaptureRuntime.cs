@@ -205,6 +205,21 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
         var foregroundIsLine = IsLineProcess(trigger.ForegroundProcessId);
         if (!pointIsLine && !foregroundIsLine)
         {
+            var pendingContext = FindLatestPendingImageContextAtPointer(
+                trigger.ScreenX,
+                trigger.ScreenY,
+                trigger.OccurredAt);
+            if (pendingContext is not null)
+            {
+                ReportRejectedPointer(
+                    trigger,
+                    _native.GetWindowBounds(pendingContext.MainWindow),
+                    pointIsLine: false,
+                    foregroundIsLine: false,
+                    pointProcessName: pointProcessName,
+                    reason: "non-line-surface");
+            }
+
             return;
         }
 
@@ -363,12 +378,47 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
         }
     }
 
+    private ValidatedLineContext? FindLatestPendingImageContextAtPointer(
+        int screenX,
+        int screenY,
+        DateTimeOffset occurredAt)
+    {
+        ValidatedLineContext[] contexts;
+        lock (_candidateGate)
+        {
+            contexts = _candidates
+                .Where(candidate =>
+                    candidate.Context.OccurredAt <= occurredAt &&
+                    candidate.Images.Count > 0 &&
+                    !candidate.IsSendObserved() &&
+                    !candidate.Cancellation.IsCancellationRequested)
+                .Select(candidate => candidate.Context)
+                .Concat(_pendingNativeDropContexts.Where(context =>
+                    context.OccurredAt <= occurredAt))
+                .DistinctBy(context => context.EventId)
+                .OrderByDescending(context => context.OccurredAt)
+                .ToArray();
+        }
+
+        return contexts.FirstOrDefault(context =>
+        {
+            var bounds = _native.GetWindowBounds(context.MainWindow);
+            return bounds.Width > 0 &&
+                   bounds.Height > 0 &&
+                   screenX >= bounds.Left &&
+                   screenX < bounds.Right &&
+                   screenY >= bounds.Top &&
+                   screenY < bounds.Bottom;
+        });
+    }
+
     private void ReportRejectedPointer(
         PointerTrigger trigger,
         WindowBounds bounds,
         bool pointIsLine,
         bool foregroundIsLine,
-        string? pointProcessName)
+        string? pointProcessName,
+        string reason = "unverified")
     {
         var xPermille = bounds.Width > 0
             ? (trigger.ScreenX - bounds.Left) * 1000 / bounds.Width
@@ -378,7 +428,7 @@ public sealed class LineCaptureRuntime : ICaptureRuntime
             : -1;
         _diagnostic?.Invoke(
             "line-send-pointer-rejected",
-            $"reason=unverified pointLine={pointIsLine} foregroundLine={foregroundIsLine} pointProcess={NormalizeProcessDiagnostic(pointProcessName)} xPermille={xPermille} yPermille={yPermille}");
+            $"reason={reason} pointLine={pointIsLine} foregroundLine={foregroundIsLine} pointProcess={NormalizeProcessDiagnostic(pointProcessName)} xPermille={xPermille} yPermille={yPermille}");
     }
 
     private static string NormalizeProcessDiagnostic(string? processName) =>

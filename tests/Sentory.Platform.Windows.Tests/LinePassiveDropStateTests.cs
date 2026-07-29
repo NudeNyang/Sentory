@@ -68,4 +68,31 @@ public sealed class LinePassiveDropStateTests
         Assert.Equal(Target, target);
         Assert.Equal(["one.png"], paths);
     }
+
+    [Fact]
+    public void UsesRememberedVisibleTargetWhenPreviewHidesItBeforeObservation()
+    {
+        var state = new LinePassiveDropState();
+        state.Begin((100, 100), ["one.png"]);
+        state.RememberFallbackTarget(Target);
+        state.Observe((250, 100), null);
+
+        state.Observe((450, 300), null);
+
+        Assert.True(state.TryTakeCompleted(out var target, out var paths));
+        Assert.Equal(Target, target);
+        Assert.Equal(["one.png"], paths);
+    }
+
+    [Fact]
+    public void RememberedVisibleTargetDoesNotAcceptReleaseOutsideItsBounds()
+    {
+        var state = new LinePassiveDropState();
+        state.Begin((100, 100), ["one.png"]);
+        state.RememberFallbackTarget(Target);
+
+        state.Observe((950, 300), null);
+
+        Assert.False(state.TryTakeCompleted(out _, out _));
+    }
 }

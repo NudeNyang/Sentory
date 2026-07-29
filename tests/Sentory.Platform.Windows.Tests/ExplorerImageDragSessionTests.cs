@@ -61,11 +61,11 @@ public sealed class ExplorerImageDragSessionTests
             ["photo.png"],
             observedAt);
 
-        session.End(generation);
+        session.End(generation, observedAt.AddSeconds(10));
 
         Assert.False(session.TryGet(observedAt, out _, out _, out _));
         Assert.True(session.TryGetRecent(
-            observedAt.AddMilliseconds(200),
+            observedAt.AddSeconds(10).AddMilliseconds(200),
             out var recentGeneration,
             out var start,
             out var paths));
@@ -89,7 +89,7 @@ public sealed class ExplorerImageDragSessionTests
             ["second.png"],
             observedAt.AddMilliseconds(10));
 
-        session.End(firstGeneration);
+        session.End(firstGeneration, observedAt.AddMilliseconds(20));
 
         Assert.True(session.TryGet(
             observedAt.AddMilliseconds(20),
@@ -113,6 +113,32 @@ public sealed class ExplorerImageDragSessionTests
         Assert.False(session.TryGet(observedAt, out _, out _, out _));
         Assert.False(session.TryGetRecent(
             observedAt,
+            out _,
+            out _,
+            out _));
+    }
+
+    [Fact]
+    public void EndedSelectionExpiresFromReleaseInsteadOfPublish()
+    {
+        var session = new ExplorerImageDragSession(
+            TimeSpan.FromMilliseconds(500));
+        var observedAt = DateTimeOffset.UtcNow;
+        var generation = session.Publish(
+            (40, 80),
+            ["photo.png"],
+            observedAt);
+        var releasedAt = observedAt.AddSeconds(5);
+
+        session.End(generation, releasedAt);
+
+        Assert.True(session.TryGetRecent(
+            releasedAt.AddMilliseconds(499),
+            out _,
+            out _,
+            out _));
+        Assert.False(session.TryGetRecent(
+            releasedAt.AddMilliseconds(501),
             out _,
             out _,
             out _));

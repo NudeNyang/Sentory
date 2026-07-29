@@ -187,7 +187,8 @@ internal sealed class PassiveMessengerDropRuntime<TTarget> : IDisposable
 
         _leftWasDown = false;
         SharedExplorerImageDragSession.Current.End(
-            _lastSharedDragGeneration);
+            _lastSharedDragGeneration,
+            DateTimeOffset.UtcNow);
         if (!_dropState.IsTracking)
         {
             return;

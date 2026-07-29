@@ -6,6 +6,7 @@ internal sealed class ExplorerImageDragSession(TimeSpan maximumAge)
     private (int X, int Y) _start;
     private string[] _paths = [];
     private DateTimeOffset _observedAt;
+    private DateTimeOffset _endedAt;
     private long _generation;
     private bool _active;
 
@@ -21,6 +22,7 @@ internal sealed class ExplorerImageDragSession(TimeSpan maximumAge)
             _start = start;
             _paths = paths.ToArray();
             _observedAt = observedAt;
+            _endedAt = default;
             _active = true;
             return _generation;
         }
@@ -37,7 +39,7 @@ internal sealed class ExplorerImageDragSession(TimeSpan maximumAge)
             generation = default;
             start = default;
             paths = [];
-            if (!_active || !IsRecent(now))
+            if (!_active || !IsPublishedRecently(now))
             {
                 return false;
             }
@@ -60,7 +62,7 @@ internal sealed class ExplorerImageDragSession(TimeSpan maximumAge)
             generation = default;
             start = default;
             paths = [];
-            if (!IsRecent(now))
+            if (_active ? !IsPublishedRecently(now) : !IsEndedRecently(now))
             {
                 return false;
             }
@@ -72,13 +74,14 @@ internal sealed class ExplorerImageDragSession(TimeSpan maximumAge)
         }
     }
 
-    public void End(long generation)
+    public void End(long generation, DateTimeOffset endedAt)
     {
         lock (_gate)
         {
-            if (_generation == generation)
+            if (_generation == generation && _active)
             {
                 _active = false;
+                _endedAt = endedAt;
             }
         }
     }
@@ -90,14 +93,23 @@ internal sealed class ExplorerImageDragSession(TimeSpan maximumAge)
             _active = false;
             _paths = [];
             _observedAt = default;
+            _endedAt = default;
         }
     }
 
-    private bool IsRecent(DateTimeOffset now)
+    private bool IsPublishedRecently(DateTimeOffset now)
     {
         return _paths.Length > 0 &&
                now >= _observedAt &&
                now - _observedAt <= maximumAge;
+    }
+
+    private bool IsEndedRecently(DateTimeOffset now)
+    {
+        return _paths.Length > 0 &&
+               _endedAt != default &&
+               now >= _endedAt &&
+               now - _endedAt <= maximumAge;
     }
 }
 

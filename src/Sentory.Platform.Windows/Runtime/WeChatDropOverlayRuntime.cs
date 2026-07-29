@@ -214,7 +214,8 @@ public sealed class WeChatDropOverlayRuntime : IDisposable
         {
             _leftWasDown = false;
             SharedExplorerImageDragSession.Current.End(
-                _lastSharedDragGeneration);
+                _lastSharedDragGeneration,
+                DateTimeOffset.UtcNow);
             _releaseTargetGraceFrames = ReleaseTargetGraceFrames;
             _releasedAt = DateTimeOffset.UtcNow;
         }

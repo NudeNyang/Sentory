@@ -290,7 +290,8 @@ public sealed class LineConfirmationPolicyTests
     [Theory]
     [InlineData(760, 650, true)]
     [InlineData(510, 650, true)]
-    [InlineData(490, 650, false)]
+    [InlineData(459, 725, true)]
+    [InlineData(390, 725, false)]
     [InlineData(760, 500, false)]
     public void ImageDialogSendPolicyUsesLowerRightButtonArea(
         int x,
