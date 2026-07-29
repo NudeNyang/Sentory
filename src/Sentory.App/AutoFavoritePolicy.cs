@@ -13,5 +13,5 @@ internal static class AutoFavoritePolicy
         enabled &&
         !isFavorite &&
         copyCount >= threshold &&
-        kind is ContentKind.Url or ContentKind.Image;
+        kind is ContentKind.Url or ContentKind.Image or ContentKind.Collection;
 }

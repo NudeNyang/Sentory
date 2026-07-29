@@ -275,6 +275,43 @@ async fn gallery_open(
 }
 
 #[tauri::command]
+async fn gallery_reveal(
+    app: AppHandle,
+    engine: State<'_, EngineClient>,
+    item_id: String,
+) -> Result<(), String> {
+    let detail = engine
+        .request(&app, "gallery-item", serde_json::json!(item_id))
+        .await?;
+    let target = resolve_open_target(&detail)
+        .ok_or_else(|| "열 수 있는 원본이 없습니다.".to_string())?;
+    let path = std::path::Path::new(&target);
+    if path.is_file() {
+        return reveal_file_in_explorer(path);
+    }
+    open::that_detached(target)
+        .map_err(|error| format!("원본 링크를 열지 못했습니다: {error}"))
+}
+
+#[cfg(target_os = "windows")]
+fn reveal_file_in_explorer(path: &std::path::Path) -> Result<(), String> {
+    std::process::Command::new("explorer.exe")
+        .arg(format!("/select,{}", path.display()))
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("원본 폴더를 열지 못했습니다: {error}"))
+}
+
+#[cfg(not(target_os = "windows"))]
+fn reveal_file_in_explorer(path: &std::path::Path) -> Result<(), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| "원본 폴더를 찾지 못했습니다.".to_string())?;
+    open::that_detached(parent)
+        .map_err(|error| format!("원본 폴더를 열지 못했습니다: {error}"))
+}
+
+#[tauri::command]
 async fn gallery_copy(
     app: AppHandle,
     engine: State<'_, EngineClient>,
@@ -559,18 +596,27 @@ fn resolve_open_target(detail: &serde_json::Value) -> Option<String> {
     let card = detail.get("card")?;
     match card.get("kind")?.as_str()? {
         "Image" => detail.get("contentPath")?.as_str().map(str::to_owned),
-        "Collection" => detail
-            .get("members")?
-            .as_array()?
-            .iter()
-            .find_map(|member| {
-                member
-                    .get("contentPath")
-                    .and_then(serde_json::Value::as_str)
-                    .or_else(|| member.get("originalUrl").and_then(serde_json::Value::as_str))
-                    .filter(|value| !value.is_empty())
-                    .map(str::to_owned)
-            }),
+        "Collection" => {
+            let members = detail.get("members")?.as_array()?;
+            members
+                .iter()
+                .find_map(|member| {
+                    member
+                        .get("contentPath")
+                        .and_then(serde_json::Value::as_str)
+                        .filter(|value| !value.is_empty())
+                        .map(str::to_owned)
+                })
+                .or_else(|| {
+                    members.iter().find_map(|member| {
+                        member
+                            .get("originalUrl")
+                            .and_then(serde_json::Value::as_str)
+                            .filter(|value| !value.is_empty())
+                            .map(str::to_owned)
+                    })
+                })
+        }
         _ => card
             .get("originalUrl")?
             .as_str()
@@ -725,6 +771,22 @@ mod tests {
         assert!(text.contains("GNU GENERAL PUBLIC LICENSE"));
         assert!(text.contains("Third-Party Notices"));
         assert!(text.contains("OCR 모델 출처와 무결성"));
+    }
+
+    #[test]
+    fn collection_open_target_prefers_a_saved_photo_over_a_link() {
+        let detail = serde_json::json!({
+            "card": { "kind": "Collection" },
+            "members": [
+                { "kind": "Url", "originalUrl": "https://example.com" },
+                { "kind": "Image", "contentPath": "C:\\Sentory\\photo.png" }
+            ]
+        });
+
+        assert_eq!(
+            resolve_open_target(&detail).as_deref(),
+            Some("C:\\Sentory\\photo.png")
+        );
     }
 
     #[test]
@@ -1261,6 +1323,7 @@ fn main() {
             gallery_favorite,
             gallery_delete,
             gallery_open,
+            gallery_reveal,
             gallery_copy,
             gallery_detail_target_open,
             gallery_detail_target_copy,

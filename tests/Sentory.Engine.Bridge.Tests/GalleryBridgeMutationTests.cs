@@ -86,6 +86,64 @@ public sealed class GalleryBridgeMutationTests : IDisposable
         Assert.True((await repository.GetGalleryItemAsync(captured.ItemId))!.IsFavorite);
     }
 
+    [Fact]
+    public async Task RepeatedCopyAutomaticallyFavoritesCollection()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var repository = new SqliteCaptureRepository(paths);
+        await repository.InitializeAsync();
+        CollectionMemberCaptureRequest[] members =
+        [
+            new(
+                ContentKind.Url,
+                "https://example.com/collection/first",
+                "https://example.com/collection/first",
+                "example.com",
+                ReadOnlyMemory<byte>.Empty,
+                null,
+                0,
+                0,
+                null,
+                null),
+            new(
+                ContentKind.Url,
+                "https://example.org/collection/second",
+                "https://example.org/collection/second",
+                "example.org",
+                ReadOnlyMemory<byte>.Empty,
+                null,
+                0,
+                0,
+                null,
+                null)
+        ];
+        var captured = await repository.UpsertCollectionAsync(new CollectionCaptureRequest(
+            Guid.NewGuid(),
+            CaptureCollectionIdentity.CreateSignature(members),
+            members,
+            SourceApp.Line,
+            CaptureMethod.LineConfirmedSend,
+            DeliveryStatus.NotObserved,
+            "bridge-collection-test",
+            DateTimeOffset.Now,
+            ["test"]));
+        var settingsStore = new SentorySettingsStore(paths);
+        var settings = settingsStore.Load();
+        settings.AutoFavoriteEnabled = true;
+        settings.AutoFavoriteCopyThreshold = 2;
+        settings.AutoFavoriteChangedAt = DateTimeOffset.UtcNow;
+        settingsStore.Save(settings);
+        var service = new GalleryBridgeService(repository, paths);
+        var id = captured.ItemId.ToString("N");
+
+        var first = await service.RecordCopyAsync(id);
+        var second = await service.RecordCopyAsync(id);
+
+        Assert.False(first.IsFavorite);
+        Assert.True(second.IsFavorite);
+        Assert.True((await repository.GetGalleryItemAsync(captured.ItemId))!.IsFavorite);
+    }
+
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();

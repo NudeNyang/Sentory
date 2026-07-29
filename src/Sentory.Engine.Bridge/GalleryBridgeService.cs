@@ -154,7 +154,7 @@ public sealed class GalleryBridgeService(
         if (settings.AutoFavoriteEnabled &&
             !isFavorite &&
             copyCount >= settings.AutoFavoriteCopyThreshold &&
-            item.Kind is ContentKind.Url or ContentKind.Image)
+            item.Kind is ContentKind.Url or ContentKind.Image or ContentKind.Collection)
         {
             isFavorite = await repository.SetFavoriteAsync(
                 id,

@@ -115,6 +115,13 @@
       </section>
     </main>
 
+    <div id="card-context-menu" class="card-context-menu" role="menu" hidden>
+      <button id="context-favorite" type="button" role="menuitem">즐겨찾기에 추가</button>
+      <button id="context-copy" type="button" role="menuitem">복사</button>
+      <button id="context-reveal" type="button" role="menuitem">원본 폴더 열기</button>
+      <button id="context-delete" class="danger-text" type="button" role="menuitem">삭제</button>
+    </div>
+
     <div id="detail-layer" class="modal-layer" hidden>
       <section class="detail-dialog" role="dialog" aria-modal="true" aria-labelledby="detail-title">
         <div class="detail-titlebar">
@@ -249,15 +256,15 @@
           <h3 id="app-info-heading">앱 정보</h3>
           <section class="settings-card app-info-card">
             <div class="setting-row">
-              <span><strong>Sentory</strong><small id="version-label">버전 2.0.0 · for Developers</small></span>
-              <span class="app-links">© 2026 <span aria-hidden="true">·</span> <a href="https://x.com/NudeNyang_VRC" data-external-url>NudeNyang</a> <span aria-hidden="true">·</span> <a href="https://github.com/NudeNyang/Sentory" data-external-url>GitHub</a></span>
+              <span><strong class="app-product-name">Sentory</strong><small id="version-label" class="app-version">버전 2.0.0 · for Developers</small></span>
+              <span class="app-links">© 2026 <span aria-hidden="true">·</span> <a class="app-author-link" href="https://x.com/NudeNyang_VRC" data-external-url>NudeNyang</a> <span aria-hidden="true">·</span> <a class="app-github-link" href="https://github.com/NudeNyang/Sentory" data-external-url>GitHub</a></span>
             </div>
             <div class="setting-row">
-              <span><strong id="update-title">수동 업데이트 확인</strong><small id="update-description">자동 확인 대기 시간과 관계없이 새 버전을 확인합니다</small></span>
+              <span><strong id="update-title" class="app-update-title">수동 업데이트 확인</strong><small id="update-description" class="app-update-description">자동 확인 대기 시간과 관계없이 새 버전을 확인합니다</small></span>
               <button id="update-check" class="settings-action" type="button">지금 확인</button>
             </div>
             <div class="setting-row">
-              <span><strong id="copyright-label">Copyright © 2026 NudeNyang</strong><small id="license-summary">GNU GPL v3에 따라 이용 가능</small></span>
+              <span><strong id="copyright-label" class="app-copyright">Copyright © 2026 NudeNyang</strong><small id="license-summary" class="app-license-summary">GNU GPL v3에 따라 이용 가능</small></span>
               <button id="view-license" class="settings-action" type="button">라이선스 보기</button>
             </div>
           </section>

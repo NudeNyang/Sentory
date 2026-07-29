@@ -400,6 +400,44 @@ button { color: inherit; }
 .card.selected { border-color: var(--selection-border); box-shadow: inset 0 0 0 1px var(--selection-border); }
 .card.selected::after { position: absolute; z-index: 1; inset: 1px; border: 1px solid var(--selection-border); border-radius: 15px; background: var(--selection-tint); content: ""; pointer-events: none; }
 
+.card-context-menu {
+  position: fixed;
+  z-index: 180;
+  min-width: 145px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 8px 22px rgba(41, 39, 34, 0.13);
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Malgun Gothic", sans-serif;
+  font-size: 12px;
+}
+
+.card-context-menu[hidden] { display: none; }
+
+.card-context-menu button {
+  display: block;
+  width: 100%;
+  height: 34px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.card-context-menu button:hover,
+.card-context-menu button:focus-visible {
+  outline: 0;
+  background: var(--status-background);
+}
+
+.card-context-menu .danger-text { color: var(--danger); }
+
 .artwork {
   position: relative;
   display: grid;
@@ -584,7 +622,7 @@ body.selection-mode .favorite { display: none; }
 .gallery-region.scrolling .scroll-indicator { opacity: 1; }
 .scroll-indicator-thumb { position: absolute; top: 0; right: 3px; width: 3px; min-height: 32px; border-radius: 3px; background: var(--scroll); }
 
-.selection-rectangle { position: absolute; z-index: 55; border: 1.5px solid var(--accent); border-radius: 4px; background: var(--selection-tint); pointer-events: none; }
+.selection-rectangle { position: absolute; z-index: 55; border: 1.5px solid var(--accent); border-radius: 4px; background: color-mix(in srgb, var(--accent) 10%, transparent); pointer-events: none; }
 .selection-bar { position: absolute; z-index: 60; bottom: 22px; left: 50%; display: flex; align-items: center; gap: 4px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: 0 10px 30px rgba(41, 39, 34, 0.14); transform: translateX(-50%); }
 .selection-bar[hidden] { display: none; }
 .selection-bar strong { margin: 0 8px 0 2px; font-size: 12px; }
@@ -778,9 +816,19 @@ body.selection-mode .favorite { display: none; }
 .inline-setting-actions .wpf-select { width: auto; min-width: 0; }
 .inline-setting-actions .wpf-select-trigger { height: 36px; font-size: 11px; }
 .data-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; }
-.app-info-card .app-links { display: block; color: var(--muted); font-size: 10.5px; white-space: nowrap; }
-.app-info-card .app-links a { color: inherit; text-decoration: none; }
-.app-info-card .app-links a:hover { color: var(--text); text-decoration: underline; }
+#app-info-heading { font-size: 12px; }
+.app-info-card .app-product-name { color: var(--text); font-size: 14px; font-weight: 600; line-height: normal; }
+.app-info-card .app-version { color: var(--muted); font-size: 11px; line-height: normal; }
+.app-info-card .app-links { display: block; color: var(--muted); font-size: 10px; line-height: normal; white-space: nowrap; }
+.app-info-card .app-links a { text-decoration: none; }
+.app-info-card .app-author-link { color: var(--text); font-weight: 600; }
+.app-info-card .app-github-link { color: var(--accent); font-weight: 400; }
+.app-info-card .app-links a:hover { text-decoration: underline; }
+.app-info-card .app-update-title { color: var(--text); font-size: 11px; font-weight: 600; line-height: normal; }
+.app-info-card .app-update-description { color: var(--muted); font-size: 10.5px; line-height: normal; }
+.app-info-card .app-copyright { color: var(--muted); font-size: 10.5px; font-weight: 400; line-height: normal; }
+.app-info-card .app-license-summary { color: var(--text); font-size: 11px; line-height: normal; }
+.app-info-card .settings-action { height: 38px; min-height: 38px; padding: 0 15px; border-radius: 9px; font-size: 12px; }
 .license-dialog { display: grid; grid-template-rows: auto minmax(0, 1fr); width: min(680px, calc(100vw - 48px)); height: min(720px, calc(100vh - 48px)); overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--window); box-shadow: 0 22px 64px rgba(21, 23, 25, 0.25); }
 .license-header { position: relative; padding: 26px 30px 18px; }
 .license-header h2 { margin: 0; font-size: 24px; font-weight: 600; }

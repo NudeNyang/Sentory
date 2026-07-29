@@ -7,6 +7,7 @@ public sealed class AutoFavoritePolicyTests
     [Theory]
     [InlineData(ContentKind.Url)]
     [InlineData(ContentKind.Image)]
+    [InlineData(ContentKind.Collection)]
     public void AddsSupportedItemAtOrAboveThreshold(ContentKind kind)
     {
         Assert.True(AutoFavoritePolicy.ShouldAdd(
@@ -25,7 +26,6 @@ public sealed class AutoFavoritePolicyTests
 
     [Theory]
     [InlineData(ContentKind.File)]
-    [InlineData(ContentKind.Collection)]
     public void IgnoresUnsupportedItemKinds(ContentKind kind)
     {
         Assert.False(AutoFavoritePolicy.ShouldAdd(
