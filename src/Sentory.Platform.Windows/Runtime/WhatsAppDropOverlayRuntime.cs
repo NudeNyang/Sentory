@@ -19,6 +19,7 @@ public sealed class WhatsAppDropOverlayRuntime : IDisposable
     private readonly WhatsAppPassiveDropState _dropState = new();
     private bool _started;
     private bool _leftWasDown;
+    private long _lastSharedDragGeneration;
     private bool _hasPointerUpSample;
     private (int X, int Y) _lastPointerUpPosition;
     private nint _lastPointerUpExplorer;
@@ -77,6 +78,7 @@ public sealed class WhatsAppDropOverlayRuntime : IDisposable
         var cursor = _dropWindows.GetCursorPosition();
         if (_leftWasDown && _dropWindows.IsEscapeKeyDown())
         {
+            SharedExplorerImageDragSession.Current.Clear();
             ResetDrag();
             _diagnostic?.Invoke(
                 "whatsapp-drop-cancelled",
@@ -86,6 +88,12 @@ public sealed class WhatsAppDropOverlayRuntime : IDisposable
 
         if (!leftDown)
         {
+            if (!_dropState.IsTracking &&
+                TryJoinSharedExplorerDrag(includeEnded: true))
+            {
+                _leftWasDown = true;
+            }
+
             CompleteDrag(cursor);
             RememberPointerUp(cursor);
             return;
@@ -95,6 +103,11 @@ public sealed class WhatsAppDropOverlayRuntime : IDisposable
         {
             _leftWasDown = true;
             BeginPossibleExplorerDrag(cursor);
+        }
+
+        if (!_dropState.IsTracking)
+        {
+            TryJoinSharedExplorerDrag();
         }
 
         if (_dropState.IsTracking)
@@ -146,7 +159,8 @@ public sealed class WhatsAppDropOverlayRuntime : IDisposable
             return;
         }
 
-        SharedExplorerImageDragSession.Current.Publish(
+        _lastSharedDragGeneration =
+            SharedExplorerImageDragSession.Current.Publish(
             start,
             paths,
             DateTimeOffset.UtcNow);
@@ -156,20 +170,30 @@ public sealed class WhatsAppDropOverlayRuntime : IDisposable
             $"files={paths.Length}");
     }
 
-    private bool TryJoinSharedExplorerDrag()
+    private bool TryJoinSharedExplorerDrag(bool includeEnded = false)
     {
-        if (!SharedExplorerImageDragSession.Current.TryGet(
+        var shared = SharedExplorerImageDragSession.Current;
+        var found = includeEnded
+            ? shared.TryGetRecent(
                 DateTimeOffset.UtcNow,
+                out var generation,
                 out var start,
-                out var paths))
+                out var paths)
+            : shared.TryGet(
+                DateTimeOffset.UtcNow,
+                out generation,
+                out start,
+                out paths);
+        if (!found || generation == _lastSharedDragGeneration)
         {
             return false;
         }
 
+        _lastSharedDragGeneration = generation;
         _dropState.Begin(start, paths);
         _diagnostic?.Invoke(
             "whatsapp-drop-selection-observed",
-            $"files={paths.Count}, source=shared");
+            $"files={paths.Count}, source={(includeEnded ? "shared-release" : "shared")}");
         return true;
     }
 
@@ -181,6 +205,8 @@ public sealed class WhatsAppDropOverlayRuntime : IDisposable
         }
 
         _leftWasDown = false;
+        SharedExplorerImageDragSession.Current.End(
+            _lastSharedDragGeneration);
         if (!_dropState.IsTracking)
         {
             return;

@@ -25,6 +25,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
         new(ExplorerOriginMaximumAge);
     private bool _started;
     private bool _leftWasDown;
+    private long _lastSharedDragGeneration;
     private int _releaseTargetGraceFrames;
     private DateTimeOffset _releasedAt;
     private nint _preDropBaselineWindow;
@@ -86,6 +87,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
         var cursor = _dropWindows.GetCursorPosition();
         if (_leftWasDown && _dropWindows.IsEscapeKeyDown())
         {
+            SharedExplorerImageDragSession.Current.Clear();
             ResetDrag();
             _diagnostic?.Invoke("line-drop-cancelled", "reason=escape");
             return;
@@ -93,6 +95,13 @@ public sealed class LineDropOverlayRuntime : IDisposable
 
         if (!leftDown)
         {
+            if (_releaseTargetGraceFrames <= 0 &&
+                !_dropState.IsTracking &&
+                TryJoinSharedExplorerDrag(includeEnded: true))
+            {
+                _leftWasDown = true;
+            }
+
             CompleteDrag(cursor);
             RememberPointerUp(cursor);
             BeginIdleBaselineRefresh();
@@ -111,6 +120,11 @@ public sealed class LineDropOverlayRuntime : IDisposable
         {
             _leftWasDown = true;
             BeginPossibleExplorerDrag(cursor);
+        }
+
+        if (!_dropState.IsTracking)
+        {
+            TryJoinSharedExplorerDrag();
         }
 
         if (_dropState.IsTracking)
@@ -166,7 +180,8 @@ public sealed class LineDropOverlayRuntime : IDisposable
             return;
         }
 
-        SharedExplorerImageDragSession.Current.Publish(
+        _lastSharedDragGeneration =
+            SharedExplorerImageDragSession.Current.Publish(
             start,
             paths,
             DateTimeOffset.UtcNow);
@@ -177,21 +192,31 @@ public sealed class LineDropOverlayRuntime : IDisposable
             $"files={paths.Length}");
     }
 
-    private bool TryJoinSharedExplorerDrag()
+    private bool TryJoinSharedExplorerDrag(bool includeEnded = false)
     {
-        if (!SharedExplorerImageDragSession.Current.TryGet(
+        var shared = SharedExplorerImageDragSession.Current;
+        var found = includeEnded
+            ? shared.TryGetRecent(
                 DateTimeOffset.UtcNow,
+                out var generation,
                 out var start,
-                out var paths))
+                out var paths)
+            : shared.TryGet(
+                DateTimeOffset.UtcNow,
+                out generation,
+                out start,
+                out paths);
+        if (!found || generation == _lastSharedDragGeneration)
         {
             return false;
         }
 
+        _lastSharedDragGeneration = generation;
         _dropState.Begin(start, paths);
         BeginPreDropBaselineCaptureFromVisibleWindow();
         _diagnostic?.Invoke(
             "line-drop-selection-observed",
-            $"files={paths.Count}, source=shared");
+            $"files={paths.Count}, source={(includeEnded ? "shared-release" : "shared")}");
         return true;
     }
 
@@ -200,6 +225,8 @@ public sealed class LineDropOverlayRuntime : IDisposable
         if (_leftWasDown)
         {
             _leftWasDown = false;
+            SharedExplorerImageDragSession.Current.End(
+                _lastSharedDragGeneration);
             _releaseTargetGraceFrames = ReleaseTargetGraceFrames;
             _releasedAt = DateTimeOffset.UtcNow;
         }

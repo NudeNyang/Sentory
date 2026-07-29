@@ -30,6 +30,7 @@ internal sealed class PassiveMessengerDropRuntime<TTarget> : IDisposable
         new(ExplorerOriginMaximumAge);
     private bool _started;
     private bool _leftWasDown;
+    private long _lastSharedDragGeneration;
 
     public PassiveMessengerDropRuntime(
         INativeWindowApi native,
@@ -102,6 +103,12 @@ internal sealed class PassiveMessengerDropRuntime<TTarget> : IDisposable
 
         if (!leftDown)
         {
+            if (!_dropState.IsTracking &&
+                JoinSharedExplorerDrag(includeEnded: true))
+            {
+                _leftWasDown = true;
+            }
+
             CompleteDrag(cursor);
             RememberPointerUp(cursor);
             return;
@@ -160,7 +167,8 @@ internal sealed class PassiveMessengerDropRuntime<TTarget> : IDisposable
             return;
         }
 
-        SharedExplorerImageDragSession.Current.Publish(
+        _lastSharedDragGeneration =
+            SharedExplorerImageDragSession.Current.Publish(
             start,
             paths,
             DateTimeOffset.UtcNow);
@@ -178,7 +186,8 @@ internal sealed class PassiveMessengerDropRuntime<TTarget> : IDisposable
         }
 
         _leftWasDown = false;
-        SharedExplorerImageDragSession.Current.Clear();
+        SharedExplorerImageDragSession.Current.End(
+            _lastSharedDragGeneration);
         if (!_dropState.IsTracking)
         {
             return;
@@ -195,20 +204,30 @@ internal sealed class PassiveMessengerDropRuntime<TTarget> : IDisposable
         }
     }
 
-    private bool JoinSharedExplorerDrag()
+    private bool JoinSharedExplorerDrag(bool includeEnded = false)
     {
-        if (!SharedExplorerImageDragSession.Current.TryGet(
+        var shared = SharedExplorerImageDragSession.Current;
+        var found = includeEnded
+            ? shared.TryGetRecent(
                 DateTimeOffset.UtcNow,
+                out var generation,
                 out var start,
-                out var paths))
+                out var paths)
+            : shared.TryGet(
+                DateTimeOffset.UtcNow,
+                out generation,
+                out start,
+                out paths);
+        if (!found || generation == _lastSharedDragGeneration)
         {
             return false;
         }
 
+        _lastSharedDragGeneration = generation;
         _dropState.Begin(start, paths);
         _diagnostic?.Invoke(
             $"{_diagnosticPrefix}-drop-selection-observed",
-            $"files={paths.Count}, source=shared");
+            $"files={paths.Count}, source={(includeEnded ? "shared-release" : "shared")}");
         return true;
     }
 
