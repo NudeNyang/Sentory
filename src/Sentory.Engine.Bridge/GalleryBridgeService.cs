@@ -253,6 +253,7 @@ public sealed record GalleryCardDto(
     string TypeLabel,
     string DateLabel,
     string StatusLabel,
+    string DeliveryStatus,
     string OriginalUrl,
     string Domain,
     string SourceApp,
@@ -308,6 +309,7 @@ public static class GalleryCardProjection
             item.DeliveryStatus == DeliveryStatus.NotObserved
                 ? "입력 시 저장됨"
                 : "전송 시 저장됨",
+            item.DeliveryStatus.ToString(),
             item.OriginalUrl,
             item.Domain,
             item.LastSourceApp.ToString(),

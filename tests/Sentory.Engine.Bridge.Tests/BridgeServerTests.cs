@@ -88,6 +88,31 @@ public sealed class BridgeServerTests : IDisposable
         Assert.True(recovered.RootElement.GetProperty("ok").GetBoolean());
     }
 
+    [Fact]
+    public async Task ShutdownRepliesOnceAndStopsReadingRequests()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var repository = new SqliteCaptureRepository(paths);
+        await repository.InitializeAsync();
+        var server = new BridgeServer(new GalleryBridgeService(repository, paths));
+        using var reader = new StringReader(
+            "{\"id\":9,\"command\":\"shutdown\",\"payload\":null}\n" +
+            "{\"id\":10,\"command\":\"health\",\"payload\":null}");
+        using var writer = new StringWriter();
+
+        await server.RunAsync(reader, writer);
+
+        var responses = writer.ToString()
+            .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        Assert.Single(responses);
+        using var shutdown = JsonDocument.Parse(responses[0]);
+        Assert.True(shutdown.RootElement.GetProperty("ok").GetBoolean());
+        Assert.Equal("stopping", shutdown.RootElement
+            .GetProperty("result")
+            .GetProperty("status")
+            .GetString());
+    }
+
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();

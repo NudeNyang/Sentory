@@ -80,6 +80,28 @@ impl EngineClient {
         }
         Err("C# 엔진 연결을 복구하지 못했습니다.".to_string())
     }
+
+    async fn stop(&self) {
+        let mut process = self.process.lock().await;
+        let Some(mut running) = process.take() else {
+            return;
+        };
+        let request_id = self.next_request_id.fetch_add(1, Ordering::Relaxed) + 1;
+        if let Err(error) = send_engine_request(
+            &mut running,
+            request_id,
+            "shutdown",
+            &serde_json::Value::Null,
+        )
+        .await
+        {
+            let detail = match error {
+                EngineCallError::Restartable(message) | EngineCallError::Request(message) => message,
+            };
+            append_diagnostic("engine-shutdown-failed", &detail);
+            let _ = running.child.kill();
+        }
+    }
 }
 
 fn spawn_engine(app: &AppHandle) -> Result<EngineProcess, String> {
@@ -245,6 +267,31 @@ async fn gallery_copy(
         .await
 }
 
+#[tauri::command]
+async fn settings_get(
+    app: AppHandle,
+    engine: State<'_, EngineClient>,
+) -> Result<serde_json::Value, String> {
+    engine.request(&app, "settings-get", serde_json::Value::Null).await
+}
+
+#[tauri::command]
+async fn settings_update(
+    app: AppHandle,
+    engine: State<'_, EngineClient>,
+    patch: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    engine.request(&app, "settings-update", patch).await
+}
+
+#[tauri::command]
+async fn discord_repair(
+    app: AppHandle,
+    engine: State<'_, EngineClient>,
+) -> Result<serde_json::Value, String> {
+    engine.request(&app, "discord-repair", serde_json::Value::Null).await
+}
+
 fn resolve_open_target(detail: &serde_json::Value) -> Option<String> {
     let card = detail.get("card")?;
     match card.get("kind")?.as_str()? {
@@ -376,7 +423,8 @@ fn diagnostic_path() -> Option<PathBuf> {
 fn main() {
     let engine = EngineClient::default();
     let setup_engine = engine.clone();
-    tauri::Builder::default()
+    let shutdown_engine = engine.clone();
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(engine)
         .setup(move |app| {
@@ -410,6 +458,32 @@ fn main() {
                         }
                         Err(error) => append_diagnostic("gallery-monitor-failed", &error),
                     }
+                    match client
+                        .request(&handle, "runtime-poll", serde_json::Value::Null)
+                        .await
+                    {
+                        Ok(poll) => {
+                            if let Some(status) = poll.get("status") {
+                                let _ = handle.emit("runtime-status", status.clone());
+                            }
+                            if let Some(events) = poll.get("events").and_then(serde_json::Value::as_array) {
+                                for event in events {
+                                    let Some(event_type) = event.get("type").and_then(serde_json::Value::as_str) else {
+                                        continue;
+                                    };
+                                    let payload = event.get("payload").cloned().unwrap_or(serde_json::Value::Null);
+                                    let event_name = match event_type {
+                                        "captured" => "capture-event",
+                                        "runtime-issue" => "runtime-issue",
+                                        "settings-changed" => "settings-changed",
+                                        _ => "runtime-status",
+                                    };
+                                    let _ = handle.emit(event_name, payload);
+                                }
+                            }
+                        }
+                        Err(error) => append_diagnostic("runtime-poll-failed", &error),
+                    }
                 }
             });
             Ok(())
@@ -422,8 +496,16 @@ fn main() {
             gallery_delete,
             gallery_open,
             gallery_copy,
+            settings_get,
+            settings_update,
+            discord_repair,
             ui_diagnostic
         ])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .expect("Sentory Tauri UI를 실행하지 못했습니다.");
+    app.run(move |_handle, event| {
+        if matches!(event, tauri::RunEvent::Exit) {
+            tauri::async_runtime::block_on(shutdown_engine.stop());
+        }
+    });
 }

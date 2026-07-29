@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>sentory-engine</AssemblyName>
@@ -12,6 +12,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Sentory.Core\Sentory.Core.csproj" />
     <ProjectReference Include="..\Sentory.Infrastructure\Sentory.Infrastructure.csproj" />
+    <ProjectReference Include="..\Sentory.Platform.Windows\Sentory.Platform.Windows.csproj" />
   </ItemGroup>
 
 </Project>

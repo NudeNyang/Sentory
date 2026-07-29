@@ -3,7 +3,9 @@ using System.Text.Json.Serialization;
 
 namespace Sentory.Engine.Bridge;
 
-public sealed class BridgeServer(GalleryBridgeService gallery)
+public sealed class BridgeServer(
+    GalleryBridgeService gallery,
+    EngineRuntimeHost? runtime = null)
 {
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -30,12 +32,17 @@ public sealed class BridgeServer(GalleryBridgeService gallery)
             }
 
             BridgeResponse response;
+            var stopAfterResponse = false;
             try
             {
                 var request = JsonSerializer.Deserialize<BridgeRequest>(
                     line,
                     JsonOptions) ?? throw new JsonException(
                     "브리지 요청이 비어 있습니다.");
+                stopAfterResponse = string.Equals(
+                    request.Command.Trim(),
+                    "shutdown",
+                    StringComparison.OrdinalIgnoreCase);
                 var result = await DispatchAsync(request, cancellationToken);
                 response = new BridgeResponse(request.Id, true, result, null);
             }
@@ -53,6 +60,10 @@ public sealed class BridgeServer(GalleryBridgeService gallery)
                 response,
                 JsonOptions));
             await output.FlushAsync(cancellationToken);
+            if (stopAfterResponse)
+            {
+                break;
+            }
         }
     }
 
@@ -90,10 +101,20 @@ public sealed class BridgeServer(GalleryBridgeService gallery)
             "gallery-copy-record" => await gallery.RecordCopyAsync(
                 ReadString(request.Payload, "항목 ID"),
                 cancellationToken),
+            "settings-get" => RequireRuntime().GetSettings(),
+            "settings-update" => await RequireRuntime().UpdateSettingsAsync(
+                request.Payload.Deserialize<EngineSettingsPatchDto>(JsonOptions) ??
+                throw new ArgumentException("설정 변경 요청을 읽지 못했습니다.")),
+            "runtime-poll" => RequireRuntime().Poll(),
+            "discord-repair" => await RequireRuntime().RepairDiscordAsync(),
+            "shutdown" => new { status = "stopping" },
             _ => throw new ArgumentException(
                 $"지원하지 않는 브리지 명령입니다: {request.Command}")
         };
     }
+
+    private EngineRuntimeHost RequireRuntime() => runtime ??
+        throw new InvalidOperationException("감지 런타임을 사용할 수 없습니다.");
 
     private async Task<GalleryMutationDto> DispatchFavoriteAsync(
         JsonElement payload,

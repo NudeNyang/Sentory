@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Sentory.Infrastructure.Data;
+using Sentory.Platform.Windows.Interop;
+using Sentory.Platform.Windows.Runtime;
 
 namespace Sentory.Engine.Bridge;
 
@@ -17,6 +19,20 @@ internal static class Program
     {
         try
         {
+            if (args.Contains(
+                    DiscordWorkerClient.WorkerArgument,
+                    StringComparer.OrdinalIgnoreCase))
+            {
+                using var workerInput = new StreamReader(Console.OpenStandardInput());
+                using var workerOutput = new StreamWriter(Console.OpenStandardOutput())
+                {
+                    AutoFlush = true
+                };
+                return await DiscordAccessibilityWorker.RunAsync(
+                    workerInput,
+                    workerOutput);
+            }
+
             var command = args.FirstOrDefault()?.Trim().ToLowerInvariant();
             if (command == "health")
             {
@@ -41,7 +57,9 @@ internal static class Program
                 {
                     AutoFlush = true
                 };
-                await new BridgeServer(service).RunAsync(input, output);
+                await using var runtime = new EngineRuntimeHost(repository, paths);
+                await runtime.StartAsync();
+                await new BridgeServer(service, runtime).RunAsync(input, output);
                 return 0;
             }
 
