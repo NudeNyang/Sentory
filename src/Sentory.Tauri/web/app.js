@@ -599,13 +599,15 @@ function applyRuntimeStatus(runtime) {
   if (runtime) state.runtimeStatus = runtime;
   const enabled = Boolean(state.settings?.sources?.Discord);
   const running = Boolean(state.runtimeStatus?.discordRunning);
-  detectionStatus.hidden = !enabled || !running;
+  let headerStatusVisible = false;
   if (enabled && running) {
     const label = sourceRuntimeLabel("Discord");
+    headerStatusVisible = label.tone !== "ready";
     detectionStatusText.textContent = label.text;
     detectionStatus.classList.toggle("issue", label.tone === "issue");
     detectionStatus.classList.toggle("ready", label.tone === "ready");
   }
+  detectionStatus.hidden = !headerStatusVisible;
   renderSourceSettings();
   void configureTray();
 }
@@ -1141,24 +1143,31 @@ function setSelectionMode(enabled) {
   document.querySelector("#select-label").textContent = t(enabled ? "selectExit" : "select");
   if (!enabled) state.selectedIds.clear();
   updateSelectionUi();
-  state.renderRevision += 1;
-  state.renderedRange = "";
-  renderVisibleCards();
+  updateVisibleSelectionVisuals();
 }
 
 function toggleSelection(itemId) {
   if (state.selectedIds.has(itemId)) state.selectedIds.delete(itemId);
   else state.selectedIds.add(itemId);
   updateSelectionUi();
-  state.renderRevision += 1;
-  state.renderedRange = "";
-  renderVisibleCards();
+  updateVisibleSelectionVisuals();
 }
 
 function updateSelectionUi() {
   selectionBar.hidden = !state.selectionMode;
   selectedCount.textContent = t("selectedCount", state.selectedIds.size);
   deleteSelectedButton.disabled = state.selectedIds.size === 0;
+}
+
+function updateVisibleSelectionVisuals() {
+  for (const card of virtualSpace.querySelectorAll(".card[data-item-id]")) {
+    const selected = state.selectedIds.has(card.dataset.itemId);
+    card.classList.toggle("selected", selected);
+    const toggle = card.querySelector(".selection-toggle");
+    if (!toggle) continue;
+    toggle.innerHTML = selected ? "&#xE73E;" : "";
+    toggle.title = selected ? t("clearSelection") : t("select");
+  }
 }
 
 function sourceLabel(source) {
@@ -1249,9 +1258,7 @@ function updateSelectionDrag() {
   }
   state.selectedIds = next;
   updateSelectionUi();
-  state.renderRevision += 1;
-  state.renderedRange = "";
-  requestRender();
+  updateVisibleSelectionVisuals();
 }
 
 function autoScrollSelection() {
@@ -1415,16 +1422,12 @@ selectVisibleButton.addEventListener("click", () => {
     if (state.items[index]) state.selectedIds.add(state.items[index].itemId);
   }
   updateSelectionUi();
-  state.renderRevision += 1;
-  state.renderedRange = "";
-  renderVisibleCards();
+  updateVisibleSelectionVisuals();
 });
 clearSelectionButton.addEventListener("click", () => {
   state.selectedIds.clear();
   updateSelectionUi();
-  state.renderRevision += 1;
-  state.renderedRange = "";
-  renderVisibleCards();
+  updateVisibleSelectionVisuals();
 });
 deleteSelectedButton.addEventListener("click", () => void deleteItems([...state.selectedIds]));
 
