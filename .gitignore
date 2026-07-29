@@ -8,3 +8,7 @@ _workspace/
 /AGENTS.md
 *.user
 *.suo
+src/Sentory.Tauri/node_modules/
+src/Sentory.Tauri/src-tauri/target/
+src/Sentory.Tauri/src-tauri/binaries/*.exe
+src/Sentory.Tauri/src-tauri/gen/

@@ -1,0 +1,13 @@
+[package]
+name = "sentory-tauri"
+version = "1.6.0"
+description = "Sentory Tauri UI preview"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde_json = "1"
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-shell = "2"

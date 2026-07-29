@@ -10,6 +10,27 @@ Sentory는 사용자가 메신저에서 다룬 URL, 이미지, 파일을 로컬�
 
 모든 데이터는 로컬에 저장한다. 메시지 본문, 상대 이름, 인증 토큰, 과거 대화 기록은 수집하지 않는다.
 
+## Tauri UI 개발자판
+
+2026-07-29부터 제품 UI를 Tauri 2로 단계적으로 전환한다. 메신저 감지, SQLite,
+OCR, 링크 미리보기와 동기화는 기존 C# 엔진에 남기며 전체 Rust 재작성은 하지
+않는다. 공개판 1.5.0의 WPF 앱은 전환 검증이 끝날 때까지 기준선으로 유지한다.
+
+첫 개발자판은 Node.js, Rust stable, Visual Studio C++ 빌드 도구와 Windows SDK가
+필요하다. 저장소 루트에서 다음 스크립트를 실행하면 C# 브리지를 self-contained
+단일 파일로 준비한 뒤 Tauri 실행 파일을 만든다. Rust 빌드는 메모리 압박으로 인한
+간헐 실패를 피하도록 한 작업만 사용한다.
+
+```powershell
+.\scripts\Build-TauriPreview.ps1 -Configuration Release
+```
+
+결과 실행 파일은
+`src\Sentory.Tauri\src-tauri\target\release\sentory-tauri.exe`다. 현재 개발자판은
+최근 500개를 읽는 구조 검증용이며 복사·삭제·즐겨찾기 변경·설정·실시간 추가는
+아직 연결하지 않았다. 전환 순서와 성능 판정 기준은
+[Tauri UI 전환 로드맵](./11-tauri-ui-migration-roadmap.md)을 따른다.
+
 ## 2026-07-16 확정된 앱별 동작
 
 ### Discord

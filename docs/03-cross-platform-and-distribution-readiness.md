@@ -6,11 +6,13 @@ Sentory의 현재 실행 앱은 WPF와 Win32 API를 사용하는 Windows 전용
 프로그램이다. 이번 구조 정리로 데이터 모델, 저장소, 설정 파일과 핵심
 캡처 흐름은 운영체제와 분리됐다.
 
-macOS와 Linux에서 바로 실행되는 앱이 완성된 것은 아니다. 이후에는
-공통 코드를 유지한 채 다음 두 부분만 플랫폼별로 구현한다.
+2026-07-29에 UI 기반을 Tauri 2로 단계적으로 전환하고 C# 엔진은 유지하기로
+결정했다. 이전 Avalonia 계획은 폐기한다. Tauri의 웹 UI는 운영체제별 WebView를
+사용할 수 있지만, 현재 메신저 감지와 트레이·자동 실행은 여전히 Windows 전용이다.
+macOS와 Linux에서 바로 실행되는 앱이 완성된 것은 아니다.
 
-1. Avalonia 기반 데스크톱 UI와 트레이 셸
-2. 각 운영체제 및 메신저에 맞는 캡처 런타임
+1. Tauri UI와 C# 엔진의 버전이 있는 로컬 IPC
+2. 각 운영체제 및 메신저에 맞는 캡처 런타임과 셸 서비스
 
 ## 프로젝트 경계
 
@@ -20,6 +22,8 @@ macOS와 Linux에서 바로 실행되는 앱이 완성된 것은 아니다. 이�
 | `Sentory.Infrastructure` | 모든 OS | SQLite, 사진 파일, 사용자 설정 |
 | `Sentory.Platform.Windows` | Windows | Win32 훅, 카카오톡 창 검증, WPF 클립보드 |
 | `Sentory.App` | Windows | WPF 갤러리, 트레이, Windows 자동 실행 |
+| `Sentory.Engine.Bridge` | 현재 Windows | Tauri와 기존 C# 데이터 계층의 로컬 계약 |
+| `Sentory.Tauri` | 전환 중 | 웹 UI, 창 수명주기, C# 엔진 사이드카 연결 |
 | `Sentory.Diagnostics` | Windows | Windows UI 구조 조사 도구 |
 
 공통 프로젝트에서는 `System.Windows`, Windows Forms, 레지스트리,
@@ -108,8 +112,8 @@ Discord가 다른 바로가기나 업데이트 경로로 먼저 실행된 경우
 
 ## macOS·Linux 이식 순서
 
-1. Avalonia 앱 프로젝트를 추가하고 현재 갤러리 화면을 이식
-2. 공통 SQLite 저장소와 설정 저장소를 연결
+1. Windows에서 Tauri UI와 C# 엔진의 기능 동등성을 먼저 완성
+2. 공통 SQLite 저장소와 설정 저장소를 장기 실행 IPC로 연결
 3. 트레이, 원본 열기, 클립보드 복사를 OS 서비스 인터페이스로 분리
 4. 각 OS에서 가능한 메신저 감지 방식 조사
 5. 오탐 방지 기준을 통과한 플랫폼 어댑터만 활성화

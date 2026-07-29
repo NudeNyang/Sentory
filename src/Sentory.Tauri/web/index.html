@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sentory</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div class="identity">
+          <h1>Sentory</h1>
+          <p>이야기 속, 흩어진 순간들을 한 곳에</p>
+        </div>
+        <label class="search-box">
+          <span aria-hidden="true">⌕</span>
+          <input id="search" type="search" placeholder="제목, URL, 도메인 검색" autocomplete="off" />
+        </label>
+      </header>
+
+      <div class="control-row">
+        <nav class="tabs" aria-label="콘텐츠 종류">
+          <button class="tab active" type="button" data-kind="all">전체</button>
+          <button class="tab" type="button" data-kind="Url">링크</button>
+          <button class="tab" type="button" data-kind="Image">사진</button>
+          <button class="tab" type="button" data-kind="favorite"><span class="gold">★</span> 즐겨찾기</button>
+        </nav>
+        <div class="tools">
+          <label>
+            <span>메신저</span>
+            <select id="source-filter">
+              <option value="all">전체</option>
+            </select>
+          </label>
+          <button id="sort" type="button">정렬 최신순</button>
+          <button id="refresh" type="button">새로 고침</button>
+        </div>
+      </div>
+
+      <section class="gallery-region" aria-live="polite">
+        <div id="status" class="status">C# 엔진에서 보관함을 읽는 중…</div>
+        <div id="scroller" class="scroller" tabindex="0">
+          <div id="virtual-space" class="virtual-space"></div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

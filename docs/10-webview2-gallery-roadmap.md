@@ -1,5 +1,9 @@
 # WebView2 갤러리 전환 로드맵
 
+> 2026-07-29 결정 변경: 카드 영역만 WebView2로 교체하는 이 계획은 비교용
+> 시제품 단계에서 종료한다. 제품 UI는 Tauri로 전환하고 C# 엔진은 유지한다.
+> 후속 계획은 [Tauri UI 전환 로드맵](./11-tauri-ui-migration-roadmap.md)에 기록한다.
+
 결정일: 2026-07-28
 
 현재 상태: 1.5.0 WPF 기준판을 릴리즈했고 `codex/webview2-gallery` 브랜치에서

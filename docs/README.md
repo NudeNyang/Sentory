@@ -19,6 +19,7 @@
 - [읽을 수 있는 클라우드 저장 형식](./08-readable-cloud-storage.md)
 - [평문 클라우드 동기화 검수 안내](./09-readable-cloud-storage-qa.md)
 - [WebView2 갤러리 전환 로드맵](./10-webview2-gallery-roadmap.md)
+- [Tauri UI 전환 로드맵](./11-tauri-ui-migration-roadmap.md)
 
 ## 릴리즈 기록
 
