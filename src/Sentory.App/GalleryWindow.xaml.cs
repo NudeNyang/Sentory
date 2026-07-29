@@ -805,8 +805,6 @@ public partial class GalleryWindow : Window
         try
         {
             _settings.Language = language;
-            SentoryLocalization.SetLanguage(language);
-            SentoryLocalization.ApplyCurrent(Resources);
             RebuildLocalizedShellControls();
 
             var virtualizingPanel = FindVisualDescendant<

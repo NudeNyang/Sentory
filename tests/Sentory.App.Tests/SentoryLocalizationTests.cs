@@ -5,6 +5,43 @@ namespace Sentory.App.Tests;
 
 public sealed class SentoryLocalizationTests
 {
+    [Fact]
+    public void ReplacesOneMergedLocalizationDictionaryOnLanguageChange()
+    {
+        var resources = new ResourceDictionary();
+        var existingDictionary = new ResourceDictionary
+        {
+            ["Existing.Resource"] = "kept"
+        };
+        resources.MergedDictionaries.Add(existingDictionary);
+
+        SentoryLocalization.Apply(resources, "ko-KR");
+
+        var koreanDictionary = Assert.Single(
+            resources.MergedDictionaries,
+            dictionary => dictionary.Contains("Loc.Tagline"));
+        Assert.Equal(
+            "이야기 속, 흩어진 순간들을 한 곳에",
+            resources["Loc.Tagline"]);
+
+        SentoryLocalization.Apply(resources, "en-US");
+
+        var englishDictionary = Assert.Single(
+            resources.MergedDictionaries,
+            dictionary => dictionary.Contains("Loc.Tagline"));
+        Assert.NotSame(koreanDictionary, englishDictionary);
+        Assert.Same(existingDictionary, resources.MergedDictionaries[0]);
+        Assert.Equal("kept", resources["Existing.Resource"]);
+        Assert.Equal(
+            "Moments scattered across your conversations, all in one place",
+            resources["Loc.Tagline"]);
+        Assert.DoesNotContain(
+            resources.Keys.Cast<object>(),
+            key => key is string text && text.StartsWith(
+                "Loc.",
+                StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData("ko-KR", "이야기 속, 흩어진 순간들을 한 곳에")]
     [InlineData("en-US", "Moments scattered across your conversations, all in one place")]

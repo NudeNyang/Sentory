@@ -9,6 +9,8 @@ internal static class SentoryLocalization
 
     private const string FallbackLanguage = "en-US";
 
+    private static readonly object LocalizationDictionaryMarker = new();
+
     private static readonly string[] SupportedLanguages =
         ["ko-KR", "en-US", "ja-JP", "zh-CN"];
 
@@ -35,9 +37,36 @@ internal static class SentoryLocalization
     public static void ApplyCurrent(ResourceDictionary resources)
     {
         ArgumentNullException.ThrowIfNull(resources);
+
+        var localizedResources = new ResourceDictionary
+        {
+            [LocalizationDictionaryMarker] = true
+        };
         foreach (var (key, value) in Texts)
         {
-            resources[$"Loc.{key}"] = value.Get(CurrentLanguage);
+            localizedResources[$"Loc.{key}"] = value.Get(CurrentLanguage);
+        }
+
+        var existingIndex = -1;
+        for (var index = 0;
+             index < resources.MergedDictionaries.Count;
+             index++)
+        {
+            if (resources.MergedDictionaries[index]
+                .Contains(LocalizationDictionaryMarker))
+            {
+                existingIndex = index;
+                break;
+            }
+        }
+
+        if (existingIndex >= 0)
+        {
+            resources.MergedDictionaries[existingIndex] = localizedResources;
+        }
+        else
+        {
+            resources.MergedDictionaries.Add(localizedResources);
         }
     }
 

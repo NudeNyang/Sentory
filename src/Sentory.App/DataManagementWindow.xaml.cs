@@ -307,8 +307,9 @@ public partial class DataManagementWindow : Window
         {
             var settings = _settingsStore.Load();
             settings.Language = option.Code;
-            SentoryLocalization.SetLanguage(settings.Language);
-            SentoryLocalization.ApplyCurrent(Resources);
+            SentoryLocalization.Apply(
+                System.Windows.Application.Current.Resources,
+                settings.Language);
             LanguageChanged = true;
             RefreshLocalizedOptions(settings);
             VersionText.Text = SentoryLocalization.Format(
@@ -336,10 +337,6 @@ public partial class DataManagementWindow : Window
                 return;
             }
 
-            await Dispatcher.InvokeAsync(
-                () => SentoryLocalization.ApplyCurrent(
-                    System.Windows.Application.Current.Resources),
-                DispatcherPriority.Background);
             await Task.Run(() => _settingsStore.Save(settings));
         }
         catch (Exception exception)
