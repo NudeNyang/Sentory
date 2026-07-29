@@ -83,6 +83,22 @@ public sealed class LineDropTargetLocatorTests
         Assert.Null(locator.FindReleaseAt(450, 300));
     }
 
+    [Fact]
+    public void TrackedReleaseUsesVisibleLineBoundsBehindTransientSurface()
+    {
+        var native = new FakeNative
+        {
+            HasTransientDragSurface = true,
+            IsForegroundOtherApp = true
+        };
+        var locator = new LineDropTargetLocator(native, native);
+
+        var target = locator.FindTrackedReleaseAt(450, 300);
+
+        Assert.NotNull(target);
+        Assert.Equal(native.Main, target.MainWindow);
+    }
+
     private sealed class FakeNative :
         INativeWindowApi,
         IKakaoDropWindowApi

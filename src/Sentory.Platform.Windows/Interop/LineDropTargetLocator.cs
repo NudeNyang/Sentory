@@ -21,6 +21,16 @@ public sealed class LineDropTargetLocator(
             requireTopmost: true,
             allowForegroundFallback: true);
 
+    public LineDropTarget? FindTrackedReleaseAt(
+        int cursorX,
+        int cursorY) =>
+        FindReleaseAt(cursorX, cursorY) ??
+        FindAt(
+            cursorX,
+            cursorY,
+            requireTopmost: false,
+            allowForegroundFallback: false);
+
     private LineDropTarget? FindAt(
         int cursorX,
         int cursorY,

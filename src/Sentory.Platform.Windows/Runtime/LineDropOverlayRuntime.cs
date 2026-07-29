@@ -217,7 +217,7 @@ public sealed class LineDropOverlayRuntime : IDisposable
 
         _dropState.Observe(
             cursor,
-            _locator.FindReleaseAt(cursor.X, cursor.Y));
+            _locator.FindTrackedReleaseAt(cursor.X, cursor.Y));
         if (_dropState.TryTakeCompleted(out var target, out var paths))
         {
             var releasedAt = _releasedAt;
