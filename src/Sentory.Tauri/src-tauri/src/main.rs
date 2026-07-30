@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use std::borrow::Cow;
 use std::fs::{create_dir_all, OpenOptions};
 use std::io::Write;
