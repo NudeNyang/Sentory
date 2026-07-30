@@ -8,6 +8,7 @@ const MINIMUM_SIDE_PADDING = 14;
 const OVERSCAN_ROWS = 3;
 const PAGE_SIZE = 80;
 const SEARCH_DELAY_MS = 110;
+const TOOLTIP_DELAY_MS = 320;
 const SCROLL_INDICATOR_REVEAL_DISTANCE = 44;
 const SOURCES = ["Discord", "KakaoTalk", "Slack", "WhatsApp", "Telegram", "Line", "WeChat"];
 const SOURCE_PATCH_KEYS = {
@@ -171,7 +172,6 @@ const state = {
   query: "",
   sort: "Newest",
   columns: 1,
-  gridLeft: MINIMUM_SIDE_PADDING,
   renderedRange: "",
   renderQueued: false,
   renderRevision: 0,
@@ -203,6 +203,7 @@ const state = {
   syncCandidates: [],
   pendingSyncFolderPath: null,
   contextItemId: null,
+  windowThemeDark: null,
 };
 
 const scroller = document.querySelector("#scroller");
@@ -271,6 +272,7 @@ const confirmTitle = document.querySelector("#confirm-title");
 const confirmMessage = document.querySelector("#confirm-message");
 const confirmCancel = document.querySelector("#confirm-cancel");
 const confirmOk = document.querySelector("#confirm-ok");
+const appTooltip = document.querySelector("#app-tooltip");
 const toast = document.querySelector("#toast");
 const settingsButton = document.querySelector("#settings");
 const settingsLayer = document.querySelector("#settings-layer");
@@ -336,15 +338,80 @@ function t(key, ...args) {
   return typeof value === "function" ? value(...args) : value;
 }
 
+function setTooltip(element, text) {
+  const tooltip = String(text ?? "").trim();
+  if (tooltip) element.dataset.tooltip = tooltip;
+  else delete element.dataset.tooltip;
+}
+
+let tooltipTarget = null;
+let tooltipPoint = null;
+let tooltipTimer = 0;
+
+function hideAppTooltip() {
+  window.clearTimeout(tooltipTimer);
+  tooltipTimer = 0;
+  tooltipTarget = null;
+  tooltipPoint = null;
+  appTooltip.hidden = true;
+}
+
+function positionAppTooltip(target, point) {
+  const margin = 8;
+  const offset = 14;
+  appTooltip.style.left = "0px";
+  appTooltip.style.top = "0px";
+  appTooltip.hidden = false;
+  const tooltipBounds = appTooltip.getBoundingClientRect();
+  const targetBounds = target.getBoundingClientRect();
+  const anchorX = point?.x ?? targetBounds.left + targetBounds.width / 2;
+  const anchorY = point?.y ?? targetBounds.bottom;
+  let left = point ? anchorX + offset : anchorX - tooltipBounds.width / 2;
+  let top = anchorY + offset;
+  if (left + tooltipBounds.width > window.innerWidth - margin) {
+    left = window.innerWidth - tooltipBounds.width - margin;
+  }
+  if (left < margin) left = margin;
+  if (top + tooltipBounds.height > window.innerHeight - margin) {
+    top = Math.max(margin, (point ? anchorY : targetBounds.top) - tooltipBounds.height - offset);
+  }
+  appTooltip.style.left = `${Math.round(left)}px`;
+  appTooltip.style.top = `${Math.round(top)}px`;
+}
+
+function queueAppTooltip(target, point = null) {
+  const text = target?.dataset.tooltip?.trim();
+  if (!text) {
+    hideAppTooltip();
+    return;
+  }
+  window.clearTimeout(tooltipTimer);
+  tooltipTarget = target;
+  tooltipPoint = point;
+  tooltipTimer = window.setTimeout(() => {
+    if (tooltipTarget !== target || !target.isConnected) return;
+    appTooltip.textContent = text;
+    positionAppTooltip(target, tooltipPoint);
+  }, TOOLTIP_DELAY_MS);
+}
+
+function syncWindowTheme(dark) {
+  if (state.windowThemeDark === dark) return;
+  state.windowThemeDark = dark;
+  void tauriCore().invoke("window_theme_set", { dark }).catch(() => {
+    if (state.windowThemeDark === dark) state.windowThemeDark = null;
+  });
+}
+
 function applyThemeMode(mode) {
   const dark = mode === "Dark" || (mode === "System" && colorScheme.matches);
   document.documentElement.dataset.theme = dark ? "dark" : "light";
   themeButton.querySelector("span").innerHTML = dark ? "&#xE706;" : "&#xE708;";
-  themeButton.title = t(dark ? "switchToLight" : "switchToDark");
-  themeButton.setAttribute("aria-label", themeButton.title);
+  const themeLabel = t(dark ? "switchToLight" : "switchToDark");
+  themeButton.setAttribute("aria-label", themeLabel);
   themeSetting.value = mode || "Light";
   syncEnhancedSelect(themeSetting);
-  void tauriCore().invoke("window_theme_set", { dark }).catch(() => {});
+  syncWindowTheme(dark);
   void configureTray();
 }
 
@@ -387,11 +454,12 @@ function refreshLocalizedVisibleCards() {
     const badge = card.querySelector(".collection-badge");
     if (badge) badge.textContent = t("collectionItems", item.memberCount);
     const artwork = card.querySelector(".artwork");
-    if (artwork) artwork.title = t("openPreview");
+    if (artwork) setTooltip(artwork, t("openPreview"));
     const favorite = card.querySelector(".favorite");
     if (favorite) {
-      favorite.title = item.isFavorite ? t("favoriteRemoveAction") : t("favoriteAddAction");
-      favorite.setAttribute("aria-label", favorite.title);
+      const favoriteLabel = item.isFavorite ? t("favoriteRemoveAction") : t("favoriteAddAction");
+      setTooltip(favorite, favoriteLabel);
+      favorite.setAttribute("aria-label", favoriteLabel);
     }
   }
 }
@@ -488,18 +556,18 @@ function applyLocalizedUi(language) {
   detailWindowTitle.textContent = t("detail");
   detailFavoriteMark.textContent = t("favoriteMarked");
   detailPhotoHeading.textContent = t("photos");
-  detailPhotoCopy.title = t("copyCurrentPhoto");
+  setTooltip(detailPhotoCopy, t("copyCurrentPhoto"));
   detailPhotoCopy.setAttribute("aria-label", t("copyCurrentPhoto"));
-  detailPhotoPrevious.title = t("previousPhoto");
+  setTooltip(detailPhotoPrevious, t("previousPhoto"));
   detailPhotoPrevious.setAttribute("aria-label", t("previousPhoto"));
-  detailPhotoNext.title = t("nextPhoto");
+  setTooltip(detailPhotoNext, t("nextPhoto"));
   detailPhotoNext.setAttribute("aria-label", t("nextPhoto"));
   detailLinkHeading.textContent = t("collectionLinks");
-  detailLinkCopy.title = t("copyUrl");
+  setTooltip(detailLinkCopy, t("copyUrl"));
   detailLinkCopy.setAttribute("aria-label", t("copyUrl"));
-  detailLinkPrevious.title = t("previousLink");
+  setTooltip(detailLinkPrevious, t("previousLink"));
   detailLinkPrevious.setAttribute("aria-label", t("previousLink"));
-  detailLinkNext.title = t("nextLink");
+  setTooltip(detailLinkNext, t("nextLink"));
   detailLinkNext.setAttribute("aria-label", t("nextLink"));
   detailCaptureCount.closest("div").querySelector("dt").textContent = t("captureCount");
   detailCopyCount.closest("div").querySelector("dt").textContent = t("copyCountLabel");
@@ -1216,7 +1284,6 @@ function evictDistantPages() {
 function measureGrid() {
   const available = Math.max(CELL_WIDTH, scroller.clientWidth - MINIMUM_SIDE_PADDING * 2);
   state.columns = Math.max(1, Math.floor(available / CELL_WIDTH));
-  state.gridLeft = Math.max(MINIMUM_SIDE_PADDING, (scroller.clientWidth - state.columns * CELL_WIDTH) / 2);
   const rows = Math.ceil(state.total / state.columns);
   virtualSpace.style.height = `${Math.max(scroller.clientHeight, TOP_PADDING + rows * ROW_HEIGHT + BOTTOM_PADDING)}px`;
   updateScrollIndicator();
@@ -1265,10 +1332,17 @@ function canReuseVirtualCard(card, item) {
     : card.classList.contains("skeleton");
 }
 
-function positionCard(card, index) {
+function cardLeft(index) {
   const row = Math.floor(index / state.columns);
   const column = index % state.columns;
-  card.style.left = `${state.gridLeft + column * CELL_WIDTH + (CELL_WIDTH - CARD_WIDTH) / 2}px`;
+  const itemsInRow = Math.min(state.columns, state.total - row * state.columns);
+  const rowLeft = Math.max(MINIMUM_SIDE_PADDING, (scroller.clientWidth - itemsInRow * CELL_WIDTH) / 2);
+  return rowLeft + column * CELL_WIDTH + (CELL_WIDTH - CARD_WIDTH) / 2;
+}
+
+function positionCard(card, index) {
+  const row = Math.floor(index / state.columns);
+  card.style.left = `${cardLeft(index)}px`;
   card.style.top = `${TOP_PADDING + row * ROW_HEIGHT + (ROW_HEIGHT - CARD_HEIGHT) / 2}px`;
 }
 
@@ -1354,7 +1428,7 @@ function createCard(item, index) {
 
   const artwork = document.createElement("div");
   artwork.className = "artwork";
-  artwork.title = t("openPreview");
+  setTooltip(artwork, t("openPreview"));
   if (item.artworkPath) {
     const artworkUrl = tauriCore().convertFileSrc(item.artworkPath);
     if (item.artworkMode === "cover") {
@@ -1402,7 +1476,7 @@ function createCard(item, index) {
   const copyButton = document.createElement("button");
   copyButton.className = "copy-button fluent";
   copyButton.type = "button";
-  copyButton.title = t("copyClipboard");
+  setTooltip(copyButton, t("copyClipboard"));
   copyButton.setAttribute("aria-label", t("copy"));
   copyButton.innerHTML = "&#xE8C8;";
   copyButton.addEventListener("click", event => {
@@ -1414,7 +1488,7 @@ function createCard(item, index) {
   selectionToggle.className = "selection-toggle";
   selectionToggle.type = "button";
   selectionToggle.innerHTML = state.selectedIds.has(item.itemId) ? "&#xE73E;" : "";
-  selectionToggle.title = state.selectedIds.has(item.itemId) ? t("clearSelection") : t("select");
+  setTooltip(selectionToggle, state.selectedIds.has(item.itemId) ? t("clearSelection") : t("select"));
   selectionToggle.addEventListener("click", event => {
     event.stopPropagation();
     toggleSelection(item.itemId);
@@ -1439,7 +1513,7 @@ function createCard(item, index) {
 
   const title = document.createElement("h2");
   title.textContent = item.title;
-  title.title = item.title;
+  setTooltip(title, item.title);
   const subtitle = document.createElement("p");
   subtitle.className = "subtitle";
   subtitle.textContent = item.subtitle;
@@ -1460,8 +1534,9 @@ function createCard(item, index) {
   favorite.className = `favorite${item.isFavorite ? " active" : ""}`;
   favorite.type = "button";
   favorite.innerHTML = item.isFavorite ? "&#xE735;" : "&#xE734;";
-  favorite.title = item.isFavorite ? t("favoriteRemoveAction") : t("favoriteAddAction");
-  favorite.setAttribute("aria-label", favorite.title);
+  const favoriteLabel = item.isFavorite ? t("favoriteRemoveAction") : t("favoriteAddAction");
+  setTooltip(favorite, favoriteLabel);
+  favorite.setAttribute("aria-label", favoriteLabel);
   favorite.addEventListener("click", event => {
     event.stopPropagation();
     void toggleFavorite(item, favorite);
@@ -1612,9 +1687,9 @@ function showDetailPhoto(requestedIndex, animate = true) {
   nodes.push(main);
   detailArtwork.replaceChildren(...nodes);
   if (animate) main.animate([{ opacity: 0.3 }, { opacity: 1 }], { duration: 170, easing: "ease-out" });
-  detailArtwork.title = t("openPhoto");
+  setTooltip(detailArtwork, t("openPhoto"));
   detailPhotoName.textContent = photo.title;
-  detailPhotoName.title = photo.title;
+  setTooltip(detailPhotoName, photo.title);
   state.detailArtworkTarget = { kind: "Image", memberPosition: photo.position };
   updateDetailPageDots(detailPhotoDots, photos.length, state.detailPhotoIndex);
 }
@@ -1633,7 +1708,7 @@ function showDetailLink(requestedIndex) {
       domain: link.domain,
     }));
   }
-  detailArtwork.title = t("openLink");
+  setTooltip(detailArtwork, t("openLink"));
   state.detailArtworkTarget = { kind: "Url", memberPosition: link.position };
 }
 
@@ -1641,7 +1716,7 @@ function updateDetailLinkRow(links = getDetailLinks()) {
   if (links.length === 0) return;
   const link = links[state.detailLinkIndex];
   detailLinkValue.textContent = link.originalUrl;
-  detailLinkValue.title = link.originalUrl;
+  setTooltip(detailLinkValue, link.originalUrl);
   updateDetailPageDots(detailLinkDots, links.length, state.detailLinkIndex);
 }
 
@@ -1749,10 +1824,11 @@ function refreshVisibleItemMetadata(item) {
     if (favorite) {
       favorite.classList.toggle("active", item.isFavorite);
       favorite.innerHTML = item.isFavorite ? "&#xE735;" : "&#xE734;";
-      favorite.title = item.isFavorite
+      const favoriteLabel = item.isFavorite
         ? t("favoriteRemoveAction")
         : t("favoriteAddAction");
-      favorite.setAttribute("aria-label", favorite.title);
+      setTooltip(favorite, favoriteLabel);
+      favorite.setAttribute("aria-label", favoriteLabel);
     }
   }
   if (state.detailItem?.card.itemId === item.itemId) {
@@ -1926,7 +2002,7 @@ function updateVisibleSelectionVisuals() {
     const toggle = card.querySelector(".selection-toggle");
     if (!toggle) continue;
     toggle.innerHTML = selected ? "&#xE73E;" : "";
-    toggle.title = selected ? t("clearSelection") : t("select");
+    setTooltip(toggle, selected ? t("clearSelection") : t("select"));
   }
 }
 
@@ -2012,8 +2088,7 @@ function updateSelectionDrag() {
     const item = state.items[index];
     if (!item) continue;
     const row = Math.floor(index / state.columns);
-    const column = index % state.columns;
-    const itemLeft = state.gridLeft + column * CELL_WIDTH + (CELL_WIDTH - CARD_WIDTH) / 2;
+    const itemLeft = cardLeft(index);
     const itemTop = TOP_PADDING + row * ROW_HEIGHT + (ROW_HEIGHT - CARD_HEIGHT) / 2;
     if (itemLeft < selection.right && itemLeft + CARD_WIDTH > selection.left &&
         itemTop < selection.bottom && itemTop + CARD_HEIGHT > selection.top) {
@@ -2568,6 +2643,7 @@ for (const link of document.querySelectorAll("[data-external-url]")) {
 
 refreshButton.addEventListener("click", () => resetGallery({ announce: true }));
 scroller.addEventListener("scroll", () => {
+  hideAppTooltip();
   if (state.selectionDrag?.active) updateSelectionDrag();
   requestRender();
   updateScrollIndicator();
@@ -2577,6 +2653,7 @@ scroller.addEventListener("scroll", () => {
 }, { passive: true });
 
 settingsScroll.addEventListener("scroll", () => {
+  hideAppTooltip();
   updateScrollIndicatorFor(settingsScroll, settingsScrollThumb);
   settingsScrollRegion.classList.add("scrolling");
   window.clearTimeout(state.settingsScrollTimer);
@@ -2586,6 +2663,7 @@ settingsScroll.addEventListener("scroll", () => {
 }, { passive: true });
 
 licenseText.addEventListener("scroll", () => {
+  hideAppTooltip();
   updateScrollIndicatorFor(licenseText, licenseScrollThumb);
   licenseScrollRegion.classList.add("scrolling");
   window.clearTimeout(state.licenseScrollTimer);
@@ -2607,6 +2685,31 @@ new ResizeObserver(() => {
 new ResizeObserver(() => {
   updateScrollIndicatorFor(licenseText, licenseScrollThumb);
 }).observe(licenseText);
+
+document.addEventListener("pointerover", event => {
+  const target = event.target instanceof Element ? event.target.closest("[data-tooltip]") : null;
+  if (!target || target === tooltipTarget) return;
+  queueAppTooltip(target, { x: event.clientX, y: event.clientY });
+});
+document.addEventListener("pointermove", event => {
+  if (!tooltipTarget) return;
+  tooltipPoint = { x: event.clientX, y: event.clientY };
+  if (!appTooltip.hidden) positionAppTooltip(tooltipTarget, tooltipPoint);
+});
+document.addEventListener("pointerout", event => {
+  if (!tooltipTarget) return;
+  const next = event.relatedTarget;
+  if (next instanceof Node && tooltipTarget.contains(next)) return;
+  const leaving = event.target instanceof Element ? event.target.closest("[data-tooltip]") : null;
+  if (leaving === tooltipTarget) hideAppTooltip();
+});
+document.addEventListener("pointerdown", hideAppTooltip);
+document.addEventListener("focusin", event => {
+  const target = event.target instanceof Element ? event.target.closest("[data-tooltip]") : null;
+  if (target) queueAppTooltip(target);
+});
+document.addEventListener("focusout", hideAppTooltip);
+window.addEventListener("blur", hideAppTooltip);
 
 [themeSetting, languageSetting, syncFolderCandidate, autoFavoriteSelect, autoCleanupSelect].forEach(enhanceSelect);
 
