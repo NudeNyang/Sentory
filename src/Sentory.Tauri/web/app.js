@@ -1,3 +1,5 @@
+import { mergeSettingsSnapshot } from "./settings-snapshot.js";
+
 const CELL_WIDTH = 268;
 const CARD_WIDTH = 252;
 const CARD_HEIGHT = 320;
@@ -685,16 +687,16 @@ function syncAllEnhancedSelects() {
   [themeSetting, languageSetting, syncFolderCandidate, autoFavoriteSelect, autoCleanupSelect].forEach(syncEnhancedSelect);
 }
 
-function applySettings(settings) {
-  state.settings = settings;
-  state.syncMode = settings.sync?.provider === "WebDav" ? "WebDav" : "Folder";
-  languageSetting.value = settings.language || "auto";
-  applyLocalizedUi(settings.language || "auto");
-  applyThemeMode(settings.themeMode || "Light");
-  autoFavoriteSelect.value = settings.autoFavoriteEnabled
-    ? String(settings.autoFavoriteCopyThreshold)
+function applySettings(settings, { replaceTheme = false } = {}) {
+  state.settings = mergeSettingsSnapshot(state.settings, settings, { replaceTheme });
+  state.syncMode = state.settings.sync?.provider === "WebDav" ? "WebDav" : "Folder";
+  languageSetting.value = state.settings.language || "auto";
+  applyLocalizedUi(state.settings.language || "auto");
+  applyThemeMode(state.settings.themeMode || "Light");
+  autoFavoriteSelect.value = state.settings.autoFavoriteEnabled
+    ? String(state.settings.autoFavoriteCopyThreshold)
     : "0";
-  autoCleanupSelect.value = String(settings.autoCleanupDays || 0);
+  autoCleanupSelect.value = String(state.settings.autoCleanupDays || 0);
   renderSyncSettings();
   syncAllEnhancedSelects();
   void configureTray();
@@ -995,7 +997,7 @@ async function configureTray() {
 
 async function loadSettings() {
   try {
-    applySettings(await tauriCore().invoke("settings_get"));
+    applySettings(await tauriCore().invoke("settings_get"), { replaceTheme: true });
   } catch (error) {
     showToast(t("settingsFailed"));
     applyLocalizedUi("auto");
