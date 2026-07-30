@@ -27,6 +27,16 @@ test("only detected cloud folders and an arbitrary folder are selectable", () =>
   assert.match(script, /value\.startsWith\("pick:"\)[\s\S]*?chooseSyncFolder/);
   assert.doesNotMatch(html, /id="sync-folder-pick"/);
   assert.doesNotMatch(script, /syncFolderPick/);
+  assert.doesNotMatch(html, /id="sync-folder-path"|class="sync-current-value"/);
+  assert.doesNotMatch(script, /syncFolderPath/);
+  assert.match(script, /pendingSyncFolderPath:\s*null/);
+  assert.match(script, /currentPath\s*&&[\s\S]*?current\.textContent\s*=\s*currentPath[\s\S]*?syncFolderCandidate\.value\s*=\s*currentPath/);
+});
+
+test("the arbitrary folder picker opens without probing the current cloud path", () => {
+  const picker = script.match(/async function chooseSyncFolder\(\) \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.match(picker, /open\(\{\s*directory:\s*true,\s*multiple:\s*false,?\s*\}\)/);
+  assert.doesNotMatch(picker, /defaultPath/);
 });
 
 test("sync configuration and power use one stateful action", () => {

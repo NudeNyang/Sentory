@@ -852,7 +852,6 @@ body.selection-mode .favorite { display: none; }
 .sync-panel { display: grid; gap: 10px; }
 .sync-panel[hidden] { display: none; }
 .sync-panel-description { margin: 0; }
-.sync-current-value { min-width: 0; overflow: hidden; color: var(--text); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .sync-field { display: grid; gap: 5px; color: var(--muted); font-size: 10.5px; }
 .sync-field input { width: 100%; height: 36px; padding: 0 11px; border: 1px solid var(--line); border-radius: 8px; outline: 0; background: var(--input); color: var(--text); font: inherit; font-size: 11px; }
 .sync-field input:focus { border-color: var(--card-hover); outline: 2px solid color-mix(in srgb, var(--card-hover) 35%, transparent); }

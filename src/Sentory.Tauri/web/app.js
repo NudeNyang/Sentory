@@ -201,6 +201,7 @@ const state = {
   settingsBusy: false,
   syncMode: "Folder",
   syncCandidates: [],
+  pendingSyncFolderPath: null,
   contextItemId: null,
 };
 
@@ -286,7 +287,6 @@ const syncMode = document.querySelector("#sync-mode");
 const syncFolderPanel = document.querySelector("#sync-folder-panel");
 const syncWebDavPanel = document.querySelector("#sync-webdav-panel");
 const syncFolderCandidate = document.querySelector("#sync-folder-candidate");
-const syncFolderPath = document.querySelector("#sync-folder-path");
 const syncWebDavEndpoint = document.querySelector("#sync-webdav-endpoint");
 const syncWebDavUsername = document.querySelector("#sync-webdav-username");
 const syncWebDavPassword = document.querySelector("#sync-webdav-password");
@@ -660,7 +660,7 @@ function hasPendingSyncConfiguration() {
   const sync = state.settings?.sync;
   if (sync?.provider !== state.syncMode) return false;
   if (state.syncMode === "Folder") {
-    const pendingPath = syncFolderPath.dataset.pendingPath;
+    const pendingPath = state.pendingSyncFolderPath;
     return Boolean(pendingPath && pendingPath !== (sync.folderPath || ""));
   }
   return syncWebDavEndpoint.value.trim() !== (sync.webDavEndpoint || "")
@@ -683,7 +683,7 @@ function renderSyncAction() {
 }
 
 function renderSyncCandidates() {
-  const currentPath = syncFolderPath.dataset.pendingPath
+  const currentPath = state.pendingSyncFolderPath
     || state.settings?.sync?.folderPath
     || "";
   syncFolderCandidate.replaceChildren();
@@ -698,22 +698,23 @@ function renderSyncCandidates() {
     option.textContent = candidate.displayName;
     syncFolderCandidate.append(option);
   }
+  if (currentPath && !state.syncCandidates.some(candidate => candidate.folderPath === currentPath)) {
+    const current = document.createElement("option");
+    current.value = currentPath;
+    current.textContent = currentPath;
+    syncFolderCandidate.append(current);
+  }
   const otherFolder = document.createElement("option");
   otherFolder.value = "pick:other";
   otherFolder.textContent = t("chooseOtherFolder");
   syncFolderCandidate.append(otherFolder);
-  syncFolderCandidate.value = state.syncCandidates.some(candidate => candidate.folderPath === currentPath)
-    ? currentPath
-    : "";
+  syncFolderCandidate.value = currentPath;
   syncEnhancedSelect(syncFolderCandidate);
 }
 
 function renderSyncSettings() {
   const sync = state.settings?.sync;
   setSyncMode(state.syncMode);
-  const folderPath = syncFolderPath.dataset.pendingPath || sync?.folderPath || "";
-  syncFolderPath.textContent = folderPath || t("folderNone");
-  syncFolderPath.title = folderPath;
   if (document.activeElement !== syncWebDavEndpoint) {
     syncWebDavEndpoint.value = sync?.webDavEndpoint || "";
   }
@@ -769,7 +770,7 @@ async function configureSelectedSync() {
       });
       syncWebDavPassword.value = "";
     } else {
-      const folderPath = syncFolderPath.dataset.pendingPath
+      const folderPath = state.pendingSyncFolderPath
         || syncFolderCandidate.value
         || state.settings?.sync?.folderPath;
       if (!folderPath) {
@@ -777,7 +778,7 @@ async function configureSelectedSync() {
         throw new Error(t("folderNone"));
       }
       settings = await tauriCore().invoke("sync_configure_folder", { folderPath });
-      delete syncFolderPath.dataset.pendingPath;
+      state.pendingSyncFolderPath = null;
     }
     applySettings(settings);
     showToast(t("syncConfigured"));
@@ -2459,7 +2460,7 @@ syncFolderCandidate.addEventListener("change", async () => {
     renderSyncCandidates();
     return;
   }
-  syncFolderPath.dataset.pendingPath = value;
+  state.pendingSyncFolderPath = value;
   renderSyncSettings();
 });
 
@@ -2470,12 +2471,9 @@ async function chooseSyncFolder() {
     const selected = await open({
       directory: true,
       multiple: false,
-      defaultPath: syncFolderPath.dataset.pendingPath
-        || state.settings?.sync?.folderPath
-        || undefined,
     });
     if (typeof selected === "string" && selected) {
-      syncFolderPath.dataset.pendingPath = selected;
+      state.pendingSyncFolderPath = selected;
       renderSyncSettings();
     }
   } catch {
