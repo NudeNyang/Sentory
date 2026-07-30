@@ -1307,18 +1307,34 @@ function createCard(item, index) {
   artwork.className = "artwork";
   artwork.title = t("openPreview");
   if (item.artworkPath) {
-    const image = document.createElement("img");
-    image.alt = "";
-    image.className = item.artworkMode;
-    image.loading = "lazy";
-    image.decoding = "async";
-    image.addEventListener("load", () => {
-      image.classList.add("loaded");
-      reportImageDiagnostic("image-loaded", item);
-    }, { once: true });
-    image.addEventListener("error", () => reportImageDiagnostic("image-failed", item), { once: true });
-    image.src = tauriCore().convertFileSrc(item.artworkPath);
-    artwork.append(image);
+    const artworkUrl = tauriCore().convertFileSrc(item.artworkPath);
+    if (item.artworkMode === "cover") {
+      const cover = document.createElement("span");
+      cover.className = "artwork-cover";
+      cover.style.backgroundImage = `url("${artworkUrl}")`;
+      const loader = new Image();
+      loader.decoding = "async";
+      loader.addEventListener("load", () => {
+        cover.classList.add("loaded");
+        reportImageDiagnostic("image-loaded", item);
+      }, { once: true });
+      loader.addEventListener("error", () => reportImageDiagnostic("image-failed", item), { once: true });
+      loader.src = artworkUrl;
+      artwork.append(cover);
+    } else {
+      const image = document.createElement("img");
+      image.alt = "";
+      image.className = item.artworkMode;
+      image.loading = "lazy";
+      image.decoding = "async";
+      image.addEventListener("load", () => {
+        image.classList.add("loaded");
+        reportImageDiagnostic("image-loaded", item);
+      }, { once: true });
+      image.addEventListener("error", () => reportImageDiagnostic("image-failed", item), { once: true });
+      image.src = artworkUrl;
+      artwork.append(image);
+    }
   } else {
     artwork.append(createUrlFallback(item));
   }
