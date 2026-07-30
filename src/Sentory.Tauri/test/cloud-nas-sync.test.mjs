@@ -25,8 +25,20 @@ test("only detected cloud folders and an arbitrary folder are selectable", () =>
   assert.match(script, /placeholder\.hidden\s*=\s*true/);
   assert.match(script, /\[\.\.\.select\.options\]\.filter\(option => !option\.hidden\)/);
   assert.match(script, /value\.startsWith\("pick:"\)[\s\S]*?chooseSyncFolder/);
-  assert.match(script, /syncFolderPick\.textContent\s*=\s*t\(folderPath\s*\?\s*"changeFolder"\s*:\s*"chooseFolder"\)/);
-  assert.match(html, /id="sync-folder-pick"[^>]*class="settings-action sync-folder-action"/);
+  assert.doesNotMatch(html, /id="sync-folder-pick"/);
+  assert.doesNotMatch(script, /syncFolderPick/);
+});
+
+test("sync configuration and power use one stateful action", () => {
+  assert.match(html, /<div class="sync-actions">\s*<button id="sync-action"[^>]*>연결 및 동기화<\/button>\s*<\/div>/);
+  assert.doesNotMatch(html, /id="sync-save"|id="sync-toggle"/);
+  assert.doesNotMatch(script, /syncSave|syncToggle/);
+  assert.match(script, /function hasPendingSyncConfiguration\(\)/);
+  assert.match(script, /function renderSyncAction\(\)/);
+  assert.match(script, /"changeSync"/);
+  assert.match(script, /"turnSyncOn"/);
+  assert.match(script, /"turnSyncOff"/);
+  assert.match(script, /syncAction\.addEventListener\("click",\s*\(\) => \{ void handleSyncAction\(\); \}\)/);
 });
 
 test("Tauri bridges sync configuration to the shared engine", () => {
