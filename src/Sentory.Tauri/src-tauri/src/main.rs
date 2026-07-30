@@ -384,7 +384,7 @@ async fn gallery_detail_target_copy(
     engine: State<'_, EngineClient>,
     item_id: String,
     member_position: Option<i32>,
-) -> Result<(), String> {
+) -> Result<serde_json::Value, String> {
     let detail = engine
         .request(&app, "gallery-item", serde_json::json!(item_id))
         .await?;
@@ -393,7 +393,10 @@ async fn gallery_detail_target_copy(
         copy_detail_target_to_clipboard(&clipboard_detail, member_position)
     })
     .await
-    .map_err(|error| format!("클립보드 작업을 기다리지 못했습니다: {error}"))?
+    .map_err(|error| format!("클립보드 작업을 기다리지 못했습니다: {error}"))??;
+    engine
+        .request(&app, "gallery-copy-record", serde_json::json!(item_id))
+        .await
 }
 
 #[tauri::command]

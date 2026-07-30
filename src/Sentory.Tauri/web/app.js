@@ -1434,7 +1434,6 @@ async function copyItem(itemId, button = null) {
   const previous = button?.innerHTML;
   if (button) {
     button.disabled = true;
-    button.innerHTML = "&#xE895;";
   }
   try {
     const result = await tauriCore().invoke("gallery_copy", { itemId });
@@ -1582,14 +1581,21 @@ async function copyCurrentDetailLink() {
 
 async function copyDetailTarget(memberPosition, button, successKey) {
   if (!state.detailItem) return;
+  const itemId = state.detailItem.card.itemId;
   const previous = button.innerHTML;
   button.disabled = true;
-  button.innerHTML = "&#xE895;";
   try {
-    await tauriCore().invoke("gallery_detail_target_copy", {
-      itemId: state.detailItem.card.itemId,
+    const result = await tauriCore().invoke("gallery_detail_target_copy", {
+      itemId,
       memberPosition,
     });
+    if (!result.success) throw new Error(t("copyHistorySaveFailed"));
+    updateLoadedItem(itemId, item => ({
+      ...item,
+      copyCount: result.copyCount ?? item.copyCount + 1,
+      isFavorite: result.isFavorite ?? item.isFavorite,
+      lastCopiedAt: new Date().toISOString(),
+    }));
     button.innerHTML = "&#xE73E;";
     showToast(t(successKey));
   } catch {
