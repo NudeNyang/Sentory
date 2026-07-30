@@ -5,6 +5,45 @@ namespace Sentory.Platform.Windows.Tests;
 
 public sealed class SlackMessageMatchPolicyTests
 {
+    [Fact]
+    public async Task InitialSnapshotRetriesTransientFocusMiss()
+    {
+        var attempts = 0;
+        var expected = new SlackAccessibilitySnapshot(
+            "channel",
+            "me",
+            new HashSet<string> { "message" });
+
+        var actual = await SlackInitialSnapshotRetry.CaptureAsync(
+            () => Task.FromResult(
+                ++attempts < 3
+                    ? null
+                    : expected),
+            TimeSpan.Zero,
+            CancellationToken.None);
+
+        Assert.Same(expected, actual);
+        Assert.Equal(3, attempts);
+    }
+
+    [Fact]
+    public async Task InitialSnapshotStopsAfterBoundedRetries()
+    {
+        var attempts = 0;
+
+        var actual = await SlackInitialSnapshotRetry.CaptureAsync<object>(
+            () =>
+            {
+                attempts++;
+                return Task.FromResult<object?>(null);
+            },
+            TimeSpan.Zero,
+            CancellationToken.None);
+
+        Assert.Null(actual);
+        Assert.Equal(4, attempts);
+    }
+
     [Theory]
     [InlineData("사용자: NudeNyang (누드냥이)")]
     [InlineData("User: NudeNyang (누드냥이)")]

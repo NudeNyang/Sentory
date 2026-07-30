@@ -69,6 +69,34 @@ internal interface ISlackAccessibilityClient
         CancellationToken cancellationToken);
 }
 
+internal static class SlackInitialSnapshotRetry
+{
+    private const int MaximumAttempts = 4;
+
+    public static async Task<T?> CaptureAsync<T>(
+        Func<Task<T?>> capture,
+        TimeSpan retryDelay,
+        CancellationToken cancellationToken)
+        where T : class
+    {
+        ArgumentNullException.ThrowIfNull(capture);
+
+        for (var attempt = 1; attempt <= MaximumAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var snapshot = await capture();
+            if (snapshot is not null || attempt == MaximumAttempts)
+            {
+                return snapshot;
+            }
+
+            await Task.Delay(retryDelay, cancellationToken);
+        }
+
+        return null;
+    }
+}
+
 internal static class SlackMessageMatchPolicy
 {
     private static readonly string[] ImageLabels =
