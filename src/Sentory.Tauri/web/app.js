@@ -707,11 +707,7 @@ async function configureTray() {
       detectionEnabled,
       startupEnabled: state.startupEnabled,
       discordEnabled: Boolean(state.settings.sources?.Discord),
-      showDiscordStatus: Boolean(
-        state.settings.sources?.Discord
-        && state.runtimeStatus?.discordRunning
-        && discordRuntime.tone !== "ready",
-      ),
+      showDiscordStatus: shouldShowDiscordReconnectNotice(),
       showDiscordRepair,
       dark: document.documentElement.dataset.theme === "dark",
     });
@@ -750,6 +746,14 @@ function sourceRuntimeLabel(source) {
     : runtime.discordState === "Recovering" ? "recovering"
       : runtime.discordState === "ReconnectRequired" ? "reconnect" : "connecting";
   return { text: t(key), tone: key === "detected" ? "ready" : key === "reconnect" ? "issue" : "" };
+}
+
+function shouldShowDiscordReconnectNotice() {
+  return Boolean(
+    state.settings?.sources?.Discord
+    && state.runtimeStatus?.discordRunning
+    && state.runtimeStatus?.discordState === "ReconnectRequired",
+  );
 }
 
 function renderSourceSettings() {
@@ -803,12 +807,10 @@ function renderSourceSettings() {
 
 function applyRuntimeStatus(runtime) {
   if (runtime) state.runtimeStatus = runtime;
-  const enabled = Boolean(state.settings?.sources?.Discord);
-  const running = Boolean(state.runtimeStatus?.discordRunning);
   let headerStatusVisible = false;
-  if (enabled && running) {
+  if (state.settings?.sources?.Discord && state.runtimeStatus?.discordRunning) {
     const label = sourceRuntimeLabel("Discord");
-    headerStatusVisible = label.tone !== "ready";
+    headerStatusVisible = shouldShowDiscordReconnectNotice();
     detectionStatusText.textContent = label.text;
     detectionStatus.classList.toggle("issue", label.tone === "issue");
     detectionStatus.classList.toggle("ready", label.tone === "ready");
