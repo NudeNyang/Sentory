@@ -25,7 +25,8 @@ test("the default newest sort is highlighted during startup", () => {
   assert.match(startup, /updateFilterUi\(\);\s*updateSortUi\(\);\s*updateSelectionUi\(\);/);
 });
 
-test("the filter popup is left-aligned six pixels below the WPF-sized trigger", () => {
+test("the filter popup keeps its previous toolbar offset", () => {
   assert.match(css, /\.popup\s*\{[^}]*top:\s*40px/);
-  assert.match(css, /\.filter-menu\s*\{[^}]*left:\s*0[^}]*right:\s*auto[^}]*width:\s*430px/);
+  assert.match(css, /\.filter-menu\s*\{[^}]*right:\s*220px[^}]*width:\s*430px/);
+  assert.doesNotMatch(css, /\.filter-menu\s*\{[^}]*left:\s*0/);
 });

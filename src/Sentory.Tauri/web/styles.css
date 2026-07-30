@@ -276,7 +276,7 @@ button { color: inherit; }
 }
 
 .popup[hidden] { display: none; }
-.filter-menu { left: 0; right: auto; width: 430px; padding: 10px; }
+.filter-menu { right: 220px; width: 430px; padding: 10px; }
 .sort-menu { right: 106px; width: 184px; }
 
 .popup-heading {
@@ -459,6 +459,7 @@ button { color: inherit; }
   transition: opacity 120ms ease;
 }
 
+.artwork img.contain { width: auto; height: auto; max-width: 214px; max-height: 144px; object-fit: contain; }
 .artwork img.icon { width: 34px; height: 34px; object-fit: contain; }
 .artwork img.loaded { opacity: 1; }
 .collection-badge { position: absolute; z-index: 2; left: 8px; bottom: 8px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 8px; background: color-mix(in srgb, var(--surface) 92%, transparent); color: var(--accent); font-size: 10px; font-weight: 600; line-height: 1; backdrop-filter: blur(3px); }

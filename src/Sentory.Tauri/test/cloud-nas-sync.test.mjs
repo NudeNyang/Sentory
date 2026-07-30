@@ -17,10 +17,13 @@ test("settings expose cloud folder and NAS WebDAV sharing", () => {
   assert.match(script, /sync_toggle/);
 });
 
-test("all supported cloud providers and an arbitrary folder remain selectable", () => {
-  assert.match(script, /SUPPORTED_CLOUD_PROVIDERS\s*=\s*\[[\s\S]*?onedrive[\s\S]*?google-drive[\s\S]*?dropbox[\s\S]*?mega[\s\S]*?\]/);
-  assert.match(script, /chooseProviderFolder/);
+test("only detected cloud folders and an arbitrary folder are selectable", () => {
+  assert.doesNotMatch(script, /SUPPORTED_CLOUD_PROVIDERS/);
+  assert.doesNotMatch(script, /chooseProviderFolder/);
+  assert.match(script, /for \(const candidate of state\.syncCandidates\)[\s\S]*?candidate\.folderPath[\s\S]*?candidate\.displayName/);
   assert.match(script, /chooseOtherFolder/);
+  assert.match(script, /placeholder\.hidden\s*=\s*true/);
+  assert.match(script, /\[\.\.\.select\.options\]\.filter\(option => !option\.hidden\)/);
   assert.match(script, /value\.startsWith\("pick:"\)[\s\S]*?chooseSyncFolder/);
   assert.match(script, /syncFolderPick\.textContent\s*=\s*t\(folderPath\s*\?\s*"changeFolder"\s*:\s*"chooseFolder"\)/);
   assert.match(html, /id="sync-folder-pick"[^>]*class="settings-action sync-folder-action"/);
