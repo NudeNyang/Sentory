@@ -21,10 +21,6 @@ internal sealed record WeChatConfirmationResponse(
 
 internal sealed record WeChatAccessibleMessage(string Id, string Text);
 
-internal readonly record struct WeChatComposerTextSnapshot(
-    bool IsAvailable,
-    string Text);
-
 internal interface IWeChatAccessibilityClient
 {
     Task<WeChatAccessibilitySnapshot?> TryCaptureAsync(
@@ -36,11 +32,6 @@ internal interface IWeChatAccessibilityClient
         WeChatConfirmationRequest request,
         Func<bool> explicitSendObserved,
         CancellationToken cancellationToken);
-}
-
-internal interface IWeChatComposerTextReader
-{
-    WeChatComposerTextSnapshot Read(nint mainWindow, uint processId);
 }
 
 internal interface IWeChatPointerSendVerifier
@@ -56,19 +47,9 @@ internal static class WeChatMessageMatchPolicy
 {
     public static bool HasMatchingSendEvidence(
         string messageText,
-        IReadOnlyList<NormalizedUrl> urls,
-        bool preSendComposerMatched) =>
-        urls.Count == 0 ||
-        (string.IsNullOrWhiteSpace(messageText)
-            ? preSendComposerMatched
-            : ContainsEveryUrl(messageText, urls));
-
-    public static bool HasMatchingComposerEvidence(
-        string composerText,
         IReadOnlyList<NormalizedUrl> urls) =>
         urls.Count == 0 ||
-        (!string.IsNullOrWhiteSpace(composerText) &&
-         ContainsEveryUrl(composerText, urls));
+        ContainsEveryUrl(messageText, urls);
 
     public static bool ContainsEveryUrl(
         string messageText,
@@ -110,18 +91,7 @@ internal static class WeChatNewMessageConfirmationPolicy
         explicitSendObserved &&
         WeChatMessageMatchPolicy.HasMatchingSendEvidence(
             messageText,
-            urls,
-            preSendComposerMatched: explicitSendObserved);
-}
-
-internal static class WeChatComposerTextPolicy
-{
-    public static string Select(
-        IReadOnlyList<string> semanticValues,
-        string accessibleName) =>
-        semanticValues.FirstOrDefault(value =>
-            !string.IsNullOrWhiteSpace(value)) ??
-        accessibleName;
+            urls);
 }
 
 internal static class WeChatConversationMatchPolicy
@@ -142,37 +112,6 @@ internal static class WeChatConversationMatchPolicy
         return baseline.MessageIds.Count == 0 ||
                currentMessages.Any(message =>
                    baseline.MessageIds.Contains(message.Id));
-    }
-}
-
-internal sealed class WeChatComposerTextReader : IWeChatComposerTextReader
-{
-    public WeChatComposerTextSnapshot Read(nint mainWindow, uint processId)
-    {
-        try
-        {
-            var root = AutomationElement.FromHandle(mainWindow);
-            var composer = WeChatAutomation.FindByAutomationId(
-                root,
-                WeChatAutomation.ComposerAutomationId);
-            if (composer is null ||
-                WeChatAutomation.SafeProcessId(composer) !=
-                checked((int)processId))
-            {
-                return new WeChatComposerTextSnapshot(false, string.Empty);
-            }
-
-            return new WeChatComposerTextSnapshot(
-                true,
-                WeChatComposerTextPolicy.Select(
-                    WeChatAutomation.ReadSemanticTextValues(composer),
-                    WeChatAutomation.SafeName(composer)));
-        }
-        catch (Exception exception)
-            when (WeChatAutomation.IsRecoverable(exception))
-        {
-            return new WeChatComposerTextSnapshot(false, string.Empty);
-        }
     }
 }
 
@@ -550,14 +489,6 @@ internal static class WeChatAutomation
             AddTextValues(descendant, values);
         }
 
-        return values;
-    }
-
-    public static IReadOnlyList<string> ReadSemanticTextValues(
-        AutomationElement element)
-    {
-        var values = new List<string>();
-        AddSemanticTextValues(element, values);
         return values;
     }
 

@@ -1,11 +1,7 @@
-using Sentory.Core;
-using Sentory.Platform.Windows.Interop;
-
 namespace Sentory.Platform.Windows.Runtime;
 
 internal readonly record struct WeChatRecentSendSignal(
-    DateTimeOffset SentAt,
-    string? ComposerText);
+    DateTimeOffset SentAt);
 
 internal sealed class WeChatRecentSendSignals
 {
@@ -16,61 +12,47 @@ internal sealed class WeChatRecentSendSignals
 
     public void Observe(
         string contextHash,
-        DateTimeOffset sentAt,
-        string? composerText) =>
-        _signals[contextHash] = new WeChatRecentSendSignal(
-            sentAt,
-            composerText);
+        DateTimeOffset sentAt) =>
+        _signals[contextHash] = new WeChatRecentSendSignal(sentAt);
 
     public void ObserveProcess(
         uint processId,
-        DateTimeOffset sentAt,
-        string? composerText) =>
-        _processSignals[processId] = new WeChatRecentSendSignal(
-            sentAt,
-            composerText);
+        DateTimeOffset sentAt) =>
+        _processSignals[processId] = new WeChatRecentSendSignal(sentAt);
 
     public bool CanApply(
         string contextHash,
         uint processId,
         DateTimeOffset pastedAt,
-        DateTimeOffset observedAt,
-        IReadOnlyList<NormalizedUrl> urls,
-        bool hasImages)
+        DateTimeOffset observedAt)
     {
         RemoveExpired(observedAt);
         if (_signals.TryGetValue(contextHash, out var exact) &&
-            IsApplicable(exact, pastedAt, observedAt) &&
-            HasMatchingContent(exact, urls, hasImages))
+            IsApplicable(exact, pastedAt, observedAt))
         {
             return true;
         }
 
         return _processSignals.TryGetValue(processId, out var process) &&
-               IsApplicable(process, pastedAt, observedAt) &&
-               HasMatchingContent(process, urls, hasImages);
+               IsApplicable(process, pastedAt, observedAt);
     }
 
     public bool TryTakeApplicable(
         string contextHash,
         uint processId,
         DateTimeOffset pastedAt,
-        DateTimeOffset observedAt,
-        IReadOnlyList<NormalizedUrl> urls,
-        bool hasImages)
+        DateTimeOffset observedAt)
     {
         RemoveExpired(observedAt);
         if (_signals.TryGetValue(contextHash, out var exact) &&
-            IsApplicable(exact, pastedAt, observedAt) &&
-            HasMatchingContent(exact, urls, hasImages))
+            IsApplicable(exact, pastedAt, observedAt))
         {
             RemoveAliases(exact.SentAt);
             return true;
         }
 
         if (_processSignals.TryGetValue(processId, out var process) &&
-            IsApplicable(process, pastedAt, observedAt) &&
-            HasMatchingContent(process, urls, hasImages))
+            IsApplicable(process, pastedAt, observedAt))
         {
             RemoveAliases(process.SentAt);
             return true;
@@ -89,15 +71,6 @@ internal sealed class WeChatRecentSendSignals
         signal.SentAt >= pastedAt &&
         observedAt >= signal.SentAt &&
         observedAt - signal.SentAt <= Retention;
-
-    private static bool HasMatchingContent(
-        WeChatRecentSendSignal signal,
-        IReadOnlyList<NormalizedUrl> urls,
-        bool hasImages) =>
-        hasImages ||
-        WeChatMessageMatchPolicy.HasMatchingComposerEvidence(
-            signal.ComposerText ?? string.Empty,
-            urls);
 
     private void RemoveExpired(DateTimeOffset observedAt)
     {

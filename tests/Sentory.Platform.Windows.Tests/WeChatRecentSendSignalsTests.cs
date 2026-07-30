@@ -1,4 +1,3 @@
-using Sentory.Core;
 using Sentory.Platform.Windows.Runtime;
 
 namespace Sentory.Platform.Windows.Tests;
@@ -6,39 +5,33 @@ namespace Sentory.Platform.Windows.Tests;
 public sealed class WeChatRecentSendSignalsTests
 {
     [Fact]
-    public void ReplaysFastSendWhenComposerStillContainsCandidateUrl()
+    public void ReplaysFastUrlSendWithoutComposerTreeRead()
     {
         var signals = new WeChatRecentSendSignals();
-        var pastedAt = DateTimeOffset.Parse("2026-07-28T12:00:00Z");
+        var pastedAt = DateTimeOffset.Parse("2026-07-30T10:00:00Z");
         var sentAt = pastedAt.AddMilliseconds(25);
-        var urls = UrlExtractor.Extract("https://example.com/path");
-        signals.Observe("context", sentAt, "https://example.com/path");
+        signals.Observe("context", sentAt);
 
         Assert.True(signals.CanApply(
             "context",
             42,
             pastedAt,
-            sentAt.AddMilliseconds(50),
-            urls,
-            hasImages: false));
+            sentAt.AddMilliseconds(50)));
     }
 
     [Fact]
-    public void DoesNotReplayRemovedUrlForLaterSend()
+    public void DoesNotReplaySendObservedBeforePaste()
     {
         var signals = new WeChatRecentSendSignals();
         var pastedAt = DateTimeOffset.Parse("2026-07-28T12:00:00Z");
-        var sentAt = pastedAt.AddMilliseconds(25);
-        var urls = UrlExtractor.Extract("https://example.com/path");
-        signals.Observe("context", sentAt, "다른 메시지");
+        var sentAt = pastedAt.AddMilliseconds(-25);
+        signals.Observe("context", sentAt);
 
         Assert.False(signals.CanApply(
             "context",
             42,
             pastedAt,
-            sentAt.AddMilliseconds(50),
-            urls,
-            hasImages: false));
+            pastedAt.AddMilliseconds(50)));
     }
 
     [Fact]
@@ -47,15 +40,13 @@ public sealed class WeChatRecentSendSignalsTests
         var signals = new WeChatRecentSendSignals();
         var pastedAt = DateTimeOffset.Parse("2026-07-28T12:00:00Z");
         var sentAt = pastedAt.AddMilliseconds(25);
-        signals.ObserveProcess(42, sentAt, composerText: null);
+        signals.ObserveProcess(42, sentAt);
 
         Assert.True(signals.CanApply(
             "missing-context",
             42,
             pastedAt,
-            sentAt.AddMilliseconds(50),
-            [],
-            hasImages: true));
+            sentAt.AddMilliseconds(50)));
     }
 
     [Fact]
@@ -64,23 +55,19 @@ public sealed class WeChatRecentSendSignalsTests
         var signals = new WeChatRecentSendSignals();
         var droppedAt = DateTimeOffset.UtcNow;
         var sentAt = droppedAt.AddMilliseconds(80);
-        signals.Observe("main-window", sentAt, composerText: null);
-        signals.ObserveProcess(42, sentAt, composerText: null);
+        signals.Observe("main-window", sentAt);
+        signals.ObserveProcess(42, sentAt);
 
         Assert.True(signals.TryTakeApplicable(
             "main-window",
             42,
             droppedAt,
-            droppedAt.AddMilliseconds(500),
-            [],
-            hasImages: true));
+            droppedAt.AddMilliseconds(500)));
         Assert.False(signals.TryTakeApplicable(
             "other-window",
             42,
             droppedAt,
-            droppedAt.AddMilliseconds(501),
-            [],
-            hasImages: true));
+            droppedAt.AddMilliseconds(501)));
     }
 
     [Fact]
@@ -89,16 +76,14 @@ public sealed class WeChatRecentSendSignalsTests
         var signals = new WeChatRecentSendSignals();
         var droppedAt = DateTimeOffset.UtcNow;
         var sentAt = droppedAt.AddMilliseconds(80);
-        signals.Observe("main-window", sentAt, composerText: null);
-        signals.ObserveProcess(42, sentAt, composerText: null);
+        signals.Observe("main-window", sentAt);
+        signals.ObserveProcess(42, sentAt);
 
         Assert.True(signals.TryConsume(sentAt));
         Assert.False(signals.TryTakeApplicable(
             "main-window",
             42,
             droppedAt,
-            droppedAt.AddMilliseconds(500),
-            [],
-            hasImages: true));
+            droppedAt.AddMilliseconds(500)));
     }
 }
