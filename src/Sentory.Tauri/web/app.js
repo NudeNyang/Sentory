@@ -446,8 +446,7 @@ function applyLocalizedUi(language) {
   renderDataStatistics();
   const sortKeys = ["newest", "oldest", "mostCaptured", "mostCopied", "recentlyCopied", "name"];
   [...sortMenu.querySelectorAll("button")].forEach((button, index) => { button.textContent = t(sortKeys[index]); });
-  const selectedSort = sortMenu.querySelector(`[data-sort="${state.sort}"]`);
-  sortLabel.textContent = t("sortLabel", selectedSort?.textContent || t("newest"));
+  updateSortUi();
   selectVisibleButton.textContent = t("visibleSelect");
   clearSelectionButton.textContent = t("clearSelection");
   deleteSelectedButton.textContent = t("deleteSelected");
@@ -1815,6 +1814,14 @@ function updateFilterUi() {
   }
 }
 
+function updateSortUi() {
+  for (const button of sortMenu.querySelectorAll("button")) {
+    button.classList.toggle("selected", state.sort === button.dataset.sort);
+  }
+  const selected = sortMenu.querySelector(`[data-sort="${state.sort}"]`);
+  sortLabel.textContent = t("sortLabel", selected?.textContent || t("newest"));
+}
+
 function togglePopup(target, trigger) {
   const willOpen = target.hidden;
   filterMenu.hidden = true;
@@ -1862,6 +1869,7 @@ filterButton.addEventListener("click", () => togglePopup(filterMenu, filterButto
 sortButton.addEventListener("click", () => togglePopup(sortMenu, sortButton));
 
 filterReset.addEventListener("click", () => {
+  if (state.sources.size === 0 && state.dateRange === "All") return;
   state.sources.clear();
   state.dateRange = "All";
   updateFilterUi();
@@ -1871,6 +1879,7 @@ filterReset.addEventListener("click", () => {
 dateOptions.addEventListener("click", event => {
   const button = event.target.closest("button[data-date]");
   if (!button) return;
+  if (state.dateRange === button.dataset.date) return;
   state.dateRange = button.dataset.date;
   updateFilterUi();
   resetGallery();
@@ -1879,9 +1888,13 @@ dateOptions.addEventListener("click", event => {
 sortMenu.addEventListener("click", event => {
   const button = event.target.closest("button[data-sort]");
   if (!button) return;
+  if (state.sort === button.dataset.sort) {
+    sortMenu.hidden = true;
+    sortButton.setAttribute("aria-expanded", "false");
+    return;
+  }
   state.sort = button.dataset.sort;
-  sortLabel.textContent = t("sortLabel", button.textContent);
-  for (const option of sortMenu.querySelectorAll("button")) option.classList.toggle("selected", option === button);
+  updateSortUi();
   sortMenu.hidden = true;
   sortButton.setAttribute("aria-expanded", "false");
   resetGallery();
@@ -2210,6 +2223,7 @@ new ResizeObserver(() => {
 [themeSetting, languageSetting, autoFavoriteSelect, autoCleanupSelect].forEach(enhanceSelect);
 
 updateFilterUi();
+updateSortUi();
 updateSelectionUi();
 void (async () => {
   try {

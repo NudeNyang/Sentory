@@ -31,7 +31,6 @@ test("app info typography matches the WPF font sizes and weights", () => {
     [".app-update-description", "font-size: 10.5px"],
     [".app-copyright", "font-size: 10.5px", "font-weight: 400"],
     [".app-license-summary", "font-size: 11px"],
-    [".app-info-card .settings-action", "height: 38px", "font-size: 12px"],
   ];
 
   for (const [selector, ...declarations] of expectedRules) {
@@ -42,6 +41,20 @@ test("app info typography matches the WPF font sizes and weights", () => {
       assert.match(match[1], new RegExp(declaration.replace(".", "\\.")));
     }
   }
+});
+
+test("app info actions use the common settings button size", () => {
+  const commonRule = css.match(/\.settings-action\s*\{([^}]*)\}/);
+  assert.ok(commonRule, "missing common settings action rule");
+  for (const declaration of [
+    "min-height: 34px",
+    "padding: 0 12px",
+    "border-radius: 8px",
+    "font-size: 11px",
+  ]) {
+    assert.match(commonRule[1], new RegExp(declaration));
+  }
+  assert.doesNotMatch(css, /\.app-info-card\s+\.settings-action\s*\{/);
 });
 
 test("app info profile links never add an underline on hover", () => {

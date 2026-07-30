@@ -828,7 +828,6 @@ body.selection-mode .favorite { display: none; }
 .app-info-card .app-update-description { color: var(--muted); font-size: 10.5px; line-height: normal; }
 .app-info-card .app-copyright { color: var(--muted); font-size: 10.5px; font-weight: 400; line-height: normal; }
 .app-info-card .app-license-summary { color: var(--text); font-size: 11px; line-height: normal; }
-.app-info-card .settings-action { height: 38px; min-height: 38px; padding: 0 15px; border-radius: 9px; font-size: 12px; }
 .license-dialog { display: grid; grid-template-rows: auto minmax(0, 1fr); width: min(680px, calc(100vw - 48px)); height: min(720px, calc(100vh - 48px)); overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--window); box-shadow: 0 22px 64px rgba(21, 23, 25, 0.25); }
 .license-header { position: relative; padding: 26px 30px 18px; }
 .license-header h2 { margin: 0; font-size: 24px; font-weight: 600; }
