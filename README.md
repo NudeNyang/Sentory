@@ -42,9 +42,10 @@ Sentory는 메신저에서 주고받은 링크와 사진을 따로 모아 두는
 - 페이지 제목, 사이트 아이콘, 대표 이미지와 설명을 포함한 링크 미리보기
 - 라이트·다크 테마와 한국어·영어·일본어·중국어 UI
 - 새 설치에서 기본 활성화되는 Windows 시작 시 자동 실행과 트레이 메뉴
-- GitHub Releases를 이용한 사전 다운로드형 업데이트와 보관함의 수동 설치 버튼
+- 설정에서 GitHub 최신 Release를 확인하고 공식 다운로드 페이지 열기
 - OneDrive, Google Drive, Dropbox, MEGA 또는 직접 고른 폴더를 이용한
   Windows 컴퓨터 간 보관함 동기화
+- NAS의 WebDAV 공유 폴더를 이용한 사진·링크 동기화
 - 여러 화면에 걸친 선택 드래그의 가장자리 자동 스크롤과 드래그 중 마우스 휠
 
 ## 데이터 저장
@@ -61,26 +62,25 @@ Sentory가 운영하는 서버로 보관 데이터를 보내지 않으며 분석
 검색을 위해 Sentory 데이터베이스에 저장됩니다. 자세한 내용은
 [개인정보 및 로컬 데이터 안내](./docs/privacy.md)를 확인해 주세요.
 
-설정에서 컴퓨터 간 동기화를 켜면 사용자가 고른 클라우드 동기화 폴더에 사진은
-일반 이미지 파일로, 링크는 읽을 수 있는 TXT로 저장됩니다. 이 기능은 Sentory
-서버를 거치지 않으며 해당 클라우드 서비스의 데스크톱 앱이 파일을 전송합니다.
-사진·링크 추가와 삭제, 즐겨찾기, 복사 횟수는 같은 폴더를 연결한 Windows
-컴퓨터끼리 맞춰집니다.
+설정에서 컴퓨터 간 동기화를 켜면 사용자가 고른 클라우드 폴더나 NAS WebDAV
+폴더에 사진은 일반 이미지 파일로, 링크는 읽을 수 있는 TXT로 저장됩니다. 이
+기능은 Sentory 서버를 거치지 않습니다. 사진·링크 추가와 삭제, 즐겨찾기, 복사
+횟수는 같은 저장소를 연결한 Windows 컴퓨터끼리 맞춰집니다.
 
 ## 다운로드
 
-현재 정식 버전은 **1.5.1**입니다. Windows 10/11 64비트에서 사용할 수 있으며,
-[Releases](https://github.com/NudeNyang/Sentory/releases)에서 PC에 맞는 파일을
-내려받으면 됩니다. macOS와 Linux 버전도 계획하고 있지만 아직 배포 일정은
-정해지지 않았습니다.
+현재 정식 버전은 **2.0.0**입니다. WPF에서 Tauri 2로 기본 화면을 바꿨으며,
+Windows 10/11 x64에서 사용할 수 있습니다.
+[Releases](https://github.com/NudeNyang/Sentory/releases)에서 설치형이나 포터블
+파일을 내려받으면 됩니다. macOS, Linux와 Windows on ARM용 Tauri판의 배포
+일정은 아직 정해지지 않았습니다.
 
-Discord의 기존 첨부 재수집 문제를 고친 내용은
-[1.5.1 릴리즈 노트](./docs/releases/1.5.1.md)에 정리되어 있습니다.
+Tauri 전환과 클라우드·NAS 동기화를 포함한 변경 내용은
+[2.0.0 릴리즈 노트](./docs/releases/2.0.0.md)에 정리되어 있습니다.
 
 | 사용 환경 | 설치형 | 포터블 |
 | --- | --- | --- |
 | 일반적인 Intel·AMD Windows PC | `Sentory-win-x64-setup.exe` | `Sentory-win-x64-portable.zip` |
-| Windows on ARM PC | `Sentory-win-arm64-setup.exe` | `Sentory-win-arm64-portable.zip` |
 
 대부분의 PC에서는 x64 설치형을 선택하시면 됩니다. 설치하지 않고 사용하려면
 포터블 ZIP을 완전히 푼 뒤 `Sentory.exe`를 실행하세요. 두 방식 모두 .NET을 따로
@@ -103,10 +103,9 @@ SmartScreen 경고가 나타날 수 있습니다. 이 저장소의 공식 Releas
 설정 화면이나 트레이 메뉴에서 끌 수 있으며, 이후 업데이트에서도 선택한 상태가
 유지됩니다.
 
-새 버전 안내를 닫은 뒤에도 보관함 상단의 업데이트 설치 버튼으로 다시 진행할
-수 있습니다. 업데이트 파일과 SHA-256 확인이 끝난 뒤에만 안내창이 나타나므로
-설치 버튼을 누른 뒤 다운로드를 기다릴 필요가 없습니다. 설치형 업데이트는
-설치 마법사를 다시 띄우지 않고 적용한 뒤 Sentory를 다시 엽니다.
+설정의 `지금 확인`을 누르면 GitHub의 최신 정식 버전을 확인합니다. 새 버전이
+있으면 공식 Release 페이지를 열며, 받은 파일은 함께 제공되는 SHA-256 값으로
+확인할 수 있습니다.
 
 Sentory는 실행 중인 Discord와 자동으로 연결을 준비합니다. 새 Discord
 프로세스에 접근성 실행 옵션이 없으면 메인 창을 찾는 즉시 15초 재시작 안내를
@@ -118,8 +117,8 @@ Sentory는 실행 중인 Discord와 자동으로 연결을 준비합니다. 새 
 지원 메신저의 화면 구조가 바뀌면 감지가 일시적으로 멈출 수 있습니다.
 메신저의 `+` 버튼으로 파일 선택창을 여는 업로드는 감지를 보장하지 않으므로,
 사진은 채팅 입력창에 붙여넣거나 탐색기에서 드롭해 주세요.
-Windows on ARM용 파일은 빌드와 실행 파일 구조 검증을 마쳤지만 실제 ARM64
-장치에서의 최종 검수는 남아 있습니다.
+2.0.0 Tauri 정식판은 x64만 제공합니다. Windows on ARM에서는 1.5.1 WPF판을
+계속 사용할 수 있지만 2.0.0으로 자동 전환되지는 않습니다.
 
 문제를 제보할 때는 개인정보가 담긴 대화나 원본 사진 대신 Sentory 버전, Windows
 버전, 사용한 메신저와 재현 순서를 적어 주세요. 자세한 내용은
@@ -136,11 +135,11 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 1.5.1
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.0
 ```
 
-배포 스크립트는 Windows x64·ARM64 설치형과 포터블 패키지, SHA-256 확인값,
-해당 버전의 소스 ZIP, `release-manifest.json`을 `artifacts` 폴더에 만듭니다.
+배포 스크립트는 Windows x64 설치형과 포터블 패키지, SHA-256 확인값, 해당
+버전의 소스 ZIP, `release-manifest.json`을 `artifacts` 폴더에 만듭니다.
 구현과 배포 절차는
 [개발 문서](./docs/development.md)와
 [공개 배포 문서](./docs/05-release-and-distribution.md)에서 확인할 수 있습니다.

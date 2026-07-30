@@ -1,7 +1,7 @@
 [package]
 name = "sentory-tauri"
 version = "2.0.0"
-description = "Sentory Tauri UI preview"
+description = "Sentory"
 edition = "2021"
 
 [build-dependencies]

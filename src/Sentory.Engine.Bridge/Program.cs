@@ -44,6 +44,12 @@ internal static class Program
                 return 0;
             }
 
+            if (command == "restore-discord-startup")
+            {
+                new DiscordStartupRegistrationManager().Restore();
+                return 0;
+            }
+
             var paths = SentoryDataPaths.FromEnvironmentOrCurrentUser(
                 Environment.GetEnvironmentVariable("SENTORY_DATA_ROOT"));
             var repository = new SqliteCaptureRepository(paths);
@@ -68,7 +74,7 @@ internal static class Program
                 "gallery-copy-record"))
             {
                 Console.Error.WriteLine(
-                    "사용법: sentory-engine health | serve | gallery-list [limit] | " +
+                    "사용법: sentory-engine health | restore-discord-startup | serve | gallery-list [limit] | " +
                     "gallery-page <request-json> | gallery-item <id> | " +
                     "gallery-favorite <id> <true|false> | gallery-delete <ids-json> | " +
                     "gallery-copy-record <id>");

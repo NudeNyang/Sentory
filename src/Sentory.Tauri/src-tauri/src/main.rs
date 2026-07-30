@@ -24,6 +24,54 @@ const STARTUP_VALUE_NAME: &str = "Sentory";
 const TRAY_MENU_WIDTH: f64 = 286.0;
 const TRAY_MENU_BASE_HEIGHT: f64 = 374.0;
 const TRAY_MENU_OPTIONAL_ROW_HEIGHT: f64 = 42.0;
+const VERIFY_INSTALLATION_ARGUMENT: &str = "--verify-installation";
+const RESTORE_DISCORD_STARTUP_ARGUMENT: &str = "--restore-discord-startup";
+const REQUEST_SHUTDOWN_ARGUMENT: &str = "--request-shutdown";
+
+fn engine_executable_path() -> Result<PathBuf, String> {
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("Sentory 실행 파일 경로를 확인하지 못했습니다: {error}"))?;
+    Ok(executable
+        .parent()
+        .ok_or_else(|| "Sentory 실행 폴더를 찾지 못했습니다.".to_string())?
+        .join("sentory-engine.exe"))
+}
+
+fn run_engine_utility(command: &str) -> i32 {
+    let engine = match engine_executable_path() {
+        Ok(path) => path,
+        Err(_) => return 1,
+    };
+    match std::process::Command::new(engine).arg(command).status() {
+        Ok(status) => status.code().unwrap_or(1),
+        Err(_) => 1,
+    }
+}
+
+fn verify_installation() -> i32 {
+    let engine = match engine_executable_path() {
+        Ok(path) => path,
+        Err(_) => return 1,
+    };
+    let output = match std::process::Command::new(engine).arg("health").output() {
+        Ok(output) if output.status.success() => output,
+        _ => return 1,
+    };
+    let health: serde_json::Value = match serde_json::from_slice(&output.stdout) {
+        Ok(value) => value,
+        Err(_) => return 1,
+    };
+    if health.get("status").and_then(serde_json::Value::as_str) == Some("ready")
+        && health
+            .get("protocolVersion")
+            .and_then(serde_json::Value::as_u64)
+            == Some(2)
+    {
+        0
+    } else {
+        1
+    }
+}
 
 #[derive(Default)]
 struct AppLifecycleState {
@@ -1454,11 +1502,35 @@ fn write_startup_enabled(_enabled: bool) -> Result<(), String> {
 }
 
 fn main() {
+    let arguments = std::env::args().collect::<Vec<_>>();
+    if arguments
+        .iter()
+        .any(|argument| argument.eq_ignore_ascii_case(VERIFY_INSTALLATION_ARGUMENT))
+    {
+        std::process::exit(verify_installation());
+    }
+    if arguments
+        .iter()
+        .any(|argument| argument.eq_ignore_ascii_case(RESTORE_DISCORD_STARTUP_ARGUMENT))
+    {
+        std::process::exit(run_engine_utility("restore-discord-startup"));
+    }
+
     let engine = EngineClient::default();
     let setup_engine = engine.clone();
     let shutdown_engine = engine.clone();
     let app = tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            if args
+                .iter()
+                .any(|argument| argument.eq_ignore_ascii_case(REQUEST_SHUTDOWN_ARGUMENT))
+            {
+                app.state::<AppLifecycleState>()
+                    .exiting
+                    .store(true, Ordering::Release);
+                app.exit(0);
+                return;
+            }
             show_main_window(app);
         }))
         .plugin(tauri_plugin_dialog::init())

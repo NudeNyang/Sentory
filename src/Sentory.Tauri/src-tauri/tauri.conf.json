@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Sentory Tauri Preview",
+  "productName": "Sentory",
   "version": "2.0.0",
-  "identifier": "com.sentory.preview",
+  "identifier": "com.nudenyang.sentory",
   "build": {
     "frontendDist": "../web"
   },

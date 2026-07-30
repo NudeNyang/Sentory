@@ -10,39 +10,39 @@ Sentory는 사용자가 메신저에서 다룬 URL, 이미지, 파일을 로컬�
 
 모든 데이터는 로컬에 저장한다. 메시지 본문, 상대 이름, 인증 토큰, 과거 대화 기록은 수집하지 않는다.
 
-## Tauri UI 개발자판
+## Tauri 기본 앱
 
-2026-07-29부터 제품 UI를 Tauri 2로 단계적으로 전환한다. 메신저 감지, SQLite,
+2026-07-30부터 Tauri 2 UI를 정식 기본 앱으로 사용한다. 메신저 감지, SQLite,
 OCR, 링크 미리보기와 동기화는 기존 C# 엔진에 남기며 전체 Rust 재작성은 하지
-않는다. 공개판 1.5.1의 WPF 앱은 전환 검증이 끝날 때까지 기준선으로 유지한다.
+않는다. WPF 1.5.1은 비교 기준과 ARM64용 이전 배포판으로 보존한다.
 
-첫 개발자판은 Node.js, Rust stable, Visual Studio C++ 빌드 도구와 Windows SDK가
-필요하다. 저장소 루트에서 다음 스크립트를 실행하면 C# 브리지를 self-contained
+Tauri 앱을 빌드하려면 Node.js, Rust stable, Visual Studio C++ 빌드 도구와
+Windows SDK가 필요하다. 저장소 루트에서 다음 스크립트를 실행하면 C# 브리지를 self-contained
 단일 파일로 준비한 뒤 Tauri 실행 파일을 만든다. Rust 빌드는 메모리 압박으로 인한
 간헐 실패를 피하도록 한 작업만 사용한다.
 
 ```powershell
-.\scripts\Build-TauriPreview.ps1 -Configuration Release
+.\scripts\Build-Tauri.ps1 -Configuration Release
 ```
 
 결과 실행 파일은
-`src\Sentory.Tauri\src-tauri\target\release\sentory-tauri.exe`다. 현재 개발자판은
+`src\Sentory.Tauri\src-tauri\target\release\sentory-tauri.exe`다. 현재 앱은
 SQL 페이지 조회와 가상 스크롤, 상세·복사·삭제·즐겨찾기·다중 선택을 제공한다.
 C# 사이드카는 시작 때 한 번 실행해 요청 사이에 재사용하며, 새 보관 항목 변화와
 비정상 종료 뒤 자동 복구도 연결했다. 설정·언어·테마·감지 상태, 단일 인스턴스와
-트레이, Windows 자동 실행, 데이터 관리와 개발자판 업데이트 확인도 WPF 기준으로
+트레이, Windows 자동 실행, 데이터 관리와 GitHub Release 확인도 WPF 기준으로
 이식했다. 전환 순서와 성능 판정 기준은
 [Tauri UI 전환 로드맵](./11-tauri-ui-migration-roadmap.md)을 따른다.
 
-Tauri 개발자판의 제목 표시줄 닫기는 앱을 종료하지 않고 창을 알림 영역으로
+Tauri 앱의 제목 표시줄 닫기는 앱을 종료하지 않고 창을 알림 영역으로
 숨긴다. 다시 실행하거나 트레이 아이콘을 더블클릭하면 기존 창이 복원된다. 테스트
 뒤 앱과 C# 사이드카를 정상 종료하려면 트레이 메뉴의 `Sentory 종료`를 사용한다.
 설정·상태·확인·알림 문구를 추가할 때는 새 표현을 만들지 말고 WPF
 `SentoryLocalization`의 같은 동작 키를 기준으로 네 언어를 함께 맞춘다.
 
 WPF 비교 기준은 WebView2 갤러리 패키지와 선택 경로가 없는 1.5.1 Developer
-빌드다. Tauri 개발자판은 다음 세대 UI를 구분하기 위해 2.0.0으로 시작하되,
-공개판이 아니라 UI 전환 검수용으로만 사용한다.
+빌드다. Tauri 정식 계열은 2.0.0부터 시작하며 WPF와 같은 사용자 데이터 형식을
+그대로 사용한다.
 
 ## 2026-07-16 확정된 앱별 동작
 
@@ -421,33 +421,21 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
   프로젝트로 유지한다.
 - Windows 전용 Win32, WPF 클립보드 및 카카오톡 감지는
   `Sentory.Platform.Windows`에만 둔다.
-- 현재 WPF 앱은 Windows 셸이며, 향후 Avalonia 셸이 공통 저장소를
-  재사용한다.
+- Tauri 2가 Windows 기본 셸이며 WPF 1.5.1은 비교 기준으로 보존한다.
 - 사용자 데이터는 설치 폴더 밖의 OS 표준 사용자 데이터 위치에
   저장한다.
 - Windows 기본 경로 `%LOCALAPPDATA%\Sentory`는 기존 사용자와의
   호환을 위해 변경하지 않는다.
-- 공개 배포는 x64·ARM64 self-contained 설치형과 포터블 패키지를 제공한다.
-- `0.9.1-beta`부터 GitHub Releases 기반 인앱 자동 업데이트를 사용한다.
-  현재 아키텍처와 설치형·포터블 여부에 맞는 자산만 선택한다.
-- `1.1.3`부터 자산 다운로드와 SHA-256 검증을 백그라운드에서 먼저 끝낸 뒤
-  안내창과 수동 설치 버튼을 표시한다. 같은 파일이 이미 있고 확인값이 맞으면
-  다시 내려받지 않는다.
-- 준비한 업데이트는 앱이 실행되는 동안 경로와 함께 보관한다. 자동 안내를
-  취소해도 버튼은 유지하며, 설치 중에는 중복 실행을 막는다.
-- 설치형 업데이트는 현재 실행 파일을 임시 헬퍼로 복사한 뒤 앱을 종료한다.
-  헬퍼는 기존 PID가 완전히 끝난 것을 확인하고 `/SILENT /SUPPRESSMSGBOXES
-  /CLOSEAPPLICATIONS /NORESTART /SENTORYUPDATE=1`로 설치 파일을 실행한다.
-  설치 마법사 전체 대신 진행창만 표시하고, 설치가 끝나면 Sentory를 다시 연다.
-- 설치 프로그램은 초기 `AppMutex` 검사로 업데이트를 즉시 취소하지 않는다.
-  업데이트 모드에서는 같은 mutex가 풀릴 때까지 기다려 헬퍼가 없던 구버전 앱도
-  다음 설치 파일로 갱신할 수 있게 한다. 최초 설치에는 Sentory 전용 색상과
-  고해상도 그림을 쓴다.
+- Tauri 공개 배포는 x64 self-contained 설치형과 포터블 패키지를 제공한다.
+- 설정의 수동 확인은 GitHub에서 더 높은 정식 버전을 찾으면 공식 Release
+  페이지를 연다. 패키지 교체는 사용자가 직접 진행한다.
+- 설치 프로그램은 WPF 1.5.1과 같은 AppId와 설치 위치를 사용해 기존 사용자
+  데이터와 자동 실행 설정을 이어받는다.
 - Sentory의 원본 소스는 GNU GPL v3 전용(`GPL-3.0-only`)으로 공개한다.
   바이너리 또는 수정본을 배포할 때는 해당 소스와 라이선스 고지를 GPL 조건에
   맞게 함께 제공한다.
-- 코드 서명은 인증서를 준비한 뒤 후속 배포에 적용한다. ARM64 패키지는 실제
-  Windows on ARM 장치에서 별도 검수한다.
+- 코드 서명은 인증서를 준비한 뒤 후속 배포에 적용한다. ARM64 Tauri 패키지는
+  Windows on ARM 장치에서 별도 검수한 뒤 추가한다.
 
 세부 구조와 이식 순서는
 [`03-cross-platform-and-distribution-readiness.md`](./03-cross-platform-and-distribution-readiness.md)에

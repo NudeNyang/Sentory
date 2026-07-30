@@ -4,6 +4,8 @@ import test from "node:test";
 
 const html = readFileSync(new URL("../web/index.html", import.meta.url), "utf8");
 const css = readFileSync(new URL("../web/styles.css", import.meta.url), "utf8");
+const script = readFileSync(new URL("../web/app.js", import.meta.url), "utf8");
+const tauriConfig = readFileSync(new URL("../src-tauri/tauri.conf.json", import.meta.url), "utf8");
 
 test("app info typography keeps the WPF semantic roles", () => {
   for (const className of [
@@ -65,5 +67,20 @@ test("app info profile links never add an underline on hover", () => {
   assert.match(
     css,
     /\.app-info-card\s+\.app-links\s+a(?:,\s*\.app-info-card\s+\.app-links\s+a:hover)?\s*\{[^}]*text-decoration:\s*none/,
+  );
+});
+
+test("the public 2.0.0 identity has no preview or developer marker", () => {
+  assert.match(html, /id="version-label"[^>]*>버전 2\.0\.0<\/small>/);
+  assert.match(script, /t\("version", "2\.0\.0"\)/);
+  assert.doesNotMatch(`${html}\n${script}\n${tauriConfig}`, /for Developers|Tauri Preview|com\.sentory\.preview/);
+  assert.match(tauriConfig, /"productName": "Sentory"/);
+  assert.match(tauriConfig, /"identifier": "com\.nudenyang\.sentory"/);
+});
+
+test("manual update checks open the verified GitHub release page", () => {
+  assert.match(
+    script,
+    /invoke\("open_external_url", \{ url: result\.releasePage \}\)/,
   );
 });

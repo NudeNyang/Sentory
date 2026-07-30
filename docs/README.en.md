@@ -42,9 +42,10 @@ supported messenger can be enabled or disabled separately in settings.
 - Show page titles, site icons, preview images, and descriptions for saved links
 - Use light or dark mode with Korean, English, Japanese, and Chinese interfaces
 - Start with Windows by default on new installations and manage the setting from the tray menu
-- Download verified updates in the background and install them from inside the app
+- Check the latest GitHub Release from settings and open its official download page
 - Sync the library between Windows computers through OneDrive, Google Drive, Dropbox,
   MEGA, or a folder selected manually
+- Sync photos and links directly to a NAS through a WebDAV shared folder
 - Auto-scroll at the library edges during range selection and use the mouse wheel while dragging
 
 ## Data storage
@@ -62,25 +63,24 @@ recognized text is stored in the Sentory database for search. See the
 [privacy and local data notice](./privacy.md) for details.
 
 When sync between computers is enabled, photos are written as regular image files and
-links as readable TXT files inside the cloud folder you select. Sentory does not relay
-this data through a Sentory-operated server; the desktop client for your cloud provider
-transfers the files. Adds, deletes, favorites, and copy counts are reconciled between
-Windows computers connected to the same folder.
+links as readable TXT files inside the cloud folder or NAS WebDAV folder you select.
+Sentory does not relay this data through a Sentory-operated server. Adds, deletes,
+favorites, and copy counts are reconciled between Windows computers connected to the
+same storage.
 
 ## Download
 
-The current stable version is **1.5.1**. It runs on 64-bit Windows 10 and 11. Download
-the package for your PC from
-[Releases](https://github.com/NudeNyang/Sentory/releases). macOS and Linux versions
-are planned, but there is no release schedule yet.
+The current stable version is **2.0.0**. It replaces the WPF interface with Tauri 2 and
+runs on x64 Windows 10 and 11. Download the installer or portable package from
+[Releases](https://github.com/NudeNyang/Sentory/releases). There is no release schedule
+yet for macOS, Linux, or a Tauri build for Windows on ARM.
 
-See the [Sentory 1.5.1 release notes](./releases/1.5.1.md) for details about the
-Discord attachment recollection fix.
+See the [Sentory 2.0.0 release notes](./releases/2.0.0.md) for the Tauri migration,
+cloud and NAS sync, and detection fixes included in this release.
 
 | System | Installer | Portable |
 | --- | --- | --- |
 | Most Intel or AMD Windows PCs | `Sentory-win-x64-setup.exe` | `Sentory-win-x64-portable.zip` |
-| Windows on ARM PCs | `Sentory-win-arm64-setup.exe` | `Sentory-win-arm64-portable.zip` |
 
 The x64 installer is the right choice for most PCs. To use Sentory without installing
 it, fully extract the portable ZIP and run `Sentory.exe`. Both packages are
@@ -101,10 +101,9 @@ Release, and compare its SHA-256 value with the accompanying `.sha256` file if n
 New installations enable Start with Windows by default. You can turn it off from
 Sentory settings or the tray menu, and later updates preserve your choice.
 
-Sentory downloads and verifies an available update before showing the install prompt.
-Installed copies update without reopening the setup wizard and start Sentory again when
-the update is complete. The manual install button remains available in the library if
-you close the first prompt.
+Use `Check now` in settings to compare your version with the latest stable GitHub
+Release. When an update is available, Sentory opens the official Release page. You can
+verify downloaded packages with the accompanying SHA-256 files.
 
 Sentory prepares detection against the currently running Discord process. If a new
 Discord process is missing the accessibility launch argument, the 15-second restart
@@ -115,9 +114,9 @@ argument, or is still loading a chat, continues without an unnecessary restart.
 
 Detection may temporarily stop if a supported messenger changes its interface. Uploads
 opened through a messenger's `+` file picker are not guaranteed to be detected; paste
-an image into the chat input or drop it from Explorer instead. The
-Windows on ARM packages have passed cross-build and executable architecture checks,
-but final testing on a physical ARM64 device is still pending.
+an image into the chat input or drop it from Explorer instead. Sentory 2.0.0 is released
+for x64 Windows only. The WPF 1.5.1 ARM64 build remains available but does not upgrade
+automatically to 2.0.0.
 
 When reporting a problem, do not attach private conversations or original images.
 The Sentory version, Windows version, messenger name, and reproduction steps are
@@ -134,11 +133,11 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 1.5.1
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.0
 ```
 
-The release script creates Windows x64 and ARM64 installers, portable packages,
-SHA-256 checksum files, the corresponding source archive, and
+The release script creates the Windows x64 installer and portable package, SHA-256
+checksum files, the corresponding source archive, and
 `release-manifest.json` in the `artifacts` directory.
 Implementation and release details are documented in
 [development.md](./development.md) and the
