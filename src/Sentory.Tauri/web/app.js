@@ -2211,9 +2211,14 @@ new ResizeObserver(() => {
 
 updateFilterUi();
 updateSelectionUi();
-void connectEngineEvents();
+void (async () => {
+  try {
+    await connectEngineEvents();
+  } finally {
+    resetGallery();
+  }
+})();
 void (async () => {
   await loadSettings();
   await loadStartupState();
 })();
-resetGallery();

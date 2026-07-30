@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Windows.Threading;
 using Sentory.Core;
 using Sentory.Infrastructure.Data;
+using Sentory.Infrastructure.Links;
 using Sentory.Infrastructure.Updates;
 using Sentory.Platform.Windows.Runtime;
 
@@ -15,6 +16,10 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
     private readonly SentoryDataPaths _paths;
     private readonly SentorySettingsStore _settingsStore;
     private readonly AutomaticCleanupCoordinator _automaticCleanup;
+    private readonly Func<int, DateTimeOffset, CancellationToken, Task<int>>
+        _enrichLinkPreviews;
+    private readonly LinkPreviewFetcher? _linkPreviewFetcher;
+    private readonly SemaphoreSlim _linkPreviewWakeSignal = new(0, 1);
     private readonly ConcurrentQueue<EngineRuntimeEventDto> _events = new();
     private readonly TaskCompletionSource _ready = new(
         TaskCreationOptions.RunContinuationsAsynchronously);
@@ -27,15 +32,26 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
     private CaptureRuntimeState _discordState = CaptureRuntimeState.Connecting;
     private Task? _discordMonitor;
     private Task? _maintenanceTask;
+    private Task? _linkPreviewTask;
     private int? _observedDiscordProcessId;
     private bool _discordAccessibilityArgumentMissing;
     private string? _lastIssueCode;
     private string? _lastIssue;
     private bool _started;
+    private int _disposed;
 
     public EngineRuntimeHost(
         SqliteCaptureRepository repository,
         SentoryDataPaths paths)
+        : this(repository, paths, null)
+    {
+    }
+
+    internal EngineRuntimeHost(
+        SqliteCaptureRepository repository,
+        SentoryDataPaths paths,
+        Func<int, DateTimeOffset, CancellationToken, Task<int>>?
+            enrichLinkPreviews)
     {
         _repository = repository;
         _paths = paths;
@@ -43,6 +59,18 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         _automaticCleanup = new AutomaticCleanupCoordinator(
             repository,
             _settingsStore);
+        if (enrichLinkPreviews is null)
+        {
+            _linkPreviewFetcher = new LinkPreviewFetcher(paths);
+            var linkPreviewService = new LinkPreviewEnrichmentService(
+                repository,
+                _linkPreviewFetcher);
+            _enrichLinkPreviews = linkPreviewService.EnrichBatchAsync;
+        }
+        else
+        {
+            _enrichLinkPreviews = enrichLinkPreviews;
+        }
         _dispatcherThread = new Thread(RunDispatcher)
         {
             IsBackground = true,
@@ -63,6 +91,8 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         await _ready.Task;
         _discordMonitor = Task.Run(() => MonitorDiscordAsync(_lifetime.Token));
         _maintenanceTask = Task.Run(() => RunMaintenanceAsync(_lifetime.Token));
+        _linkPreviewTask = Task.Run(() =>
+            RunLinkPreviewLoopAsync(_lifetime.Token));
     }
 
     public EngineSettingsDto GetSettings()
@@ -308,6 +338,10 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
             notification.CapturedAt,
             notification.SourceApp?.ToString(),
             notification.DeliveryStatus?.ToString()));
+        if (notification.Kind is ContentKind.Url or ContentKind.Collection)
+        {
+            WakeLinkPreviewWorker();
+        }
     }
 
     private void OnIssueDetected(object? sender, CaptureRuntimeIssue issue)
@@ -441,6 +475,79 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         }
     }
 
+    private async Task RunLinkPreviewLoopAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (true)
+            {
+                var updated = 0;
+                try
+                {
+                    updated = await EnrichLinkPreviewsOnceAsync(cancellationToken);
+                }
+                catch (OperationCanceledException)
+                    when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    Console.Error.WriteLine(
+                        $"link-preview-failed\t{exception.Message.Replace('\r', ' ').Replace('\n', ' ')}");
+                }
+
+                if (updated == 4)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+                    continue;
+                }
+
+                await _linkPreviewWakeSignal.WaitAsync(
+                    TimeSpan.FromMinutes(15),
+                    cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    internal async Task<int> EnrichLinkPreviewsOnceAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var updated = await _enrichLinkPreviews(
+            4,
+            DateTimeOffset.UtcNow.AddDays(-30),
+            cancellationToken);
+        if (updated > 0)
+        {
+            Enqueue("gallery-changed", new
+            {
+                reason = "link-preview",
+                updated
+            });
+        }
+        return updated;
+    }
+
+    private void WakeLinkPreviewWorker()
+    {
+        if (_linkPreviewWakeSignal.CurrentCount != 0)
+        {
+            return;
+        }
+        try
+        {
+            _linkPreviewWakeSignal.Release();
+        }
+        catch (SemaphoreFullException)
+        {
+        }
+    }
+
     private async Task ApplyAutomaticCleanupAsync(
         CancellationToken cancellationToken)
     {
@@ -526,8 +633,13 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
         if (!_started)
         {
+            DisposeOwnedResources();
             return;
         }
         _lifetime.Cancel();
@@ -546,6 +658,16 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
             try
             {
                 await _maintenanceTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+        if (_linkPreviewTask is not null)
+        {
+            try
+            {
+                await _linkPreviewTask;
             }
             catch (OperationCanceledException)
             {
@@ -591,6 +713,13 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         {
             _dispatcherThread.Join(TimeSpan.FromSeconds(5));
         }
+        DisposeOwnedResources();
+    }
+
+    private void DisposeOwnedResources()
+    {
+        _linkPreviewFetcher?.Dispose();
+        _linkPreviewWakeSignal.Dispose();
         _lifetime.Dispose();
     }
 }

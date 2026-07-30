@@ -827,9 +827,26 @@ fn copy_collection_to_clipboard(_payload: &CollectionClipboardPayload) -> Result
     Err("묶음 파일 복사는 Windows에서만 지원합니다.".to_string())
 }
 
+fn runtime_event_name(event_type: &str) -> &'static str {
+    match event_type {
+        "captured" => "capture-event",
+        "runtime-issue" => "runtime-issue",
+        "settings-changed" => "settings-changed",
+        "automatic-cleanup" => "automatic-cleanup",
+        "gallery-changed" => "gallery-changed",
+        _ => "runtime-status",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn link_preview_change_is_forwarded_to_gallery() {
+        assert_eq!(runtime_event_name("gallery-changed"), "gallery-changed");
+        assert_eq!(runtime_event_name("captured"), "capture-event");
+    }
 
     #[test]
     fn app_info_links_only_allow_the_project_profiles() {
@@ -1439,13 +1456,7 @@ fn main() {
                                         .get("payload")
                                         .cloned()
                                         .unwrap_or(serde_json::Value::Null);
-                                    let event_name = match event_type {
-                                        "captured" => "capture-event",
-                                        "runtime-issue" => "runtime-issue",
-                                        "settings-changed" => "settings-changed",
-                                        "automatic-cleanup" => "automatic-cleanup",
-                                        _ => "runtime-status",
-                                    };
+                                    let event_name = runtime_event_name(event_type);
                                     let _ = handle.emit(event_name, payload);
                                 }
                             }
