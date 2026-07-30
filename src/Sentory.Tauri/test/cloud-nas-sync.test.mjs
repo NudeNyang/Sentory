@@ -17,6 +17,15 @@ test("settings expose cloud folder and NAS WebDAV sharing", () => {
   assert.match(script, /sync_toggle/);
 });
 
+test("all supported cloud providers and an arbitrary folder remain selectable", () => {
+  assert.match(script, /SUPPORTED_CLOUD_PROVIDERS\s*=\s*\[[\s\S]*?onedrive[\s\S]*?google-drive[\s\S]*?dropbox[\s\S]*?mega[\s\S]*?\]/);
+  assert.match(script, /chooseProviderFolder/);
+  assert.match(script, /chooseOtherFolder/);
+  assert.match(script, /value\.startsWith\("pick:"\)[\s\S]*?chooseSyncFolder/);
+  assert.match(script, /syncFolderPick\.textContent\s*=\s*t\(folderPath\s*\?\s*"changeFolder"\s*:\s*"chooseFolder"\)/);
+  assert.match(html, /id="sync-folder-pick"[^>]*class="settings-action sync-folder-action"/);
+});
+
 test("Tauri bridges sync configuration to the shared engine", () => {
   assert.match(rust, /async fn sync_configure_folder/);
   assert.match(rust, /"sync-configure-folder"/);

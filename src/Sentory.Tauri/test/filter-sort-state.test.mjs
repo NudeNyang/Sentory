@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const script = readFileSync(new URL("../web/app.js", import.meta.url), "utf8");
+const css = readFileSync(new URL("../web/styles.css", import.meta.url), "utf8");
 
 test("selecting the active period does not reload the gallery", () => {
   assert.match(
@@ -22,4 +23,9 @@ test("the default newest sort is highlighted during startup", () => {
   assert.match(script, /function updateSortUi\(\)[\s\S]*?classList\.toggle\("selected", state\.sort === button\.dataset\.sort\)/);
   const startup = script.slice(script.lastIndexOf("updateFilterUi();"));
   assert.match(startup, /updateFilterUi\(\);\s*updateSortUi\(\);\s*updateSelectionUi\(\);/);
+});
+
+test("the filter popup is left-aligned six pixels below the WPF-sized trigger", () => {
+  assert.match(css, /\.popup\s*\{[^}]*top:\s*40px/);
+  assert.match(css, /\.filter-menu\s*\{[^}]*left:\s*0[^}]*right:\s*auto[^}]*width:\s*430px/);
 });
