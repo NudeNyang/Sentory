@@ -45,6 +45,9 @@ const TRANSLATIONS = {
     engineRecovering: "워커 복구 중", engineFailed: "Sentory를 시작하지 못했습니다", itemNotFound: "항목을 찾지 못했습니다.",
     windowsStartup: "Windows 시작 시 실행", startupEnabledDescription: "현재 Windows 로그인 시 자동으로 실행됩니다", startupDisabledDescription: "현재 자동 실행을 사용하지 않습니다",
     turnOn: "켜기", turnOff: "끄기", startupEnabled: "Windows 자동 실행을 켰습니다.", startupDisabled: "Windows 자동 실행을 껐습니다.", startupChangeFailed: "자동 실행 설정을 변경하지 못했습니다.",
+    computerSync: "컴퓨터 · 모바일 간 동기화", cloudNasSharing: "클라우드 · NAS 공유", syncDescription: "사진과 링크를 다른 기기에서 바로 보고 공유할 수 있게 동기화합니다", cloudFolder: "클라우드 폴더", nasWebDav: "NAS · WebDAV",
+    cloudFolderDescription: "OneDrive, Google Drive, Dropbox, MEGA 또는 직접 고른 폴더를 사용합니다", nasDescription: "NAS의 WebDAV 공유 폴더 주소와 계정을 입력합니다", detectedCloudFolder: "자동으로 찾은 클라우드 폴더", folderNone: "선택된 폴더 없음", chooseFolder: "폴더 선택",
+    webdavEndpoint: "WebDAV 주소", username: "사용자 이름", password: "비밀번호", passwordHint: "비밀번호는 Windows 사용자 계정으로 암호화해 저장합니다", passwordKeptHint: "비워 두면 저장된 비밀번호를 계속 사용합니다", connectSync: "연결 및 동기화", syncDisabled: "동기화 꺼짐", syncWaiting: "동기화 대기 중", syncMigrating: "동기화 형식을 준비 중", syncRecovering: "저장소 복구 중", syncSyncing: "동기화 중", syncSucceeded: "최근 동기화 완료", syncUnavailable: "저장소 연결 확인 필요", syncInvalid: "동기화 데이터 확인 필요", syncFailed: "동기화 실패", syncConfigured: "동기화 연결을 저장했습니다.", syncTurnedOff: "동기화를 껐습니다. 공유 파일은 유지됩니다.", syncSettingFailed: "동기화 설정을 저장하지 못했습니다.", folderPickerFailed: "폴더 선택 창을 열지 못했습니다.",
     dataManagement: "데이터 관리", favoriteCleanupExclusion: "즐겨찾기에 등록된 항목은 자동 정리에서 포함되지 않음", stored: "보관 중", imageStorage: "사진 저장 용량",
     itemsCount: n => `${n.toLocaleString("ko-KR")}개`, kindsCount: (links, photos) => `링크 ${links.toLocaleString("ko-KR")} · 사진 ${photos.toLocaleString("ko-KR")}`,
     favoritesPreserved: n => `즐겨찾기 ${n.toLocaleString("ko-KR")}개 보존 중`, statisticsLoadFailed: "데이터 현황을 불러오지 못했습니다.",
@@ -86,6 +89,9 @@ const TRANSLATIONS = {
     engineFailed: "Could not recover the C# engine connection.", itemNotFound: "Item not found.",
     windowsStartup: "Start with Windows", startupEnabledDescription: "Currently starts when you sign in to Windows", startupDisabledDescription: "Automatic startup is currently off",
     turnOn: "Turn on", turnOff: "Turn off", startupEnabled: "Start with Windows is on.", startupDisabled: "Start with Windows is off.", startupChangeFailed: "Could not change the startup setting.",
+    computerSync: "Computer and mobile sync", cloudNasSharing: "Cloud · NAS sharing", syncDescription: "Sync photos and links so they can be viewed and shared from other devices", cloudFolder: "Cloud folder", nasWebDav: "NAS · WebDAV",
+    cloudFolderDescription: "Use OneDrive, Google Drive, Dropbox, MEGA, or another folder you choose", nasDescription: "Enter the address and account for a NAS WebDAV shared folder", detectedCloudFolder: "Automatically detected cloud folder", folderNone: "No folder selected", chooseFolder: "Choose folder",
+    webdavEndpoint: "WebDAV address", username: "Username", password: "Password", passwordHint: "The password is encrypted for your Windows account", passwordKeptHint: "Leave blank to keep the saved password", connectSync: "Connect and sync", syncDisabled: "Sync is off", syncWaiting: "Waiting to sync", syncMigrating: "Preparing sync format", syncRecovering: "Recovering storage", syncSyncing: "Syncing", syncSucceeded: "Sync completed recently", syncUnavailable: "Check storage connection", syncInvalid: "Check sync data", syncFailed: "Sync failed", syncConfigured: "Sync connection saved.", syncTurnedOff: "Sync is off. Shared files are kept.", syncSettingFailed: "Could not save sync settings.", folderPickerFailed: "Could not open the folder picker.",
     dataManagement: "Data management", favoriteCleanupExclusion: "Favorites are excluded from automatic cleanup", stored: "Stored", imageStorage: "Photo storage",
     itemsCount: n => `${n.toLocaleString("en-US")} items`, kindsCount: (links, photos) => `Links ${links.toLocaleString("en-US")} · Photos ${photos.toLocaleString("en-US")}`,
     favoritesPreserved: n => `${n.toLocaleString("en-US")} favorites preserved`, statisticsLoadFailed: "Could not load storage statistics.",
@@ -120,6 +126,7 @@ TRANSLATIONS["ja-JP"] = {
   discordPhotoSaved: "Discord で写真の送信を確認して保存しました。", discordUrlSaved: "Discord で URL の送信を確認して保存しました。", discordUrlsSaved: n => `Discord で URL ${n.toLocaleString("ja-JP")}件の送信を確認して保存しました。`, discordCollectionSaved: "Discord の複数項目を1つのまとめとして保存しました。",
   inputPhotoSaved: "写真を入力時に保存しました。", inputUrlSaved: "URL を入力時に保存しました。", inputUrlsSaved: n => `URL ${n.toLocaleString("ja-JP")}件を入力時に保存しました。`, inputCollectionSaved: "複数の入力項目を1つのまとめとして保存しました。",
   windowsStartup: "Windows 起動時に実行", startupEnabledDescription: "現在 Windows サインイン時に自動実行されます", startupDisabledDescription: "現在、自動起動は使用していません", turnOn: "オン", turnOff: "オフ", startupEnabled: "Windows 自動起動をオンにしました。", startupDisabled: "Windows 自動起動をオフにしました。", startupChangeFailed: "自動起動設定を変更できませんでした。",
+  computerSync: "パソコン・モバイル間の同期", cloudNasSharing: "クラウド・NAS 共有", syncDescription: "写真とリンクを他の端末から閲覧・共有できるように同期します", cloudFolder: "クラウドフォルダー", nasWebDav: "NAS・WebDAV", cloudFolderDescription: "OneDrive、Google Drive、Dropbox、MEGA、または選択したフォルダーを使用します", nasDescription: "NAS の WebDAV 共有フォルダーのアドレスとアカウントを入力します", detectedCloudFolder: "自動検出したクラウドフォルダー", folderNone: "フォルダーが選択されていません", chooseFolder: "フォルダーを選択", webdavEndpoint: "WebDAV アドレス", username: "ユーザー名", password: "パスワード", passwordHint: "パスワードは Windows ユーザーアカウントで暗号化して保存します", passwordKeptHint: "空欄のままにすると保存済みのパスワードを使用します", connectSync: "接続して同期", syncDisabled: "同期オフ", syncWaiting: "同期待機中", syncMigrating: "同期形式を準備中", syncRecovering: "ストレージを復旧中", syncSyncing: "同期中", syncSucceeded: "最近の同期が完了", syncUnavailable: "ストレージ接続を確認してください", syncInvalid: "同期データを確認してください", syncFailed: "同期失敗", syncConfigured: "同期接続を保存しました。", syncTurnedOff: "同期をオフにしました。共有ファイルは保持されます。", syncSettingFailed: "同期設定を保存できませんでした。", folderPickerFailed: "フォルダー選択画面を開けませんでした。",
   dataManagement: "データ管理", favoriteCleanupExclusion: "お気に入りは自動整理の対象外です", stored: "保存中", imageStorage: "写真の保存容量", itemsCount: n => `${n.toLocaleString("ja-JP")}件`, kindsCount: (links, photos) => `リンク ${links.toLocaleString("ja-JP")} · 写真 ${photos.toLocaleString("ja-JP")}`, favoritesPreserved: n => `お気に入り ${n.toLocaleString("ja-JP")}件を保持`, statisticsLoadFailed: "データの状況を読み込めませんでした。",
   autoFavorite: "自動お気に入り", autoFavoriteDescription: "同じリンクや写真を繰り返し使用するとお気に入りに追加します", autoFavoriteOff: "使用しない", autoFavoriteCount: n => `${n}回の繰り返し使用後に追加`, autoFavoriteDisabled: "自動お気に入りを使用しません。", autoFavoriteSaved: n => `${n}回繰り返し使用すると自動的にお気に入りへ追加します。`, autoFavoriteSaveFailed: "自動お気に入りの設定を保存できませんでした。",
   autoCleanup: "自動整理", autoCleanupDefault: "初期設定では使用しません", cleanupOff: "自動整理を使用しない", cleanup7: "7日を基準に整理", cleanup30: "30日を基準に整理", cleanup90: "90日を基準に整理", cleanup180: "180日を基準に整理", autoCleanupDisabled: "自動整理を使用しません。", autoCleanupSaved: n => `${n}日基準の自動整理を保存しました。`, autoCleanupSaveFailed: "自動整理設定を保存できませんでした。", saveSettings: "設定を保存",
@@ -144,6 +151,7 @@ TRANSLATIONS["zh-CN"] = {
   discordPhotoSaved: "已保存经确认在 Discord 中发送的图片。", discordUrlSaved: "已保存经确认在 Discord 中发送的 URL。", discordUrlsSaved: n => `已保存 ${n.toLocaleString("zh-CN")} 个经确认在 Discord 中发送的 URL。`, discordCollectionSaved: "已将 Discord 中发送的多个项目保存为一个组合。",
   inputPhotoSaved: "已在粘贴图片时保存。", inputUrlSaved: "已在粘贴 URL 时保存。", inputUrlsSaved: n => `已在粘贴时保存 ${n.toLocaleString("zh-CN")} 个 URL。`, inputCollectionSaved: "已将粘贴的多个项目保存为一个组合。",
   windowsStartup: "Windows 启动时运行", startupEnabledDescription: "当前会在登录 Windows 时自动运行", startupDisabledDescription: "当前未使用自动启动", turnOn: "开启", turnOff: "关闭", startupEnabled: "已开启 Windows 自动启动。", startupDisabled: "已关闭 Windows 自动启动。", startupChangeFailed: "无法更改自动启动设置。",
+  computerSync: "电脑 · 移动设备同步", cloudNasSharing: "云端 · NAS 共享", syncDescription: "同步图片和链接，以便从其他设备查看和共享", cloudFolder: "云端文件夹", nasWebDav: "NAS · WebDAV", cloudFolderDescription: "使用 OneDrive、Google Drive、Dropbox、MEGA 或自行选择的文件夹", nasDescription: "输入 NAS WebDAV 共享文件夹的地址和账户", detectedCloudFolder: "自动找到的云端文件夹", folderNone: "尚未选择文件夹", chooseFolder: "选择文件夹", webdavEndpoint: "WebDAV 地址", username: "用户名", password: "密码", passwordHint: "密码将使用 Windows 用户账户加密保存", passwordKeptHint: "留空将继续使用已保存的密码", connectSync: "连接并同步", syncDisabled: "同步已关闭", syncWaiting: "等待同步", syncMigrating: "正在准备同步格式", syncRecovering: "正在恢复存储", syncSyncing: "正在同步", syncSucceeded: "最近同步已完成", syncUnavailable: "请检查存储连接", syncInvalid: "请检查同步数据", syncFailed: "同步失败", syncConfigured: "同步连接已保存。", syncTurnedOff: "同步已关闭，共享文件会保留。", syncSettingFailed: "无法保存同步设置。", folderPickerFailed: "无法打开文件夹选择器。",
   dataManagement: "数据管理", favoriteCleanupExclusion: "收藏项目不会被自动清理", stored: "已保存", imageStorage: "图片存储空间", itemsCount: n => `${n.toLocaleString("zh-CN")} 项`, kindsCount: (links, photos) => `链接 ${links.toLocaleString("zh-CN")} · 图片 ${photos.toLocaleString("zh-CN")}`, favoritesPreserved: n => `保留 ${n.toLocaleString("zh-CN")} 个收藏项目`, statisticsLoadFailed: "无法加载数据统计。",
   autoFavorite: "自动收藏", autoFavoriteDescription: "同一链接或图片被重复使用后自动收藏", autoFavoriteOff: "不使用", autoFavoriteCount: n => `重复使用 ${n} 次后收藏`, autoFavoriteDisabled: "已关闭自动收藏。", autoFavoriteSaved: n => `重复使用 ${n} 次后将自动添加到收藏。`, autoFavoriteSaveFailed: "无法保存自动收藏设置。",
   autoCleanup: "自动清理", autoCleanupDefault: "默认关闭", cleanupOff: "不使用自动清理", cleanup7: "清理超过 7 天的项目", cleanup30: "清理超过 30 天的项目", cleanup90: "清理超过 90 天的项目", cleanup180: "清理超过 180 天的项目", autoCleanupDisabled: "自动清理已关闭。", autoCleanupSaved: n => `已保存按 ${n} 天自动清理的设置。`, autoCleanupSaveFailed: "无法保存自动清理设置。", saveSettings: "保存设置",
@@ -190,6 +198,8 @@ const state = {
   dataStatistics: null,
   locale: "ko-KR",
   settingsBusy: false,
+  syncMode: "Folder",
+  syncCandidates: [],
   contextItemId: null,
 };
 
@@ -271,6 +281,19 @@ const languageSetting = document.querySelector("#setting-language");
 const settingsSources = document.querySelector("#settings-sources");
 const startupDescription = document.querySelector("#startup-description");
 const startupToggle = document.querySelector("#startup-toggle");
+const syncMode = document.querySelector("#sync-mode");
+const syncFolderPanel = document.querySelector("#sync-folder-panel");
+const syncWebDavPanel = document.querySelector("#sync-webdav-panel");
+const syncFolderCandidate = document.querySelector("#sync-folder-candidate");
+const syncFolderPath = document.querySelector("#sync-folder-path");
+const syncFolderPick = document.querySelector("#sync-folder-pick");
+const syncWebDavEndpoint = document.querySelector("#sync-webdav-endpoint");
+const syncWebDavUsername = document.querySelector("#sync-webdav-username");
+const syncWebDavPassword = document.querySelector("#sync-webdav-password");
+const syncWebDavPasswordHint = document.querySelector("#sync-webdav-password-hint");
+const syncStatus = document.querySelector("#sync-status");
+const syncSave = document.querySelector("#sync-save");
+const syncToggle = document.querySelector("#sync-toggle");
 const autoFavoriteSelect = document.querySelector("#auto-favorite-select");
 const autoFavoriteSave = document.querySelector("#auto-favorite-save");
 const autoCleanupSelect = document.querySelector("#auto-cleanup-select");
@@ -409,6 +432,18 @@ function applyLocalizedUi(language) {
   document.querySelector("#settings-description").textContent = t("settingsDescription");
   document.querySelector("#general-heading").textContent = t("general");
   document.querySelector("#messenger-heading").textContent = t("messenger");
+  document.querySelector("#sync-section-heading").textContent = t("computerSync");
+  document.querySelector("#sync-heading").textContent = t("cloudNasSharing");
+  document.querySelector("#sync-description").textContent = t("syncDescription");
+  document.querySelector("#sync-mode-folder").textContent = t("cloudFolder");
+  document.querySelector("#sync-mode-webdav").textContent = t("nasWebDav");
+  document.querySelector("#sync-folder-description").textContent = t("cloudFolderDescription");
+  document.querySelector("#sync-webdav-description").textContent = t("nasDescription");
+  document.querySelector("#sync-webdav-endpoint-label").textContent = t("webdavEndpoint");
+  document.querySelector("#sync-webdav-username-label").textContent = t("username");
+  document.querySelector("#sync-webdav-password-label").textContent = t("password");
+  syncFolderPick.textContent = t("chooseFolder");
+  syncSave.textContent = t("connectSync");
   document.querySelector("#theme-setting-title").textContent = t("theme");
   document.querySelector("#theme-setting-description").textContent = t("themeDescription");
   document.querySelector("#language-setting-title").textContent = t("language");
@@ -442,6 +477,7 @@ function applyLocalizedUi(language) {
   languageSetting.options[0].textContent = t("auto");
   languageSetting.options[1].textContent = t("korean");
   renderStartupState();
+  renderSyncSettings();
   renderDataOptions();
   renderDataStatistics();
   const sortKeys = ["newest", "oldest", "mostCaptured", "mostCopied", "recentlyCopied", "name"];
@@ -580,11 +616,12 @@ function syncEnhancedSelect(select) {
 }
 
 function syncAllEnhancedSelects() {
-  [themeSetting, languageSetting, autoFavoriteSelect, autoCleanupSelect].forEach(syncEnhancedSelect);
+  [themeSetting, languageSetting, syncFolderCandidate, autoFavoriteSelect, autoCleanupSelect].forEach(syncEnhancedSelect);
 }
 
 function applySettings(settings) {
   state.settings = settings;
+  state.syncMode = settings.sync?.provider === "WebDav" ? "WebDav" : "Folder";
   languageSetting.value = settings.language || "auto";
   applyLocalizedUi(settings.language || "auto");
   applyThemeMode(settings.themeMode || "Light");
@@ -592,6 +629,7 @@ function applySettings(settings) {
     ? String(settings.autoFavoriteCopyThreshold)
     : "0";
   autoCleanupSelect.value = String(settings.autoCleanupDays || 0);
+  renderSyncSettings();
   syncAllEnhancedSelects();
   void configureTray();
 }
@@ -601,6 +639,121 @@ function renderStartupState() {
     ? "startupEnabledDescription"
     : "startupDisabledDescription");
   startupToggle.textContent = t(state.startupEnabled ? "turnOff" : "turnOn");
+}
+
+function setSyncMode(mode) {
+  state.syncMode = mode === "WebDav" ? "WebDav" : "Folder";
+  for (const button of syncMode.querySelectorAll("button[data-sync-mode]")) {
+    const selected = button.dataset.syncMode === state.syncMode;
+    button.classList.toggle("active", selected);
+    button.setAttribute("aria-selected", String(selected));
+  }
+  syncFolderPanel.hidden = state.syncMode !== "Folder";
+  syncWebDavPanel.hidden = state.syncMode !== "WebDav";
+}
+
+function renderSyncCandidates() {
+  const currentPath = syncFolderPath.dataset.pendingPath
+    || state.settings?.sync?.folderPath
+    || "";
+  syncFolderCandidate.replaceChildren();
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = t("detectedCloudFolder");
+  syncFolderCandidate.append(placeholder);
+  for (const candidate of state.syncCandidates) {
+    const option = document.createElement("option");
+    option.value = candidate.folderPath;
+    option.textContent = candidate.displayName;
+    syncFolderCandidate.append(option);
+  }
+  syncFolderCandidate.value = state.syncCandidates.some(candidate => candidate.folderPath === currentPath)
+    ? currentPath
+    : "";
+  syncEnhancedSelect(syncFolderCandidate);
+}
+
+function renderSyncSettings() {
+  const sync = state.settings?.sync;
+  setSyncMode(state.syncMode);
+  const folderPath = syncFolderPath.dataset.pendingPath || sync?.folderPath || "";
+  syncFolderPath.textContent = folderPath || t("folderNone");
+  syncFolderPath.title = folderPath;
+  if (document.activeElement !== syncWebDavEndpoint) {
+    syncWebDavEndpoint.value = sync?.webDavEndpoint || "";
+  }
+  if (document.activeElement !== syncWebDavUsername) {
+    syncWebDavUsername.value = sync?.webDavUsername || "";
+  }
+  syncWebDavPassword.placeholder = sync?.webDavPasswordSet ? "••••••••" : "";
+  syncWebDavPasswordHint.textContent = t(sync?.webDavPasswordSet
+    ? "passwordKeptHint"
+    : "passwordHint");
+  const stateKey = {
+    Disabled: "syncDisabled",
+    Waiting: "syncWaiting",
+    Migrating: "syncMigrating",
+    Recovering: "syncRecovering",
+    Syncing: "syncSyncing",
+    Succeeded: "syncSucceeded",
+    FolderUnavailable: "syncUnavailable",
+    InvalidData: "syncInvalid",
+    Failed: "syncFailed",
+  }[sync?.state] || (sync?.enabled ? "syncWaiting" : "syncDisabled");
+  syncStatus.textContent = t(stateKey);
+  syncStatus.className = `sync-status${sync?.state === "Succeeded" ? " ready" : ["FolderUnavailable", "InvalidData", "Failed"].includes(sync?.state) ? " issue" : ""}`;
+  syncToggle.textContent = t(sync?.enabled ? "turnOff" : "turnOn");
+  renderSyncCandidates();
+}
+
+async function loadSyncCandidates() {
+  try {
+    state.syncCandidates = await tauriCore().invoke("sync_folder_candidates");
+  } catch {
+    state.syncCandidates = [];
+  }
+  renderSyncCandidates();
+}
+
+async function configureSelectedSync() {
+  syncSave.disabled = true;
+  syncToggle.disabled = true;
+  try {
+    let settings;
+    if (state.syncMode === "WebDav") {
+      const endpoint = syncWebDavEndpoint.value.trim();
+      if (!endpoint || !syncWebDavEndpoint.checkValidity()) {
+        syncWebDavEndpoint.focus();
+        throw new Error(t("syncSettingFailed"));
+      }
+      const enteredPassword = syncWebDavPassword.value;
+      settings = await tauriCore().invoke("sync_configure_webdav", {
+        endpoint,
+        username: syncWebDavUsername.value.trim() || null,
+        password: enteredPassword ? enteredPassword : null,
+      });
+      syncWebDavPassword.value = "";
+    } else {
+      const folderPath = syncFolderPath.dataset.pendingPath
+        || syncFolderCandidate.value
+        || state.settings?.sync?.folderPath;
+      if (!folderPath) {
+        syncFolderPick.focus();
+        throw new Error(t("folderNone"));
+      }
+      settings = await tauriCore().invoke("sync_configure_folder", { folderPath });
+      delete syncFolderPath.dataset.pendingPath;
+    }
+    applySettings(settings);
+    showToast(t("syncConfigured"));
+  } catch (error) {
+    const message = String(error?.message || error || "").trim();
+    showToast(message && !message.includes("Error") ? message : t("syncSettingFailed"));
+  } finally {
+    syncSave.disabled = false;
+    syncToggle.disabled = false;
+    renderSyncSettings();
+  }
 }
 
 function renderDataOptions() {
@@ -905,6 +1058,15 @@ async function connectEngineEvents() {
       applySettings(event.payload);
       void loadStartupState();
     }
+  });
+  await listen("sync-status", event => {
+    if (event.payload && state.settings) {
+      state.settings.sync = event.payload;
+      renderSyncSettings();
+    }
+  });
+  await listen("sync-issue", event => {
+    if (event.payload?.message) showToast(event.payload.message);
   });
 }
 
@@ -2090,6 +2252,7 @@ settingsButton.addEventListener("click", () => {
   renderSourceSettings();
   void loadStartupState();
   void loadDataStatistics();
+  void loadSyncCandidates();
   updateScrollIndicatorFor(settingsScroll, settingsScrollThumb);
   enhancedSelects.get(themeSetting)?.trigger.focus();
 });
@@ -2142,6 +2305,54 @@ startupToggle.addEventListener("click", async () => {
   } finally {
     startupToggle.disabled = false;
     renderStartupState();
+  }
+});
+syncMode.addEventListener("click", event => {
+  const button = event.target.closest("button[data-sync-mode]");
+  if (button) setSyncMode(button.dataset.syncMode);
+});
+syncFolderCandidate.addEventListener("change", () => {
+  if (!syncFolderCandidate.value) return;
+  syncFolderPath.dataset.pendingPath = syncFolderCandidate.value;
+  renderSyncSettings();
+});
+syncFolderPick.addEventListener("click", async () => {
+  try {
+    const open = window.__TAURI__?.dialog?.open;
+    if (!open) throw new Error("dialog unavailable");
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      defaultPath: syncFolderPath.dataset.pendingPath
+        || state.settings?.sync?.folderPath
+        || undefined,
+    });
+    if (typeof selected === "string" && selected) {
+      syncFolderPath.dataset.pendingPath = selected;
+      renderSyncSettings();
+    }
+  } catch {
+    showToast(t("folderPickerFailed"));
+  }
+});
+syncSave.addEventListener("click", () => { void configureSelectedSync(); });
+syncToggle.addEventListener("click", async () => {
+  const sync = state.settings?.sync;
+  const configured = sync?.provider === state.syncMode
+    && (state.syncMode === "WebDav" ? sync.webDavEndpoint : sync.folderPath);
+  if (!configured) {
+    await configureSelectedSync();
+    return;
+  }
+  syncToggle.disabled = true;
+  try {
+    const settings = await tauriCore().invoke("sync_toggle", { enabled: !sync.enabled });
+    applySettings(settings);
+    showToast(t(settings.sync.enabled ? "syncConfigured" : "syncTurnedOff"));
+  } catch {
+    showToast(t("syncSettingFailed"));
+  } finally {
+    syncToggle.disabled = false;
   }
 });
 autoFavoriteSave.addEventListener("click", async () => {
@@ -2267,7 +2478,7 @@ new ResizeObserver(() => {
   updateScrollIndicatorFor(licenseText, licenseScrollThumb);
 }).observe(licenseText);
 
-[themeSetting, languageSetting, autoFavoriteSelect, autoCleanupSelect].forEach(enhanceSelect);
+[themeSetting, languageSetting, syncFolderCandidate, autoFavoriteSelect, autoCleanupSelect].forEach(enhanceSelect);
 
 updateFilterUi();
 updateSortUi();

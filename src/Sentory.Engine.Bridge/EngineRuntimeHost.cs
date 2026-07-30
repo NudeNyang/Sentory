@@ -1,10 +1,14 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text.Json;
 using System.Windows.Threading;
 using Sentory.Core;
+using Sentory.Core.Sync;
 using Sentory.Infrastructure.Data;
 using Sentory.Infrastructure.Links;
+using Sentory.Infrastructure.Sync;
 using Sentory.Infrastructure.Updates;
 using Sentory.Platform.Windows.Runtime;
 
@@ -20,10 +24,13 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         _enrichLinkPreviews;
     private readonly LinkPreviewFetcher? _linkPreviewFetcher;
     private readonly SemaphoreSlim _linkPreviewWakeSignal = new(0, 1);
+    private readonly SemaphoreSlim _syncWakeSignal = new(0, 1);
+    private readonly SyncRuntimeStatusTracker _syncStatusTracker = new();
     private readonly ConcurrentQueue<EngineRuntimeEventDto> _events = new();
     private readonly TaskCompletionSource _ready = new(
         TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly object _stateGate = new();
+    private readonly object _webDavStoreGate = new();
     private readonly CancellationTokenSource _lifetime = new();
     private readonly Thread _dispatcherThread;
     private CompositeCaptureRuntime? _runtime;
@@ -33,6 +40,10 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
     private Task? _discordMonitor;
     private Task? _maintenanceTask;
     private Task? _linkPreviewTask;
+    private Task? _syncTask;
+    private LocalFolderSyncRuntimeService? _syncRuntimeService;
+    private WebDavSyncObjectStore? _webDavStore;
+    private string? _webDavStoreConfiguration;
     private int? _observedDiscordProcessId;
     private bool _discordAccessibilityArgumentMissing;
     private string? _lastIssueCode;
@@ -93,12 +104,226 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         _maintenanceTask = Task.Run(() => RunMaintenanceAsync(_lifetime.Token));
         _linkPreviewTask = Task.Run(() =>
             RunLinkPreviewLoopAsync(_lifetime.Token));
+        _syncTask = Task.Run(() => RunSyncLoopAsync(_lifetime.Token));
     }
 
     public EngineSettingsDto GetSettings()
     {
         var settings = _settingsStore.Load();
         return CreateSettingsDto(settings);
+    }
+
+    public IReadOnlyList<EngineSyncFolderCandidateDto>
+        DiscoverSyncFolders() =>
+        WindowsCloudSyncFolderDiscovery.Discover()
+            .Select(candidate => new EngineSyncFolderCandidateDto(
+                candidate.ProviderId,
+                candidate.ProviderName,
+                candidate.FolderPath,
+                candidate.DisplayName))
+            .ToArray();
+
+    public async Task<EngineSettingsDto> ConfigureSyncFolderAsync(
+        string folderPath,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(folderPath);
+        var selectedPath = Path.GetFullPath(folderPath);
+        Directory.CreateDirectory(selectedPath);
+        var capability = await SyncFolderCapabilityProbe.CheckAsync(
+            selectedPath,
+            cancellationToken);
+        if (!capability.IsSupported)
+        {
+            throw new IOException(capability.FailureReason switch
+            {
+                SyncFolderCapabilityFailure.NotDirectory =>
+                    "파일은 동기화 위치로 사용할 수 없습니다.",
+                SyncFolderCapabilityFailure.RenameUnavailable =>
+                    "이 위치에서는 파일 이름 변경을 사용할 수 없습니다.",
+                SyncFolderCapabilityFailure.ContentMismatch =>
+                    "이 위치에 쓴 파일의 내용이 달라졌습니다.",
+                _ => "이 위치에서 파일을 만들거나 읽을 수 없습니다."
+            });
+        }
+
+        var settings = _settingsStore.Load();
+        var folderChanged =
+            settings.SyncProvider != SentorySettings.FolderSyncProvider ||
+            !string.Equals(
+                settings.SyncFolderPath,
+                selectedPath,
+                OperatingSystem.IsWindows()
+                    ? StringComparison.OrdinalIgnoreCase
+                    : StringComparison.Ordinal);
+        var previous = CaptureSyncConfiguration(settings);
+        settings.SyncProvider = SentorySettings.FolderSyncProvider;
+        settings.SyncFolderPath = selectedPath;
+        settings.SyncEnabled = true;
+        if (folderChanged ||
+            !SyncDeviceIdentity.IsValid(settings.SyncDeviceId))
+        {
+            settings.SyncDeviceId = SyncDeviceIdentity.Create();
+            settings.SyncStorageVersion =
+                SentorySettings.CurrentSyncStorageVersion;
+            settings.SyncMigrationDeviceId = null;
+            settings.SyncStoreId = null;
+        }
+
+        _settingsStore.Save(settings);
+        try
+        {
+            if (folderChanged)
+            {
+                await EnsureSyncJournalInitializedAsync(
+                    previous.DeviceId,
+                    settings.SyncDeviceId!,
+                    cancellationToken);
+                await SqliteSyncOperationJournal.ResetForNewStoreAsync(
+                    _paths,
+                    settings.SyncDeviceId!,
+                    cancellationToken);
+            }
+        }
+        catch
+        {
+            RestoreSyncConfiguration(settings, previous);
+            _settingsStore.Save(settings);
+            throw;
+        }
+
+        PublishSyncStatus(SyncRuntimeState.Waiting);
+        WakeSyncWorker();
+        var result = CreateSettingsDto(_settingsStore.Load());
+        Enqueue("settings-changed", result);
+        return result;
+    }
+
+    public async Task<EngineSettingsDto> ConfigureSyncWebDavAsync(
+        string endpoint,
+        string? username,
+        string? password,
+        CancellationToken cancellationToken = default)
+    {
+        var settings = _settingsStore.Load();
+        var normalizedUsername = string.IsNullOrWhiteSpace(username)
+            ? null
+            : username.Trim();
+        using var candidate = new WebDavSyncObjectStore(
+            endpoint,
+            normalizedUsername,
+            ResolveWebDavPassword(
+                settings,
+                endpoint,
+                normalizedUsername,
+                password));
+        await candidate.ProbeAsync(cancellationToken);
+        var storeId = await GetOrCreateWebDavStoreIdAsync(
+            candidate,
+            cancellationToken);
+        var normalizedEndpoint = candidate.Endpoint.AbsoluteUri;
+        var configurationChanged =
+            settings.SyncProvider != SentorySettings.WebDavSyncProvider ||
+            !string.Equals(
+                settings.SyncWebDavEndpoint,
+                normalizedEndpoint,
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(
+                settings.SyncWebDavUsername,
+                normalizedUsername,
+                StringComparison.Ordinal) ||
+            !string.Equals(
+                settings.SyncStoreId,
+                storeId,
+                StringComparison.Ordinal);
+        var previous = CaptureSyncConfiguration(settings);
+        settings.SyncProvider = SentorySettings.WebDavSyncProvider;
+        settings.SyncFolderPath = null;
+        settings.SyncWebDavEndpoint = normalizedEndpoint;
+        settings.SyncWebDavUsername = normalizedUsername;
+        if (password is not null)
+        {
+            settings.SyncWebDavProtectedPassword =
+                WebDavCredentialProtector.Protect(password);
+        }
+        else if (configurationChanged)
+        {
+            settings.SyncWebDavProtectedPassword = null;
+        }
+        settings.SyncEnabled = true;
+        settings.SyncStorageVersion = SentorySettings.CurrentSyncStorageVersion;
+        settings.SyncMigrationDeviceId = null;
+        settings.SyncStoreId = storeId;
+        if (configurationChanged ||
+            !SyncDeviceIdentity.IsValid(settings.SyncDeviceId))
+        {
+            settings.SyncDeviceId = SyncDeviceIdentity.Create();
+        }
+
+        _settingsStore.Save(settings);
+        try
+        {
+            if (configurationChanged)
+            {
+                await EnsureSyncJournalInitializedAsync(
+                    previous.DeviceId,
+                    settings.SyncDeviceId!,
+                    cancellationToken);
+                await SqliteSyncOperationJournal.ResetForNewStoreAsync(
+                    _paths,
+                    settings.SyncDeviceId!,
+                    cancellationToken);
+            }
+        }
+        catch
+        {
+            RestoreSyncConfiguration(settings, previous);
+            _settingsStore.Save(settings);
+            throw;
+        }
+
+        PublishSyncStatus(SyncRuntimeState.Waiting);
+        WakeSyncWorker();
+        var result = CreateSettingsDto(_settingsStore.Load());
+        Enqueue("settings-changed", result);
+        return result;
+    }
+
+    public async Task<EngineSettingsDto> ToggleSyncAsync(
+        bool enabled,
+        CancellationToken cancellationToken = default)
+    {
+        var settings = _settingsStore.Load();
+        if (enabled && !HasCompleteSyncConfiguration(settings))
+        {
+            throw new InvalidOperationException(
+                "먼저 클라우드 폴더나 NAS WebDAV 연결을 설정해 주세요.");
+        }
+
+        if (enabled && !SyncDeviceIdentity.IsValid(settings.SyncDeviceId))
+        {
+            settings.SyncDeviceId = SyncDeviceIdentity.Create();
+            await EnsureSyncJournalInitializedAsync(
+                null,
+                settings.SyncDeviceId,
+                cancellationToken);
+            await SqliteSyncOperationJournal.ResetForNewStoreAsync(
+                _paths,
+                settings.SyncDeviceId,
+                cancellationToken);
+        }
+        settings.SyncEnabled = enabled;
+        _settingsStore.Save(settings);
+        PublishSyncStatus(
+            enabled ? SyncRuntimeState.Waiting : SyncRuntimeState.Disabled);
+        if (enabled)
+        {
+            WakeSyncWorker();
+        }
+
+        var result = CreateSettingsDto(_settingsStore.Load());
+        Enqueue("settings-changed", result);
+        return result;
     }
 
     public async Task<DataStatistics> GetDataStatisticsAsync(
@@ -186,6 +411,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
             settings.AutoFavoriteEnabled,
             settings.AutoFavoriteCopyThreshold);
         await ApplySourceSettingsAsync(settings);
+        WakeSyncWorker();
         Enqueue("settings-changed", CreateSettingsDto(settings));
         return CreateSettingsDto(settings);
     }
@@ -342,6 +568,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         {
             WakeLinkPreviewWorker();
         }
+        WakeSyncWorker();
     }
 
     private void OnIssueDetected(object? sender, CaptureRuntimeIssue issue)
@@ -548,6 +775,387 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         }
     }
 
+    private async Task RunSyncLoopAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(8), cancellationToken);
+            while (true)
+            {
+                await RunConfiguredSyncOnceAsync(cancellationToken);
+                await _syncWakeSignal.WaitAsync(
+                    TimeSpan.FromSeconds(30),
+                    cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    internal async Task RunConfiguredSyncOnceAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var settings = _settingsStore.Load();
+        if (!settings.SyncEnabled ||
+            !HasCompleteSyncConfiguration(settings) ||
+            !SyncDeviceIdentity.IsValid(settings.SyncDeviceId))
+        {
+            PublishSyncStatus(SyncRuntimeState.Disabled);
+            return;
+        }
+
+        PublishSyncStatus(
+            settings.SyncProvider == SentorySettings.FolderSyncProvider &&
+            (settings.SyncStorageVersion <
+                 SentorySettings.CurrentSyncStorageVersion ||
+             settings.SyncMigrationDeviceId is not null)
+                ? SyncRuntimeState.Migrating
+                : SyncRuntimeState.Syncing);
+        try
+        {
+            var migrationProjected = 0;
+            LocalFolderSyncRunResult result;
+            _syncRuntimeService ??= new LocalFolderSyncRuntimeService(
+                _paths,
+                _repository,
+                _settingsStore,
+                () => PublishSyncStatus(SyncRuntimeState.Recovering));
+            if (settings.SyncProvider == SentorySettings.WebDavSyncProvider)
+            {
+                var store = GetWebDavStore(settings);
+                var remoteStoreId = await GetOrCreateWebDavStoreIdAsync(
+                    store,
+                    cancellationToken);
+                if (!string.Equals(
+                        settings.SyncStoreId,
+                        remoteStoreId,
+                        StringComparison.Ordinal))
+                {
+                    settings.SyncDeviceId = SyncDeviceIdentity.Create();
+                    settings.SyncStoreId = remoteStoreId;
+                    await EnsureSyncJournalInitializedAsync(
+                        null,
+                        settings.SyncDeviceId,
+                        cancellationToken);
+                    await SqliteSyncOperationJournal.ResetForNewStoreAsync(
+                        _paths,
+                        settings.SyncDeviceId,
+                        cancellationToken);
+                    _settingsStore.Save(settings);
+                    PublishSyncStatus(SyncRuntimeState.Recovering);
+                }
+
+                result = await _syncRuntimeService.RunObjectStoreOnceAsync(
+                    settings.SyncDeviceId!,
+                    store,
+                    cancellationToken: cancellationToken);
+            }
+            else
+            {
+                var migration = await new SyncStorageMigrationService(
+                    _paths,
+                    _repository,
+                    _settingsStore).MigrateIfNeededAsync(
+                    settings,
+                    cancellationToken);
+                if (migration.Migrated)
+                {
+                    settings = _settingsStore.Load();
+                    migrationProjected = migration.LegacyProjected;
+                    PublishSyncStatus(SyncRuntimeState.Syncing);
+                }
+
+                result = await _syncRuntimeService.RunOnceAsync(
+                    settings.SyncDeviceId!,
+                    settings.SyncFolderPath!,
+                    cancellationToken);
+            }
+
+            var succeededAt = DateTimeOffset.UtcNow;
+            _syncStatusTracker.Update(
+                SyncRuntimeState.Succeeded,
+                succeededAt,
+                succeededAt);
+            Enqueue("sync-status", CreateSyncSettingsDto(
+                _settingsStore.Load()));
+            if (result.Metadata.SettingsChanged)
+            {
+                Enqueue("settings-changed", CreateSettingsDto(
+                    _settingsStore.Load()));
+            }
+            if (result.Cycle.Projection.Projected > 0 ||
+                result.Metadata.Projected > 0 ||
+                migrationProjected > 0)
+            {
+                Enqueue("gallery-changed", new
+                {
+                    reason = "sync",
+                    projected = result.Cycle.Projection.Projected +
+                                result.Metadata.Projected +
+                                migrationProjected
+                });
+                WakeLinkPreviewWorker();
+            }
+            if (result.Export.Exported == 200 ||
+                result.Publish.Downloaded > 0)
+            {
+                WakeSyncWorker();
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (SyncStoreUnavailableException exception)
+        {
+            PublishSyncStatus(SyncRuntimeState.FolderUnavailable);
+            Enqueue("sync-issue", new { message = exception.Message });
+        }
+        catch (InvalidDataException exception)
+        {
+            PublishSyncStatus(SyncRuntimeState.InvalidData);
+            Enqueue("sync-issue", new { message = exception.Message });
+        }
+        catch (Exception exception)
+        {
+            PublishSyncStatus(SyncRuntimeState.Failed);
+            Enqueue("sync-issue", new { message = exception.Message });
+        }
+    }
+
+    private void WakeSyncWorker()
+    {
+        if (_syncWakeSignal.CurrentCount != 0)
+        {
+            return;
+        }
+        try
+        {
+            _syncWakeSignal.Release();
+        }
+        catch (SemaphoreFullException)
+        {
+        }
+    }
+
+    private void PublishSyncStatus(SyncRuntimeState state)
+    {
+        _syncStatusTracker.Update(state, DateTimeOffset.UtcNow);
+        Enqueue("sync-status", CreateSyncSettingsDto(
+            _settingsStore.Load()));
+    }
+
+    private WebDavSyncObjectStore GetWebDavStore(
+        SentorySettings settings)
+    {
+        var configuration = CreateWebDavConfigurationKey(settings);
+        lock (_webDavStoreGate)
+        {
+            if (_webDavStore is not null &&
+                string.Equals(
+                    _webDavStoreConfiguration,
+                    configuration,
+                    StringComparison.Ordinal))
+            {
+                return _webDavStore;
+            }
+
+            var replacement = CreateWebDavStore(settings);
+            _webDavStore?.Dispose();
+            _webDavStore = replacement;
+            _webDavStoreConfiguration = configuration;
+            return replacement;
+        }
+    }
+
+    private void ReplaceWebDavStore(
+        WebDavSyncObjectStore? store,
+        string? configuration)
+    {
+        lock (_webDavStoreGate)
+        {
+            _webDavStore?.Dispose();
+            _webDavStore = store;
+            _webDavStoreConfiguration = configuration;
+        }
+    }
+
+    private static WebDavSyncObjectStore CreateWebDavStore(
+        SentorySettings settings) =>
+        new(
+            settings.SyncWebDavEndpoint ??
+            throw new InvalidOperationException(
+                "NAS WebDAV 주소가 설정되지 않았습니다."),
+            settings.SyncWebDavUsername,
+            string.IsNullOrWhiteSpace(settings.SyncWebDavProtectedPassword)
+                ? null
+                : WebDavCredentialProtector.Unprotect(
+                    settings.SyncWebDavProtectedPassword));
+
+    private static string CreateWebDavConfigurationKey(
+        SentorySettings settings) =>
+        string.Join(
+            '\n',
+            settings.SyncWebDavEndpoint,
+            settings.SyncWebDavUsername,
+            settings.SyncWebDavProtectedPassword);
+
+    private static string? ResolveWebDavPassword(
+        SentorySettings settings,
+        string endpoint,
+        string? username,
+        string? password)
+    {
+        if (password is not null)
+        {
+            return password;
+        }
+        if (settings.SyncProvider != SentorySettings.WebDavSyncProvider ||
+            !WebDavEndpointsEqual(settings.SyncWebDavEndpoint, endpoint) ||
+            !string.Equals(
+                settings.SyncWebDavUsername,
+                username,
+                StringComparison.Ordinal) ||
+            string.IsNullOrWhiteSpace(settings.SyncWebDavProtectedPassword))
+        {
+            return null;
+        }
+
+        return WebDavCredentialProtector.Unprotect(
+            settings.SyncWebDavProtectedPassword);
+    }
+
+    private static bool WebDavEndpointsEqual(string? left, string? right) =>
+        !string.IsNullOrWhiteSpace(left) &&
+        !string.IsNullOrWhiteSpace(right) &&
+        string.Equals(
+            left.TrimEnd('/'),
+            right.Trim().TrimEnd('/'),
+            StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasCompleteSyncConfiguration(
+        SentorySettings settings) =>
+        settings.SyncProvider switch
+        {
+            SentorySettings.WebDavSyncProvider =>
+                !string.IsNullOrWhiteSpace(settings.SyncWebDavEndpoint),
+            _ => !string.IsNullOrWhiteSpace(settings.SyncFolderPath)
+        };
+
+    private static async Task<string> GetOrCreateWebDavStoreIdAsync(
+        WebDavSyncObjectStore store,
+        CancellationToken cancellationToken)
+    {
+        const string key = ".sentory/v2/store.json";
+        var stored = await store.TryGetAsync(key, cancellationToken);
+        if (stored is not null)
+        {
+            return ReadWebDavStoreId(stored.Content);
+        }
+
+        var manifest = new WebDavStoreManifest(
+            1,
+            Guid.NewGuid().ToString("N"),
+            DateTimeOffset.UtcNow);
+        var content = JsonSerializer.SerializeToUtf8Bytes(
+            manifest,
+            BridgeServer.JsonOptions);
+        var sha256 = Convert.ToHexString(SHA256.HashData(content))
+            .ToLowerInvariant();
+        await store.PutIfAbsentAsync(
+            key,
+            content,
+            sha256,
+            cancellationToken);
+        stored = await store.TryGetAsync(key, cancellationToken) ??
+                 throw new SyncStoreUnavailableException(
+                     "NAS 동기화 저장소 식별 파일을 읽지 못했습니다.");
+        return ReadWebDavStoreId(stored.Content);
+    }
+
+    private static string ReadWebDavStoreId(byte[] content)
+    {
+        WebDavStoreManifest? manifest;
+        try
+        {
+            manifest = JsonSerializer.Deserialize<WebDavStoreManifest>(
+                content,
+                BridgeServer.JsonOptions);
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidDataException(
+                "NAS 동기화 저장소 식별 파일을 읽을 수 없습니다.",
+                exception);
+        }
+        if (manifest is null ||
+            manifest.FormatVersion != 1 ||
+            manifest.StoreId.Length != 32 ||
+            !Guid.TryParseExact(manifest.StoreId, "N", out _))
+        {
+            throw new InvalidDataException(
+                "NAS 동기화 저장소 식별 정보가 올바르지 않습니다.");
+        }
+        return manifest.StoreId.ToLowerInvariant();
+    }
+
+    private static SyncConfigurationSnapshot CaptureSyncConfiguration(
+        SentorySettings settings) =>
+        new(
+            settings.SyncEnabled,
+            settings.SyncProvider,
+            settings.SyncFolderPath,
+            settings.SyncWebDavEndpoint,
+            settings.SyncWebDavUsername,
+            settings.SyncWebDavProtectedPassword,
+            settings.SyncDeviceId,
+            settings.SyncStorageVersion,
+            settings.SyncMigrationDeviceId,
+            settings.SyncStoreId);
+
+    private async Task EnsureSyncJournalInitializedAsync(
+        string? existingDeviceId,
+        string newDeviceId,
+        CancellationToken cancellationToken)
+    {
+        var initializationDeviceId = SyncDeviceIdentity.IsValid(
+            existingDeviceId)
+            ? existingDeviceId!
+            : newDeviceId;
+        try
+        {
+            await new SqliteSyncOperationJournal(
+                _paths,
+                initializationDeviceId).InitializeAsync(
+                cancellationToken);
+        }
+        catch (SyncDeviceBindingMismatchException)
+        {
+            // InitializeAsync creates the schema before reporting the stale
+            // device binding. The reset below intentionally replaces it.
+        }
+    }
+
+    private static void RestoreSyncConfiguration(
+        SentorySettings settings,
+        SyncConfigurationSnapshot snapshot)
+    {
+        settings.SyncEnabled = snapshot.Enabled;
+        settings.SyncProvider = snapshot.Provider;
+        settings.SyncFolderPath = snapshot.FolderPath;
+        settings.SyncWebDavEndpoint = snapshot.WebDavEndpoint;
+        settings.SyncWebDavUsername = snapshot.WebDavUsername;
+        settings.SyncWebDavProtectedPassword = snapshot.ProtectedPassword;
+        settings.SyncDeviceId = snapshot.DeviceId;
+        settings.SyncStorageVersion = snapshot.StorageVersion;
+        settings.SyncMigrationDeviceId = snapshot.MigrationDeviceId;
+        settings.SyncStoreId = snapshot.StoreId;
+    }
+
     private async Task ApplyAutomaticCleanupAsync(
         CancellationToken cancellationToken)
     {
@@ -592,7 +1200,24 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         settings.AutoFavoriteEnabled,
         settings.AutoFavoriteCopyThreshold,
         settings.AutoCleanupDays,
-        CreateSourceStates(settings));
+        CreateSourceStates(settings),
+        CreateSyncSettingsDto(settings));
+
+    private EngineSyncSettingsDto CreateSyncSettingsDto(
+        SentorySettings settings)
+    {
+        var snapshot = _syncStatusTracker.Current;
+        return new EngineSyncSettingsDto(
+            settings.SyncEnabled,
+            settings.SyncProvider,
+            settings.SyncFolderPath,
+            settings.SyncWebDavEndpoint,
+            settings.SyncWebDavUsername,
+            !string.IsNullOrWhiteSpace(
+                settings.SyncWebDavProtectedPassword),
+            snapshot.State.ToString(),
+            snapshot.LastSucceededAt);
+    }
 
     private static IReadOnlyDictionary<string, bool> CreateSourceStates(
         SentorySettings settings) => new Dictionary<string, bool>(StringComparer.Ordinal)
@@ -631,6 +1256,23 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         }
     }
 
+    private sealed record WebDavStoreManifest(
+        int FormatVersion,
+        string StoreId,
+        DateTimeOffset CreatedAt);
+
+    private sealed record SyncConfigurationSnapshot(
+        bool Enabled,
+        string Provider,
+        string? FolderPath,
+        string? WebDavEndpoint,
+        string? WebDavUsername,
+        string? ProtectedPassword,
+        string? DeviceId,
+        int StorageVersion,
+        string? MigrationDeviceId,
+        string? StoreId);
+
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
@@ -668,6 +1310,16 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
             try
             {
                 await _linkPreviewTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+        if (_syncTask is not null)
+        {
+            try
+            {
+                await _syncTask;
             }
             catch (OperationCanceledException)
             {
@@ -718,8 +1370,10 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
 
     private void DisposeOwnedResources()
     {
+        ReplaceWebDavStore(null, null);
         _linkPreviewFetcher?.Dispose();
         _linkPreviewWakeSignal.Dispose();
+        _syncWakeSignal.Dispose();
         _lifetime.Dispose();
     }
 }
@@ -731,7 +1385,24 @@ public sealed record EngineSettingsDto(
     bool AutoFavoriteEnabled,
     int AutoFavoriteCopyThreshold,
     int AutoCleanupDays,
-    IReadOnlyDictionary<string, bool> Sources);
+    IReadOnlyDictionary<string, bool> Sources,
+    EngineSyncSettingsDto Sync);
+
+public sealed record EngineSyncSettingsDto(
+    bool Enabled,
+    string Provider,
+    string? FolderPath,
+    string? WebDavEndpoint,
+    string? WebDavUsername,
+    bool WebDavPasswordSet,
+    string State,
+    DateTimeOffset? LastSucceededAt);
+
+public sealed record EngineSyncFolderCandidateDto(
+    string ProviderId,
+    string ProviderName,
+    string FolderPath,
+    string DisplayName);
 
 public sealed record EngineSettingsPatchDto(
     string? ThemeMode = null,

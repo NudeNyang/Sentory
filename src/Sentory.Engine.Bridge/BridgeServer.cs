@@ -105,6 +105,22 @@ public sealed class BridgeServer(
             "settings-update" => await RequireRuntime().UpdateSettingsAsync(
                 request.Payload.Deserialize<EngineSettingsPatchDto>(JsonOptions) ??
                 throw new ArgumentException("설정 변경 요청을 읽지 못했습니다.")),
+            "sync-folder-candidates" =>
+                RequireRuntime().DiscoverSyncFolders(),
+            "sync-configure-folder" => await RequireRuntime()
+                .ConfigureSyncFolderAsync(
+                    request.Payload.Deserialize<SyncFolderRequest>(JsonOptions)
+                        ?.FolderPath ?? throw new ArgumentException(
+                            "동기화 폴더 경로를 읽지 못했습니다."),
+                    cancellationToken),
+            "sync-configure-webdav" => await DispatchSyncWebDavAsync(
+                request.Payload,
+                cancellationToken),
+            "sync-toggle" => await RequireRuntime().ToggleSyncAsync(
+                request.Payload.Deserialize<SyncToggleRequest>(JsonOptions)
+                    ?.Enabled ?? throw new ArgumentException(
+                        "동기화 사용 여부를 읽지 못했습니다."),
+                cancellationToken),
             "runtime-poll" => RequireRuntime().Poll(),
             "runtime-pause-toggle" => await RequireRuntime().TogglePauseAsync(),
             "discord-repair" => await RequireRuntime().RepairDiscordAsync(),
@@ -135,6 +151,20 @@ public sealed class BridgeServer(
         return await gallery.SetFavoriteAsync(
             request.ItemId,
             request.IsFavorite,
+            cancellationToken);
+    }
+
+    private async Task<EngineSettingsDto> DispatchSyncWebDavAsync(
+        JsonElement payload,
+        CancellationToken cancellationToken)
+    {
+        var request = payload.Deserialize<SyncWebDavRequest>(JsonOptions) ??
+            throw new ArgumentException(
+                "NAS WebDAV 설정을 읽지 못했습니다.");
+        return await RequireRuntime().ConfigureSyncWebDavAsync(
+            request.Endpoint,
+            request.Username,
+            request.Password,
             cancellationToken);
     }
 
@@ -179,3 +209,12 @@ public sealed record BridgeResponse(
 public sealed record GalleryFavoriteRequest(
     string ItemId,
     bool IsFavorite);
+
+public sealed record SyncFolderRequest(string FolderPath);
+
+public sealed record SyncWebDavRequest(
+    string Endpoint,
+    string? Username,
+    string? Password);
+
+public sealed record SyncToggleRequest(bool Enabled);

@@ -61,6 +61,37 @@ public sealed class EngineRuntimeHostTests : IDisposable
         Assert.Empty(poll.Events);
     }
 
+    [Fact]
+    public async Task ConfiguredFolderUsesTheSharedSyncRuntime()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var repository = new SqliteCaptureRepository(paths);
+        await repository.InitializeAsync();
+        var folder = Path.Combine(_root, "cloud", "Sentory");
+        await using var host = new EngineRuntimeHost(repository, paths);
+
+        var configured = await host.ConfigureSyncFolderAsync(folder);
+        await host.RunConfiguredSyncOnceAsync();
+        var completed = host.GetSettings();
+
+        Assert.True(configured.Sync.Enabled);
+        Assert.Equal("Folder", configured.Sync.Provider);
+        Assert.Equal(Path.GetFullPath(folder), configured.Sync.FolderPath);
+        Assert.Equal("Succeeded", completed.Sync.State);
+        Assert.True(Directory.Exists(Path.Combine(folder, ".sentory", "v2")));
+    }
+
+    [Fact]
+    public void WebDavCredentialIsEncryptedForTheCurrentWindowsUser()
+    {
+        var encrypted = WebDavCredentialProtector.Protect("nas-password");
+
+        Assert.NotEqual("nas-password", encrypted);
+        Assert.Equal(
+            "nas-password",
+            WebDavCredentialProtector.Unprotect(encrypted));
+    }
+
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();

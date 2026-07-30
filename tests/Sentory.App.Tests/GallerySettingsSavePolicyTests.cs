@@ -22,7 +22,11 @@ public sealed class GallerySettingsSavePolicyTests
             AutoFavoriteChangedAt = DateTimeOffset.Parse("2026-07-28T01:00:00Z"),
             LastUpdateCheckAt = DateTimeOffset.Parse("2026-07-28T02:00:00Z"),
             SyncEnabled = true,
+            SyncProvider = SentorySettings.WebDavSyncProvider,
             SyncFolderPath = @"C:\Cloud\Sentory",
+            SyncWebDavEndpoint = "https://nas.example.test/webdav/Sentory/",
+            SyncWebDavUsername = "sentory",
+            SyncWebDavProtectedPassword = "protected-secret",
             SyncDeviceId = "11111111111111111111111111111111",
             SyncStorageVersion = SentorySettings.CurrentSyncStorageVersion,
             SyncMigrationDeviceId = "22222222222222222222222222222222",
@@ -32,7 +36,11 @@ public sealed class GallerySettingsSavePolicyTests
         {
             StartWithWindows = false,
             SyncEnabled = false,
+            SyncProvider = SentorySettings.FolderSyncProvider,
             SyncFolderPath = @"C:\Old\Sentory",
+            SyncWebDavEndpoint = null,
+            SyncWebDavUsername = null,
+            SyncWebDavProtectedPassword = null,
             SyncDeviceId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             SyncStoreId = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
         };
@@ -54,7 +62,13 @@ public sealed class GallerySettingsSavePolicyTests
         Assert.Equal(current.AutoFavoriteChangedAt, merged.AutoFavoriteChangedAt);
         Assert.Equal(current.LastUpdateCheckAt, merged.LastUpdateCheckAt);
         Assert.True(merged.SyncEnabled);
+        Assert.Equal(current.SyncProvider, merged.SyncProvider);
         Assert.Equal(current.SyncFolderPath, merged.SyncFolderPath);
+        Assert.Equal(current.SyncWebDavEndpoint, merged.SyncWebDavEndpoint);
+        Assert.Equal(current.SyncWebDavUsername, merged.SyncWebDavUsername);
+        Assert.Equal(
+            current.SyncWebDavProtectedPassword,
+            merged.SyncWebDavProtectedPassword);
         Assert.Equal(current.SyncDeviceId, merged.SyncDeviceId);
         Assert.Equal(current.SyncStorageVersion, merged.SyncStorageVersion);
         Assert.Equal(current.SyncMigrationDeviceId, merged.SyncMigrationDeviceId);

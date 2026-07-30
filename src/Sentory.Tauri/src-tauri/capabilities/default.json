@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Sentory 로컬 UI 기본 권한",
   "windows": ["main", "tray-menu"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "dialog:allow-open"]
 }

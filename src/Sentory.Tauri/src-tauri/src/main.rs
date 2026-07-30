@@ -832,6 +832,67 @@ fn copy_collection_to_clipboard(_payload: &CollectionClipboardPayload) -> Result
     Err("묶음 파일 복사는 Windows에서만 지원합니다.".to_string())
 }
 
+#[tauri::command]
+async fn sync_folder_candidates(
+    app: AppHandle,
+    engine: State<'_, EngineClient>,
+) -> Result<serde_json::Value, String> {
+    engine
+        .request(&app, "sync-folder-candidates", serde_json::Value::Null)
+        .await
+}
+
+#[tauri::command]
+async fn sync_configure_folder(
+    app: AppHandle,
+    engine: State<'_, EngineClient>,
+    folder_path: String,
+) -> Result<serde_json::Value, String> {
+    engine
+        .request(
+            &app,
+            "sync-configure-folder",
+            serde_json::json!({ "folderPath": folder_path }),
+        )
+        .await
+}
+
+#[tauri::command]
+async fn sync_configure_webdav(
+    app: AppHandle,
+    engine: State<'_, EngineClient>,
+    endpoint: String,
+    username: Option<String>,
+    password: Option<String>,
+) -> Result<serde_json::Value, String> {
+    engine
+        .request(
+            &app,
+            "sync-configure-webdav",
+            serde_json::json!({
+                "endpoint": endpoint,
+                "username": username,
+                "password": password
+            }),
+        )
+        .await
+}
+
+#[tauri::command]
+async fn sync_toggle(
+    app: AppHandle,
+    engine: State<'_, EngineClient>,
+    enabled: bool,
+) -> Result<serde_json::Value, String> {
+    engine
+        .request(
+            &app,
+            "sync-toggle",
+            serde_json::json!({ "enabled": enabled }),
+        )
+        .await
+}
+
 fn runtime_event_name(event_type: &str) -> &'static str {
     match event_type {
         "captured" => "capture-event",
@@ -839,6 +900,8 @@ fn runtime_event_name(event_type: &str) -> &'static str {
         "settings-changed" => "settings-changed",
         "automatic-cleanup" => "automatic-cleanup",
         "gallery-changed" => "gallery-changed",
+        "sync-status" => "sync-status",
+        "sync-issue" => "sync-issue",
         _ => "runtime-status",
     }
 }
@@ -1398,6 +1461,7 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
         }))
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .manage(AppLifecycleState::default())
         .manage(engine)
@@ -1497,6 +1561,10 @@ fn main() {
             gallery_detail_target_copy,
             settings_get,
             settings_update,
+            sync_folder_candidates,
+            sync_configure_folder,
+            sync_configure_webdav,
+            sync_toggle,
             discord_repair,
             runtime_pause_toggle,
             data_statistics,

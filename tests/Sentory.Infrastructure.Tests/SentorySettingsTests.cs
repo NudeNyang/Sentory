@@ -252,4 +252,49 @@ public sealed class SentorySettingsTests
 
         Assert.False(settings.SyncEnabled);
     }
+
+    [Fact]
+    public void NormalizePreservesCompleteWebDavSyncConfiguration()
+    {
+        var deviceId = SyncDeviceIdentity.Create();
+        var settings = new SentorySettings
+        {
+            SyncEnabled = true,
+            SyncProvider = "WebDav",
+            SyncWebDavEndpoint = "https://nas.example.test/webdav/Sentory/",
+            SyncWebDavUsername = "sentory",
+            SyncWebDavProtectedPassword = "protected-secret",
+            SyncDeviceId = deviceId
+        };
+
+        settings.Normalize();
+
+        Assert.True(settings.SyncEnabled);
+        Assert.Equal("WebDav", settings.SyncProvider);
+        Assert.Equal(
+            "https://nas.example.test/webdav/Sentory/",
+            settings.SyncWebDavEndpoint);
+        Assert.Equal(deviceId, settings.SyncDeviceId);
+    }
+
+    [Theory]
+    [InlineData("ftp://nas.example.test/Sentory/")]
+    [InlineData("https://user:secret@nas.example.test/Sentory/")]
+    [InlineData("https://nas.example.test/Sentory/?token=secret")]
+    [InlineData("relative-webdav")]
+    [InlineData("")]
+    public void NormalizeDisablesInvalidWebDavConfiguration(string endpoint)
+    {
+        var settings = new SentorySettings
+        {
+            SyncEnabled = true,
+            SyncProvider = "WebDav",
+            SyncWebDavEndpoint = endpoint,
+            SyncDeviceId = SyncDeviceIdentity.Create()
+        };
+
+        settings.Normalize();
+
+        Assert.False(settings.SyncEnabled);
+    }
 }

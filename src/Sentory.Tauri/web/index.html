@@ -224,6 +224,41 @@
           <h3 id="messenger-heading">메신저 감지</h3>
           <section id="settings-sources" class="settings-card source-settings"></section>
 
+          <h3 id="sync-section-heading">컴퓨터 · 모바일 간 동기화</h3>
+          <section class="settings-card sync-settings">
+            <div class="sync-card-heading">
+              <span><strong id="sync-heading">클라우드 · NAS 공유</strong><small id="sync-description">사진과 링크를 다른 기기에서 바로 보고 공유할 수 있게 동기화합니다</small></span>
+              <span id="sync-status" class="sync-status">동기화 꺼짐</span>
+            </div>
+            <div id="sync-mode" class="sync-mode" role="tablist" aria-label="동기화 방식">
+              <button id="sync-mode-folder" class="active" type="button" role="tab" data-sync-mode="Folder" aria-selected="true">클라우드 폴더</button>
+              <button id="sync-mode-webdav" type="button" role="tab" data-sync-mode="WebDav" aria-selected="false">NAS · WebDAV</button>
+            </div>
+            <div id="sync-folder-panel" class="sync-panel">
+              <p id="sync-folder-description" class="sync-panel-description">OneDrive, Google Drive, Dropbox, MEGA 또는 직접 고른 폴더를 사용합니다</p>
+              <select id="sync-folder-candidate" aria-label="클라우드 동기화 폴더">
+                <option value="">자동으로 찾은 클라우드 폴더</option>
+              </select>
+              <div class="sync-path-row">
+                <span id="sync-folder-path" class="sync-current-value">선택된 폴더 없음</span>
+                <button id="sync-folder-pick" class="settings-action" type="button">폴더 선택</button>
+              </div>
+            </div>
+            <div id="sync-webdav-panel" class="sync-panel" hidden>
+              <p id="sync-webdav-description" class="sync-panel-description">NAS의 WebDAV 공유 폴더 주소와 계정을 입력합니다</p>
+              <label class="sync-field"><span id="sync-webdav-endpoint-label">WebDAV 주소</span><input id="sync-webdav-endpoint" type="url" inputmode="url" autocomplete="url" placeholder="https://nas.example.com/webdav/Sentory/" /></label>
+              <div class="sync-credential-grid">
+                <label class="sync-field"><span id="sync-webdav-username-label">사용자 이름</span><input id="sync-webdav-username" type="text" autocomplete="username" /></label>
+                <label class="sync-field"><span id="sync-webdav-password-label">비밀번호</span><input id="sync-webdav-password" type="password" autocomplete="current-password" /></label>
+              </div>
+              <small id="sync-webdav-password-hint" class="sync-password-hint">비밀번호는 Windows 사용자 계정으로 암호화해 저장합니다</small>
+            </div>
+            <div class="sync-actions">
+              <button id="sync-save" class="settings-action primary-action" type="button">연결 및 동기화</button>
+              <button id="sync-toggle" class="settings-action" type="button">켜기</button>
+            </div>
+          </section>
+
           <h3 id="data-heading">데이터 관리</h3>
           <section class="settings-card data-settings">
             <p id="favorite-cleanup-note" class="settings-note">즐겨찾기에 등록된 항목은 자동 정리에서 포함되지 않음</p>
