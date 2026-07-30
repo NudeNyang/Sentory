@@ -1443,13 +1443,8 @@ async function copyItem(itemId, button = null) {
       ...item,
       copyCount: result.copyCount ?? item.copyCount + 1,
       isFavorite: result.isFavorite ?? item.isFavorite,
+      lastCopiedAt: new Date().toISOString(),
     }));
-    if (state.detailItem?.card.itemId === itemId) {
-      state.detailItem.card.copyCount = result.copyCount ?? state.detailItem.card.copyCount + 1;
-      state.detailItem.card.isFavorite = result.isFavorite ?? state.detailItem.card.isFavorite;
-      detailCopyCount.textContent = t("times", state.detailItem.card.copyCount);
-      detailFavoriteMark.hidden = !state.detailItem.card.isFavorite;
-    }
     const loaded = state.items.find(item => item?.itemId === itemId) ?? state.detailItem?.card;
     showToast(loaded?.kind === "Image" ? t("photoCopied") : loaded?.kind === "Collection" ? t("collectionCopied") : t("urlCopied"));
     if (button) button.innerHTML = "&#xE73E;";
@@ -1484,10 +1479,54 @@ async function toggleFavorite(item, button) {
 
 function updateLoadedItem(itemId, transform) {
   const index = state.items.findIndex(item => item?.itemId === itemId);
-  if (index >= 0) state.items[index] = transform(state.items[index]);
-  state.renderRevision += 1;
-  state.renderedRange = "";
-  renderVisibleCards();
+  let current = index >= 0 ? state.items[index] : null;
+  if (current) {
+    const updated = transform(current);
+    Object.assign(current, updated);
+  } else if (state.detailItem?.card.itemId === itemId) {
+    current = state.detailItem.card;
+    const updated = transform(current);
+    Object.assign(current, updated);
+  }
+  if (!current) return null;
+  if (state.detailItem?.card.itemId === itemId &&
+      state.detailItem.card !== current) {
+    Object.assign(state.detailItem.card, current);
+  }
+  refreshVisibleItemMetadata(current);
+  return current;
+}
+
+function refreshVisibleItemMetadata(item) {
+  for (const card of virtualSpace.querySelectorAll(".card[data-item-id]")) {
+    if (card.dataset.itemId !== item.itemId) continue;
+    const footer = card.querySelector(".card-footer");
+    const favorite = card.querySelector(".favorite");
+    let usage = card.querySelector(".copy-usage");
+    if (item.copyCount > 0) {
+      if (!usage && footer) {
+        usage = document.createElement("span");
+        usage.className = "copy-usage";
+        footer.insertBefore(usage, favorite);
+      }
+      if (usage) usage.textContent = t("copyCount", item.copyCount);
+    } else {
+      usage?.remove();
+    }
+    if (favorite) {
+      favorite.classList.toggle("active", item.isFavorite);
+      favorite.innerHTML = item.isFavorite ? "&#xE735;" : "&#xE734;";
+      favorite.title = item.isFavorite
+        ? t("favoriteRemoveAction")
+        : t("favoriteAddAction");
+      favorite.setAttribute("aria-label", favorite.title);
+    }
+  }
+  if (state.detailItem?.card.itemId === item.itemId) {
+    detailCopyCount.textContent = t("times", item.copyCount);
+    detailFavoriteMark.hidden = !item.isFavorite;
+  }
+  if (state.contextItemId === item.itemId) refreshCardContextMenu();
 }
 
 async function openItem(itemId) {
