@@ -7,7 +7,7 @@
 - 현재 배포 버전: `2.0.0`
 - 라이선스: GNU General Public License v3.0 only (`GPL-3.0-only`)
 - 현재 배포 운영체제: Windows 10/11 64비트
-- 지원 아키텍처: x64
+- 지원 아키텍처: x64, ARM64
 - 공식 저장소: `https://github.com/NudeNyang/Sentory`
 
 Sentory의 원본 소스 코드는 GPL-3.0-only로 공개합니다. 사용, 연구, 수정,
@@ -28,13 +28,15 @@ Sentory의 원본 소스 코드는 GPL-3.0-only로 공개합니다. 사용, 연�
 
 ```powershell
 git status --short
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.0
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.0 -Architecture x64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.0 -Architecture arm64
 ```
 
 `Publish-TauriRelease.ps1`은 제품명과 버전, 앱 식별자를 확인하고 `for
 Developers`, `Preview` 같은 개발자판 표시가 남아 있으면 작업을 중단한다. C#
-엔진을 self-contained 사이드카로 만들고 Tauri 호스트와 함께 x64 포터블·설치형에
-넣은 뒤 실행 파일 자체 점검까지 마친다.
+엔진을 self-contained 사이드카로 만들고 Tauri 호스트와 함께 선택한 아키텍처의
+포터블·설치형에 넣는다. 호스트와 엔진의 PE 아키텍처를 확인하고, 같은 아키텍처의
+Windows에서는 실행 파일 자체 점검도 마친다.
 
 Tauri 로컬 검수판은 다음 명령으로 만든다.
 
@@ -89,6 +91,8 @@ Sentory가 정상 종료 완료 신호를 보내지 않으면 게시를 실패�
 |---|---|
 | `Sentory-win-x64-setup.exe` | Intel·AMD Windows 설치형 |
 | `Sentory-win-x64-portable.zip` | Intel·AMD Windows 포터블 |
+| `Sentory-win-arm64-setup.exe` | Windows on ARM 설치형 |
+| `Sentory-win-arm64-portable.zip` | Windows on ARM 포터블 |
 | `Sentory-2.0.0-source.zip` | 해당 바이너리에 대응하는 전체 소스 |
 
 각 배포 파일의 `.sha256` 확인값과 `release-manifest.json`도 함께 생성된다.
@@ -125,7 +129,7 @@ winget install --id JRSoftware.InnoSetup -e
 - `README.md`, `docs/README.en.md`
 - `docs/privacy.md`, `distribution/THIRD-PARTY-NOTICES.txt`, `CHANGELOG.md`,
   `docs/support.md`
-- Release의 x64 설치형·포터블 패키지와 소스 ZIP
+- Release의 x64·ARM64 설치형·포터블 패키지와 소스 ZIP
 - 각 배포 파일의 `.sha256` 및 `release-manifest.json`
 
 GitHub가 자동으로 제공하는 “Source code” 파일만 이용해도 소스를 받을 수
@@ -142,7 +146,7 @@ GitHub가 자동으로 제공하는 “Source code” 파일만 이용해도 소
    대화 이동을 확인합니다.
 6. 카카오톡의 링크·사진 붙여넣기와 탐색기 드롭을 확인합니다.
 7. 다른 앱에서 다룬 내용이 저장되지 않는지 확인합니다.
-8. x64 설치형과 포터블을 별도 데이터 폴더에서 실행합니다.
+8. x64와 ARM64 설치형·포터블을 각각 같은 아키텍처의 Windows에서 실행합니다.
 9. 앱 정보에 `for Developers`나 `Preview`가 없는지 확인합니다.
 10. `v2.0.0` 태그가 배포 파일을 만든 커밋을 가리키는지 확인합니다.
 11. Release 자산의 SHA-256 값과 `release-manifest.json`을 대조합니다.

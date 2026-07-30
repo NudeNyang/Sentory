@@ -70,10 +70,10 @@ Sentory가 운영하는 서버로 보관 데이터를 보내지 않으며 분석
 ## 다운로드
 
 현재 정식 버전은 **2.0.0**입니다. WPF에서 Tauri 2로 기본 화면을 바꿨으며,
-Windows 10/11 x64에서 사용할 수 있습니다.
+Windows 10/11 x64와 ARM64에서 사용할 수 있습니다.
 [Releases](https://github.com/NudeNyang/Sentory/releases)에서 설치형이나 포터블
-파일을 내려받으면 됩니다. macOS, Linux와 Windows on ARM용 Tauri판의 배포
-일정은 아직 정해지지 않았습니다.
+파일을 내려받으면 됩니다. macOS와 Linux판의 배포 일정은 아직 정해지지
+않았습니다.
 
 Tauri 전환과 클라우드·NAS 동기화를 포함한 변경 내용은
 [2.0.0 릴리즈 노트](./docs/releases/2.0.0.md)에 정리되어 있습니다.
@@ -81,9 +81,11 @@ Tauri 전환과 클라우드·NAS 동기화를 포함한 변경 내용은
 | 사용 환경 | 설치형 | 포터블 |
 | --- | --- | --- |
 | 일반적인 Intel·AMD Windows PC | `Sentory-win-x64-setup.exe` | `Sentory-win-x64-portable.zip` |
+| Windows on ARM PC | `Sentory-win-arm64-setup.exe` | `Sentory-win-arm64-portable.zip` |
 
 대부분의 PC에서는 x64 설치형을 선택하시면 됩니다. 설치하지 않고 사용하려면
-포터블 ZIP을 완전히 푼 뒤 `Sentory.exe`를 실행하세요. 두 방식 모두 .NET을 따로
+포터블 ZIP을 완전히 푼 뒤 `Sentory.exe`를 실행하세요. Windows on ARM에서는
+파일 이름에 `arm64`가 들어간 패키지를 받으면 됩니다. 두 방식 모두 .NET을 따로
 설치할 필요가 없습니다.
 
 현재 파일에는 코드 서명이 적용되지 않았습니다. Windows에서 알 수 없는 게시자나
@@ -117,8 +119,8 @@ Sentory는 실행 중인 Discord와 자동으로 연결을 준비합니다. 새 
 지원 메신저의 화면 구조가 바뀌면 감지가 일시적으로 멈출 수 있습니다.
 메신저의 `+` 버튼으로 파일 선택창을 여는 업로드는 감지를 보장하지 않으므로,
 사진은 채팅 입력창에 붙여넣거나 탐색기에서 드롭해 주세요.
-2.0.0 Tauri 정식판은 x64만 제공합니다. Windows on ARM에서는 1.5.1 WPF판을
-계속 사용할 수 있지만 2.0.0으로 자동 전환되지는 않습니다.
+ARM64 패키지는 ARM64 Windows 가상 환경에서 빌드와 실행 자체 점검을 마쳤습니다.
+메신저를 설치한 실제 Windows on ARM 장치에서의 통합 검수는 남아 있습니다.
 
 문제를 제보할 때는 개인정보가 담긴 대화나 원본 사진 대신 Sentory 버전, Windows
 버전, 사용한 메신저와 재현 순서를 적어 주세요. 자세한 내용은
@@ -135,11 +137,14 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.0
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.0 -Architecture x64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.0 -Architecture arm64
 ```
 
-배포 스크립트는 Windows x64 설치형과 포터블 패키지, SHA-256 확인값, 해당
-버전의 소스 ZIP, `release-manifest.json`을 `artifacts` 폴더에 만듭니다.
+배포 스크립트는 선택한 Windows 아키텍처의 설치형과 포터블 패키지, SHA-256
+확인값, 해당 버전의 소스 ZIP, `release-manifest.json`을 `artifacts` 폴더에
+만듭니다. ARM64 정식 배포는 GitHub Actions의 네이티브 ARM64 Windows 러너에서도
+같은 스크립트로 만듭니다.
 구현과 배포 절차는
 [개발 문서](./docs/development.md)와
 [공개 배포 문서](./docs/05-release-and-distribution.md)에서 확인할 수 있습니다.

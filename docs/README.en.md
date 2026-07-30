@@ -71,9 +71,9 @@ same storage.
 ## Download
 
 The current stable version is **2.0.0**. It replaces the WPF interface with Tauri 2 and
-runs on x64 Windows 10 and 11. Download the installer or portable package from
-[Releases](https://github.com/NudeNyang/Sentory/releases). There is no release schedule
-yet for macOS, Linux, or a Tauri build for Windows on ARM.
+runs on x64 and ARM64 Windows 10 and 11. Download the installer or portable package
+from [Releases](https://github.com/NudeNyang/Sentory/releases). There is no release
+schedule yet for macOS or Linux.
 
 See the [Sentory 2.0.0 release notes](./releases/2.0.0.md) for the Tauri migration,
 cloud and NAS sync, and detection fixes included in this release.
@@ -81,10 +81,12 @@ cloud and NAS sync, and detection fixes included in this release.
 | System | Installer | Portable |
 | --- | --- | --- |
 | Most Intel or AMD Windows PCs | `Sentory-win-x64-setup.exe` | `Sentory-win-x64-portable.zip` |
+| Windows on ARM PCs | `Sentory-win-arm64-setup.exe` | `Sentory-win-arm64-portable.zip` |
 
 The x64 installer is the right choice for most PCs. To use Sentory without installing
-it, fully extract the portable ZIP and run `Sentory.exe`. Both packages are
-self-contained, so they do not require a separate .NET installation.
+it, fully extract the portable ZIP and run `Sentory.exe`. On Windows on ARM, choose a
+package with `arm64` in its name. All packages are self-contained and do not require a
+separate .NET installation.
 
 The current binaries are not code-signed. Windows may show an Unknown Publisher or
 SmartScreen warning. Confirm that the file came from this repository's official
@@ -114,9 +116,9 @@ argument, or is still loading a chat, continues without an unnecessary restart.
 
 Detection may temporarily stop if a supported messenger changes its interface. Uploads
 opened through a messenger's `+` file picker are not guaranteed to be detected; paste
-an image into the chat input or drop it from Explorer instead. Sentory 2.0.0 is released
-for x64 Windows only. The WPF 1.5.1 ARM64 build remains available but does not upgrade
-automatically to 2.0.0.
+an image into the chat input or drop it from Explorer instead. The ARM64 packages pass
+their build and installation self-checks on an ARM64 Windows virtual machine. Messenger
+integration testing on a physical Windows on ARM device is still pending.
 
 When reporting a problem, do not attach private conversations or original images.
 The Sentory version, Windows version, messenger name, and reproduction steps are
@@ -133,12 +135,14 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.0
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.0 -Architecture x64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.0 -Architecture arm64
 ```
 
-The release script creates the Windows x64 installer and portable package, SHA-256
-checksum files, the corresponding source archive, and
-`release-manifest.json` in the `artifacts` directory.
+The release script creates the installer and portable package for the selected Windows
+architecture, SHA-256 checksum files, the corresponding source archive, and
+`release-manifest.json` in the `artifacts` directory. Official ARM64 packages are also
+built with the same script on a native ARM64 Windows GitHub Actions runner.
 Implementation and release details are documented in
 [development.md](./development.md) and the
 [release guide](./05-release-and-distribution.md).

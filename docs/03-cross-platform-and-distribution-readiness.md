@@ -57,11 +57,12 @@ macOS와 Linux에서 바로 실행되는 앱이 완성된 것은 아니다.
 
 ## Windows 배포
 
-2.0.0 정식판은 Tauri 호스트와 self-contained C# 엔진을 묶은 x64 설치형과
+2.0.0 정식판은 Tauri 호스트와 self-contained C# 엔진을 묶은 x64·ARM64 설치형과
 포터블 패키지로 배포한다. .NET 런타임을 따로 설치할 필요는 없다.
 
 ```powershell
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.0
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.0 -Architecture x64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.0 -Architecture arm64
 ```
 
 결과 위치:
@@ -69,6 +70,8 @@ macOS와 Linux에서 바로 실행되는 앱이 완성된 것은 아니다.
 ```text
 artifacts\Sentory-win-x64-portable.zip
 artifacts\Sentory-win-x64-setup.exe
+artifacts\Sentory-win-arm64-portable.zip
+artifacts\Sentory-win-arm64-setup.exe
 artifacts\release-manifest.json
 ```
 

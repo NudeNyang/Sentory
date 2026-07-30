@@ -7,12 +7,13 @@ Sentory는 이야기 속, 흩어진 순간들을 한 곳에 모아 보는 Window
 ---------
 
 - Windows 10/11 64비트
-- 일반적인 Intel·AMD x64 PC
+- Intel·AMD x64 PC 또는 Windows on ARM PC
 
 설치형 사용 방법
 ----------------
 
-1. Sentory-win-x64-setup.exe를 실행해 주세요.
+1. Intel·AMD PC에서는 Sentory-win-x64-setup.exe를 실행해 주세요.
+   Windows on ARM에서는 Sentory-win-arm64-setup.exe를 실행해 주세요.
 2. 설치 화면에서 라이선스를 확인하고 설치해 주세요.
 3. 설치가 끝나면 시작 메뉴의 Sentory를 실행해 주세요.
 
@@ -82,7 +83,8 @@ SHA-256 확인값을 확인한 뒤 실행해 주세요.
 - 메신저의 + 버튼으로 파일 선택창을 여는 업로드는 감지를 보장하지 않습니다.
   사진은 채팅 입력창에 붙여넣거나 탐색기에서 드롭한 뒤 전송해 주세요.
 - 지원 메신저의 화면 구조가 바뀌면 감지가 일시적으로 동작하지 않을 수 있습니다.
-- 2.0.0 Tauri 정식판은 x64 Windows만 지원합니다.
+- ARM64 패키지는 ARM64 Windows 가상 환경에서 실행 자체 점검을 마쳤습니다.
+  메신저를 설치한 실제 Windows on ARM 장치에서의 통합 검수는 남아 있습니다.
 
 컴퓨터 간 동기화
 ----------------

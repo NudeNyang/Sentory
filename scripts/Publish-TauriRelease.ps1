@@ -2,7 +2,11 @@
 param(
     [ValidatePattern('^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$')]
     [string]$Version = "2.0.0",
-    [string]$OutputRoot = "artifacts"
+    [string]$OutputRoot = "artifacts",
+    [ValidateSet("x64", "arm64")]
+    [string]$Architecture = "x64",
+    [switch]$SkipSourceArchive,
+    [switch]$SkipManifest
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,7 +18,15 @@ $cargoManifestPath = Join-Path $tauriRoot "src-tauri\Cargo.toml"
 $packageManifestPath = Join-Path $tauriRoot "package.json"
 $webAppPath = Join-Path $tauriRoot "web\app.js"
 $webHtmlPath = Join-Path $tauriRoot "web\index.html"
-$targetDirectory = Join-Path $tauriRoot "src-tauri\target\release"
+$targetTriple = if ($Architecture -eq "arm64") {
+    "aarch64-pc-windows-msvc"
+}
+else {
+    "x86_64-pc-windows-msvc"
+}
+$targetDirectory = Join-Path `
+    $tauriRoot `
+    "src-tauri\target\$targetTriple\release"
 $installerScript = Join-Path $repositoryRoot "installer\Sentory.iss"
 $licensePath = Join-Path $repositoryRoot "LICENSE.txt"
 $iconPath = Join-Path $repositoryRoot "src\Sentory.App\Assets\Sentory.ico"
@@ -23,8 +35,12 @@ if (-not [System.IO.Path]::IsPathRooted($OutputRoot)) {
     $OutputRoot = Join-Path $repositoryRoot $OutputRoot
 }
 $outputRootFull = [System.IO.Path]::GetFullPath($OutputRoot)
-$stagingDirectory = Join-Path $outputRootFull "Sentory-win-x64-portable"
-$portableArchive = Join-Path $outputRootFull "Sentory-win-x64-portable.zip"
+$stagingDirectory = Join-Path `
+    $outputRootFull `
+    "Sentory-win-$Architecture-portable"
+$portableArchive = Join-Path `
+    $outputRootFull `
+    "Sentory-win-$Architecture-portable.zip"
 
 function Assert-OutputChildPath {
     param([Parameter(Mandatory)][string]$Path)
@@ -80,7 +96,9 @@ if ($publicIdentity -match 'for Developers|Tauri Preview|com\.sentory\.preview')
     throw "공개 배포 파일에 개발자판 표시가 남아 있습니다."
 }
 
-& (Join-Path $PSScriptRoot "Build-Tauri.ps1") -Configuration Release
+& (Join-Path $PSScriptRoot "Build-Tauri.ps1") `
+    -Configuration Release `
+    -Architecture $Architecture
 if ($LASTEXITCODE -ne 0) {
     throw "Tauri Release 빌드에 실패했습니다."
 }
@@ -124,14 +142,50 @@ if ($versionInfo.ProductVersion -notmatch ("^" + $escapedVersion) -or
     throw "정식 Tauri 실행 파일의 제품 정보가 올바르지 않습니다."
 }
 
-$verification = Start-Process `
-    -FilePath $stagedExecutable `
-    -ArgumentList "--verify-installation" `
-    -WindowStyle Hidden `
-    -Wait `
-    -PassThru
-if ($verification.ExitCode -ne 0) {
-    throw "Tauri 배포 실행 파일 자체 점검에 실패했습니다. 종료 코드: $($verification.ExitCode)"
+function Assert-PeArchitecture {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $expectedMachine = if ($Architecture -eq "arm64") { 0xAA64 } else { 0x8664 }
+    $stream = [System.IO.File]::OpenRead($Path)
+    $reader = [System.IO.BinaryReader]::new($stream)
+    try {
+        $stream.Position = 0x3C
+        $peOffset = $reader.ReadInt32()
+        $stream.Position = $peOffset + 4
+        $actualMachine = $reader.ReadUInt16()
+        if ($actualMachine -ne $expectedMachine) {
+            throw ("배포 실행 파일 아키텍처가 올바르지 않습니다. " +
+                "파일: {0}, 예상: 0x{1:X4}, 실제: 0x{2:X4}" -f `
+                $Path, $expectedMachine, $actualMachine)
+        }
+    }
+    finally {
+        $reader.Dispose()
+        $stream.Dispose()
+    }
+}
+
+Assert-PeArchitecture $stagedExecutable
+Assert-PeArchitecture (Join-Path $stagingDirectory "sentory-engine.exe")
+
+$hostArchitecture =
+    [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+$canRunVerification =
+    ($Architecture -eq "x64" -and $hostArchitecture -eq "X64") -or
+    ($Architecture -eq "arm64" -and $hostArchitecture -eq "Arm64")
+if ($canRunVerification) {
+    $verification = Start-Process `
+        -FilePath $stagedExecutable `
+        -ArgumentList "--verify-installation" `
+        -WindowStyle Hidden `
+        -Wait `
+        -PassThru
+    if ($verification.ExitCode -ne 0) {
+        throw "Tauri 배포 실행 파일 자체 점검에 실패했습니다. 종료 코드: $($verification.ExitCode)"
+    }
+}
+else {
+    Write-Host "$Architecture 실행 점검은 같은 아키텍처의 Windows에서 수행해야 합니다."
 }
 
 Compress-Archive `
@@ -155,32 +209,36 @@ $numericVersion = "{0}.{1}.{2}.0" -f `
 & $isccPath `
     "/DMyVersion=$Version" `
     "/DMyNumericVersion=$numericVersion" `
-    "/DMyArch=x64" `
+    "/DMyArch=$Architecture" `
     "/DSourceDir=$stagingDirectory" `
     "/DOutputDir=$outputRootFull" `
     "/DLicenseFile=$licensePath" `
     "/DIconFile=$iconPath" `
     $installerScript
 if ($LASTEXITCODE -ne 0) {
-    throw "Tauri x64 설치형 배포 생성에 실패했습니다."
+    throw "Tauri $Architecture 설치형 배포 생성에 실패했습니다."
 }
 
 $sourceArchive = Join-Path $outputRootFull "Sentory-$Version-source.zip"
-Remove-OutputPathIfPresent $sourceArchive
-Remove-OutputPathIfPresent "$sourceArchive.sha256"
-git -C $repositoryRoot archive `
-    --format=zip `
-    "--prefix=Sentory-$Version-source/" `
-    "--output=$sourceArchive" `
-    HEAD
-if ($LASTEXITCODE -ne 0) {
-    throw "현재 커밋의 소스 배포 ZIP을 만들지 못했습니다."
+if (-not $SkipSourceArchive) {
+    Remove-OutputPathIfPresent $sourceArchive
+    Remove-OutputPathIfPresent "$sourceArchive.sha256"
+    git -C $repositoryRoot archive `
+        --format=zip `
+        "--prefix=Sentory-$Version-source/" `
+        "--output=$sourceArchive" `
+        HEAD
+    if ($LASTEXITCODE -ne 0) {
+        throw "현재 커밋의 소스 배포 ZIP을 만들지 못했습니다."
+    }
 }
 
 $assetPaths = @(
     $portableArchive,
-    (Join-Path $outputRootFull "Sentory-win-x64-setup.exe"),
-    $sourceArchive)
+    (Join-Path $outputRootFull "Sentory-win-$Architecture-setup.exe"))
+if (-not $SkipSourceArchive) {
+    $assetPaths += $sourceArchive
+}
 $assets = foreach ($assetPath in $assetPaths) {
     if (-not (Test-Path -LiteralPath $assetPath)) {
         throw "배포 파일을 찾지 못했습니다: $assetPath"
@@ -196,24 +254,40 @@ $assets = foreach ($assetPath in $assetPaths) {
     }
 }
 
-$manifest = [ordered]@{
-    product = "Sentory"
-    version = $Version
-    channel = if ($Version.Contains('-')) { "beta" } else { "stable" }
-    runtime = "Tauri 2"
-    publishedAt = [DateTimeOffset]::UtcNow.ToString("O")
-    assets = @($assets)
+if (-not $SkipManifest) {
+    $manifestAssetFiles = Get-ChildItem -LiteralPath $outputRootFull -File |
+        Where-Object {
+            $_.Name -match '^Sentory-win-(x64|arm64)-(portable\.zip|setup\.exe)$' -or
+            $_.Name -eq "Sentory-$Version-source.zip"
+        } |
+        Sort-Object Name
+    $manifestAssets = foreach ($file in $manifestAssetFiles) {
+        $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash
+        [ordered]@{
+            name = $file.Name
+            size = $file.Length
+            sha256 = $hash.ToLowerInvariant()
+        }
+    }
+    $manifest = [ordered]@{
+        product = "Sentory"
+        version = $Version
+        channel = if ($Version.Contains('-')) { "beta" } else { "stable" }
+        runtime = "Tauri 2"
+        publishedAt = [DateTimeOffset]::UtcNow.ToString("O")
+        assets = @($manifestAssets)
+    }
+    $manifestPath = Join-Path $outputRootFull "release-manifest.json"
+    $manifest | ConvertTo-Json -Depth 5 |
+        Set-Content -LiteralPath $manifestPath -Encoding utf8
 }
-$manifestPath = Join-Path $outputRootFull "release-manifest.json"
-$manifest | ConvertTo-Json -Depth 5 |
-    Set-Content -LiteralPath $manifestPath -Encoding utf8
 
 Write-Host ""
-Write-Host "Sentory $Version Tauri x64 배포 파일을 만들었습니다." -ForegroundColor Green
+Write-Host "Sentory $Version Tauri $Architecture 배포 파일을 만들었습니다." -ForegroundColor Green
 Write-Host "출력 폴더: $outputRootFull"
 Get-ChildItem -LiteralPath $outputRootFull -File |
     Where-Object {
-        $_.Name -match '^Sentory-win-x64-(portable|setup)' -or
+        $_.Name -match "^Sentory-win-$Architecture-(portable|setup)" -or
         $_.Name -match '^Sentory-[0-9].*-source\.zip(?:\.sha256)?$' -or
         $_.Name -eq 'release-manifest.json'
     } |
