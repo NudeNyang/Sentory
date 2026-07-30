@@ -23,7 +23,8 @@ test("interactive hints use the borderless app tooltip instead of native title p
 });
 
 test("native title bar theme is not repainted when the resolved theme did not change", () => {
-  assert.match(script, /createThemeApplyCoordinator/);
-  assert.match(script, /windowThemeCoordinator\.request\(dark\)/);
-  assert.match(script, /applyTheme: dark => tauriCore\(\)\.invoke\("window_theme_set", \{ dark \}\)/);
+  assert.match(script, /windowThemeDark:\s*null/);
+  assert.match(script, /function syncWindowTheme\(dark\)/);
+  assert.match(script, /if \(state\.windowThemeDark === dark\) return;/);
+  assert.match(script, /invoke\("window_theme_set",\s*\{ dark \}\)/);
 });

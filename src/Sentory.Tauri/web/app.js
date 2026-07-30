@@ -1,5 +1,3 @@
-import { createThemeApplyCoordinator } from "./theme-apply-coordinator.js";
-
 const CELL_WIDTH = 268;
 const CARD_WIDTH = 252;
 const CARD_HEIGHT = 320;
@@ -205,6 +203,7 @@ const state = {
   syncCandidates: [],
   pendingSyncFolderPath: null,
   contextItemId: null,
+  windowThemeDark: null,
 };
 
 const scroller = document.querySelector("#scroller");
@@ -396,12 +395,12 @@ function queueAppTooltip(target, point = null) {
   }, TOOLTIP_DELAY_MS);
 }
 
-const windowThemeCoordinator = createThemeApplyCoordinator({
-  applyTheme: dark => tauriCore().invoke("window_theme_set", { dark }),
-});
-
 function syncWindowTheme(dark) {
-  windowThemeCoordinator.request(dark);
+  if (state.windowThemeDark === dark) return;
+  state.windowThemeDark = dark;
+  void tauriCore().invoke("window_theme_set", { dark }).catch(() => {
+    if (state.windowThemeDark === dark) state.windowThemeDark = null;
+  });
 }
 
 function applyThemeMode(mode) {

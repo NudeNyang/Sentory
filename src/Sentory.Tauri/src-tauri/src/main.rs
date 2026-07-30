@@ -513,6 +513,21 @@ fn license_text() -> String {
 }
 
 #[cfg(windows)]
+fn title_bar_dwm_attributes(dark: bool) -> [(u32, i32); 4] {
+    const TRANSITIONS_FORCEDISABLED: u32 = 3;
+    const USE_IMMERSIVE_DARK_MODE: u32 = 20;
+    const CAPTION_COLOR: u32 = 35;
+    const TEXT_COLOR: u32 = 36;
+
+    [
+        (TRANSITIONS_FORCEDISABLED, 1),
+        (USE_IMMERSIVE_DARK_MODE, i32::from(dark)),
+        (CAPTION_COLOR, if dark { 0x00201c19 } else { 0x00cad6de }),
+        (TEXT_COLOR, if dark { 0x00e7ebec } else { 0x00222729 }),
+    ]
+}
+
+#[cfg(windows)]
 fn apply_window_title_bar(window: &tauri::WebviewWindow, dark: bool) -> Result<(), String> {
     use std::ffi::c_void;
     #[link(name = "dwmapi")]
@@ -524,20 +539,10 @@ fn apply_window_title_bar(window: &tauri::WebviewWindow, dark: bool) -> Result<(
             value_size: u32,
         ) -> i32;
     }
-    const USE_IMMERSIVE_DARK_MODE: u32 = 20;
-    const CAPTION_COLOR: u32 = 35;
-    const TEXT_COLOR: u32 = 36;
     let hwnd = window
         .hwnd()
         .map_err(|error| format!("창 핸들을 읽지 못했습니다: {error}"))?;
-    let dark_mode: i32 = i32::from(dark);
-    let caption_color: i32 = if dark { 0x00201c19 } else { 0x00cad6de };
-    let text_color: i32 = if dark { 0x00e7ebec } else { 0x00222729 };
-    for (attribute, value) in [
-        (USE_IMMERSIVE_DARK_MODE, dark_mode),
-        (CAPTION_COLOR, caption_color),
-        (TEXT_COLOR, text_color),
-    ] {
+    for (attribute, value) in title_bar_dwm_attributes(dark) {
         let _ = unsafe {
             DwmSetWindowAttribute(
                 hwnd.0 as *mut c_void,
@@ -1595,6 +1600,8 @@ fn main() {
 #[cfg(test)]
 mod tray_menu_tests {
     use super::clamp_tray_menu_position;
+    #[cfg(windows)]
+    use super::title_bar_dwm_attributes;
 
     #[test]
     fn tray_menu_stays_inside_the_monitor_work_area() {
@@ -1608,5 +1615,17 @@ mod tray_menu_tests {
             ),
             (-1920, 0)
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn title_bar_theme_disables_dwm_transitions_before_changing_colors() {
+        let light = title_bar_dwm_attributes(false);
+        let dark = title_bar_dwm_attributes(true);
+
+        assert_eq!(light[0], (3, 1));
+        assert_eq!(dark[0], (3, 1));
+        assert_eq!(light[1..], [(20, 0), (35, 0x00cad6de), (36, 0x00222729)]);
+        assert_eq!(dark[1..], [(20, 1), (35, 0x00201c19), (36, 0x00e7ebec)]);
     }
 }
