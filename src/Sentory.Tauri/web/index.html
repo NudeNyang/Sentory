@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sentory</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div class="header-top">
+          <div class="identity">
+            <h1>Sentory</h1>
+            <p id="tagline">이야기 속, 흩어진 순간들을 한 곳에</p>
+            <div id="detection-status" class="detection-status" hidden>
+              <span class="detection-dot"></span>
+              <span id="detection-label">Discord 감지</span>
+              <strong id="detection-status-text"></strong>
+            </div>
+          </div>
+
+          <div class="header-actions">
+            <label class="search-box">
+              <span class="fluent search-icon" aria-hidden="true">&#xE721;</span>
+              <input id="search" type="search" aria-label="보관함 검색" placeholder="제목, URL, 도메인 검색" autocomplete="off" />
+            </label>
+            <button id="theme" class="icon-button" type="button" aria-label="다크 테마로 전환">
+              <span class="fluent" aria-hidden="true">&#xE708;</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="control-row">
+          <nav class="tabs" aria-label="전체">
+            <button class="tab active" type="button" data-kind="all">전체</button>
+            <button class="tab" type="button" data-kind="Url">링크</button>
+            <button class="tab" type="button" data-kind="Image">사진</button>
+            <button class="tab" type="button" data-kind="favorite">
+              <span class="fluent favorite-glyph" aria-hidden="true">&#xE735;</span>
+              <span>즐겨찾기</span>
+            </button>
+          </nav>
+
+          <div class="tools">
+            <button id="filter" class="toolbar-button" type="button" aria-haspopup="menu" aria-expanded="false">
+              <span class="fluent" aria-hidden="true">&#xE71C;</span>
+              <span id="filter-label">필터</span>
+              <span id="filter-count" class="filter-count" hidden>0</span>
+              <span class="fluent chevron" aria-hidden="true">&#xE70D;</span>
+            </button>
+            <button id="sort" class="toolbar-button" type="button" aria-haspopup="menu" aria-expanded="false">
+              <span class="fluent" aria-hidden="true">&#xE8CB;</span>
+              <span id="sort-label">정렬 최신순</span>
+              <span class="fluent chevron" aria-hidden="true">&#xE70D;</span>
+            </button>
+            <button id="select-mode" class="toolbar-button" type="button">
+              <span class="fluent" aria-hidden="true">&#xE762;</span>
+              <span id="select-label">선택</span>
+            </button>
+            <button id="settings" class="toolbar-button" type="button">
+              <span class="fluent" aria-hidden="true">&#xE713;</span>
+              <span id="settings-label">설정</span>
+            </button>
+            <button id="refresh" class="visually-hidden" type="button">다시 시도</button>
+            <section id="filter-menu" class="popup filter-menu" hidden aria-label="필터">
+              <div class="popup-heading">
+                <strong>필터</strong>
+                <button id="filter-reset" type="button">초기화</button>
+              </div>
+              <div class="filter-columns">
+                <div>
+                  <h2>메신저</h2>
+                  <div id="source-options" class="menu-options"></div>
+                </div>
+                <div>
+                  <h2>기간</h2>
+                  <div id="date-options" class="menu-options">
+                    <button type="button" data-date="All">전체 기간</button>
+                    <button type="button" data-date="Today">오늘</button>
+                    <button type="button" data-date="Last7Days">최근 7일</button>
+                    <button type="button" data-date="Last30Days">최근 30일</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+            <section id="sort-menu" class="popup sort-menu menu-options" hidden aria-label="정렬 최신순">
+              <button type="button" data-sort="Newest">정렬 최신순</button>
+              <button type="button" data-sort="Oldest">정렬 오래된순</button>
+              <button type="button" data-sort="MostCaptured">많이 저장한 순</button>
+              <button type="button" data-sort="MostCopied">많이 복사한 순</button>
+              <button type="button" data-sort="RecentlyCopied">최근 복사한 순</button>
+              <button type="button" data-sort="Name">이름순</button>
+            </section>
+          </div>
+        </div>
+      </header>
+
+      <section class="gallery-region" aria-live="polite">
+        <div id="status" class="status">보관함을 불러오는 중</div>
+        <div id="scroller" class="scroller" tabindex="0">
+          <div id="virtual-space" class="virtual-space"></div>
+        </div>
+        <div id="scroll-indicator" class="scroll-indicator" aria-hidden="true">
+          <div class="scroll-indicator-thumb"></div>
+        </div>
+        <div id="selection-rectangle" class="selection-rectangle" hidden></div>
+        <div id="selection-bar" class="selection-bar" hidden>
+          <strong id="selected-count">0개 선택</strong>
+          <button id="select-visible" type="button">전체 선택</button>
+          <button id="clear-selection" type="button">선택 취소</button>
+          <button id="delete-selected" class="danger-action" type="button">선택 항목 삭제</button>
+        </div>
+      </section>
+    </main>
+
+    <div id="card-context-menu" class="card-context-menu" role="menu" hidden>
+      <button id="context-favorite" type="button" role="menuitem">즐겨찾기에 추가</button>
+      <button id="context-copy" type="button" role="menuitem">복사</button>
+      <button id="context-reveal" type="button" role="menuitem">원본 폴더 열기</button>
+      <button id="context-delete" class="danger-text" type="button" role="menuitem">삭제</button>
+    </div>
+
+    <div id="detail-layer" class="modal-layer" hidden>
+      <section class="detail-dialog" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+        <div class="detail-titlebar">
+          <span id="detail-window-title">Sentory 항목 상세</span>
+          <button id="detail-close" class="detail-close fluent" type="button" aria-label="알림 닫기">&#xE711;</button>
+        </div>
+        <div class="detail-window-body">
+          <div class="detail-heading">
+            <span id="detail-type"></span>
+            <strong id="detail-favorite-mark" hidden>★ 즐겨찾기</strong>
+            <h2 id="detail-title">Sentory 항목 상세</h2>
+          </div>
+          <div class="detail-content">
+            <button id="detail-artwork" class="detail-artwork" type="button"></button>
+            <div class="detail-info">
+              <p id="detail-description"></p>
+
+              <section id="detail-photo-section" class="detail-media-section" hidden>
+                <h3 id="detail-photo-heading">사진</h3>
+                <div class="detail-media-row">
+                  <span id="detail-photo-name"></span>
+                  <button id="detail-photo-copy" class="detail-media-copy fluent" type="button">&#xE8C8;</button>
+                </div>
+                <div id="detail-photo-navigation" class="detail-navigation" hidden>
+                  <button id="detail-photo-previous" type="button">&#x2039;</button>
+                  <div id="detail-photo-dots" class="detail-page-dots"></div>
+                  <button id="detail-photo-next" type="button">&#x203A;</button>
+                </div>
+              </section>
+
+              <section id="detail-link-section" class="detail-media-section" hidden>
+                <h3 id="detail-link-heading">링크</h3>
+                <div class="detail-media-row">
+                  <span id="detail-link-value"></span>
+                  <button id="detail-link-copy" class="detail-media-copy fluent" type="button">&#xE8C8;</button>
+                </div>
+                <div id="detail-link-navigation" class="detail-navigation" hidden>
+                  <button id="detail-link-previous" type="button">&#x2039;</button>
+                  <div id="detail-link-dots" class="detail-page-dots"></div>
+                  <button id="detail-link-next" type="button">&#x203A;</button>
+                </div>
+              </section>
+
+              <dl class="detail-stat-grid">
+                <div><dt>저장 횟수</dt><dd id="detail-capture-count"></dd></div>
+                <div><dt>복사 횟수</dt><dd id="detail-copy-count"></dd></div>
+                <div><dt>마지막 출처</dt><dd id="detail-source"></dd></div>
+                <div><dt>마지막 저장</dt><dd id="detail-date"></dd></div>
+              </dl>
+              <p id="detail-delivery" class="detail-delivery"></p>
+            </div>
+          </div>
+        </div>
+        <div class="detail-actions" hidden>
+          <button id="detail-delete" class="danger-text" type="button">삭제</button>
+          <span></span>
+          <button id="detail-open" type="button">원본 열기</button>
+          <button id="detail-copy" class="primary-action" type="button">복사</button>
+        </div>
+      </section>
+    </div>
+
+    <div id="settings-layer" class="modal-layer" hidden>
+      <section class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <header class="settings-header">
+          <div>
+            <h2 id="settings-title">설정</h2>
+            <p id="settings-description">Sentory의 실행, 메신저 감지와 보관 데이터를 한곳에서 관리합니다</p>
+          </div>
+          <button id="settings-close" class="detail-close fluent" type="button" aria-label="알림 닫기">&#xE711;</button>
+        </header>
+        <div class="settings-scroll-region">
+          <div id="settings-scroll" class="settings-scroll">
+          <h3 id="general-heading">일반</h3>
+          <section class="settings-card">
+            <div class="setting-row">
+              <span><strong id="theme-setting-title">화면 테마</strong><small id="theme-setting-description">라이트 모드와 다크 모드를 선택합니다</small></span>
+              <select id="setting-theme" aria-labelledby="theme-setting-title">
+                <option value="Light">라이트 모드</option>
+                <option value="Dark">다크 모드</option>
+                <option value="System">시스템 테마</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <span><strong id="language-setting-title">Language</strong><small id="language-setting-description">화면에 표시할 언어를 선택합니다</small></span>
+              <select id="setting-language" aria-labelledby="language-setting-title">
+                <option value="auto">Auto</option>
+                <option value="ko-KR">한국어</option>
+                <option value="en-US">English</option>
+                <option value="ja-JP">日本語</option>
+                <option value="zh-CN">简体中文</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <span><strong id="startup-title">Windows 시작 시 실행</strong><small id="startup-description">현재 자동 실행을 사용하지 않습니다</small></span>
+              <button id="startup-toggle" class="settings-action" type="button">켜기</button>
+            </div>
+          </section>
+
+          <h3 id="messenger-heading">메신저 감지</h3>
+          <section id="settings-sources" class="settings-card source-settings"></section>
+
+          <h3 id="sync-section-heading">컴퓨터 · 모바일 간 동기화</h3>
+          <section class="settings-card sync-settings">
+            <div class="sync-card-heading">
+              <span><strong id="sync-heading">클라우드 · NAS 공유</strong><small id="sync-description">사진과 링크를 다른 기기에서 바로 보고 공유할 수 있게 동기화합니다</small></span>
+              <span id="sync-status" class="sync-status">동기화 꺼짐</span>
+            </div>
+            <div id="sync-mode" class="sync-mode" role="tablist" aria-label="동기화 방식">
+              <button id="sync-mode-folder" class="active" type="button" role="tab" data-sync-mode="Folder" aria-selected="true">클라우드 폴더</button>
+              <button id="sync-mode-webdav" type="button" role="tab" data-sync-mode="WebDav" aria-selected="false">NAS · WebDAV</button>
+            </div>
+            <div id="sync-folder-panel" class="sync-panel">
+              <p id="sync-folder-description" class="sync-panel-description">OneDrive, Google Drive, Dropbox, MEGA 또는 직접 고른 폴더를 사용합니다</p>
+              <select id="sync-folder-candidate" aria-label="클라우드 동기화 폴더">
+                <option value="">자동으로 찾은 클라우드 폴더</option>
+              </select>
+            </div>
+            <div id="sync-webdav-panel" class="sync-panel" hidden>
+              <p id="sync-webdav-description" class="sync-panel-description">NAS의 WebDAV 공유 폴더 주소와 계정을 입력합니다</p>
+              <label class="sync-field"><span id="sync-webdav-endpoint-label">WebDAV 주소</span><input id="sync-webdav-endpoint" type="url" inputmode="url" autocomplete="url" placeholder="https://nas.example.com/webdav/Sentory/" /></label>
+              <div class="sync-credential-grid">
+                <label class="sync-field"><span id="sync-webdav-username-label">사용자 이름</span><input id="sync-webdav-username" type="text" autocomplete="username" /></label>
+                <label class="sync-field"><span id="sync-webdav-password-label">비밀번호</span><input id="sync-webdav-password" type="password" autocomplete="current-password" /></label>
+              </div>
+              <small id="sync-webdav-password-hint" class="sync-password-hint">비밀번호는 Windows 사용자 계정으로 암호화해 저장합니다</small>
+            </div>
+            <div class="sync-actions">
+              <button id="sync-action" class="settings-action primary-action" type="button">연결 및 동기화</button>
+            </div>
+          </section>
+
+          <h3 id="data-heading">데이터 관리</h3>
+          <section class="settings-card data-settings">
+            <p id="favorite-cleanup-note" class="settings-note">즐겨찾기에 등록된 항목은 자동 정리에서 포함되지 않음</p>
+            <div class="statistics-grid">
+              <span><small id="stored-label">보관 중</small><strong id="stored-value">-</strong><small id="kinds-value"></small></span>
+              <span><small id="image-storage-label">사진 저장 용량</small><strong id="image-storage-value">-</strong><small id="favorites-value"></small></span>
+            </div>
+            <div class="data-divider"></div>
+            <div class="data-setting-block">
+              <span><strong id="auto-favorite-title">자동 즐겨찾기</strong><small id="auto-favorite-description">같은 링크나 사진을 반복해서 사용하면 즐겨찾기에 추가합니다</small></span>
+              <div class="inline-setting-actions">
+                <select id="auto-favorite-select" aria-labelledby="auto-favorite-title"></select>
+                <button id="auto-favorite-save" class="settings-action primary-action" type="button">설정 저장</button>
+              </div>
+            </div>
+            <div class="data-divider"></div>
+            <div class="data-setting-block">
+              <span><strong id="auto-cleanup-title">자동 정리</strong><small id="auto-cleanup-description">기본값 사용 안 함</small></span>
+              <div class="inline-setting-actions">
+                <select id="auto-cleanup-select" aria-labelledby="auto-cleanup-title"></select>
+                <button id="auto-cleanup-save" class="settings-action primary-action" type="button">설정 저장</button>
+              </div>
+            </div>
+            <div class="data-actions">
+              <button id="open-data-folder" class="settings-action" type="button">데이터 폴더 열기</button>
+              <button id="delete-non-favorites" class="settings-action danger-action" type="button">즐겨찾기 제외 항목 모두 삭제</button>
+            </div>
+          </section>
+
+          <h3 id="app-info-heading">앱 정보</h3>
+          <section class="settings-card app-info-card">
+            <div class="setting-row">
+              <span><strong class="app-product-name">Sentory</strong><small id="version-label" class="app-version">버전 2.0.0</small></span>
+              <span class="app-links">© 2026 <span aria-hidden="true">·</span> <a class="app-author-link" href="https://x.com/NudeNyang_VRC" data-external-url>NudeNyang</a> <span aria-hidden="true">·</span> <a class="app-github-link" href="https://github.com/NudeNyang/Sentory" data-external-url>GitHub</a></span>
+            </div>
+            <div class="setting-row">
+              <span><strong id="update-title" class="app-update-title">수동 업데이트 확인</strong><small id="update-description" class="app-update-description">자동 확인 대기 시간과 관계없이 새 버전을 확인합니다</small></span>
+              <button id="update-check" class="settings-action" type="button">지금 확인</button>
+            </div>
+            <div class="setting-row">
+              <span><strong id="copyright-label" class="app-copyright">Copyright © 2026 NudeNyang</strong><small id="license-summary" class="app-license-summary">GNU GPL v3에 따라 이용 가능</small></span>
+              <button id="view-license" class="settings-action" type="button">라이선스 보기</button>
+            </div>
+          </section>
+          </div>
+          <div id="settings-scroll-indicator" class="scroll-indicator" aria-hidden="true">
+            <div class="scroll-indicator-thumb"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div id="license-layer" class="modal-layer" hidden>
+      <section class="license-dialog" role="dialog" aria-modal="true" aria-labelledby="license-heading">
+        <header class="license-header">
+          <div>
+            <h2 id="license-heading">라이선스 및 제3자 고지</h2>
+            <p id="license-description">Sentory의 배포 조건과 포함된 오픈소스 구성 요소</p>
+          </div>
+          <button id="license-close" class="detail-close fluent" type="button" aria-label="닫기">&#xE711;</button>
+        </header>
+        <div class="license-scroll-region">
+          <pre id="license-text" class="license-text"></pre>
+          <div id="license-scroll-indicator" class="scroll-indicator" aria-hidden="true">
+            <div class="scroll-indicator-thumb"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div id="confirm-layer" class="modal-layer" hidden>
+      <section class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title">
+        <h2 id="confirm-title">항목을 삭제할까요?</h2>
+        <p id="confirm-message">이 항목을 보관함에서 삭제합니다. 이 작업은 되돌릴 수 없습니다.</p>
+        <div>
+          <button id="confirm-cancel" type="button">취소</button>
+          <button id="confirm-ok" class="danger-action" type="button">삭제</button>
+        </div>
+      </section>
+    </div>
+    <div id="app-tooltip" class="app-tooltip" role="tooltip" hidden></div>
+    <div id="toast" class="toast" hidden></div>
+  </body>
+</html>

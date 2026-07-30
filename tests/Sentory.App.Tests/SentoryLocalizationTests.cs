@@ -209,10 +209,10 @@ public sealed class SentoryLocalizationTests
     }
 
     [Theory]
-    [InlineData("ko-KR", "컴퓨터 · 모바일 간 동기화", "클라우드 공유", "동기화 중")]
-    [InlineData("en-US", "Computer and mobile sync", "Cloud sharing", "Syncing")]
-    [InlineData("ja-JP", "パソコン・モバイル間同期", "クラウド共有", "同期中")]
-    [InlineData("zh-CN", "电脑与手机同步", "云端共享", "正在同步")]
+    [InlineData("ko-KR", "컴퓨터 · 모바일 간 동기화", "클라우드 · NAS 공유", "동기화 중")]
+    [InlineData("en-US", "Computer and mobile sync", "Cloud · NAS sharing", "Syncing")]
+    [InlineData("ja-JP", "パソコン・モバイル間同期", "クラウド・NAS 共有", "同期中")]
+    [InlineData("zh-CN", "电脑与手机同步", "云端 · NAS 共享", "正在同步")]
     public void ComputerSyncSettingsAreLocalized(
         string language,
         string expectedHeading,

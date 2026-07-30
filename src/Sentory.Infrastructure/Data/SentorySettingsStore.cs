@@ -15,6 +15,8 @@ public enum SentoryThemeMode
 public sealed class SentorySettings
 {
     public const string AutomaticLanguage = "auto";
+    public const string FolderSyncProvider = "Folder";
+    public const string WebDavSyncProvider = "WebDav";
     public const int CurrentLanguageSettingVersion = 1;
     public const int CurrentSyncStorageVersion = 2;
     public const bool DefaultAutoFavoriteEnabled = true;
@@ -84,7 +86,15 @@ public sealed class SentorySettings
 
     public bool SyncEnabled { get; set; }
 
+    public string SyncProvider { get; set; } = FolderSyncProvider;
+
     public string? SyncFolderPath { get; set; }
+
+    public string? SyncWebDavEndpoint { get; set; }
+
+    public string? SyncWebDavUsername { get; set; }
+
+    public string? SyncWebDavProtectedPassword { get; set; }
 
     public string? SyncDeviceId { get; set; }
 
@@ -157,6 +167,13 @@ public sealed class SentorySettings
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
+        SyncProvider = string.Equals(
+            SyncProvider,
+            WebDavSyncProvider,
+            StringComparison.OrdinalIgnoreCase)
+            ? WebDavSyncProvider
+            : FolderSyncProvider;
+
         if (!string.IsNullOrWhiteSpace(SyncFolderPath))
         {
             try
@@ -178,7 +195,21 @@ public sealed class SentorySettings
             SyncFolderPath = null;
         }
 
-        if (SyncFolderPath is null)
+        SyncWebDavEndpoint = NormalizeWebDavEndpoint(
+            SyncWebDavEndpoint);
+        SyncWebDavUsername = string.IsNullOrWhiteSpace(
+            SyncWebDavUsername)
+            ? null
+            : SyncWebDavUsername.Trim();
+        SyncWebDavProtectedPassword = string.IsNullOrWhiteSpace(
+            SyncWebDavProtectedPassword)
+            ? null
+            : SyncWebDavProtectedPassword;
+
+        if ((SyncProvider == FolderSyncProvider &&
+             SyncFolderPath is null) ||
+            (SyncProvider == WebDavSyncProvider &&
+             SyncWebDavEndpoint is null))
         {
             SyncEnabled = false;
         }
@@ -229,6 +260,34 @@ public sealed class SentorySettings
         value.Length == 32 &&
         string.Equals(value, value.ToLowerInvariant(), StringComparison.Ordinal) &&
         Guid.TryParseExact(value, "N", out _);
+
+    private static string? NormalizeWebDavEndpoint(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) ||
+            !Uri.TryCreate(value.Trim(), UriKind.Absolute, out var uri) ||
+            !string.Equals(
+                uri.Scheme,
+                Uri.UriSchemeHttp,
+                StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(
+                uri.Scheme,
+                Uri.UriSchemeHttps,
+                StringComparison.OrdinalIgnoreCase) ||
+            !string.IsNullOrEmpty(uri.UserInfo) ||
+            !string.IsNullOrEmpty(uri.Query) ||
+            !string.IsNullOrEmpty(uri.Fragment))
+        {
+            return null;
+        }
+
+        var builder = new UriBuilder(uri)
+        {
+            Path = uri.AbsolutePath.EndsWith("/", StringComparison.Ordinal)
+                ? uri.AbsolutePath
+                : string.Concat(uri.AbsolutePath, "/")
+        };
+        return builder.Uri.AbsoluteUri;
+    }
 }
 
 public sealed class SentorySettingsStore(SentoryDataPaths paths)

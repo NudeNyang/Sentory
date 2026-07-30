@@ -7,7 +7,9 @@ using System.Security.Cryptography;
 namespace Sentory.Infrastructure.Data;
 
 public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
-    : ICaptureRepository, IImageOcrRepository, ISyncItemDeletionRepository
+    : ICaptureRepository, IGalleryPageRepository, IGalleryItemRepository,
+      IImageOcrRepository,
+      ISyncItemDeletionRepository
 {
     private const int CurrentSchemaVersion = 7;
     private static readonly TimeSpan UsageSessionGap = TimeSpan.FromHours(6);
@@ -721,58 +723,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         {
             while (await reader.ReadAsync(cancellationToken))
             {
-                results.Add(new CapturedItemSummary(
-                    Guid.Parse(reader.GetString(0)),
-                    Enum.Parse<ContentKind>(reader.GetString(1)),
-                    reader.GetString(2),
-                    reader.GetString(3),
-                    reader.GetString(4),
-                    Enum.Parse<SourceApp>(reader.GetString(5)),
-                    Enum.Parse<CaptureMethod>(reader.GetString(6)),
-                    Enum.Parse<DeliveryStatus>(reader.GetString(7)),
-                    reader.GetInt32(8),
-                    reader.GetInt32(9),
-                    DateTimeOffset.Parse(reader.GetString(10)),
-                    DateTimeOffset.Parse(reader.GetString(11)),
-                    reader.IsDBNull(12) ? null : reader.GetString(12),
-                    reader.IsDBNull(13) ? null : reader.GetString(13),
-                    reader.GetInt32(14) != 0,
-                    reader.GetInt32(15),
-                    reader.IsDBNull(16)
-                        ? null
-                        : DateTimeOffset.Parse(reader.GetString(16)),
-                    reader.IsDBNull(17) ? null : reader.GetString(17),
-                    reader.IsDBNull(18) ? null : reader.GetString(18),
-                    reader.IsDBNull(19) ? null : reader.GetString(19),
-                    reader.IsDBNull(20) ? null : reader.GetString(20),
-                    reader.IsDBNull(21)
-                        ? null
-                        : Enum.Parse<LinkPreviewStatus>(reader.GetString(21)),
-                    reader.IsDBNull(22)
-                        ? null
-                        : DateTimeOffset.Parse(reader.GetString(22)),
-                    ParseSourceApps(
-                        reader.IsDBNull(24) ? null : reader.GetString(24),
-                        Enum.Parse<SourceApp>(reader.GetString(5))),
-                    reader.IsDBNull(23) ? null : reader.GetString(23),
-                    OcrDisplayName: reader.IsDBNull(25)
-                        ? null
-                        : reader.GetString(25),
-                    OcrText: reader.IsDBNull(26)
-                        ? null
-                        : reader.GetString(26),
-                    OcrStatus: reader.IsDBNull(27)
-                        ? null
-                        : Enum.Parse<ImageOcrStatus>(reader.GetString(27)),
-                    OcrLanguage: reader.IsDBNull(28)
-                        ? null
-                        : reader.GetString(28),
-                    PixelWidth: reader.IsDBNull(29)
-                        ? null
-                        : reader.GetInt32(29),
-                    PixelHeight: reader.IsDBNull(30)
-                        ? null
-                        : reader.GetInt32(30)));
+                results.Add(ReadCapturedItemSummary(reader));
             }
         }
 
@@ -796,6 +747,318 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 }
                 : item)
             .ToArray();
+    }
+
+    public async Task<GalleryPageResult> GetGalleryPageAsync(
+        GalleryPageRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(request.Options);
+        if (request.Offset < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(request));
+        }
+        if (request.Limit <= 0)
+        {
+            return new GalleryPageResult(0, []);
+        }
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var countCommand = connection.CreateCommand();
+        var countWhere = ConfigureGalleryQuery(countCommand, request);
+        countCommand.CommandText =
+            $"""
+            SELECT COUNT(*)
+            FROM items
+            LEFT JOIN image_ocr
+              ON image_ocr.content_hash = lower(items.content_hash)
+            {countWhere};
+            """;
+        var total = Convert.ToInt32(
+            await countCommand.ExecuteScalarAsync(cancellationToken));
+        if (total == 0 || request.Offset >= total)
+        {
+            return new GalleryPageResult(total, []);
+        }
+
+        await using var pageCommand = connection.CreateCommand();
+        var pageWhere = ConfigureGalleryQuery(pageCommand, request);
+        pageCommand.CommandText =
+            $"""
+            SELECT id, kind, original_url, normalized_key, domain,
+                   last_source_app, last_capture_method, delivery_status,
+                   capture_count, share_count, created_at, last_captured_at,
+                   content_path, items.content_hash, is_favorite, copy_count,
+                   last_copied_at, page_title, page_description,
+                   site_icon_path, preview_image_path, preview_status,
+                   preview_fetched_at, mime_type,
+                   (SELECT GROUP_CONCAT(DISTINCT source_app)
+                    FROM capture_events
+                    WHERE item_id = items.id) AS source_apps,
+                   image_ocr.display_name, image_ocr.recognized_text,
+                   image_ocr.status, image_ocr.language,
+                   image_width, image_height
+            FROM items
+            LEFT JOIN image_ocr
+              ON image_ocr.content_hash = lower(items.content_hash)
+            {pageWhere}
+            ORDER BY {GetGalleryOrderBy(request.Options.SortMode)}
+            LIMIT $limit OFFSET $offset;
+            """;
+        pageCommand.Parameters.AddWithValue("$limit", request.Limit);
+        pageCommand.Parameters.AddWithValue("$offset", request.Offset);
+
+        var results = new List<CapturedItemSummary>(request.Limit);
+        await using (var reader =
+                     await pageCommand.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                results.Add(ReadCapturedItemSummary(reader));
+            }
+        }
+
+        var collections = results
+            .Where(item => item.Kind == ContentKind.Collection)
+            .Select(item => item.ItemId)
+            .ToArray();
+        if (collections.Length > 0)
+        {
+            var memberLookup = await ReadCollectionMembersAsync(
+                connection,
+                collections,
+                cancellationToken);
+            results = results.Select(item => item.Kind == ContentKind.Collection
+                    ? item with
+                    {
+                        Members = memberLookup.GetValueOrDefault(item.ItemId, [])
+                    }
+                    : item)
+                .ToList();
+        }
+
+        return new GalleryPageResult(total, results);
+    }
+
+    public async Task<CapturedItemSummary?> GetGalleryItemAsync(
+        Guid itemId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT id, kind, original_url, normalized_key, domain,
+                   last_source_app, last_capture_method, delivery_status,
+                   capture_count, share_count, created_at, last_captured_at,
+                   content_path, items.content_hash, is_favorite, copy_count,
+                   last_copied_at, page_title, page_description,
+                   site_icon_path, preview_image_path, preview_status,
+                   preview_fetched_at, mime_type,
+                   (SELECT GROUP_CONCAT(DISTINCT source_app)
+                    FROM capture_events
+                    WHERE item_id = items.id) AS source_apps,
+                   image_ocr.display_name, image_ocr.recognized_text,
+                   image_ocr.status, image_ocr.language,
+                   image_width, image_height
+            FROM items
+            LEFT JOIN image_ocr
+              ON image_ocr.content_hash = lower(items.content_hash)
+            WHERE items.id = $itemId
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$itemId", itemId.ToString());
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        var item = ReadCapturedItemSummary(reader);
+        if (item.Kind != ContentKind.Collection)
+        {
+            return item;
+        }
+        await reader.DisposeAsync();
+        var members = await ReadCollectionMembersAsync(
+            connection,
+            [itemId],
+            cancellationToken);
+        return item with { Members = members.GetValueOrDefault(itemId, []) };
+    }
+
+    private static string ConfigureGalleryQuery(
+        SqliteCommand command,
+        GalleryPageRequest request)
+    {
+        var options = request.Options;
+        var predicates = new List<string>();
+        if (options.Kind is { } kind)
+        {
+            predicates.Add(
+                """
+                (items.kind = $kind OR
+                 (items.kind = $collectionKind AND EXISTS (
+                    SELECT 1 FROM collection_members AS kind_members
+                    WHERE kind_members.collection_id = items.id
+                      AND kind_members.kind = $kind)))
+                """);
+            command.Parameters.AddWithValue("$kind", kind.ToString());
+            command.Parameters.AddWithValue(
+                "$collectionKind",
+                ContentKind.Collection.ToString());
+        }
+        if (options.FavoritesOnly)
+        {
+            predicates.Add("items.is_favorite <> 0");
+        }
+        if (options.SourceApps is { Count: > 0 })
+        {
+            var sourceParameters = options.SourceApps
+                .OrderBy(source => source)
+                .Select((source, index) =>
+                {
+                    var name = $"$source{index}";
+                    command.Parameters.AddWithValue(name, source.ToString());
+                    return name;
+                })
+                .ToArray();
+            predicates.Add(
+                $"items.last_source_app IN ({string.Join(", ", sourceParameters)})");
+        }
+
+        var dateStart = GetGalleryDateStart(request.Now, options.DateRange);
+        if (dateStart is { } start)
+        {
+            predicates.Add(
+                "julianday(items.last_captured_at) >= julianday($dateStart)");
+            command.Parameters.AddWithValue("$dateStart", start.ToString("O"));
+        }
+
+        var search = options.SearchText.Trim().ToLowerInvariant();
+        if (search.Length > 0)
+        {
+            predicates.Add(
+                """
+                (instr(lower(items.original_url), $search) > 0 OR
+                 instr(lower(items.normalized_key), $search) > 0 OR
+                 instr(lower(items.domain), $search) > 0 OR
+                 instr(lower(coalesce(items.page_title, '')), $search) > 0 OR
+                 instr(lower(coalesce(items.page_description, '')), $search) > 0 OR
+                 instr(lower(coalesce(image_ocr.display_name, '')), $search) > 0 OR
+                 instr(lower(coalesce(image_ocr.recognized_text, '')), $search) > 0 OR
+                 EXISTS (
+                    SELECT 1
+                    FROM collection_members AS search_members
+                    LEFT JOIN image_ocr AS member_ocr
+                      ON member_ocr.content_hash = lower(search_members.content_hash)
+                    WHERE search_members.collection_id = items.id AND
+                         (instr(lower(search_members.original_url), $search) > 0 OR
+                          instr(lower(search_members.normalized_key), $search) > 0 OR
+                          instr(lower(search_members.domain), $search) > 0 OR
+                          instr(lower(coalesce(member_ocr.display_name, '')), $search) > 0 OR
+                          instr(lower(coalesce(member_ocr.recognized_text, '')), $search) > 0)))
+                """);
+            command.Parameters.AddWithValue("$search", search);
+        }
+
+        return predicates.Count == 0
+            ? string.Empty
+            : $"WHERE {string.Join(" AND ", predicates)}";
+    }
+
+    private static DateTimeOffset? GetGalleryDateStart(
+        DateTimeOffset now,
+        GalleryDateRange range) => range switch
+        {
+            GalleryDateRange.All => null,
+            GalleryDateRange.Today => new DateTimeOffset(
+                now.Year,
+                now.Month,
+                now.Day,
+                0,
+                0,
+                0,
+                now.Offset),
+            GalleryDateRange.Last7Days => now.AddDays(-7),
+            GalleryDateRange.Last30Days => now.AddDays(-30),
+            _ => throw new ArgumentOutOfRangeException(nameof(range))
+        };
+
+    private static string GetGalleryOrderBy(GallerySortMode sortMode) =>
+        sortMode switch
+        {
+            GallerySortMode.Newest =>
+                "items.last_captured_at DESC, items.created_at DESC",
+            GallerySortMode.Oldest =>
+                "items.last_captured_at ASC, items.created_at ASC",
+            GallerySortMode.MostCaptured =>
+                "items.capture_count DESC, items.last_captured_at DESC",
+            GallerySortMode.MostCopied =>
+                "items.copy_count DESC, items.last_copied_at DESC, " +
+                "items.last_captured_at DESC",
+            GallerySortMode.RecentlyCopied =>
+                "(items.last_copied_at IS NOT NULL) DESC, " +
+                "items.last_copied_at DESC, items.last_captured_at DESC",
+            GallerySortMode.Name =>
+                "CASE " +
+                "WHEN items.kind = 'Url' THEN " +
+                "coalesce(nullif(items.page_title, ''), " +
+                "nullif(items.domain, ''), items.normalized_key) " +
+                "WHEN items.kind = 'Image' THEN " +
+                "coalesce(nullif(image_ocr.display_name, ''), '클립보드 이미지') " +
+                "ELSE '묶음' END COLLATE NOCASE ASC, " +
+                "items.last_captured_at DESC",
+            _ => throw new ArgumentOutOfRangeException(nameof(sortMode))
+        };
+
+    private static CapturedItemSummary ReadCapturedItemSummary(
+        SqliteDataReader reader)
+    {
+        var fallbackSource = Enum.Parse<SourceApp>(reader.GetString(5));
+        return new CapturedItemSummary(
+            Guid.Parse(reader.GetString(0)),
+            Enum.Parse<ContentKind>(reader.GetString(1)),
+            reader.GetString(2),
+            reader.GetString(3),
+            reader.GetString(4),
+            fallbackSource,
+            Enum.Parse<CaptureMethod>(reader.GetString(6)),
+            Enum.Parse<DeliveryStatus>(reader.GetString(7)),
+            reader.GetInt32(8),
+            reader.GetInt32(9),
+            DateTimeOffset.Parse(reader.GetString(10)),
+            DateTimeOffset.Parse(reader.GetString(11)),
+            reader.IsDBNull(12) ? null : reader.GetString(12),
+            reader.IsDBNull(13) ? null : reader.GetString(13),
+            reader.GetInt32(14) != 0,
+            reader.GetInt32(15),
+            reader.IsDBNull(16)
+                ? null
+                : DateTimeOffset.Parse(reader.GetString(16)),
+            reader.IsDBNull(17) ? null : reader.GetString(17),
+            reader.IsDBNull(18) ? null : reader.GetString(18),
+            reader.IsDBNull(19) ? null : reader.GetString(19),
+            reader.IsDBNull(20) ? null : reader.GetString(20),
+            reader.IsDBNull(21)
+                ? null
+                : Enum.Parse<LinkPreviewStatus>(reader.GetString(21)),
+            reader.IsDBNull(22)
+                ? null
+                : DateTimeOffset.Parse(reader.GetString(22)),
+            ParseSourceApps(
+                reader.IsDBNull(24) ? null : reader.GetString(24),
+                fallbackSource),
+            reader.IsDBNull(23) ? null : reader.GetString(23),
+            OcrDisplayName: reader.IsDBNull(25) ? null : reader.GetString(25),
+            OcrText: reader.IsDBNull(26) ? null : reader.GetString(26),
+            OcrStatus: reader.IsDBNull(27)
+                ? null
+                : Enum.Parse<ImageOcrStatus>(reader.GetString(27)),
+            OcrLanguage: reader.IsDBNull(28) ? null : reader.GetString(28),
+            PixelWidth: reader.IsDBNull(29) ? null : reader.GetInt32(29),
+            PixelHeight: reader.IsDBNull(30) ? null : reader.GetInt32(30));
     }
 
     private static IReadOnlyList<SourceApp> ParseSourceApps(

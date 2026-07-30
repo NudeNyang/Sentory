@@ -165,7 +165,7 @@ internal static class SentoryLocalization
             L("KakaoDropDescription", "붙여넣고 Sentory에 함께 저장합니다", "Pastes them and saves them to Sentory", "貼り付けて Sentory にも保存します", "粘贴图片并同时保存到 Sentory"),
             L("DetectionReady", "감지 준비 완료", "Ready to detect", "検出準備完了", "检测已就绪"),
             L("ComputerSync", "컴퓨터 · 모바일 간 동기화", "Computer and mobile sync", "パソコン・モバイル間同期", "电脑与手机同步"),
-            L("ComputerSyncHeading", "클라우드 공유", "Cloud sharing", "クラウド共有", "云端共享"),
+            L("ComputerSyncHeading", "클라우드 · NAS 공유", "Cloud · NAS sharing", "クラウド・NAS 共有", "云端 · NAS 共享"),
             L("ComputerSyncDescription", "사진과 링크를 클라우드에서 바로 보고 공유할 수 있는 일반 파일로 저장합니다. 폴더에 접근할 수 있는 사람은 내용을 볼 수 있습니다", "Stores photos and links as regular files that can be viewed and shared from the cloud. Anyone with folder access can view them", "写真とリンクをクラウドで直接表示・共有できる通常のファイルとして保存します。フォルダーにアクセスできる人は内容を表示できます", "将图片和链接保存为可在云端直接查看和共享的普通文件。能够访问该文件夹的人都可以查看内容"),
             L("StartSync", "동기화 시작", "Start syncing", "同期を開始", "开始同步"),
             L("SyncLocationDetecting", "사용할 수 있는 클라우드 위치를 확인하고 있습니다", "Looking for an available cloud location", "利用可能なクラウドの場所を確認しています", "正在查找可用的云端位置"),

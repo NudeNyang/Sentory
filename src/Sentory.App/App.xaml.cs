@@ -2142,7 +2142,11 @@ public partial class App : System.Windows.Application
         }
 
         var settings = _settingsStore.Load();
-        if (!settings.SyncEnabled ||
+        if (!string.Equals(
+                settings.SyncProvider,
+                SentorySettings.FolderSyncProvider,
+                StringComparison.Ordinal) ||
+            !settings.SyncEnabled ||
             settings.SyncFolderPath is not { Length: > 0 }
                 selectedDirectory ||
             settings.SyncDeviceId is not { } deviceId ||

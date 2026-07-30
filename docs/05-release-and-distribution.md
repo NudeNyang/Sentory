@@ -4,10 +4,10 @@
 
 - 제품명: Sentory
 - 제작자·게시자: NudeNyang
-- 현재 배포 버전: `1.5.1`
+- 현재 배포 버전: `2.0.0`
 - 라이선스: GNU General Public License v3.0 only (`GPL-3.0-only`)
 - 현재 배포 운영체제: Windows 10/11 64비트
-- 지원 아키텍처: x64, ARM64
+- 지원 아키텍처: x64
 - 공식 저장소: `https://github.com/NudeNyang/Sentory`
 
 Sentory의 원본 소스 코드는 GPL-3.0-only로 공개합니다. 사용, 연구, 수정,
@@ -28,22 +28,21 @@ Sentory의 원본 소스 코드는 GPL-3.0-only로 공개합니다. 사용, 연�
 
 ```powershell
 git status --short
-.\scripts\Publish-Release.ps1 -Version 1.5.1
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.0
 ```
 
-`Publish-Release.ps1`은 내부적으로 `SentoryBuildFlavor=Public`을 명시한다. 공개
-배포 실행 파일의 제품 버전에 `+developers`가 포함되면 작업을 중단하므로,
-설정 화면에 `for Developers`가 표시되는 검수판이 설치형이나 포터블 배포에
-들어가지 않는다.
+`Publish-TauriRelease.ps1`은 제품명과 버전, 앱 식별자를 확인하고 `for
+Developers`, `Preview` 같은 개발자판 표시가 남아 있으면 작업을 중단한다. C#
+엔진을 self-contained 사이드카로 만들고 Tauri 호스트와 함께 x64 포터블·설치형에
+넣은 뒤 실행 파일 자체 점검까지 마친다.
 
-로컬 검수판은 다음 명령으로 만든다. `Publish-Portable.ps1`의 기본 빌드 구분은
-`Developer`이며, x64 검수판만 저장소 루트의 `Sentory.exe`를 교체한다.
+Tauri 로컬 검수판은 다음 명령으로 만든다.
 
 ```powershell
-.\scripts\Publish-Portable.ps1 -Runtime win-x64 -BuildFlavor Developer
+.\scripts\Build-Tauri.ps1 -Configuration Release
 ```
 
-### QA VM 개발자판 자동 배포
+### WPF 1.5.1 유지보수용 QA VM 배포
 
 다음 사용자 환경 변수를 모두 설정한 개발 PC에서는 x64 `Developer` 포터블을
 게시할 때 QA VM도 같은 실행 파일로 자동 갱신한다.
@@ -81,8 +80,8 @@ Sentory가 정상 종료 완료 신호를 보내지 않으면 게시를 실패�
     -AllowStoppedInstance
 ```
 
-공개판을 수동으로 만들 때도 `-BuildFlavor Public`을 반드시 명시한다. 정식
-릴리스에서는 수동 호출 대신 `Publish-Release.ps1`을 사용한다.
+이 절은 WPF 1.5.1 유지보수에만 사용한다. Tauri 정식 릴리스는
+`Publish-TauriRelease.ps1`로 만든다.
 
 `artifacts` 폴더에는 다음 파일이 생성됩니다.
 
@@ -90,20 +89,13 @@ Sentory가 정상 종료 완료 신호를 보내지 않으면 게시를 실패�
 |---|---|
 | `Sentory-win-x64-setup.exe` | Intel·AMD Windows 설치형 |
 | `Sentory-win-x64-portable.zip` | Intel·AMD Windows 포터블 |
-| `Sentory-win-arm64-setup.exe` | Windows on ARM 설치형 |
-| `Sentory-win-arm64-portable.zip` | Windows on ARM 포터블 |
-| `Sentory-1.5.1-source.zip` | 해당 바이너리에 대응하는 전체 소스 |
+| `Sentory-2.0.0-source.zip` | 해당 바이너리에 대응하는 전체 소스 |
 
-각 배포 파일의 `.sha256` 확인값과 `release-manifest.json`도 함께
-생성됩니다. 인앱 업데이트는 GitHub Releases API에서 현재 아키텍처와 설치
-방식에 맞는 파일을 먼저 내려받고 SHA-256을 확인합니다. 검증을 마친 뒤에만
-안내창과 수동 설치 버튼을 표시합니다.
+각 배포 파일의 `.sha256` 확인값과 `release-manifest.json`도 함께 생성된다.
 
-개발자 검수판은 설정의 `앱 정보`에서 `지금 확인`을 눌러 자동 확인의 6시간
-간격과 관계없이 GitHub Releases를 즉시 조회할 수 있습니다. 이 진단용 확인
-버튼은 `+developers` 빌드에만 표시되며 공개판에는 나타나지 않습니다. 새
-버전이 있으면 자동 확인과 동일하게 현재 설치 방식에 맞는 파일을 다운로드하고
-SHA-256 검증을 마친 뒤 설치 안내를 표시합니다.
+설정의 `앱 정보`에서 `지금 확인`을 누르면 GitHub Releases를 즉시 조회한다. 새
+정식 버전이 있으면 공식 Release 페이지를 연다. 2.0.0 Tauri판은 앱 안에서
+패키지를 교체하지 않으므로 사용자가 설치형이나 포터블 파일을 직접 받는다.
 
 설치형 패키지는 Inno Setup 6으로 만듭니다. 빌드 PC에 컴파일러가 없으면 다음
 명령으로 설치할 수 있습니다.
@@ -128,12 +120,12 @@ winget install --id JRSoftware.InnoSetup -e
 
 공개 저장소에는 최소한 다음 항목을 같은 버전으로 올립니다.
 
-- 전체 소스 코드와 `v1.5.1` 태그
+- 전체 소스 코드와 `v2.0.0` 태그
 - `LICENSE.txt`의 GNU GPL v3 전문
 - `README.md`, `docs/README.en.md`
 - `docs/privacy.md`, `distribution/THIRD-PARTY-NOTICES.txt`, `CHANGELOG.md`,
   `docs/support.md`
-- Release의 네 가지 Windows 패키지와 소스 ZIP
+- Release의 x64 설치형·포터블 패키지와 소스 ZIP
 - 각 배포 파일의 `.sha256` 및 `release-manifest.json`
 
 GitHub가 자동으로 제공하는 “Source code” 파일만 이용해도 소스를 받을 수
@@ -151,12 +143,13 @@ GitHub가 자동으로 제공하는 “Source code” 파일만 이용해도 소
 6. 카카오톡의 링크·사진 붙여넣기와 탐색기 드롭을 확인합니다.
 7. 다른 앱에서 다룬 내용이 저장되지 않는지 확인합니다.
 8. x64 설치형과 포터블을 별도 데이터 폴더에서 실행합니다.
-9. ARM64 패키지는 가능하면 실제 Windows on ARM 장치에서 확인합니다.
-10. `v1.5.1` 태그가 배포 파일을 만든 커밋을 가리키는지 확인합니다.
+9. 앱 정보에 `for Developers`나 `Preview`가 없는지 확인합니다.
+10. `v2.0.0` 태그가 배포 파일을 만든 커밋을 가리키는지 확인합니다.
 11. Release 자산의 SHA-256 값과 `release-manifest.json`을 대조합니다.
 
-기존 설치본이 없는 환경에서는 아래 명령으로 x64 설치·실행·제거 과정을
-자동으로 확인할 수 있습니다.
+아래 두 검사는 WPF 1.5.1 유지보수에만 사용한다. Tauri 정식판은
+`Publish-TauriRelease.ps1`이 포터블 자체 점검을 실행하며 설치형은 별도 환경에서
+설치·실행·제거를 확인한다.
 
 ```powershell
 .\scripts\Test-InstallerRoundTrip.ps1
@@ -197,16 +190,10 @@ GitHub가 자동으로 제공하는 “Source code” 파일만 이용해도 소
 
 ## 버전과 업데이트
 
-Sentory는 의미적 버전 형식을 사용합니다. 앱은 시작 후 GitHub Releases에서 새
-버전을 확인하며, 같은 채널의 더 높은 버전이 있을 때만 업데이트를 준비합니다.
-확인은 6시간에 한 번으로 제한합니다. 파일 다운로드와 SHA-256 검증이 끝나면
-짧은 안내창과 보관함의 수동 설치 버튼을 표시합니다. 이미 검증된 파일이 있으면
-다시 내려받지 않습니다.
-
-업데이트 메타데이터의 Release 페이지, 패키지와 체크섬 URL은 HTTPS만 허용합니다.
-패키지는 256MB, 체크섬 응답은 8KB를 넘으면 중단하며, 현재 공개 패키지의 약
-81~115MB 크기보다 충분한 여유를 둡니다. 파일 크기 헤더가 없거나 실제 본문이
-헤더와 달라도 스트리밍 중 같은 상한을 다시 확인합니다.
+Sentory는 의미적 버전 형식을 사용한다. 2.0.0 Tauri판은 설정의 `지금 확인`을
+눌렀을 때 GitHub Releases에서 같은 채널의 더 높은 버전이 있는지 확인한다. 새
+버전이 있으면 HTTPS 공식 Release 페이지를 열며 패키지 설치는 사용자가 직접
+진행한다.
 
 버전 선택과 동기화는 Codex가 맡습니다. 변경 범위에 따라 의미적 버전의 다음
 번호를 정하고 프로젝트, 설치 프로그램, 배포 스크립트, 테스트와 문서의 버전을
@@ -217,12 +204,6 @@ Sentory는 의미적 버전 형식을 사용합니다. 앱은 시작 후 GitHub 
 않는 `_workspace`에 보관합니다. 이 절차를 마친 문서만 GitHub Release 본문으로
 사용합니다.
 
-설치형은 업데이트 전용 헬퍼를 먼저 준비한 뒤 Sentory를 종료합니다. 헬퍼는 기존
-프로세스가 완전히 끝난 것을 확인하고 `/SILENT` 모드로 설치 파일을 실행합니다.
-이때 설치 마법사 전체 대신 업데이트 진행창만 표시되며, 설치가 끝나면 Sentory가
-자동으로 다시 열립니다. 새 설치 파일은 구버전 앱에서 시작한 업데이트도 이어질 수
-있도록 초기 단일 인스턴스 검사로 바로 중단하지 않고 기존 앱의 종료를 기다립니다.
-
-처음 설치할 때만 Sentory 색상과 전용 그림을 적용한 설치 마법사가 나타납니다.
-포터블은 앱이 종료된 뒤 임시 업데이트 프로세스가 파일을 교체합니다. 사용자
-데이터는 설치 폴더 밖에 있으므로 두 방식 모두 업데이트 중에 유지됩니다.
+설치형은 기존 1.5.1과 같은 AppId와 설치 위치를 사용한다. 포터블은 앱을 완전히
+종료한 뒤 압축을 새 폴더에 풀어 교체한다. 사용자 데이터는 설치 폴더 밖에 있으므로
+두 방식 모두 버전을 바꿀 때 유지된다.

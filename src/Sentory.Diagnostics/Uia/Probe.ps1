@@ -152,6 +152,17 @@ $targetProcesses = @(
     }
 ) | Sort-Object Id -Unique
 
+if ($targetProcesses.Count -eq 0) {
+    [pscustomobject]@{
+        capturedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
+        runtime = 'Windows PowerShell 5.1 / .NET Framework UI Automation'
+        privacyMode = 'No names, values, text, titles, or full executable paths are collected.'
+        requestedProcesses = $requestedNames
+        snapshots = @()
+    } | ConvertTo-Json -Depth 8 -Compress
+    exit 0
+}
+
 $targetById = @{}
 foreach ($process in $targetProcesses) {
     $targetById[$process.Id] = $process

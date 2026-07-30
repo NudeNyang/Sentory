@@ -71,6 +71,21 @@ public sealed class LocalFolderSyncRuntimeService(
             cancellationToken,
             storeReset: false);
 
+    public async Task<LocalFolderSyncRunResult> RunObjectStoreOnceAsync(
+        string deviceId,
+        ISyncObjectStore objectStore,
+        bool storeReset = false,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(deviceId);
+        ArgumentNullException.ThrowIfNull(objectStore);
+        return await RunOnceAsync(
+            deviceId,
+            objectStore,
+            cancellationToken,
+            storeReset);
+    }
+
     private ReadableFolderSyncObjectStore GetReadableStore(
         string selectedDirectory,
         bool forceRefresh)

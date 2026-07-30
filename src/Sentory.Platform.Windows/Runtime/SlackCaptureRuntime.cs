@@ -19,6 +19,8 @@ public enum SlackNativeDropRegistrationResult
 public sealed class SlackCaptureRuntime : ICaptureRuntime
 {
     private const int MaximumActiveCandidates = 8;
+    private static readonly TimeSpan InitialSnapshotRetryDelay =
+        TimeSpan.FromMilliseconds(75);
 
     private readonly INativeWindowApi _native;
     private readonly SlackContextValidator _validator;
@@ -235,13 +237,28 @@ public sealed class SlackCaptureRuntime : ICaptureRuntime
             return;
         }
 
-        var baseline = await _accessibility.TryCaptureAsync(
-            context,
-            requireFocusedComposer: true,
+        var captureAttempts = 0;
+        var baseline = await SlackInitialSnapshotRetry.CaptureAsync(
+            () =>
+            {
+                captureAttempts++;
+                return _accessibility.TryCaptureAsync(
+                    context,
+                    requireFocusedComposer: true,
+                    cancellationToken);
+            },
+            InitialSnapshotRetryDelay,
             cancellationToken);
         if (baseline is null)
         {
             return;
+        }
+
+        if (captureAttempts > 1)
+        {
+            _diagnostic?.Invoke(
+                "slack-context-recovered",
+                $"attempts={captureAttempts}");
         }
 
         var clipboard = await _clipboardReader.ReadAsync(

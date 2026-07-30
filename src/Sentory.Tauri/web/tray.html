@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sentory</title>
+  <link rel="stylesheet" href="tray.css">
+  <script type="module" src="tray.js"></script>
+</head>
+<body>
+  <main class="tray-card" aria-labelledby="tray-title">
+    <header class="tray-header">
+      <strong id="tray-title" class="tray-title">Sentory</strong>
+      <span id="tray-status" class="tray-status">상태: 감지 준비 완료</span>
+    </header>
+
+    <div id="tray-discord-status" class="tray-detection" hidden>
+      <span class="tray-detection-dot" aria-hidden="true"></span>
+      <span id="tray-discord-detection">Discord 감지</span>
+      <strong id="tray-discord-state">감지 준비 완료</strong>
+    </div>
+
+    <div class="tray-separator" role="separator"></div>
+
+    <button id="tray-open" class="tray-action" type="button" data-action="open">
+      <span class="tray-icon" aria-hidden="true">&#xE8A7;</span>
+      <span id="tray-open-label" class="tray-action-label">보관함 열기</span>
+      <span id="tray-double-click" class="tray-helper">더블클릭</span>
+    </button>
+
+    <button id="tray-pause" class="tray-action" type="button" data-action="pause">
+      <span id="tray-pause-icon" class="tray-icon" aria-hidden="true">&#xE769;</span>
+      <span id="tray-pause-label" class="tray-action-label">감지 일시정지</span>
+      <span id="tray-pause-switch" class="tray-mini-switch" aria-hidden="true"><span></span></span>
+    </button>
+
+    <button id="tray-startup" class="tray-action" type="button" data-action="startup">
+      <span class="tray-icon" aria-hidden="true">&#xE7E8;</span>
+      <span id="tray-startup-label" class="tray-action-label">Windows 시작 시 실행</span>
+      <span id="tray-startup-check" class="tray-check" aria-hidden="true">&#xE73E;</span>
+    </button>
+
+    <button id="tray-discord" class="tray-action tray-action-tall" type="button" data-action="discord">
+      <span class="tray-icon" aria-hidden="true">&#xE774;</span>
+      <span class="tray-action-copy">
+        <span id="tray-discord-label" class="tray-action-label">Discord 자동 연결</span>
+        <span id="tray-accessibility" class="tray-subtitle">접근성 모드로 시작</span>
+      </span>
+      <span id="tray-discord-check" class="tray-check" aria-hidden="true">&#xE73E;</span>
+    </button>
+
+    <button id="tray-repair" class="tray-action" type="button" data-action="repair" hidden>
+      <span class="tray-icon" aria-hidden="true">&#xE777;</span>
+      <span id="tray-repair-label" class="tray-action-label">Discord 재시작 후 연결</span>
+    </button>
+
+    <div class="tray-separator" role="separator"></div>
+
+    <button id="tray-open-data" class="tray-action" type="button" data-action="open-data">
+      <span class="tray-icon" aria-hidden="true">&#xE8B7;</span>
+      <span id="tray-open-data-label" class="tray-action-label">데이터 폴더 열기</span>
+    </button>
+
+    <button id="tray-exit" class="tray-action tray-danger" type="button" data-action="exit">
+      <span class="tray-icon" aria-hidden="true">&#xE8BB;</span>
+      <span id="tray-exit-label" class="tray-action-label">Sentory 종료</span>
+    </button>
+  </main>
+</body>
+</html>

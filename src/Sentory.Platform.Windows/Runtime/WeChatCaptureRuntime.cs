@@ -37,7 +37,6 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
     private readonly StaClipboardReader _clipboardReader;
     private readonly IWeChatAccessibilityClient _accessibility;
     private readonly IWeChatPointerSendVerifier _pointerSendVerifier;
-    private readonly IWeChatComposerTextReader _composerTextReader;
     private readonly CaptureCoordinator _coordinator;
     private readonly Action<string, string>? _diagnostic;
     private readonly Channel<PasteTrigger> _triggers =
@@ -69,7 +68,6 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
         _clipboardReader = new StaClipboardReader(native);
         _accessibility = new WeChatAccessibilityClient(native, diagnostic);
         _pointerSendVerifier = new WeChatPointerSendVerifier();
-        _composerTextReader = new WeChatComposerTextReader();
         _coordinator = new CaptureCoordinator(repository);
         _diagnostic = diagnostic;
     }
@@ -125,41 +123,35 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
 
         if (_validator.TryValidate(trigger, out var context))
         {
-            var composer = _composerTextReader.Read(
-                context.MainWindow,
-                context.ProcessId);
-            ObserveSendSignal(
-                context,
-                context.OccurredAt,
-                composer);
+            lock (_candidateGate)
+            {
+                _recentSendSignals.Observe(
+                    context.ContextHash,
+                    context.OccurredAt);
+                _recentSendSignals.ObserveProcess(
+                    context.ProcessId,
+                    context.OccurredAt);
+            }
+
             var observed = MarkSendObserved(
                 context.MainWindow,
                 context.OccurredAt,
-                "keyboard",
-                composer);
+                "keyboard");
             ReportBufferedSend("keyboard", observed);
             return;
         }
 
-        var root = _native.GetRootWindow(trigger.ForegroundWindow);
-        var fallbackComposer = root == nint.Zero
-            ? new WeChatComposerTextSnapshot(false, string.Empty)
-            : _composerTextReader.Read(root, trigger.ForegroundProcessId);
         lock (_candidateGate)
         {
             _recentSendSignals.ObserveProcess(
                 trigger.ForegroundProcessId,
-                trigger.OccurredAt,
-                fallbackComposer.IsAvailable
-                    ? fallbackComposer.Text
-                    : null);
+                trigger.OccurredAt);
         }
 
         var fallbackObserved = MarkSendObservedByProcess(
             trigger.ForegroundProcessId,
             trigger.OccurredAt,
-            "keyboard-fallback",
-            fallbackComposer);
+            "keyboard-fallback");
         ReportBufferedSend("keyboard-fallback", fallbackObserved);
     }
 
@@ -196,67 +188,40 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
             return;
         }
 
-        var composer = _composerTextReader.Read(
-            root,
-            trigger.ForegroundProcessId);
-        if (hasContext)
+        lock (_candidateGate)
         {
-            ObserveSendSignal(context, trigger.OccurredAt, composer);
-        }
-        else
-        {
-            lock (_candidateGate)
+            if (hasContext)
             {
-                _recentSendSignals.ObserveProcess(
-                    trigger.ForegroundProcessId,
-                    trigger.OccurredAt,
-                    composer.IsAvailable ? composer.Text : null);
+                _recentSendSignals.Observe(
+                    context.ContextHash,
+                    trigger.OccurredAt);
             }
+
+            _recentSendSignals.ObserveProcess(
+                trigger.ForegroundProcessId,
+                trigger.OccurredAt);
         }
 
         var observed = hasContext
             ? MarkSendObserved(
                 root,
                 trigger.OccurredAt,
-                "pointer",
-                composer)
+                "pointer")
             : MarkSendObservedByProcess(
                 trigger.ForegroundProcessId,
                 trigger.OccurredAt,
-                "pointer-fallback",
-                composer);
+                "pointer-fallback");
         ReportBufferedSend(
             hasContext ? "pointer" : "pointer-fallback",
             observed);
     }
 
-    private void ObserveSendSignal(
-        ValidatedWeChatContext context,
-        DateTimeOffset occurredAt,
-        WeChatComposerTextSnapshot composer)
-    {
-        lock (_candidateGate)
-        {
-            var text = composer.IsAvailable ? composer.Text : null;
-            _recentSendSignals.Observe(
-                context.ContextHash,
-                occurredAt,
-                text);
-            _recentSendSignals.ObserveProcess(
-                context.ProcessId,
-                occurredAt,
-                text);
-        }
-    }
-
     private int MarkSendObserved(
         nint mainWindow,
         DateTimeOffset occurredAt,
-        string inputKind,
-        WeChatComposerTextSnapshot composer)
+        string inputKind)
     {
         var observed = 0;
-        var rejected = 0;
         lock (_candidateGate)
         {
             var candidates = _candidates.Where(candidate =>
@@ -265,11 +230,9 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
                     !candidate.IsSendObserved() &&
                     !candidate.Cancellation.IsCancellationRequested)
                 .ToArray();
-            rejected = candidates.Count(candidate =>
-                !CanApplySendEvidence(candidate, composer));
             var candidate = MessengerSendCandidatePolicy.SelectLatestEligible(
                 candidates,
-                candidate => CanApplySendEvidence(candidate, composer),
+                _ => true,
                 candidate => candidate.Context.OccurredAt);
             if (candidate is not null &&
                 _recentSendSignals.TryConsume(occurredAt) &&
@@ -279,7 +242,6 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
             }
         }
 
-        ReportRejectedSendEvidence(inputKind, rejected, composer.IsAvailable);
         if (observed > 0)
         {
             _diagnostic?.Invoke(
@@ -293,11 +255,9 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
     private int MarkSendObservedByProcess(
         uint processId,
         DateTimeOffset occurredAt,
-        string inputKind,
-        WeChatComposerTextSnapshot composer)
+        string inputKind)
     {
         var observed = 0;
-        var rejected = 0;
         lock (_candidateGate)
         {
             var candidates = _candidates.Where(candidate =>
@@ -306,11 +266,9 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
                     !candidate.IsSendObserved() &&
                     !candidate.Cancellation.IsCancellationRequested)
                 .ToArray();
-            rejected = candidates.Count(candidate =>
-                !CanApplySendEvidence(candidate, composer));
             var candidate = MessengerSendCandidatePolicy.SelectLatestEligible(
                 candidates,
-                candidate => CanApplySendEvidence(candidate, composer),
+                _ => true,
                 candidate => candidate.Context.OccurredAt);
             if (candidate is not null &&
                 _recentSendSignals.TryConsume(occurredAt) &&
@@ -320,7 +278,6 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
             }
         }
 
-        ReportRejectedSendEvidence(inputKind, rejected, composer.IsAvailable);
         if (observed > 0)
         {
             _diagnostic?.Invoke(
@@ -329,28 +286,6 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
         }
 
         return observed;
-    }
-
-    private static bool CanApplySendEvidence(
-        CandidateRegistration candidate,
-        WeChatComposerTextSnapshot composer) =>
-        candidate.Urls.Count == 0 ||
-        (composer.IsAvailable &&
-         WeChatMessageMatchPolicy.HasMatchingComposerEvidence(
-             composer.Text,
-             candidate.Urls));
-
-    private void ReportRejectedSendEvidence(
-        string inputKind,
-        int rejected,
-        bool composerAvailable)
-    {
-        if (rejected > 0)
-        {
-            _diagnostic?.Invoke(
-                "wechat-send-input-rejected",
-                $"reason=composer-url-mismatch kind={inputKind} candidates={rejected} composerAvailable={composerAvailable}");
-        }
     }
 
     private void ReportBufferedSend(string inputKind, int observed)
@@ -557,9 +492,7 @@ public sealed class WeChatCaptureRuntime : ICaptureRuntime
                     context.ContextHash,
                     context.ProcessId,
                     context.OccurredAt,
-                    DateTimeOffset.UtcNow,
-                    candidateUrls,
-                    candidateImages.Count > 0))
+                    DateTimeOffset.UtcNow))
             {
                 registration.MarkSendObserved();
                 _diagnostic?.Invoke(

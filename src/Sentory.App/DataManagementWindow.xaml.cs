@@ -502,8 +502,12 @@ public partial class DataManagementWindow : Window
         }
 
         var settings = _settingsStore.Load();
-        if (!settings.SyncEnabled &&
-            string.IsNullOrWhiteSpace(settings.SyncFolderPath))
+        if (!string.Equals(
+                settings.SyncProvider,
+                SentorySettings.FolderSyncProvider,
+                StringComparison.Ordinal) ||
+            (!settings.SyncEnabled &&
+             string.IsNullOrWhiteSpace(settings.SyncFolderPath)))
         {
             await StartSyncWithAutomaticFolderAsync();
             return;
@@ -766,6 +770,7 @@ public partial class DataManagementWindow : Window
             var selectedPath = Path.GetFullPath(folderPath);
             Directory.CreateDirectory(selectedPath);
             var oldFolderPath = settings.SyncFolderPath;
+            var oldProvider = settings.SyncProvider;
             var oldDeviceId = settings.SyncDeviceId;
             var oldStorageVersion = settings.SyncStorageVersion;
             var oldMigrationDeviceId = settings.SyncMigrationDeviceId;
@@ -788,13 +793,18 @@ public partial class DataManagementWindow : Window
                 return;
             }
             var folderChanged =
-                !string.IsNullOrWhiteSpace(oldFolderPath) &&
                 !string.Equals(
-                    Path.GetFullPath(oldFolderPath),
-                    selectedPath,
-                    OperatingSystem.IsWindows()
-                        ? StringComparison.OrdinalIgnoreCase
-                        : StringComparison.Ordinal);
+                    oldProvider,
+                    SentorySettings.FolderSyncProvider,
+                    StringComparison.Ordinal) ||
+                (!string.IsNullOrWhiteSpace(oldFolderPath) &&
+                 !string.Equals(
+                     Path.GetFullPath(oldFolderPath),
+                     selectedPath,
+                     OperatingSystem.IsWindows()
+                         ? StringComparison.OrdinalIgnoreCase
+                         : StringComparison.Ordinal));
+            settings.SyncProvider = SentorySettings.FolderSyncProvider;
             settings.SyncFolderPath = selectedPath;
             settings.SyncEnabled = true;
             var isNewStore = folderChanged ||
@@ -827,6 +837,7 @@ public partial class DataManagementWindow : Window
                 catch
                 {
                     settings.SyncFolderPath = oldFolderPath;
+                    settings.SyncProvider = oldProvider;
                     settings.SyncDeviceId = oldDeviceId;
                     settings.SyncStorageVersion = oldStorageVersion;
                     settings.SyncMigrationDeviceId = oldMigrationDeviceId;
@@ -1269,8 +1280,12 @@ public partial class DataManagementWindow : Window
         SentorySettings settings,
         SyncRuntimeSnapshot snapshot)
     {
-        var hasFolder = !string.IsNullOrWhiteSpace(
-            settings.SyncFolderPath);
+        var hasFolder = string.Equals(
+                            settings.SyncProvider,
+                            SentorySettings.FolderSyncProvider,
+                            StringComparison.Ordinal) &&
+                        !string.IsNullOrWhiteSpace(
+                            settings.SyncFolderPath);
         SyncFolderPathText.Text = hasFolder
             ? settings.SyncFolderPath
             : string.Empty;
@@ -1313,7 +1328,7 @@ public partial class DataManagementWindow : Window
         Grid.SetColumnSpan(SyncToggleButton, hasFolder ? 1 : 3);
         SyncToggleButton.Width = hasFolder ? 82 : double.NaN;
         SyncToggleButton.Visibility = Visibility.Visible;
-        SyncRuntimeStatusText.Text = settings.SyncEnabled
+        SyncRuntimeStatusText.Text = settings.SyncEnabled && hasFolder
             ? SentoryLocalization.Text(snapshot.State switch
             {
                 SyncRuntimeState.Syncing => "SyncStateSyncing",
