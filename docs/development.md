@@ -14,7 +14,7 @@ Sentory는 사용자가 메신저에서 다룬 URL, 이미지, 파일을 로컬�
 
 2026-07-29부터 제품 UI를 Tauri 2로 단계적으로 전환한다. 메신저 감지, SQLite,
 OCR, 링크 미리보기와 동기화는 기존 C# 엔진에 남기며 전체 Rust 재작성은 하지
-않는다. 공개판 1.5.0의 WPF 앱은 전환 검증이 끝날 때까지 기준선으로 유지한다.
+않는다. 공개판 1.5.1의 WPF 앱은 전환 검증이 끝날 때까지 기준선으로 유지한다.
 
 첫 개발자판은 Node.js, Rust stable, Visual Studio C++ 빌드 도구와 Windows SDK가
 필요하다. 저장소 루트에서 다음 스크립트를 실행하면 C# 브리지를 self-contained
@@ -40,7 +40,7 @@ Tauri 개발자판의 제목 표시줄 닫기는 앱을 종료하지 않고 창�
 설정·상태·확인·알림 문구를 추가할 때는 새 표현을 만들지 말고 WPF
 `SentoryLocalization`의 같은 동작 키를 기준으로 네 언어를 함께 맞춘다.
 
-WPF 비교 기준은 WebView2 갤러리 패키지와 선택 경로가 없는 1.5.0 Developer
+WPF 비교 기준은 WebView2 갤러리 패키지와 선택 경로가 없는 1.5.1 Developer
 빌드다. Tauri 개발자판은 다음 세대 UI를 구분하기 위해 2.0.0으로 시작하되,
 공개판이 아니라 UI 전환 검수용으로만 사용한다.
 
@@ -482,11 +482,11 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
 모두 종료한 뒤 저장소 루트에서 다음 명령을 실행한다.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\Start-InstalledDiagnostics.ps1 -Version 1.5.0
+powershell -ExecutionPolicy Bypass -File .\scripts\Start-InstalledDiagnostics.ps1 -Version 1.5.1
 ```
 
 설치판의 데이터베이스, 설정, 캐시와 Discord 추적 로그는
-`%LOCALAPPDATA%\Sentory-Diagnostics\1.5.0` 아래에 생성된다. 환경 변수는 실행한
+`%LOCALAPPDATA%\Sentory-Diagnostics\1.5.1` 아래에 생성된다. 환경 변수는 실행한
 프로세스와 그 접근성 작업자에만 전달되므로 기본 데이터 폴더와 시스템 환경
 변수는 바뀌지 않는다. Windows 자동 실행이나 일반 바로가기로 연 Sentory는 이
 진단 폴더를 사용하지 않으므로 재현할 때마다 위 스크립트로 실행한다.

@@ -69,13 +69,13 @@ Windows computers connected to the same folder.
 
 ## Download
 
-The current stable version is **1.5.0**. It runs on 64-bit Windows 10 and 11. Download
+The current stable version is **1.5.1**. It runs on 64-bit Windows 10 and 11. Download
 the package for your PC from
 [Releases](https://github.com/NudeNyang/Sentory/releases). macOS and Linux versions
 are planned, but there is no release schedule yet.
 
-See the [Sentory 1.5.0 release notes](./releases/1.5.0.md) for the full list of new
-messenger support, sync features, and consecutive-send fixes.
+See the [Sentory 1.5.1 release notes](./releases/1.5.1.md) for details about the
+Discord attachment recollection fix.
 
 | System | Installer | Portable |
 | --- | --- | --- |
@@ -134,7 +134,7 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-Release.ps1 -Version 1.5.0
+.\scripts\Publish-Release.ps1 -Version 1.5.1
 ```
 
 The release script creates Windows x64 and ARM64 installers, portable packages,
