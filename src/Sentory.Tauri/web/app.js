@@ -1176,7 +1176,15 @@ function renderMessengerSetup() {
     input.setAttribute("aria-label", sourceLabel(source));
     const track = document.createElement("span");
     track.className = "switch-track";
-    input.addEventListener("change", () => {
+    input.addEventListener("change", async () => {
+      if (source === "Discord" && input.checked) {
+        const confirmed = await ensureDiscordAutoRestartConsent();
+        if (!confirmed) {
+          input.checked = false;
+          return;
+        }
+        state.discordAutoRestartProcessId = null;
+      }
       if (input.checked) state.messengerSetupSources.add(source);
       else state.messengerSetupSources.delete(source);
       renderMessengerSetup();
@@ -1386,7 +1394,8 @@ async function showDiscordUnavailablePrompt() {
 
 async function showDiscordDefaultOffNotice() {
   const storageKey = "sentory.discord-default-off-notice.v1";
-  if (state.settings?.sources?.Discord ||
+  if (needsMessengerSetup(state.settings) ||
+      state.settings?.sources?.Discord ||
       window.localStorage.getItem(storageKey) === "shown") {
     return;
   }
@@ -2800,7 +2809,18 @@ detectionOffAction.addEventListener(
   "click",
   () => openSettings({ focusMessenger: true }),
 );
-messengerSetupAll.addEventListener("click", () => {
+messengerSetupAll.addEventListener("click", async () => {
+  if (!state.messengerSetupSources.has("Discord")) {
+    const confirmed = await ensureDiscordAutoRestartConsent();
+    if (!confirmed) {
+      state.messengerSetupSources = new Set(
+        SOURCES.filter((source) => source !== "Discord"),
+      );
+      renderMessengerSetup();
+      return;
+    }
+    state.discordAutoRestartProcessId = null;
+  }
   state.messengerSetupSources = new Set(SOURCES);
   renderMessengerSetup();
 });

@@ -68,6 +68,21 @@ test("messenger toggles render immediately and save through the async latest-val
   );
   assert.match(
     script,
-    /input\.addEventListener\("change", \(\) => \{[\s\S]*updateSourceSetting\(source, enabled\);/,
+    /input\.addEventListener\("change", async \(\) => \{[\s\S]*updateSourceSetting\(source, enabled\);/,
+  );
+});
+
+test("Discord consent is required from both onboarding selection paths", () => {
+  assert.match(
+    script,
+    /function renderMessengerSetup\(\)[\s\S]*?source === "Discord" && input\.checked[\s\S]*?ensureDiscordAutoRestartConsent\(\)/,
+  );
+  assert.match(
+    script,
+    /messengerSetupAll\.addEventListener\("click", async \(\) => \{[\s\S]*?ensureDiscordAutoRestartConsent\(\)/,
+  );
+  assert.match(
+    script,
+    /if \(!confirmed\) \{[\s\S]*?SOURCES\.filter\(\(source\) => source !== "Discord"\)[\s\S]*?renderMessengerSetup\(\)/,
   );
 });
