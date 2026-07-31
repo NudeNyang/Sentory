@@ -70,13 +70,13 @@ same storage.
 
 ## Download
 
-The current stable version is **2.0.0**. It replaces the WPF interface with Tauri 2 and
-runs on x64 and ARM64 Windows 10 and 11. Download the installer or portable package
-from [Releases](https://github.com/NudeNyang/Sentory/releases). There is no release
-schedule yet for macOS or Linux.
+The current stable version is **2.0.1**. It runs on x64 and ARM64 Windows 10 and 11.
+Download the installer or portable package from
+[Releases](https://github.com/NudeNyang/Sentory/releases). There is no release schedule
+yet for macOS or Linux.
 
-See the [Sentory 2.0.0 release notes](./releases/2.0.0.md) for the Tauri migration,
-cloud and NAS sync, and detection fixes included in this release.
+See the [Sentory 2.0.1 release notes](./releases/2.0.1.md) for the Discord startup and
+image OCR fixes included in this release.
 
 | System | Installer | Portable |
 | --- | --- | --- |
@@ -137,8 +137,8 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.0 -Architecture x64
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.0 -Architecture arm64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.1 -Architecture x64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.1 -Architecture arm64
 ```
 
 The release script creates the installer and portable package for the selected Windows

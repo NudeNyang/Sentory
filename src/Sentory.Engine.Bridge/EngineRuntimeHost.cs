@@ -382,7 +382,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
     {
         using var client = new GitHubReleaseUpdateClient();
         var update = await client.CheckAsync(
-            "2.0.0",
+            "2.0.1",
             RuntimeInformation.ProcessArchitecture,
             UpdatePackageKind.Portable,
             cancellationToken);

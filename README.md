@@ -70,14 +70,14 @@ Sentory가 운영하는 서버로 보관 데이터를 보내지 않으며 분석
 
 ## 다운로드
 
-현재 정식 버전은 **2.0.0**입니다. WPF에서 Tauri 2로 기본 화면을 바꿨으며,
-Windows 10/11 x64와 ARM64에서 사용할 수 있습니다.
+현재 정식 버전은 **2.0.1**입니다. Windows 10/11 x64와 ARM64에서 사용할 수
+있습니다.
 [Releases](https://github.com/NudeNyang/Sentory/releases)에서 설치형이나 포터블
 파일을 내려받으면 됩니다. macOS와 Linux판의 배포 일정은 아직 정해지지
 않았습니다.
 
-Tauri 전환과 클라우드·NAS 동기화를 포함한 변경 내용은
-[2.0.0 릴리즈 노트](./docs/releases/2.0.0.md)에 정리되어 있습니다.
+Discord 시작 방식과 사진 OCR을 손본 내용은
+[2.0.1 릴리즈 노트](./docs/releases/2.0.1.md)에 정리되어 있습니다.
 
 | 사용 환경 | 설치형 | 포터블 |
 | --- | --- | --- |
@@ -140,8 +140,8 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.0 -Architecture x64
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.0 -Architecture arm64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.1 -Architecture x64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.1 -Architecture arm64
 ```
 
 배포 스크립트는 선택한 Windows 아키텍처의 설치형과 포터블 패키지, SHA-256

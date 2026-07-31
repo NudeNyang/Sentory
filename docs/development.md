@@ -23,7 +23,8 @@ Windows SDK가 필요하다. 저장소 루트에서 다음 스크립트를 실�
 간헐 실패를 피하도록 한 작업만 사용한다.
 
 ```powershell
-.\scripts\Build-Tauri.ps1 -Configuration Release
+.\scripts\Build-Tauri.ps1 -Configuration Release -Architecture x64
+.\scripts\Build-Tauri.ps1 -Configuration Release -Architecture arm64
 ```
 
 빌드 결과는 저장소 루트의 `Sentory.exe`와 `sentory-engine.exe`로 함께

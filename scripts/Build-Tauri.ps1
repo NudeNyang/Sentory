@@ -84,18 +84,29 @@ finally {
     Pop-Location
 }
 
-$builtExecutable = Join-Path $tauriRoot "src-tauri\target\release\sentory-tauri.exe"
-$builtEngine = Join-Path $tauriRoot "src-tauri\target\release\sentory-engine.exe"
+$targetDirectory = Join-Path `
+    $tauriRoot `
+    "src-tauri\target\$targetTriple\release"
+$builtExecutable = Join-Path $targetDirectory "sentory-tauri.exe"
+$builtEngine = Join-Path $targetDirectory "sentory-engine.exe"
 if (-not (Test-Path -LiteralPath $builtExecutable) -or
     -not (Test-Path -LiteralPath $builtEngine)) {
     throw "Tauri 루트 실행 파일을 배치할 빌드 결과를 찾지 못했습니다."
 }
 
-$rootExecutable = Join-Path $repositoryRoot "Sentory.exe"
-$rootEngine = Join-Path $repositoryRoot "sentory-engine.exe"
-Copy-Item -LiteralPath $builtExecutable -Destination $rootExecutable -Force
-Copy-Item -LiteralPath $builtEngine -Destination $rootEngine -Force
+$canDeployToRoot =
+    ($Architecture -eq "x64" -and $hostArchitecture -eq "X64") -or
+    ($Architecture -eq "arm64" -and $hostArchitecture -eq "Arm64")
+if ($canDeployToRoot) {
+    $rootExecutable = Join-Path $repositoryRoot "Sentory.exe"
+    $rootEngine = Join-Path $repositoryRoot "sentory-engine.exe"
+    Copy-Item -LiteralPath $builtExecutable -Destination $rootExecutable -Force
+    Copy-Item -LiteralPath $builtEngine -Destination $rootEngine -Force
 
-Write-Host "Tauri 실행 파일 배치 완료:"
-Write-Host "  $rootExecutable"
-Write-Host "  $rootEngine"
+    Write-Host "Tauri 실행 파일 배치 완료:"
+    Write-Host "  $rootExecutable"
+    Write-Host "  $rootEngine"
+}
+else {
+    Write-Host "$Architecture 교차 빌드는 루트 실행 파일을 교체하지 않습니다."
+}

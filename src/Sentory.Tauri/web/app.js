@@ -536,7 +536,7 @@ function applyLocalizedUi(language) {
   document.querySelector("#auto-cleanup-title").textContent = t("autoCleanup");
   document.querySelector("#auto-cleanup-description").textContent = t("autoCleanupDefault");
   document.querySelector("#app-info-heading").textContent = t("appInfo");
-  document.querySelector("#version-label").textContent = t("version", "2.0.0");
+  document.querySelector("#version-label").textContent = t("version", "2.0.1");
   document.querySelector("#update-title").textContent = t("checkForUpdates");
   document.querySelector("#update-description").textContent = t("checkForUpdatesDescription");
   document.querySelector("#copyright-label").textContent = t("copyrightNotice");

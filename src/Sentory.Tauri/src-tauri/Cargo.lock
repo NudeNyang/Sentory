@@ -3025,7 +3025,7 @@ dependencies = [
 
 [[package]]
 name = "sentory-tauri"
-version = "2.0.0"
+version = "2.0.1"
 dependencies = [
  "arboard",
  "clipboard-win",
