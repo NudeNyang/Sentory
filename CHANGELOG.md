@@ -2,6 +2,16 @@
 
 ## 개발 중
 
+- Microsoft Store 제출용 MSIX 패키징 경로를 추가했다. x64와 ARM64 Tauri
+  포터블을 각각 검증된 MSIX로 만들고 하나의 `msixbundle`로 묶으며, Store
+  identity 세 값과 선택적 인증서 서명을 명시적으로 받는다.
+- 기존 Sentory 아이콘에서 StoreLogo와 44px·150px 타일 자산을 만들고,
+  `Windows.FullTrustApplication`과 `runFullTrust`를 선언한 데스크톱 앱
+  매니페스트를 추가했다. Partner Center 값이 없을 때는 제출판과 혼동되지 않는
+  unsigned 시험용 identity와 파일 이름을 사용한다.
+- x64 unsigned 시험 패키지는 WACK 전체 검사를 통과했다. 프로세스 실행 API를
+  감지한 선택 검사의 경고성 실패는 배포 문서에 따로 기록했다.
+
 ## 2.0.1 — 2026-07-31
 
 - WPF 제거 과정에서 빠졌던 사진 OCR 백그라운드 작업자를 Tauri C# 엔진에

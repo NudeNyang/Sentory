@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+  <Identity
+    Name="__PACKAGE_IDENTITY_NAME__"
+    Publisher="__PUBLISHER__"
+    Version="__PACKAGE_VERSION__"
+    ProcessorArchitecture="__ARCHITECTURE__" />
+  <Properties>
+    <DisplayName>Sentory</DisplayName>
+    <PublisherDisplayName>__PUBLISHER_DISPLAY_NAME__</PublisherDisplayName>
+    <Description>메신저로 보낸 링크와 이미지를 로컬에 정리하는 개인용 기록 도구</Description>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+  <Dependencies>
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="10.0.17763.0"
+      MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+  <Resources>
+    <Resource Language="ko-KR" />
+    <Resource Language="en-US" />
+    <Resource Language="ja-JP" />
+    <Resource Language="zh-CN" />
+  </Resources>
+  <Applications>
+    <Application
+      Id="Sentory"
+      Executable="Sentory.exe"
+      EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Sentory"
+        Description="메신저로 보낸 링크와 이미지를 로컬에 정리하는 개인용 기록 도구"
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png" />
+    </Application>
+  </Applications>
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

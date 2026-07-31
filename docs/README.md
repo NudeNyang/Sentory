@@ -20,6 +20,7 @@
 - [평문 클라우드 동기화 검수 안내](./09-readable-cloud-storage-qa.md)
 - [WebView2 갤러리 전환 로드맵](./10-webview2-gallery-roadmap.md)
 - [Tauri UI 전환 로드맵](./11-tauri-ui-migration-roadmap.md)
+- [Microsoft Store MSIX 배포](./12-microsoft-store-msix.md)
 
 ## 릴리즈 기록
 
