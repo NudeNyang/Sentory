@@ -22,6 +22,7 @@ const SOURCE_PATCH_KEYS = {
   Line: "lineSupportEnabled",
   WeChat: "weChatSupportEnabled",
 };
+const DISCORD_AUTO_RESTART_CONSENT_KEY = "sentory.discord-auto-restart-consent.v1";
 const TRANSLATIONS = {
   "ko-KR": {
     tagline: "이야기 속, 흩어진 순간들을 한 곳에", all: "전체", link: "링크", photo: "사진", image: "사진", typeLink: "링크", collection: "묶음", favorite: "즐겨찾기",
@@ -43,6 +44,7 @@ const TRANSLATIONS = {
     deleteWarning: n => n === 1 ? "이 항목을 보관함에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다." : "선택한 항목과 저장된 사진 파일을 보관함에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다.", deleted: n => `${n.toLocaleString("ko-KR")}개 항목을 삭제했습니다.`,
     repairQuestion: "Discord를 다시 연결할까요?", repairWarning: "Discord를 접근성 모드로 다시 시작합니다. 작성 중인 메시지와 진행 중인 통화가 종료될 수 있습니다.", restart: "다시 시작",
     discordDefaultOffTitle: "Discord 감지는 기본으로 꺼져 있어요", discordDefaultOffMessage: "Discord 감지는 앱을 다시 시작해야 할 수 있어 처음에는 사용하지 않습니다. 필요하면 설정의 메신저 감지에서 직접 켤 수 있어요.", discordDefaultOffAction: "설정에서 확인",
+    discordAutoRestartConsentTitle: "Discord 자동 재시작을 허용할까요?", discordAutoRestartConsentMessage: "Discord 감지를 켜면 필요한 접근성 실행 옵션이 없을 때 15초 안내 후 Discord를 자동으로 다시 시작합니다.\n작성 중인 메시지와 진행 중인 통화가 종료될 수 있습니다.", discordAutoRestartConsentAction: "동의하고 켜기", discordAutoRestartConsentDeclined: "동의하지 않아 Discord 자동 재시작을 진행하지 않았습니다. 설정에서 직접 다시 연결할 수 있어요.",
     discordAutoRestartTitle: "Discord 감지 연결을 준비할게요", discordAutoRestartCountdown: seconds => `Discord에 필요한 접근성 인자가 없습니다.\n작성 중인 메시지와 통화를 보호하려면 취소해 주세요.\n${seconds}초 뒤 Discord를 자동으로 다시 시작합니다.`, discordAutoRestartCancelled: "Discord 자동 재시작을 취소했습니다. 설정에서 언제든 다시 연결할 수 있어요.",
     discordSendWarningTitle: "지금 보낸 항목은 저장되지 않았어요", discordSendWarningMessage: "Discord 감지가 연결되지 않은 상태에서 붙여넣기 또는 드롭이 감지됐습니다. 이후 항목을 저장하려면 Discord를 접근성 모드로 다시 시작해야 합니다.",
     repairing: "워커 복구 중", repaired: "Discord를 연결 복구 모드로 다시 시작했습니다.", settingsFailed: "Sentory를 시작하지 못했습니다",
@@ -90,6 +92,7 @@ const TRANSLATIONS = {
     deleteWarning: n => n === 1 ? "This item will be removed from the library.\nThis cannot be undone." : "The selected items and saved photo files will be removed from the library.\nThis cannot be undone.", deleted: n => `Deleted ${n} items.`, repairQuestion: "Reconnect Discord?",
     repairWarning: "Discord will restart in accessibility mode. Draft messages and active calls may be ended.", restart: "Restart", repairing: "Recovering worker",
     discordDefaultOffTitle: "Discord detection starts off", discordDefaultOffMessage: "Discord detection can require restarting the app, so it is disabled initially. You can enable it under Messenger detection in Settings.", discordDefaultOffAction: "Review settings",
+    discordAutoRestartConsentTitle: "Allow automatic Discord restarts?", discordAutoRestartConsentMessage: "When Discord detection is on and the required accessibility launch option is missing, Sentory shows a 15-second warning and then restarts Discord automatically.\nDraft messages and active calls may be ended.", discordAutoRestartConsentAction: "Agree and enable", discordAutoRestartConsentDeclined: "Automatic Discord restart was not allowed. You can reconnect Discord manually from Settings.",
     discordAutoRestartTitle: "Preparing Discord detection", discordAutoRestartCountdown: seconds => `Discord is missing the required accessibility argument.\nCancel to protect drafts and active calls.\nDiscord will restart automatically in ${seconds} seconds.`, discordAutoRestartCancelled: "Automatic Discord restart was cancelled. You can reconnect it from Settings.",
     discordSendWarningTitle: "The item you just sent was not saved", discordSendWarningMessage: "A paste or drop was detected while Discord detection was disconnected. Restart Discord in accessibility mode to save subsequent items.",
     repaired: "Discord restarted in connection recovery mode.", settingsFailed: "Could not load settings.", galleryRefreshing: "Loading library",
@@ -133,6 +136,7 @@ TRANSLATIONS["ja-JP"] = {
   close: "通知を閉じる", detail: "Sentory 項目の詳細", favoriteMarked: "★ お気に入り", captureCount: "保存回数", copyCountLabel: "コピー回数", messageSource: "最後の送信元", savedAt: "最終保存", photos: "写真", collectionLinks: "リンク", previousPhoto: "前の写真", nextPhoto: "次の写真", copyCurrentPhoto: "現在の写真をコピー", previousLink: "前のリンク", nextLink: "次のリンク", collectionItems: n => `${n.toLocaleString("ja-JP")}件`, collectionTitle: (photos, links) => `写真 ${photos.toLocaleString("ja-JP")}件・リンク ${links.toLocaleString("ja-JP")}件`, times: n => `${n.toLocaleString("ja-JP")}回`, openPhoto: "写真を開く", openLink: "リンクを開く", openPreview: "元をすぐ開く", copyPhoto: "写真をコピー", copyUrl: "URL をコピー", copyCollection: "まとめてコピー", delete: "削除", openOriginal: "元を開く", openOriginalFolder: "元のフォルダーを開く", openOriginalLink: "元のリンクを開く", cancel: "キャンセル",
   deleteQuestion: n => n === 1 ? "この項目を削除しますか？" : `選択した ${n.toLocaleString("ja-JP")}件を削除しますか？`, deleteWarning: n => n === 1 ? "この項目をライブラリから削除します。\nこの操作は元に戻せません。" : "選択した項目と保存された写真ファイルをライブラリから削除します。\nこの操作は元に戻せません。", deleted: n => `${n.toLocaleString("ja-JP")}件を削除しました。`,
   repairQuestion: "Discord を再接続しますか？", repairWarning: "Discord をアクセシビリティモードで再起動します。作成中のメッセージや通話が終了する場合があります。", restart: "再起動", repaired: "Discord を接続復旧モードで再起動しました。",
+  discordAutoRestartConsentTitle: "Discord の自動再起動を許可しますか？", discordAutoRestartConsentMessage: "Discord 検出をオンにすると、必要なアクセシビリティ起動オプションがない場合に15秒間の案内後、Discord を自動的に再起動します。\n作成中のメッセージや通話が終了する場合があります。", discordAutoRestartConsentAction: "同意してオンにする", discordAutoRestartConsentDeclined: "同意されなかったため、Discord の自動再起動は行いませんでした。設定から手動で再接続できます。",
   discordPhotoSaved: "Discord で写真の送信を確認して保存しました。", discordUrlSaved: "Discord で URL の送信を確認して保存しました。", discordUrlsSaved: n => `Discord で URL ${n.toLocaleString("ja-JP")}件の送信を確認して保存しました。`, discordCollectionSaved: "Discord の複数項目を1つのまとめとして保存しました。",
   inputPhotoSaved: "写真を入力時に保存しました。", inputUrlSaved: "URL を入力時に保存しました。", inputUrlsSaved: n => `URL ${n.toLocaleString("ja-JP")}件を入力時に保存しました。`, inputCollectionSaved: "複数の入力項目を1つのまとめとして保存しました。",
   windowsStartup: "Windows 起動時に実行", startupEnabledDescription: "現在 Windows サインイン時に自動実行されます", startupDisabledDescription: "現在、自動起動は使用していません", turnOn: "オン", turnOff: "オフ", startupEnabled: "Windows 自動起動をオンにしました。", startupDisabled: "Windows 自動起動をオフにしました。", startupChangeFailed: "自動起動設定を変更できませんでした。",
@@ -158,6 +162,7 @@ TRANSLATIONS["zh-CN"] = {
   close: "关闭通知", detail: "Sentory 项目详情", favoriteMarked: "★ 已收藏", captureCount: "保存次数", copyCountLabel: "复制次数", messageSource: "最近来源", savedAt: "最后保存", photos: "图片", collectionLinks: "链接", previousPhoto: "上一张图片", nextPhoto: "下一张图片", copyCurrentPhoto: "复制当前图片", previousLink: "上一个链接", nextLink: "下一个链接", collectionItems: n => `${n.toLocaleString("zh-CN")} 项`, collectionTitle: (photos, links) => `${photos.toLocaleString("zh-CN")} 张图片 · ${links.toLocaleString("zh-CN")} 个链接`, times: n => `${n.toLocaleString("zh-CN")} 次`, openPhoto: "打开图片", openLink: "打开链接", openPreview: "直接打开原文件", copyPhoto: "复制图片", copyUrl: "复制 URL", copyCollection: "复制组合", delete: "删除", openOriginal: "打开原文件", openOriginalFolder: "打开原文件所在文件夹", openOriginalLink: "打开原链接", cancel: "取消",
   deleteQuestion: n => n === 1 ? "要删除此项目吗？" : `要删除所选的 ${n.toLocaleString("zh-CN")} 个项目吗？`, deleteWarning: n => n === 1 ? "将从收藏库中删除此项目。\n此操作无法撤销。" : "将从收藏库中删除所选项目及保存的图片文件。\n此操作无法撤销。", deleted: n => `已删除 ${n.toLocaleString("zh-CN")} 个项目。`,
   repairQuestion: "要重新连接 Discord 吗？", repairWarning: "Discord 将以无障碍模式重启。正在编辑的消息和通话可能会结束。", restart: "重新启动", repaired: "Discord 已以连接恢复模式重新启动。",
+  discordAutoRestartConsentTitle: "允许自动重启 Discord 吗？", discordAutoRestartConsentMessage: "开启 Discord 检测后，如果缺少所需的无障碍启动选项，Sentory 会先显示 15 秒提示，然后自动重启 Discord。\n正在编辑的消息和通话可能会结束。", discordAutoRestartConsentAction: "同意并开启", discordAutoRestartConsentDeclined: "由于未获得同意，未自动重启 Discord。你可以在设置中手动重新连接。",
   discordPhotoSaved: "已保存经确认在 Discord 中发送的图片。", discordUrlSaved: "已保存经确认在 Discord 中发送的 URL。", discordUrlsSaved: n => `已保存 ${n.toLocaleString("zh-CN")} 个经确认在 Discord 中发送的 URL。`, discordCollectionSaved: "已将 Discord 中发送的多个项目保存为一个组合。",
   inputPhotoSaved: "已在粘贴图片时保存。", inputUrlSaved: "已在粘贴 URL 时保存。", inputUrlsSaved: n => `已在粘贴时保存 ${n.toLocaleString("zh-CN")} 个 URL。`, inputCollectionSaved: "已将粘贴的多个项目保存为一个组合。",
   windowsStartup: "Windows 启动时运行", startupEnabledDescription: "当前会在登录 Windows 时自动运行", startupDisabledDescription: "当前未使用自动启动", turnOn: "开启", turnOff: "关闭", startupEnabled: "已开启 Windows 自动启动。", startupDisabled: "已关闭 Windows 自动启动。", startupChangeFailed: "无法更改自动启动设置。",
@@ -216,6 +221,8 @@ const state = {
   discordAutoRestartActive: false,
   discordUnavailablePromptShown: false,
   pendingDiscordAutoRestart: null,
+  discordAutoRestartConsentGranted: readDiscordAutoRestartConsent(),
+  discordAutoRestartConsentPromise: null,
 };
 
 const scroller = document.querySelector("#scroller");
@@ -1008,6 +1015,7 @@ async function configureTray() {
 async function loadSettings() {
   try {
     applySettings(await tauriCore().invoke("settings_get"), { replaceTheme: true });
+    adoptDiscordAutoRestartConsentForExistingSetting();
     if (state.pendingDiscordAutoRestart) {
       const pending = state.pendingDiscordAutoRestart;
       state.pendingDiscordAutoRestart = null;
@@ -1084,9 +1092,17 @@ function renderSourceSettings() {
     const track = document.createElement("span");
     track.className = "switch-track";
     input.addEventListener("change", async () => {
-      state.settings.sources[source] = input.checked;
-      renderSourceSettings();
       const enabled = input.checked;
+      if (source === "Discord" && enabled) {
+        const confirmed = await ensureDiscordAutoRestartConsent();
+        if (!confirmed) {
+          input.checked = false;
+          return;
+        }
+        state.discordAutoRestartProcessId = null;
+      }
+      state.settings.sources[source] = enabled;
+      renderSourceSettings();
       const settings = await persistSettings({ [SOURCE_PATCH_KEYS[source]]: enabled });
       const displaySource = sourceLabel(source);
       showToast(settings ? t(enabled ? "sourceEnabled" : "sourceDisabled", displaySource) : t("sourceSettingFailed", displaySource));
@@ -1138,6 +1154,50 @@ async function performDiscordRepair(command, args = {}) {
   }
 }
 
+function readDiscordAutoRestartConsent() {
+  try {
+    return window.localStorage.getItem(DISCORD_AUTO_RESTART_CONSENT_KEY) === "accepted";
+  } catch {
+    return false;
+  }
+}
+
+function saveDiscordAutoRestartConsent() {
+  try {
+    window.localStorage.setItem(DISCORD_AUTO_RESTART_CONSENT_KEY, "accepted");
+  } catch {
+    // The in-memory consent still applies for this session.
+  }
+}
+
+function adoptDiscordAutoRestartConsentForExistingSetting() {
+  if (!state.settings?.sources?.Discord || state.discordAutoRestartConsentGranted) return;
+  state.discordAutoRestartConsentGranted = true;
+  saveDiscordAutoRestartConsent();
+}
+
+async function ensureDiscordAutoRestartConsent() {
+  if (state.discordAutoRestartConsentGranted) return true;
+  if (state.discordAutoRestartConsentPromise) return state.discordAutoRestartConsentPromise;
+  state.discordAutoRestartConsentPromise = (async () => {
+    const confirmed = await askConfirmation(
+      t("discordAutoRestartConsentTitle"),
+      t("discordAutoRestartConsentMessage"),
+      { okText: t("discordAutoRestartConsentAction"), danger: false },
+    );
+    if (confirmed) {
+      state.discordAutoRestartConsentGranted = true;
+      saveDiscordAutoRestartConsent();
+    }
+    return confirmed;
+  })();
+  try {
+    return await state.discordAutoRestartConsentPromise;
+  } finally {
+    state.discordAutoRestartConsentPromise = null;
+  }
+}
+
 async function scheduleDiscordAutomaticRestart(payload) {
   const processId = Number(payload?.processId);
   const countdownSeconds = Math.max(1, Number(payload?.countdownSeconds) || 15);
@@ -1151,6 +1211,10 @@ async function scheduleDiscordAutomaticRestart(payload) {
     return;
   }
   state.discordAutoRestartProcessId = processId;
+  if (!await ensureDiscordAutoRestartConsent()) {
+    showToast(t("discordAutoRestartConsentDeclined"));
+    return;
+  }
   state.discordAutoRestartActive = true;
   try {
     await tauriCore().invoke("main_window_show");

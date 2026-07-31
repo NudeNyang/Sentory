@@ -2,6 +2,9 @@
 
 ## 개발 중
 
+- Discord 감지를 처음 켤 때 15초 안내 뒤 Discord가 자동 재시작될 수 있음을
+  설명하고 한 번 동의를 받는다. 동의하지 않으면 감지를 켜지 않는다. 업데이트
+  전에 이미 Discord 감지를 켜 둔 사용자는 기존 선택을 유지하며 다시 묻지 않는다.
 - Microsoft Store 제출용 MSIX 패키징 경로를 추가했다. x64와 ARM64 Tauri
   포터블을 각각 검증된 MSIX로 만들고 하나의 `msixbundle`로 묶으며, Store
   identity 세 값과 선택적 인증서 서명을 명시적으로 받는다.
