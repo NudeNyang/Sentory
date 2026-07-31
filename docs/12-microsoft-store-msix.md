@@ -21,21 +21,21 @@ Partner Center에서 앱 이름을 예약한 뒤 `제품 관리 > 제품 ID`에 
 
 ## Store 제출용 번들 만들기
 
-2.0.1 공개 릴리즈의 포터블 ZIP을 내려받았다는 전제로 다음처럼 실행한다.
+2.0.2 공개 릴리즈의 포터블 ZIP을 내려받았다는 전제로 다음처럼 실행한다.
 
 ```powershell
 .\scripts\Publish-MsixStoreBundle.ps1 `
-  -PackageVersion 2.0.1.0 `
+  -PackageVersion 2.0.2.0 `
   -X64PayloadArchive artifacts\store-input\Sentory-win-x64-portable.zip `
   -Arm64PayloadArchive artifacts\store-input\Sentory-win-arm64-portable.zip
 ```
 
 결과는 `artifacts/store`에 생성된다.
 
-- `Sentory-2.0.1-store.msixbundle`: Partner Center 제출 파일
-- `Sentory-2.0.1-store.msixbundle.sha256`: 번들 SHA-256
-- `Sentory-2.0.1.0-store-x64.msix`: x64 개별 패키지
-- `Sentory-2.0.1.0-store-arm64.msix`: ARM64 개별 패키지
+- `Sentory-2.0.2-store.msixbundle`: Partner Center 제출 파일
+- `Sentory-2.0.2-store.msixbundle.sha256`: 번들 SHA-256
+- `Sentory-2.0.2.0-store-x64.msix`: x64 개별 패키지
+- `Sentory-2.0.2.0-store-arm64.msix`: ARM64 개별 패키지
 - `msix-package-manifest.json`: identity와 각 파일의 크기·해시
 
 Store 제출용 MSIX는 로컬 인증서로 서명하지 않아도 된다. Microsoft Store가 인증
@@ -50,7 +50,7 @@ Partner Center identity가 아직 없을 때는 다음 옵션으로 구조와 �
 
 ```powershell
 .\scripts\Publish-MsixStoreBundle.ps1 `
-  -PackageVersion 2.0.1.0 `
+  -PackageVersion 2.0.2.0 `
   -X64PayloadArchive artifacts\store-input\Sentory-win-x64-portable.zip `
   -Arm64PayloadArchive artifacts\store-input\Sentory-win-arm64-portable.zip `
   -PackageIdentityName NudeNyang.Sentory.Test `

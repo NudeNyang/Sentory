@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')]
-    [string]$PackageVersion = "2.0.1.0",
+    [string]$PackageVersion = "2.0.2.0",
     [Parameter(Mandatory)]
     [string]$X64PayloadArchive,
     [Parameter(Mandatory)]

@@ -70,13 +70,13 @@ same storage.
 
 ## Download
 
-The current stable version is **2.0.1**. It runs on x64 and ARM64 Windows 10 and 11.
+The current stable version is **2.0.2**. It runs on x64 and ARM64 Windows 10 and 11.
 Download the installer or portable package from
 [Releases](https://github.com/NudeNyang/Sentory/releases). There is no release schedule
 yet for macOS or Linux.
 
-See the [Sentory 2.0.1 release notes](./releases/2.0.1.md) for the Discord startup and
-image OCR fixes included in this release.
+See the [Sentory 2.0.2 release notes](./releases/2.0.2.md) for the first-run messenger
+selection and Discord restart consent changes.
 
 | System | Installer | Portable |
 | --- | --- | --- |
@@ -107,12 +107,15 @@ Use `Check now` in settings to compare your version with the latest stable GitHu
 Release. When an update is available, Sentory opens the official Release page. You can
 verify downloaded packages with the accompanying SHA-256 files.
 
-Discord detection is off by default on a new installation, and Sentory explains this
-once at first launch. After you enable it, a new Discord process that is confirmed to
-be missing the accessibility launch argument receives a 15-second restart prompt.
-Ordinary connection or worker recovery states never restart Discord automatically.
-The first paste or drop detected while disconnected shows an immediate warning and a
-manual restart action.
+All messenger detection switches start off on a new installation. Choose the messengers
+you use on the first screen; existing installations keep their saved choices.
+
+The first time you enable Discord detection, Sentory asks for consent before allowing
+automatic restarts and warns that a draft message may be cancelled or a call may end.
+The choice is remembered only after Discord detection is actually enabled. People who
+already used Discord detection are not asked again. A Discord process missing the
+required accessibility argument receives a 15-second restart notice. Ordinary
+connection and worker recovery states do not restart Discord.
 
 ## Good to know
 
@@ -137,8 +140,8 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.1 -Architecture x64
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.1 -Architecture arm64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.2 -Architecture x64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.2 -Architecture arm64
 ```
 
 The release script creates the installer and portable package for the selected Windows

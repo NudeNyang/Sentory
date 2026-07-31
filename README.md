@@ -70,14 +70,14 @@ Sentory가 운영하는 서버로 보관 데이터를 보내지 않으며 분석
 
 ## 다운로드
 
-현재 정식 버전은 **2.0.1**입니다. Windows 10/11 x64와 ARM64에서 사용할 수
+현재 정식 버전은 **2.0.2**입니다. Windows 10/11 x64와 ARM64에서 사용할 수
 있습니다.
 [Releases](https://github.com/NudeNyang/Sentory/releases)에서 설치형이나 포터블
 파일을 내려받으면 됩니다. macOS와 Linux판의 배포 일정은 아직 정해지지
 않았습니다.
 
-Discord 시작 방식과 사진 OCR을 손본 내용은
-[2.0.1 릴리즈 노트](./docs/releases/2.0.1.md)에 정리되어 있습니다.
+첫 실행 메신저 선택과 Discord 자동 재시작 동의에 관한 내용은
+[2.0.2 릴리즈 노트](./docs/releases/2.0.2.md)에 정리되어 있습니다.
 
 | 사용 환경 | 설치형 | 포터블 |
 | --- | --- | --- |
@@ -114,17 +114,16 @@ SmartScreen 경고가 나타날 수 있습니다. 이 저장소의 공식 Releas
 사용할 메신저만 고를 수 있으며 `모두 켜기`도 제공합니다. 기존 사용자의 저장된
 선택은 그대로 유지하고 선택창을 다시 띄우지 않습니다.
 
-초기 선택창이나 설정에서 Discord 감지를 처음 켤 때는 자동 재시작 동작과 작성
-중인 메시지·통화에 미칠 수 있는 영향을 안내하고 한 번 동의를 받습니다. 동의한
-뒤 새 Discord 프로세스에 접근성 실행 옵션이 없으면 15초 재시작 안내를 표시하며,
-취소하거나 바로 재시작할 수 있습니다. 업데이트 전에 이미 Discord 감지를 켜 둔
-사용자에게는 다시 묻지 않습니다. 일반적인 연결 준비나 워커 복구 문제만으로는
-Discord를 자동 재시작하지 않습니다. 연결이 끊긴 상태에서 붙여넣기나 드롭이 처음
-감지되면 해당 항목이 저장되지 않았다는 경고와 수동 재시작 버튼을 표시합니다.
-첫 실행 선택창이 표시된 경우에는 Discord 토글이나 `모두 켜기`를 처음 누르는
-순간 동의 안내를 확실히 표시하며, 같은 선택 과정에서는 반복해서 묻지 않습니다.
-Discord를 켠 설정이 실제로 저장된 뒤부터는 다시 묻지 않습니다. 첫 화면에서
-동의하지 않고 Discord를 끈 채 완료했다면 나중에 설정에서 켤 때 다시 안내합니다.
+초기 선택창이나 설정에서 Discord 감지를 처음 켜면 자동 재시작 동작을 설명하고
+한 번 동의를 받습니다. 이때 작성 중인 메시지가 취소되거나 통화가 종료될 수
+있다는 점도 함께 알립니다. 동의 기록은 Discord 감지가 실제로 켜진 뒤에만 남기며,
+첫 화면에서 거절했다면 나중에 설정에서 켤 때 다시 안내합니다. 이미 Discord
+감지를 쓰던 사용자에게는 묻지 않습니다.
+
+접근성 실행 옵션 없이 시작된 Discord는 15초 안내 뒤 자동으로 다시 시작합니다.
+바로 재시작하거나 취소할 수도 있습니다. 일반적인 연결 준비나 워커 복구 때문에
+Discord를 종료하지는 않습니다. 연결이 끊긴 상태에서 붙여넣기나 드롭을 놓치면
+저장되지 않았다는 경고와 수동 재시작 버튼을 표시합니다.
 
 ## 알아둘 점
 
@@ -149,8 +148,8 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.1 -Architecture x64
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.1 -Architecture arm64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.2 -Architecture x64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.2 -Architecture arm64
 ```
 
 배포 스크립트는 선택한 Windows 아키텍처의 설치형과 포터블 패키지, SHA-256
