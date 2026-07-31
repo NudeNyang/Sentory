@@ -50,12 +50,9 @@ test("onboarding and the disabled detection notice are wired into the UI", () =>
   assert.match(script, /needsMessengerSetup\(state\.settings\)/);
 });
 
-test("Korean setup guidance uses the formal product voice", () => {
-  assert.match(
-    markup,
-    /사용하는 메신저만 켜면 됩니다\. 나중에 설정에서 변경할 수 있습니다\./,
-  );
-  assert.match(script, /이 컴퓨터에서 감지할 수 있습니다/);
-  assert.doesNotMatch(markup, /바꿀 수 있어요/);
-  assert.doesNotMatch(script, /바꿀 수 있어요/);
+test("setup copy keeps only the later settings guidance", () => {
+  assert.match(markup, /나중에 설정에서 변경할 수 있습니다\./);
+  assert.doesNotMatch(markup, /사용하는 메신저만 켜면 됩니다/);
+  assert.doesNotMatch(script, /이 컴퓨터에서 감지할 수 있습니다/);
+  assert.doesNotMatch(script, /messengerAvailable/);
 });

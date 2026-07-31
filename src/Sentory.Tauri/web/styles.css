@@ -849,7 +849,6 @@ body.selection-mode .favorite { display: none; }
 .source-setting.available { background: color-mix(in srgb, var(--surface) 90%, var(--accent) 10%); }
 .source-control { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
 .source-status { color: var(--muted); font-size: 11px; line-height: 1.4; }
-.source-available { color: var(--accent) !important; font-weight: 600; }
 .repair-button {
   height: 32px;
   padding: 0 10px;
