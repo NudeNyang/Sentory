@@ -147,22 +147,11 @@ GitHub가 자동으로 제공하는 “Source code” 파일만 이용해도 소
 10. `v2.0.0` 태그가 배포 파일을 만든 커밋을 가리키는지 확인합니다.
 11. Release 자산의 SHA-256 값과 `release-manifest.json`을 대조합니다.
 
-아래 두 검사는 WPF 1.5.1 유지보수에만 사용한다. Tauri 정식판은
-`Publish-TauriRelease.ps1`이 포터블 자체 점검을 실행하며 설치형은 별도 환경에서
-설치·실행·제거를 확인한다.
+Tauri 정식판은 `Publish-TauriRelease.ps1`이 포터블 자체 점검을 실행하며
+설치형은 별도 환경에서 다음 왕복 검사를 실행한다.
 
 ```powershell
 .\scripts\Test-InstallerRoundTrip.ps1
-```
-
-기존 설치본과 충돌하지 않는 별도 AppId와 데이터 폴더로 실행 중 업데이트를
-확인하려면 아래 명령을 실행합니다. 이 검사는 기존 앱이 종료될 때까지 설치가
-기다리는지, 업데이트 진행창이 나타나는지, 설치 뒤 자체 점검이 실행되는지 함께
-확인합니다. 실행하기 전에는 개발자 검수판을 포함한 모든 Sentory 프로세스를
-종료해야 합니다.
-
-```powershell
-.\scripts\Test-UpdateInstaller.ps1
 ```
 
 ## 문서와 라이선스 파일

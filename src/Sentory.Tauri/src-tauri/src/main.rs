@@ -881,6 +881,26 @@ fn copy_collection_to_clipboard(_payload: &CollectionClipboardPayload) -> Result
 }
 
 #[tauri::command]
+async fn discord_auto_repair(
+    app: AppHandle,
+    engine: State<'_, EngineClient>,
+    expected_process_id: i64,
+) -> Result<serde_json::Value, String> {
+    engine
+        .request(
+            &app,
+            "discord-auto-repair",
+            serde_json::json!({ "expectedProcessId": expected_process_id }),
+        )
+        .await
+}
+
+#[tauri::command]
+fn main_window_show(app: AppHandle) {
+    show_main_window(&app);
+}
+
+#[tauri::command]
 async fn sync_folder_candidates(
     app: AppHandle,
     engine: State<'_, EngineClient>,
@@ -945,6 +965,7 @@ fn runtime_event_name(event_type: &str) -> &'static str {
     match event_type {
         "captured" => "capture-event",
         "runtime-issue" => "runtime-issue",
+        "discord-auto-restart-required" => "discord-auto-restart-required",
         "settings-changed" => "settings-changed",
         "automatic-cleanup" => "automatic-cleanup",
         "gallery-changed" => "gallery-changed",
@@ -962,6 +983,10 @@ mod tests {
     fn link_preview_change_is_forwarded_to_gallery() {
         assert_eq!(runtime_event_name("gallery-changed"), "gallery-changed");
         assert_eq!(runtime_event_name("captured"), "capture-event");
+        assert_eq!(
+            runtime_event_name("discord-auto-restart-required"),
+            "discord-auto-restart-required"
+        );
     }
 
     #[test]
@@ -1262,7 +1287,7 @@ fn create_tray(app: &tauri::App) -> tauri::Result<()> {
             exit_label: "Sentory 종료".to_string(),
             paused: false,
             startup_enabled,
-            discord_enabled: true,
+            discord_enabled: false,
             show_discord_status: false,
             show_discord_repair: false,
             dark: false,
@@ -1426,7 +1451,7 @@ async fn tray_action(
                 .get("sources")
                 .and_then(|sources| sources.get("Discord"))
                 .and_then(serde_json::Value::as_bool)
-                .unwrap_or(true);
+                .unwrap_or(false);
             let updated = engine
                 .request(
                     &app,
@@ -1638,6 +1663,8 @@ fn main() {
             sync_configure_webdav,
             sync_toggle,
             discord_repair,
+            discord_auto_repair,
+            main_window_show,
             runtime_pause_toggle,
             data_statistics,
             data_cleanup_preview,

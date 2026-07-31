@@ -42,6 +42,9 @@ const TRANSLATIONS = {
     times: n => `${n.toLocaleString("ko-KR")}회`, openPhoto: "사진 열기", openLink: "링크 열기", openPreview: "원본 바로 열기", copyPhoto: "사진 복사", copyUrl: "URL 복사", copyCollection: "묶음 복사", delete: "삭제", openOriginal: "원본 열기", openOriginalFolder: "원본 폴더 열기", openOriginalLink: "원본 링크 열기", cancel: "취소", deleteQuestion: n => n === 1 ? "항목을 삭제할까요?" : `선택한 ${n.toLocaleString("ko-KR")}개 항목을 삭제할까요?`,
     deleteWarning: n => n === 1 ? "이 항목을 보관함에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다." : "선택한 항목과 저장된 사진 파일을 보관함에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다.", deleted: n => `${n.toLocaleString("ko-KR")}개 항목을 삭제했습니다.`,
     repairQuestion: "Discord를 다시 연결할까요?", repairWarning: "Discord를 접근성 모드로 다시 시작합니다. 작성 중인 메시지와 진행 중인 통화가 종료될 수 있습니다.", restart: "다시 시작",
+    discordDefaultOffTitle: "Discord 감지는 기본으로 꺼져 있어요", discordDefaultOffMessage: "Discord 감지는 앱을 다시 시작해야 할 수 있어 처음에는 사용하지 않습니다. 필요하면 설정의 메신저 감지에서 직접 켤 수 있어요.", discordDefaultOffAction: "설정에서 확인",
+    discordAutoRestartTitle: "Discord 감지 연결을 준비할게요", discordAutoRestartCountdown: seconds => `Discord에 필요한 접근성 인자가 없습니다.\n작성 중인 메시지와 통화를 보호하려면 취소해 주세요.\n${seconds}초 뒤 Discord를 자동으로 다시 시작합니다.`, discordAutoRestartCancelled: "Discord 자동 재시작을 취소했습니다. 설정에서 언제든 다시 연결할 수 있어요.",
+    discordSendWarningTitle: "지금 보낸 항목은 저장되지 않았어요", discordSendWarningMessage: "Discord 감지가 연결되지 않은 상태에서 붙여넣기 또는 드롭이 감지됐습니다. 이후 항목을 저장하려면 Discord를 접근성 모드로 다시 시작해야 합니다.",
     repairing: "워커 복구 중", repaired: "Discord를 연결 복구 모드로 다시 시작했습니다.", settingsFailed: "Sentory를 시작하지 못했습니다",
     discordPhotoSaved: "Discord에서 사진 전송을 확인해 저장했습니다.", discordUrlSaved: "Discord에서 URL 전송을 확인해 저장했습니다.", discordUrlsSaved: n => `Discord에서 URL ${n.toLocaleString("ko-KR")}개 전송을 확인해 저장했습니다.`, discordCollectionSaved: "Discord에서 여러 항목의 전송을 확인해 하나의 묶음으로 저장했습니다.",
     inputPhotoSaved: "사진을 입력 시 저장했습니다.", inputUrlSaved: "URL을 입력 시 저장했습니다.", inputUrlsSaved: n => `URL ${n.toLocaleString("ko-KR")}개를 입력 시 저장했습니다.`, inputCollectionSaved: "여러 항목을 입력 시 하나의 묶음으로 저장했습니다.",
@@ -86,6 +89,9 @@ const TRANSLATIONS = {
     delete: "Delete", openPreview: "Open original", openOriginal: "Open original", openOriginalFolder: "Open containing folder", openOriginalLink: "Open original link", cancel: "Cancel", deleteQuestion: n => n === 1 ? "Delete this item?" : `Delete ${n} selected items?`,
     deleteWarning: n => n === 1 ? "This item will be removed from the library.\nThis cannot be undone." : "The selected items and saved photo files will be removed from the library.\nThis cannot be undone.", deleted: n => `Deleted ${n} items.`, repairQuestion: "Reconnect Discord?",
     repairWarning: "Discord will restart in accessibility mode. Draft messages and active calls may be ended.", restart: "Restart", repairing: "Recovering worker",
+    discordDefaultOffTitle: "Discord detection starts off", discordDefaultOffMessage: "Discord detection can require restarting the app, so it is disabled initially. You can enable it under Messenger detection in Settings.", discordDefaultOffAction: "Review settings",
+    discordAutoRestartTitle: "Preparing Discord detection", discordAutoRestartCountdown: seconds => `Discord is missing the required accessibility argument.\nCancel to protect drafts and active calls.\nDiscord will restart automatically in ${seconds} seconds.`, discordAutoRestartCancelled: "Automatic Discord restart was cancelled. You can reconnect it from Settings.",
+    discordSendWarningTitle: "The item you just sent was not saved", discordSendWarningMessage: "A paste or drop was detected while Discord detection was disconnected. Restart Discord in accessibility mode to save subsequent items.",
     repaired: "Discord restarted in connection recovery mode.", settingsFailed: "Could not load settings.", galleryRefreshing: "Loading library",
     discordPhotoSaved: "Saved a photo confirmed as sent in Discord.", discordUrlSaved: "Saved a URL confirmed as sent in Discord.", discordUrlsSaved: n => `Saved ${n.toLocaleString("en-US")} URLs confirmed as sent in Discord.`, discordCollectionSaved: "Saved multiple Discord items as one collection.",
     inputPhotoSaved: "Saved the photo when pasted.", inputUrlSaved: "Saved the URL when pasted.", inputUrlsSaved: n => `Saved ${n.toLocaleString("en-US")} URLs when pasted.`, inputCollectionSaved: "Saved multiple pasted items as one collection.",
@@ -206,6 +212,10 @@ const state = {
   pendingSyncFolderPath: null,
   contextItemId: null,
   windowThemeDark: null,
+  discordAutoRestartProcessId: null,
+  discordAutoRestartActive: false,
+  discordUnavailablePromptShown: false,
+  pendingDiscordAutoRestart: null,
 };
 
 const scroller = document.querySelector("#scroller");
@@ -998,6 +1008,11 @@ async function configureTray() {
 async function loadSettings() {
   try {
     applySettings(await tauriCore().invoke("settings_get"), { replaceTheme: true });
+    if (state.pendingDiscordAutoRestart) {
+      const pending = state.pendingDiscordAutoRestart;
+      state.pendingDiscordAutoRestart = null;
+      void scheduleDiscordAutomaticRestart(pending);
+    }
   } catch (error) {
     showToast(t("settingsFailed"));
     applyLocalizedUi("auto");
@@ -1086,6 +1101,10 @@ function renderSourceSettings() {
 
 function applyRuntimeStatus(runtime) {
   if (runtime) state.runtimeStatus = runtime;
+  if (!state.settings?.sources?.Discord ||
+      state.runtimeStatus?.discordState === "Ready") {
+    state.discordUnavailablePromptShown = false;
+  }
   let headerStatusVisible = false;
   if (state.settings?.sources?.Discord && state.runtimeStatus?.discordRunning) {
     const label = sourceRuntimeLabel("Discord");
@@ -1102,15 +1121,90 @@ function applyRuntimeStatus(runtime) {
 async function repairDiscord() {
   const confirmed = await askConfirmation(t("repairQuestion"), t("repairWarning"), { okText: t("restart"), danger: false });
   if (!confirmed) return;
+  await performDiscordRepair("discord_repair");
+}
+
+async function performDiscordRepair(command, args = {}) {
   detectionStatus.hidden = false;
   detectionStatusText.textContent = t("recovering");
   showToast(t("repairing"));
   try {
-    applyRuntimeStatus(await tauriCore().invoke("discord_repair"));
+    applyRuntimeStatus(await tauriCore().invoke(command, args));
     showToast(t("repaired"));
+    return true;
   } catch {
     showToast(t("discordRepairFailed"));
+    return false;
   }
+}
+
+async function scheduleDiscordAutomaticRestart(payload) {
+  const processId = Number(payload?.processId);
+  const countdownSeconds = Math.max(1, Number(payload?.countdownSeconds) || 15);
+  if (!state.settings) {
+    state.pendingDiscordAutoRestart = payload;
+    return;
+  }
+  if (!Number.isInteger(processId) ||
+      !state.settings?.sources?.Discord ||
+      state.discordAutoRestartProcessId === processId) {
+    return;
+  }
+  state.discordAutoRestartProcessId = processId;
+  state.discordAutoRestartActive = true;
+  try {
+    await tauriCore().invoke("main_window_show");
+  } catch {
+    // The countdown still works if Windows refuses to focus the main window.
+  }
+  const confirmed = await askConfirmation(
+    t("discordAutoRestartTitle"),
+    t("discordAutoRestartCountdown", countdownSeconds),
+    {
+      okText: t("restart"),
+      danger: false,
+      autoAcceptSeconds: countdownSeconds,
+      autoMessage: seconds => t("discordAutoRestartCountdown", seconds),
+    },
+  );
+  state.discordAutoRestartActive = false;
+  if (!confirmed) {
+    showToast(t("discordAutoRestartCancelled"));
+    return;
+  }
+  if (!state.settings?.sources?.Discord) return;
+  await performDiscordRepair("discord_auto_repair", { expectedProcessId: processId });
+}
+
+async function showDiscordUnavailablePrompt() {
+  if (state.discordUnavailablePromptShown || state.discordAutoRestartActive) return;
+  state.discordUnavailablePromptShown = true;
+  try {
+    await tauriCore().invoke("main_window_show");
+  } catch {
+    // Keep the warning available even when focus cannot be forced.
+  }
+  const confirmed = await askConfirmation(
+    t("discordSendWarningTitle"),
+    t("discordSendWarningMessage"),
+    { okText: t("restart"), danger: false },
+  );
+  if (confirmed) await performDiscordRepair("discord_repair");
+}
+
+async function showDiscordDefaultOffNotice() {
+  const storageKey = "sentory.discord-default-off-notice.v1";
+  if (state.settings?.sources?.Discord ||
+      window.localStorage.getItem(storageKey) === "shown") {
+    return;
+  }
+  window.localStorage.setItem(storageKey, "shown");
+  const openSettings = await askConfirmation(
+    t("discordDefaultOffTitle"),
+    t("discordDefaultOffMessage"),
+    { okText: t("discordDefaultOffAction"), danger: false },
+  );
+  if (openSettings) settingsButton.click();
 }
 
 function buildRequest(offset) {
@@ -1163,11 +1257,16 @@ async function connectEngineEvents() {
     }
   });
   await listen("runtime-status", event => applyRuntimeStatus(event.payload));
+  await listen("discord-auto-restart-required", event => {
+    void scheduleDiscordAutomaticRestart(event.payload);
+  });
   await listen("capture-event", event => {
     showToast(localizedCaptureMessage(event.payload));
   });
   await listen("runtime-issue", event => {
-    if (event.payload?.message) {
+    if (event.payload?.requiresDiscordRestart) {
+      void showDiscordUnavailablePrompt();
+    } else if (event.payload?.message) {
       showToast(event.payload.message.includes("Discord") ? t("discordRecoveryIssue") : t("captureIssue"));
     }
   });
@@ -1944,7 +2043,16 @@ async function deleteItems(itemIds) {
   }
 }
 
-function askConfirmation(title, message, { okText = t("delete"), danger = true } = {}) {
+function askConfirmation(
+  title,
+  message,
+  {
+    okText = t("delete"),
+    danger = true,
+    autoAcceptSeconds = 0,
+    autoMessage = null,
+  } = {},
+) {
   confirmTitle.textContent = title;
   confirmMessage.textContent = message;
   confirmOk.textContent = okText;
@@ -1952,7 +2060,9 @@ function askConfirmation(title, message, { okText = t("delete"), danger = true }
   confirmOk.classList.toggle("primary-action", !danger);
   confirmLayer.hidden = false;
   return new Promise(resolve => {
+    let countdownTimer = 0;
     const finish = value => {
+      window.clearInterval(countdownTimer);
       confirmLayer.hidden = true;
       confirmCancel.removeEventListener("click", cancel);
       confirmOk.removeEventListener("click", accept);
@@ -1962,6 +2072,17 @@ function askConfirmation(title, message, { okText = t("delete"), danger = true }
     const accept = () => finish(true);
     confirmCancel.addEventListener("click", cancel);
     confirmOk.addEventListener("click", accept);
+    if (autoAcceptSeconds > 0) {
+      let remaining = autoAcceptSeconds;
+      countdownTimer = window.setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          finish(true);
+          return;
+        }
+        if (autoMessage) confirmMessage.textContent = autoMessage(remaining);
+      }, 1000);
+    }
     confirmCancel.focus();
   });
 }
@@ -2733,4 +2854,5 @@ void (async () => {
 void (async () => {
   await loadSettings();
   await loadStartupState();
+  await showDiscordDefaultOffNotice();
 })();

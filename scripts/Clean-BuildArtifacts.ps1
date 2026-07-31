@@ -9,21 +9,7 @@ $repositoryPrefix = $repositoryRoot.TrimEnd(
     [System.IO.Path]::AltDirectorySeparatorChar) +
     [System.IO.Path]::DirectorySeparatorChar
 $artifactsRoot = Join-Path $repositoryRoot "artifacts"
-$preservedPortableDirectories = @(
-    (Join-Path $artifactsRoot "Sentory-win-x64-portable"),
-    (Join-Path $artifactsRoot "Sentory-win-arm64-portable")
-)
-$preservedArtifactNames = @(
-    "Sentory-win-x64-portable.zip",
-    "Sentory-win-x64-portable.zip.sha256",
-    "Sentory-win-arm64-portable.zip",
-    "Sentory-win-arm64-portable.zip.sha256",
-    "Sentory-win-x64-setup.exe",
-    "Sentory-win-x64-setup.exe.sha256",
-    "Sentory-win-arm64-setup.exe",
-    "Sentory-win-arm64-setup.exe.sha256",
-    "release-manifest.json"
-)
+$preservedBackupDirectory = Join-Path $artifactsRoot "developer-wpf-1.5.1"
 
 function Assert-RepositoryChildPath {
     param([Parameter(Mandatory)][string]$Path)
@@ -81,6 +67,16 @@ if (Test-Path -LiteralPath $temporaryDirectory) {
     $targets.Add((Assert-RepositoryChildPath $temporaryDirectory))
 }
 
+$tauriGeneratedTargets = @(
+    (Join-Path $repositoryRoot "src\Sentory.Tauri\src-tauri\target"),
+    (Join-Path $repositoryRoot "src\Sentory.Tauri\src-tauri\binaries")
+)
+foreach ($tauriTarget in $tauriGeneratedTargets) {
+    if (Test-Path -LiteralPath $tauriTarget) {
+        $targets.Add((Assert-RepositoryChildPath $tauriTarget))
+    }
+}
+
 if (Test-Path -LiteralPath $artifactsRoot) {
     foreach ($artifactDirectory in Get-ChildItem `
             -LiteralPath $artifactsRoot `
@@ -88,11 +84,9 @@ if (Test-Path -LiteralPath $artifactsRoot) {
             -Force) {
         $directoryPath = [System.IO.Path]::GetFullPath(
             $artifactDirectory.FullName)
-        $isPreservedDirectory = $preservedPortableDirectories.Where({
-            $directoryPath.Equals(
-                [System.IO.Path]::GetFullPath($_),
-                [System.StringComparison]::OrdinalIgnoreCase)
-        }).Count -gt 0
+        $isPreservedDirectory = $directoryPath.Equals(
+            [System.IO.Path]::GetFullPath($preservedBackupDirectory),
+            [System.StringComparison]::OrdinalIgnoreCase)
         if (-not $isPreservedDirectory) {
             $targets.Add((Assert-RepositoryChildPath `
                 $artifactDirectory.FullName))
@@ -105,10 +99,7 @@ if (Test-Path -LiteralPath $artifactsRoot) {
             -Force) {
         $fullFilePath = [System.IO.Path]::GetFullPath(
             $artifactFile.FullName)
-        $isPreserved = $preservedArtifactNames -contains $artifactFile.Name
-        if (-not $isPreserved) {
-            $targets.Add((Assert-RepositoryChildPath $fullFilePath))
-        }
+        $targets.Add((Assert-RepositoryChildPath $fullFilePath))
     }
 }
 
@@ -126,4 +117,5 @@ Write-Host "Sentory build cleanup completed." -ForegroundColor Green
 Write-Host "Removed paths: $($verifiedTargets.Count)"
 Write-Host ("Reclaimed space: {0:N1} MB" -f ($reclaimedBytes / 1MB))
 Write-Host "Preserved executable: $(Join-Path $repositoryRoot 'Sentory.exe')"
-Write-Host "Preserved latest x64 and ARM64 release packages."
+Write-Host "Preserved engine: $(Join-Path $repositoryRoot 'sentory-engine.exe')"
+Write-Host "Preserved latest backup: $preservedBackupDirectory"

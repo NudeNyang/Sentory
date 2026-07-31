@@ -17,7 +17,7 @@ $webHtmlPath = Join-Path $tauriRoot "web\index.html"
 $targetDirectory = Join-Path $tauriRoot "src-tauri\target\release"
 $installerScript = Join-Path $repositoryRoot "installer\Sentory.iss"
 $licensePath = Join-Path $repositoryRoot "LICENSE.txt"
-$iconPath = Join-Path $repositoryRoot "src\Sentory.App\Assets\Sentory.ico"
+$iconPath = Join-Path $repositoryRoot "src\Sentory.Tauri\src-tauri\icons\Sentory.ico"
 
 if (-not [System.IO.Path]::IsPathRooted($OutputRoot)) {
     $OutputRoot = Join-Path $repositoryRoot $OutputRoot

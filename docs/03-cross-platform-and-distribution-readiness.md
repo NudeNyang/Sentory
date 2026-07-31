@@ -2,9 +2,9 @@
 
 ## 현재 결론
 
-Sentory의 현재 실행 앱은 WPF와 Win32 API를 사용하는 Windows 전용
-프로그램이다. 이번 구조 정리로 데이터 모델, 저장소, 설정 파일과 핵심
-캡처 흐름은 운영체제와 분리됐다.
+Sentory의 현재 실행 앱은 Tauri 2 UI와 Windows C# 엔진을 결합한 Windows 전용
+프로그램이다. 데이터 모델, 저장소, 설정 파일과 핵심 캡처 흐름은 운영체제와
+분리돼 있다.
 
 2026-07-29에 UI 기반을 Tauri 2로 단계적으로 전환하고 C# 엔진은 유지하기로
 결정했다. 이전 Avalonia 계획은 폐기한다. Tauri의 웹 UI는 운영체제별 WebView를
@@ -20,8 +20,7 @@ macOS와 Linux에서 바로 실행되는 앱이 완성된 것은 아니다.
 |---|---|---|
 | `Sentory.Core` | 모든 OS | 모델, URL 처리, 캡처 조정, 런타임 계약 |
 | `Sentory.Infrastructure` | 모든 OS | SQLite, 사진 파일, 사용자 설정 |
-| `Sentory.Platform.Windows` | Windows | Win32 훅, 카카오톡 창 검증, WPF 클립보드 |
-| `Sentory.App` | Windows | WPF 1.5.1 기준선과 이전 배포판 |
+| `Sentory.Platform.Windows` | Windows | Win32 훅, 카카오톡 창 검증, Windows 클립보드 |
 | `Sentory.Engine.Bridge` | 현재 Windows | Tauri와 기존 C# 데이터 계층의 로컬 계약 |
 | `Sentory.Tauri` | Windows 기본 앱 | 웹 UI, 창 수명주기, C# 엔진 사이드카 연결 |
 | `Sentory.Diagnostics` | Windows | Windows UI 구조 조사 도구 |

@@ -4,7 +4,7 @@ param()
 $ErrorActionPreference = "Stop"
 $repositoryRoot = [System.IO.Path]::GetFullPath(
     (Split-Path -Parent $PSScriptRoot))
-$logoPath = Join-Path $repositoryRoot "src\Sentory.App\Assets\Sentory.png"
+$logoPath = Join-Path $repositoryRoot "src\Sentory.Tauri\src-tauri\icons\Sentory.png"
 $assetsDirectory = Join-Path $repositoryRoot "installer\Assets"
 $wizardImagePath = Join-Path $assetsDirectory "SentoryWizard.bmp"
 $smallImagePath = Join-Path $assetsDirectory "SentoryWizardSmall.bmp"

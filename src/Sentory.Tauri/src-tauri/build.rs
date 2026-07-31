@@ -1,6 +1,6 @@
 fn main() {
     let windows = tauri_build::WindowsAttributes::new()
-        .window_icon_path("../../Sentory.App/Assets/Sentory.ico");
+        .window_icon_path("icons/Sentory.ico");
     let attributes = tauri_build::Attributes::new()
         .windows_attributes(windows);
 

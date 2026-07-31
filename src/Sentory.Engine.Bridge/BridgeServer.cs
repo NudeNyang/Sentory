@@ -124,6 +124,10 @@ public sealed class BridgeServer(
             "runtime-poll" => RequireRuntime().Poll(),
             "runtime-pause-toggle" => await RequireRuntime().TogglePauseAsync(),
             "discord-repair" => await RequireRuntime().RepairDiscordAsync(),
+            "discord-auto-repair" => await RequireRuntime().RepairDiscordAsync(
+                request.Payload.Deserialize<DiscordAutoRepairRequest>(JsonOptions)
+                    ?.ExpectedProcessId ?? throw new ArgumentException(
+                        "Discord 프로세스 ID를 읽지 못했습니다.")),
             "data-statistics" => await RequireRuntime().GetDataStatisticsAsync(
                 cancellationToken),
             "data-cleanup-preview" => await RequireRuntime().PreviewCleanupAsync(
@@ -218,3 +222,5 @@ public sealed record SyncWebDavRequest(
     string? Password);
 
 public sealed record SyncToggleRequest(bool Enabled);
+
+public sealed record DiscordAutoRepairRequest(int ExpectedProcessId);

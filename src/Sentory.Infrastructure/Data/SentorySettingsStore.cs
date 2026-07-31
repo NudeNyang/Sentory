@@ -42,7 +42,7 @@ public sealed class SentorySettings
 
     public int LanguageSettingVersion { get; set; }
 
-    public bool DiscordSupportEnabled { get; set; } = true;
+    public bool DiscordSupportEnabled { get; set; }
 
     public bool KakaoTalkSupportEnabled { get; set; } = true;
 

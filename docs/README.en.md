@@ -105,18 +105,19 @@ Use `Check now` in settings to compare your version with the latest stable GitHu
 Release. When an update is available, Sentory opens the official Release page. You can
 verify downloaded packages with the accompanying SHA-256 files.
 
-Sentory prepares detection against the currently running Discord process. If a new
-Discord process is missing the accessibility launch argument, the 15-second restart
-prompt appears as soon as its main window is found. A process that already has the
-argument, or is still loading a chat, continues without an unnecessary restart.
+Discord detection is off by default on a new installation, and Sentory explains this
+once at first launch. After you enable it, a new Discord process that is confirmed to
+be missing the accessibility launch argument receives a 15-second restart prompt.
+Ordinary connection or worker recovery states never restart Discord automatically.
+The first paste or drop detected while disconnected shows an immediate warning and a
+manual restart action.
 
 ## Good to know
 
 Detection may temporarily stop if a supported messenger changes its interface. Uploads
 opened through a messenger's `+` file picker are not guaranteed to be detected; paste
 an image into the chat input or drop it from Explorer instead. Sentory 2.0.0 is released
-for x64 Windows only. The WPF 1.5.1 ARM64 build remains available but does not upgrade
-automatically to 2.0.0.
+for x64 Windows only. A Windows on ARM package will follow separate device validation.
 
 When reporting a problem, do not attach private conversations or original images.
 The Sentory version, Windows version, messenger name, and reproduction steps are

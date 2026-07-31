@@ -862,7 +862,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         Assert.Equal("Oldest", settings.SortMode);
         Assert.False(settings.IsDarkTheme);
         Assert.Equal("Light", settings.ThemeMode);
-        Assert.True(settings.DiscordSupportEnabled);
+        Assert.False(settings.DiscordSupportEnabled);
         Assert.True(settings.KakaoTalkSupportEnabled);
         Assert.True(settings.SlackSupportEnabled);
         Assert.True(settings.WhatsAppSupportEnabled);
@@ -884,7 +884,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         var restored = store.Load();
         Assert.True(restored.IsDarkTheme);
         Assert.Equal("Dark", restored.ThemeMode);
-        Assert.True(restored.DiscordSupportEnabled);
+        Assert.False(restored.DiscordSupportEnabled);
         Assert.True(restored.KakaoTalkSupportEnabled);
         Assert.True(restored.SlackSupportEnabled);
         Assert.True(restored.WhatsAppSupportEnabled);

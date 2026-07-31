@@ -54,3 +54,19 @@ try {
 finally {
     Pop-Location
 }
+
+$builtExecutable = Join-Path $tauriRoot "src-tauri\target\release\sentory-tauri.exe"
+$builtEngine = Join-Path $tauriRoot "src-tauri\target\release\sentory-engine.exe"
+if (-not (Test-Path -LiteralPath $builtExecutable) -or
+    -not (Test-Path -LiteralPath $builtEngine)) {
+    throw "Tauri 루트 실행 파일을 배치할 빌드 결과를 찾지 못했습니다."
+}
+
+$rootExecutable = Join-Path $repositoryRoot "Sentory.exe"
+$rootEngine = Join-Path $repositoryRoot "sentory-engine.exe"
+Copy-Item -LiteralPath $builtExecutable -Destination $rootExecutable -Force
+Copy-Item -LiteralPath $builtEngine -Destination $rootEngine -Force
+
+Write-Host "Tauri 실행 파일 배치 완료:"
+Write-Host "  $rootExecutable"
+Write-Host "  $rootEngine"

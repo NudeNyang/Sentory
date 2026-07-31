@@ -426,8 +426,16 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         return new EngineRuntimePollDto(GetStatus(), pending);
     }
 
-    public async Task<EngineRuntimeStatusDto> RepairDiscordAsync()
+    public async Task<EngineRuntimeStatusDto> RepairDiscordAsync(
+        int? expectedProcessId = null)
     {
+        var launcher = new DiscordAccessibilityLauncher();
+        if (expectedProcessId.HasValue &&
+            launcher.GetMainProcessId() != expectedProcessId)
+        {
+            throw new InvalidOperationException(
+                "Discord가 카운트다운 도중 다시 실행되어 자동 재시작을 취소했습니다.");
+        }
         lock (_stateGate)
         {
             _discordState = CaptureRuntimeState.Recovering;
@@ -438,7 +446,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         Enqueue("detection-status", GetStatus());
         try
         {
-            await new DiscordAccessibilityLauncher().RestartAsync();
+            await launcher.RestartAsync();
             var dispatcher = _dispatcher ?? throw new InvalidOperationException(
                 "감지 런타임이 준비되지 않았습니다.");
             await dispatcher.InvokeAsync(() =>
@@ -573,16 +581,21 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
 
     private void OnIssueDetected(object? sender, CaptureRuntimeIssue issue)
     {
+        bool requiresDiscordRestart;
         lock (_stateGate)
         {
             _lastIssueCode = issue.Code;
             _lastIssue = issue.UserMessage;
+            requiresDiscordRestart =
+                issue.Code == "discord-detection-unavailable" &&
+                _discordState == CaptureRuntimeState.ReconnectRequired;
         }
         Enqueue("runtime-issue", new
         {
             code = issue.Code,
             message = issue.UserMessage,
-            occurredAt = issue.OccurredAt
+            occurredAt = issue.OccurredAt,
+            requiresDiscordRestart
         });
     }
 
@@ -647,6 +660,11 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
                             () => launcher.GetAccessibilityArgumentState(currentProcessId),
                             cancellationToken)
                         : DiscordAccessibilityArgumentState.Unknown;
+                    var offerAutomaticRestart =
+                        DiscordAutomaticRestartPolicy.ShouldOffer(
+                            settings.DiscordSupportEnabled,
+                            processId,
+                            argumentState);
                     var argumentMissing =
                         argumentState == DiscordAccessibilityArgumentState.Missing;
                     lock (_stateGate)
@@ -672,6 +690,15 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
                             _runtime?.RequestRecovery(SourceApp.Discord));
                     }
                     Enqueue("detection-status", GetStatus());
+                    if (offerAutomaticRestart)
+                    {
+                        Enqueue("discord-auto-restart-required", new
+                        {
+                            processId,
+                            countdownSeconds =
+                                DiscordAutomaticRestartPolicy.CountdownSeconds
+                        });
+                    }
                 }
                 await Task.Delay(
                     settings.DiscordSupportEnabled
