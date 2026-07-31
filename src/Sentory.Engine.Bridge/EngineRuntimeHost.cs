@@ -8,8 +8,10 @@ using Sentory.Core;
 using Sentory.Core.Sync;
 using Sentory.Infrastructure.Data;
 using Sentory.Infrastructure.Links;
+using Sentory.Infrastructure.Ocr;
 using Sentory.Infrastructure.Sync;
 using Sentory.Infrastructure.Updates;
+using Sentory.Platform.Windows.Ocr;
 using Sentory.Platform.Windows.Runtime;
 
 namespace Sentory.Engine.Bridge;
@@ -22,8 +24,12 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
     private readonly AutomaticCleanupCoordinator _automaticCleanup;
     private readonly Func<int, DateTimeOffset, CancellationToken, Task<int>>
         _enrichLinkPreviews;
+    private readonly Func<int, CancellationToken, Task<OcrEnrichmentBatchResult>>?
+        _enrichImageOcr;
     private readonly LinkPreviewFetcher? _linkPreviewFetcher;
+    private readonly PaddleOcrImageTextRecognizer? _ocrRecognizer;
     private readonly SemaphoreSlim _linkPreviewWakeSignal = new(0, 1);
+    private readonly SemaphoreSlim _ocrWakeSignal = new(0, 1);
     private readonly SemaphoreSlim _syncWakeSignal = new(0, 1);
     private readonly SyncRuntimeStatusTracker _syncStatusTracker = new();
     private readonly ConcurrentQueue<EngineRuntimeEventDto> _events = new();
@@ -40,6 +46,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
     private Task? _discordMonitor;
     private Task? _maintenanceTask;
     private Task? _linkPreviewTask;
+    private Task? _ocrTask;
     private Task? _syncTask;
     private LocalFolderSyncRuntimeService? _syncRuntimeService;
     private WebDavSyncObjectStore? _webDavStore;
@@ -54,7 +61,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
     public EngineRuntimeHost(
         SqliteCaptureRepository repository,
         SentoryDataPaths paths)
-        : this(repository, paths, null)
+        : this(repository, paths, null, null)
     {
     }
 
@@ -62,7 +69,9 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         SqliteCaptureRepository repository,
         SentoryDataPaths paths,
         Func<int, DateTimeOffset, CancellationToken, Task<int>>?
-            enrichLinkPreviews)
+            enrichLinkPreviews,
+        Func<int, CancellationToken, Task<OcrEnrichmentBatchResult>>?
+            enrichImageOcr = null)
     {
         _repository = repository;
         _paths = paths;
@@ -81,6 +90,30 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         else
         {
             _enrichLinkPreviews = enrichLinkPreviews;
+        }
+        if (enrichImageOcr is not null)
+        {
+            _enrichImageOcr = enrichImageOcr;
+        }
+        else if (!string.Equals(
+                     Environment.GetEnvironmentVariable(
+                         "SENTORY_DISABLE_OCR"),
+                     "1",
+                     StringComparison.Ordinal))
+        {
+            _ocrRecognizer = new PaddleOcrImageTextRecognizer(
+                Path.Combine(paths.RootDirectory, "ocr-models"),
+                new WindowsImageTextRecognizer());
+            var ocrService = new OcrEnrichmentService(
+                repository,
+                _ocrRecognizer,
+                paths,
+                (sha256, exception) => Console.Error.WriteLine(
+                    $"image-ocr-item-failed " +
+                    $"{sha256[..Math.Min(12, sha256.Length)]} " +
+                    $"{exception.GetType().Name}: {exception.Message}"),
+                new WindowsImageMetadataTitleReader());
+            _enrichImageOcr = ocrService.EnrichBatchAsync;
         }
         _dispatcherThread = new Thread(RunDispatcher)
         {
@@ -104,6 +137,10 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         _maintenanceTask = Task.Run(() => RunMaintenanceAsync(_lifetime.Token));
         _linkPreviewTask = Task.Run(() =>
             RunLinkPreviewLoopAsync(_lifetime.Token));
+        if (_enrichImageOcr is not null)
+        {
+            _ocrTask = Task.Run(() => RunOcrLoopAsync(_lifetime.Token));
+        }
         _syncTask = Task.Run(() => RunSyncLoopAsync(_lifetime.Token));
     }
 
@@ -576,6 +613,10 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         {
             WakeLinkPreviewWorker();
         }
+        if (notification.Kind is ContentKind.Image or ContentKind.Collection)
+        {
+            WakeOcrWorker();
+        }
         WakeSyncWorker();
     }
 
@@ -802,6 +843,86 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         }
     }
 
+    internal async Task<OcrEnrichmentBatchResult> EnrichOcrOnceAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (_enrichImageOcr is null)
+        {
+            return new OcrEnrichmentBatchResult(0, 0);
+        }
+
+        var result = await _enrichImageOcr(1, cancellationToken);
+        if (result.Updated > 0)
+        {
+            Enqueue("gallery-changed", new
+            {
+                reason = "image-ocr",
+                updated = result.Updated
+            });
+        }
+        return result;
+    }
+
+    private async Task RunOcrLoopAsync(
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (true)
+            {
+                OcrEnrichmentBatchResult result;
+                try
+                {
+                    result = await EnrichOcrOnceAsync(cancellationToken);
+                }
+                catch (OperationCanceledException)
+                    when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    Console.Error.WriteLine(
+                        $"image-ocr-failed {exception.GetType().Name}: " +
+                        exception.Message);
+                    result = new OcrEnrichmentBatchResult(0, 0);
+                }
+
+                if (result.Attempted == 1)
+                {
+                    await Task.Delay(
+                        TimeSpan.FromSeconds(2),
+                        cancellationToken);
+                    continue;
+                }
+
+                _ocrRecognizer?.ReleaseModels();
+                await _ocrWakeSignal.WaitAsync(
+                    TimeSpan.FromMinutes(15),
+                    cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+            when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private void WakeOcrWorker()
+    {
+        if (_ocrWakeSignal.CurrentCount != 0)
+        {
+            return;
+        }
+        try
+        {
+            _ocrWakeSignal.Release();
+        }
+        catch (SemaphoreFullException)
+        {
+        }
+    }
+
     private async Task RunSyncLoopAsync(
         CancellationToken cancellationToken)
     {
@@ -925,6 +1046,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
                                 migrationProjected
                 });
                 WakeLinkPreviewWorker();
+                WakeOcrWorker();
             }
             if (result.Export.Exported == 200 ||
                 result.Publish.Downloaded > 0)
@@ -1342,6 +1464,16 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
             {
             }
         }
+        if (_ocrTask is not null)
+        {
+            try
+            {
+                await _ocrTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
         if (_syncTask is not null)
         {
             try
@@ -1399,7 +1531,9 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
     {
         ReplaceWebDavStore(null, null);
         _linkPreviewFetcher?.Dispose();
+        _ocrRecognizer?.Dispose();
         _linkPreviewWakeSignal.Dispose();
+        _ocrWakeSignal.Dispose();
         _syncWakeSignal.Dispose();
         _lifetime.Dispose();
     }

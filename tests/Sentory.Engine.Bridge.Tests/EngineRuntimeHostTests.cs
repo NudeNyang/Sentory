@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Sentory.Infrastructure.Data;
+using Sentory.Infrastructure.Ocr;
 
 namespace Sentory.Engine.Bridge.Tests;
 
@@ -59,6 +60,39 @@ public sealed class EngineRuntimeHostTests : IDisposable
 
         Assert.Equal(0, updated);
         Assert.Empty(poll.Events);
+    }
+
+    [Fact]
+    public async Task ImageOcrBatchPublishesGalleryChangedEvent()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var repository = new SqliteCaptureRepository(paths);
+        await repository.InitializeAsync();
+        var attempts = 0;
+        await using var host = new EngineRuntimeHost(
+            repository,
+            paths,
+            (_, _, _) => Task.FromResult(0),
+            (limit, cancellationToken) =>
+            {
+                Assert.Equal(1, limit);
+                Assert.False(cancellationToken.IsCancellationRequested);
+                attempts++;
+                return Task.FromResult(new OcrEnrichmentBatchResult(1, 1));
+            });
+
+        var result = await host.EnrichOcrOnceAsync();
+        var poll = host.Poll();
+
+        Assert.Equal(new OcrEnrichmentBatchResult(1, 1), result);
+        Assert.Equal(1, attempts);
+        var runtimeEvent = Assert.Single(poll.Events);
+        Assert.Equal("gallery-changed", runtimeEvent.Type);
+        var payload = JsonSerializer.SerializeToElement(
+            runtimeEvent.Payload,
+            BridgeServer.JsonOptions);
+        Assert.Equal("image-ocr", payload.GetProperty("reason").GetString());
+        Assert.Equal(1, payload.GetProperty("updated").GetInt32());
     }
 
     [Fact]
