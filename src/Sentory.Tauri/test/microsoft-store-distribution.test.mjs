@@ -14,6 +14,8 @@ const cargo = read("../src-tauri/Cargo.toml");
 const manifest = read("../../../installer/msix/AppxManifest.xml.template");
 const buildScript = read("../../../scripts/Build-Tauri.ps1");
 const bundleScript = read("../../../scripts/Publish-MsixStoreBundle.ps1");
+const certificateScript = read("../../../scripts/New-MsixTestCertificate.ps1");
+const installTestPackageScript = read("../../../scripts/Install-MsixTestPackage.ps1");
 const workflow = read("../../../.github/workflows/tauri-msix-store.yml");
 
 test("the Store channel has no in-app update path", () => {
@@ -34,6 +36,19 @@ test("Store packages are built from Store-channel source for x64 and ARM64", () 
   assert.match(workflow, /runs-on: windows-11-vs2026-arm/);
   assert.match(workflow, /Publish-MsixStoreBundle\.ps1/);
   assert.doesNotMatch(workflow, /gh release|release upload/i);
+});
+
+test("local executable MSIX review uses a signed test channel", () => {
+  assert.match(bundleScript, /\[switch\]\$SignedTest/);
+  assert.match(bundleScript, /if \(\$SignedTest -and \[string\]::IsNullOrWhiteSpace\(\$CertificateThumbprint\)\)/);
+  assert.match(bundleScript, /channel = if \(\$UnsignedTest -or \$SignedTest\)/);
+  assert.match(certificateScript, /1\.3\.6\.1\.5\.5\.7\.3\.3/);
+  assert.match(certificateScript, /2\.5\.29\.19=\{text\}/);
+  assert.match(certificateScript, /KeyExportPolicy NonExportable/);
+  assert.match(installTestPackageScript, /Cert:\\LocalMachine\\TrustedPeople/);
+  assert.match(installTestPackageScript, /Get-AuthenticodeSignature/);
+  assert.match(installTestPackageScript, /Add-AppxPackage -Path \$bundle/);
+  assert.doesNotMatch(installTestPackageScript, /AllowUnsigned/);
 });
 
 test("Store startup uses the declared StartupTask instead of the Run key", () => {

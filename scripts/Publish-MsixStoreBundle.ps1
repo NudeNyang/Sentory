@@ -11,6 +11,7 @@ param(
     [string[]]$Architectures = @("x64", "arm64"),
     [string]$CertificateThumbprint,
     [switch]$UnsignedTest,
+    [switch]$SignedTest,
     [switch]$SkipBuild
 )
 
@@ -71,6 +72,12 @@ function Find-WindowsSdkTool {
 if ($UnsignedTest -and -not [string]::IsNullOrWhiteSpace($CertificateThumbprint)) {
     throw "unsigned 시험용 번들은 인증서로 서명할 수 없습니다."
 }
+if ($UnsignedTest -and $SignedTest) {
+    throw "unsigned 시험과 서명된 시험 모드는 함께 사용할 수 없습니다."
+}
+if ($SignedTest -and [string]::IsNullOrWhiteSpace($CertificateThumbprint)) {
+    throw "서명된 시험용 번들에는 검수 인증서 지문이 필요합니다."
+}
 $Architectures = @($Architectures | Select-Object -Unique)
 if ($Architectures.Count -eq 0) {
     throw "MSIX를 만들 아키텍처를 하나 이상 지정해야 합니다."
@@ -102,7 +109,7 @@ if ([string]::IsNullOrWhiteSpace($PackageIdentityName) -or
 $outputRootFull = Resolve-RepositoryPath $OutputRoot
 $inputRoot = Join-Path $outputRootFull "input"
 $bundleInput = Join-Path $outputRootFull "bundle-input"
-$channel = if ($UnsignedTest) { "test" } else { "store" }
+$channel = if ($UnsignedTest -or $SignedTest) { "test" } else { "store" }
 $unsignedMarker = "OID.2.25.311729368913984317654407730594956997722=1"
 $effectivePublisher = if ($UnsignedTest -and
     $Publisher -notmatch [regex]::Escape($unsignedMarker)) {
@@ -188,6 +195,7 @@ $packages = foreach ($architecture in $Architectures) {
         PublisherDisplayName = $PublisherDisplayName
         OutputRoot = $outputRootFull
         UnsignedTest = $UnsignedTest
+        TestPackage = $SignedTest
     }
     $result = & (Join-Path $PSScriptRoot "Publish-MsixPackage.ps1") @arguments
     if ($LASTEXITCODE -ne 0) {

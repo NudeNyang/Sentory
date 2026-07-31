@@ -15,7 +15,8 @@ param(
     [Parameter(Mandatory)]
     [string]$PublisherDisplayName,
     [string]$OutputRoot = "artifacts\store",
-    [switch]$UnsignedTest
+    [switch]$UnsignedTest,
+    [switch]$TestPackage
 )
 
 $ErrorActionPreference = "Stop"
@@ -146,7 +147,7 @@ foreach ($binaryName in @("Sentory.exe", "sentory-engine.exe")) {
     }
 }
 
-$channel = if ($UnsignedTest) { "test" } else { "store" }
+$channel = if ($UnsignedTest -or $TestPackage) { "test" } else { "store" }
 $stageRoot = Join-Path $outputRootFull "staging\$channel-$Architecture"
 $packageName = "Sentory-$PackageVersion-$channel-$Architecture.msix"
 $packagePath = Join-Path $outputRootFull $packageName
