@@ -42,19 +42,21 @@ public sealed class SentorySettings
 
     public int LanguageSettingVersion { get; set; }
 
+    public bool MessengerDetectionSetupCompleted { get; set; }
+
     public bool DiscordSupportEnabled { get; set; }
 
-    public bool KakaoTalkSupportEnabled { get; set; } = true;
+    public bool KakaoTalkSupportEnabled { get; set; }
 
-    public bool SlackSupportEnabled { get; set; } = true;
+    public bool SlackSupportEnabled { get; set; }
 
-    public bool WhatsAppSupportEnabled { get; set; } = true;
+    public bool WhatsAppSupportEnabled { get; set; }
 
-    public bool TelegramSupportEnabled { get; set; } = true;
+    public bool TelegramSupportEnabled { get; set; }
 
-    public bool LineSupportEnabled { get; set; } = true;
+    public bool LineSupportEnabled { get; set; }
 
-    public bool WeChatSupportEnabled { get; set; } = true;
+    public bool WeChatSupportEnabled { get; set; }
 
     public bool? StartWithWindows { get; set; }
 
@@ -311,6 +313,7 @@ public sealed class SentorySettingsStore(SentoryDataPaths paths)
                                json,
                                JsonOptions) ??
                            new SentorySettings();
+            MigrateLegacyMessengerDetectionSettings(json, settings);
             settings.Normalize();
             return settings;
         }
@@ -370,4 +373,69 @@ public sealed class SentorySettingsStore(SentoryDataPaths paths)
         {
         }
     }
+
+    private static void MigrateLegacyMessengerDetectionSettings(
+        string json,
+        SentorySettings settings)
+    {
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        if (HasProperty(
+                root,
+                nameof(SentorySettings.MessengerDetectionSetupCompleted)))
+        {
+            return;
+        }
+
+        settings.MessengerDetectionSetupCompleted = true;
+        PreserveLegacyDefault(
+            root,
+            nameof(SentorySettings.DiscordSupportEnabled),
+            value => settings.DiscordSupportEnabled = value);
+        PreserveLegacyDefault(
+            root,
+            nameof(SentorySettings.KakaoTalkSupportEnabled),
+            value => settings.KakaoTalkSupportEnabled = value);
+        PreserveLegacyDefault(
+            root,
+            nameof(SentorySettings.SlackSupportEnabled),
+            value => settings.SlackSupportEnabled = value);
+        PreserveLegacyDefault(
+            root,
+            nameof(SentorySettings.WhatsAppSupportEnabled),
+            value => settings.WhatsAppSupportEnabled = value);
+        PreserveLegacyDefault(
+            root,
+            nameof(SentorySettings.TelegramSupportEnabled),
+            value => settings.TelegramSupportEnabled = value);
+        PreserveLegacyDefault(
+            root,
+            nameof(SentorySettings.LineSupportEnabled),
+            value => settings.LineSupportEnabled = value);
+        PreserveLegacyDefault(
+            root,
+            nameof(SentorySettings.WeChatSupportEnabled),
+            value => settings.WeChatSupportEnabled = value);
+    }
+
+    private static void PreserveLegacyDefault(
+        JsonElement root,
+        string propertyName,
+        Action<bool> apply)
+    {
+        if (!HasProperty(root, propertyName))
+        {
+            apply(true);
+        }
+    }
+
+    private static bool HasProperty(
+        JsonElement root,
+        string propertyName) =>
+        root.ValueKind == JsonValueKind.Object &&
+        root.EnumerateObject().Any(property =>
+            string.Equals(
+                property.Name,
+                propertyName,
+                StringComparison.OrdinalIgnoreCase));
 }

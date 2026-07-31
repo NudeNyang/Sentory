@@ -76,7 +76,7 @@ button { color: inherit; }
 
 .app-shell {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   width: 100%;
   height: 100%;
   background: var(--window);
@@ -126,6 +126,38 @@ button { color: inherit; }
 .detection-status.ready .detection-dot { background: #66845d; }
 .detection-status.issue strong { color: var(--danger); }
 .detection-status.issue .detection-dot { background: var(--danger); }
+
+.detection-off-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 52px;
+  padding: 8px 30px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.detection-off-banner[hidden] { display: none; }
+.detection-off-banner > span { display: grid; gap: 2px; min-width: 0; }
+.detection-off-banner strong { font-size: 12px; font-weight: 600; }
+.detection-off-banner small { color: var(--muted); font-size: 10.5px; }
+.detection-off-banner button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.detection-off-banner button:hover { background: color-mix(in srgb, var(--accent) 88%, var(--surface)); }
+.detection-off-banner button:active { transform: scale(0.98); }
+.detection-off-banner button:focus-visible { outline: 2px solid var(--card-hover); outline-offset: 2px; }
 
 .header-actions {
   display: grid;
@@ -814,8 +846,10 @@ body.selection-mode .favorite { display: none; }
 .settings-action.danger-action:not(:disabled):hover { background: color-mix(in srgb, var(--danger) 88%, var(--surface)) !important; }
 .settings-action:disabled { cursor: default; opacity: 0.54; }
 .source-setting { min-height: 64px; }
+.source-setting.available { background: color-mix(in srgb, var(--surface) 90%, var(--accent) 10%); }
 .source-control { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
 .source-status { color: var(--muted); font-size: 11px; line-height: 1.4; }
+.source-available { color: var(--accent) !important; font-weight: 600; }
 .repair-button {
   height: 32px;
   padding: 0 10px;
@@ -918,6 +952,34 @@ body.selection-mode .favorite { display: none; }
 .toast { position: fixed; z-index: 300; bottom: 28px; left: 50%; padding: 10px 15px; border-radius: 10px; background: var(--text); color: var(--header); font-size: 12px; transform: translateX(-50%); box-shadow: 0 8px 28px rgba(21, 23, 25, 0.20); }
 .toast[hidden] { display: none; }
 
+.messenger-setup-dialog {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(560px, calc(100vw - 48px));
+  max-height: min(720px, calc(100vh - 48px));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--window);
+  box-shadow: 0 22px 64px rgba(21, 23, 25, 0.25);
+}
+.messenger-setup-dialog > header { padding: 26px 28px 20px; }
+.messenger-setup-dialog h2 { margin: 0; font-size: 23px; font-weight: 600; }
+.messenger-setup-dialog p { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.messenger-setup-dialog > .settings-card {
+  margin: 0 28px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll) transparent;
+}
+.messenger-setup-dialog > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 18px 28px 24px;
+}
+.messenger-setup-dialog > footer .settings-action { min-width: 92px; }
+
 .empty { position: absolute; top: 38%; left: 50%; display: grid; gap: 8px; width: min(420px, calc(100% - 40px)); margin: 0; color: var(--muted); text-align: center; transform: translate(-50%, -50%); }
 .empty strong { color: var(--text); font-size: 16px; font-weight: 600; }
 .empty span { font-size: 12px; }
@@ -931,12 +993,17 @@ body.selection-mode .favorite { display: none; }
 
 @media (max-width: 620px) {
   .modal-layer { padding: 12px; }
+  .detection-off-banner { align-items: flex-start; padding-inline: 20px; }
   .settings-dialog { width: calc(100vw - 24px); height: calc(100vh - 24px); }
   .settings-header { padding-inline: 20px; }
   .settings-scroll { padding-inline: 20px; }
   .setting-row { align-items: flex-start; gap: 12px; }
   .setting-row .wpf-select { width: 136px; }
   .source-control { justify-content: flex-end; }
+  .messenger-setup-dialog { width: calc(100vw - 24px); max-height: calc(100vh - 24px); }
+  .messenger-setup-dialog > header { padding-inline: 20px; }
+  .messenger-setup-dialog > .settings-card { margin-inline: 20px; }
+  .messenger-setup-dialog > footer { padding-inline: 20px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

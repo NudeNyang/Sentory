@@ -97,6 +97,14 @@
         </div>
       </header>
 
+      <section id="detection-off-banner" class="detection-off-banner" hidden>
+        <span>
+          <strong id="detection-off-title">메신저 감지가 꺼져 있습니다</strong>
+          <small id="detection-off-description">사용할 메신저를 켜야 새 링크와 사진을 저장합니다</small>
+        </span>
+        <button id="detection-off-action" type="button">메신저 선택</button>
+      </section>
+
       <section class="gallery-region" aria-live="polite">
         <div id="status" class="status">보관함을 불러오는 중</div>
         <div id="scroller" class="scroller" tabindex="0">
@@ -181,6 +189,20 @@
           <button id="detail-open" type="button">원본 열기</button>
           <button id="detail-copy" class="primary-action" type="button">복사</button>
         </div>
+      </section>
+    </div>
+
+    <div id="messenger-setup-layer" class="modal-layer" hidden>
+      <section class="messenger-setup-dialog" role="dialog" aria-modal="true" aria-labelledby="messenger-setup-title" aria-describedby="messenger-setup-description">
+        <header>
+          <h2 id="messenger-setup-title">사용할 메신저 선택</h2>
+          <p id="messenger-setup-description">사용하는 메신저만 켜면 됩니다. 나중에 설정에서 변경할 수 있습니다.</p>
+        </header>
+        <div id="messenger-setup-sources" class="settings-card source-settings"></div>
+        <footer>
+          <button id="messenger-setup-all" class="settings-action" type="button">모두 켜기</button>
+          <button id="messenger-setup-complete" class="settings-action primary-action" type="button">선택 완료</button>
+        </footer>
       </section>
     </div>
 

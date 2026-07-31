@@ -431,6 +431,9 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         ApplyIfPresent(patch.TelegramSupportEnabled, value => settings.TelegramSupportEnabled = value);
         ApplyIfPresent(patch.LineSupportEnabled, value => settings.LineSupportEnabled = value);
         ApplyIfPresent(patch.WeChatSupportEnabled, value => settings.WeChatSupportEnabled = value);
+        ApplyIfPresent(
+            patch.MessengerDetectionSetupCompleted,
+            value => settings.MessengerDetectionSetupCompleted = value);
         ApplyIfPresent(patch.StartWithWindows, value => settings.StartWithWindows = value);
         ApplyIfPresent(patch.AutoFavoriteEnabled, value => settings.AutoFavoriteEnabled = value);
         if (patch.AutoFavoriteCopyThreshold is { } threshold)
@@ -1349,7 +1352,9 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         settings.AutoFavoriteEnabled,
         settings.AutoFavoriteCopyThreshold,
         settings.AutoCleanupDays,
+        settings.MessengerDetectionSetupCompleted,
         CreateSourceStates(settings),
+        MessengerAvailabilityProbe.Detect(),
         CreateSyncSettingsDto(settings));
 
     private EngineSyncSettingsDto CreateSyncSettingsDto(
@@ -1546,7 +1551,9 @@ public sealed record EngineSettingsDto(
     bool AutoFavoriteEnabled,
     int AutoFavoriteCopyThreshold,
     int AutoCleanupDays,
+    bool MessengerDetectionSetupCompleted,
     IReadOnlyDictionary<string, bool> Sources,
+    IReadOnlyDictionary<string, bool> AvailableSources,
     EngineSyncSettingsDto Sync);
 
 public sealed record EngineSyncSettingsDto(
@@ -1575,6 +1582,7 @@ public sealed record EngineSettingsPatchDto(
     bool? TelegramSupportEnabled = null,
     bool? LineSupportEnabled = null,
     bool? WeChatSupportEnabled = null,
+    bool? MessengerDetectionSetupCompleted = null,
     bool? StartWithWindows = null,
     bool? AutoFavoriteEnabled = null,
     int? AutoFavoriteCopyThreshold = null,

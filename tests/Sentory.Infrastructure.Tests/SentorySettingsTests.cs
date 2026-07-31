@@ -6,19 +6,101 @@ namespace Sentory.Infrastructure.Tests;
 public sealed class SentorySettingsTests
 {
     [Fact]
-    public void WeChatDetectionDefaultsToEnabled()
+    public void MessengerDetectionDefaultsToDisabledUntilSetupCompletes()
     {
         var settings = new SentorySettings();
 
-        Assert.True(settings.WeChatSupportEnabled);
+        Assert.False(settings.MessengerDetectionSetupCompleted);
+        Assert.False(settings.DiscordSupportEnabled);
+        Assert.False(settings.KakaoTalkSupportEnabled);
+        Assert.False(settings.SlackSupportEnabled);
+        Assert.False(settings.WhatsAppSupportEnabled);
+        Assert.False(settings.TelegramSupportEnabled);
+        Assert.False(settings.LineSupportEnabled);
+        Assert.False(settings.WeChatSupportEnabled);
     }
 
     [Fact]
-    public void TelegramDetectionDefaultsToEnabled()
+    public void ExistingSettingsKeepTheirMessengerChoicesAndSkipSetup()
     {
-        var settings = new SentorySettings();
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "sentory-settings-tests",
+            Guid.NewGuid().ToString("N"));
+        try
+        {
+            var paths = SentoryDataPaths.ForRoot(root);
+            paths.EnsureDirectories();
+            File.WriteAllText(
+                paths.SettingsPath,
+                """
+                {
+                  "DiscordSupportEnabled": false,
+                  "KakaoTalkSupportEnabled": true,
+                  "SlackSupportEnabled": false,
+                  "WhatsAppSupportEnabled": true,
+                  "TelegramSupportEnabled": false,
+                  "LineSupportEnabled": true,
+                  "WeChatSupportEnabled": false
+                }
+                """);
 
-        Assert.True(settings.TelegramSupportEnabled);
+            var settings = new SentorySettingsStore(paths).Load();
+
+            Assert.True(settings.MessengerDetectionSetupCompleted);
+            Assert.False(settings.DiscordSupportEnabled);
+            Assert.True(settings.KakaoTalkSupportEnabled);
+            Assert.False(settings.SlackSupportEnabled);
+            Assert.True(settings.WhatsAppSupportEnabled);
+            Assert.False(settings.TelegramSupportEnabled);
+            Assert.True(settings.LineSupportEnabled);
+            Assert.False(settings.WeChatSupportEnabled);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void SavedIncompleteMessengerSetupRemainsIncomplete()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "sentory-settings-tests",
+            Guid.NewGuid().ToString("N"));
+        try
+        {
+            var paths = SentoryDataPaths.ForRoot(root);
+            var store = new SentorySettingsStore(paths);
+            store.Save(new SentorySettings());
+
+            var settings = store.Load();
+
+            Assert.False(settings.MessengerDetectionSetupCompleted);
+            Assert.All(
+                new[]
+                {
+                    settings.DiscordSupportEnabled,
+                    settings.KakaoTalkSupportEnabled,
+                    settings.SlackSupportEnabled,
+                    settings.WhatsAppSupportEnabled,
+                    settings.TelegramSupportEnabled,
+                    settings.LineSupportEnabled,
+                    settings.WeChatSupportEnabled
+                },
+                Assert.False);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
     }
 
     [Fact]

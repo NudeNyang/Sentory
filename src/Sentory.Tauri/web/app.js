@@ -1,4 +1,11 @@
 import { mergeSettingsSnapshot } from "./settings-snapshot.js";
+import {
+  MESSENGER_SOURCES,
+  MESSENGER_SOURCE_PATCH_KEYS,
+  createMessengerSourcePatch,
+  hasEnabledMessengerSource,
+  needsMessengerSetup,
+} from "./messenger-setup.js";
 
 const CELL_WIDTH = 268;
 const CARD_WIDTH = 252;
@@ -12,16 +19,8 @@ const PAGE_SIZE = 80;
 const SEARCH_DELAY_MS = 110;
 const TOOLTIP_DELAY_MS = 320;
 const SCROLL_INDICATOR_REVEAL_DISTANCE = 44;
-const SOURCES = ["Discord", "KakaoTalk", "Slack", "WhatsApp", "Telegram", "Line", "WeChat"];
-const SOURCE_PATCH_KEYS = {
-  Discord: "discordSupportEnabled",
-  KakaoTalk: "kakaoTalkSupportEnabled",
-  Slack: "slackSupportEnabled",
-  WhatsApp: "whatsAppSupportEnabled",
-  Telegram: "telegramSupportEnabled",
-  Line: "lineSupportEnabled",
-  WeChat: "weChatSupportEnabled",
-};
+const SOURCES = MESSENGER_SOURCES;
+const SOURCE_PATCH_KEYS = MESSENGER_SOURCE_PATCH_KEYS;
 const DISCORD_AUTO_RESTART_CONSENT_KEY = "sentory.discord-auto-restart-consent.v1";
 const TRANSLATIONS = {
   "ko-KR": {
@@ -73,6 +72,7 @@ const TRANSLATIONS = {
     discordNotRunning: "Discord 미실행", discordRecoveryIssue: "Discord 연결 복구가 필요합니다. 설정에서 다시 연결해 주세요.", discordRepairFailed: "Discord 연결을 복구하지 못했습니다. Discord를 종료한 뒤 다시 시도해 주세요.", captureIssue: "일부 입력을 처리하지 못했습니다. 감지는 계속됩니다.", favoriteChangeFailed: "즐겨찾기를 변경하지 못했습니다.", copyFailedShort: "복사 실패", copyHistorySaveFailed: "복사했지만 사용 기록을 저장하지 못했습니다.", openOriginalFailed: "원본을 열지 못했습니다.", deleteSelectedFailed: "선택한 항목을 삭제하지 못했습니다.",
     themeApplied: mode => mode === "Dark" ? "다크 모드를 적용했습니다." : mode === "System" ? "시스템 테마 모드를 적용했습니다." : "라이트 모드를 적용했습니다.", themeSaveFailed: "테마 설정을 저장하지 못했습니다.", languageApplied: "언어를 변경했습니다.", languageSaveFailed: "언어 설정을 저장하지 못했습니다.",
     sourceEnabled: source => `${source === "KakaoTalk" ? "카카오톡" : source === "Line" ? "LINE" : source} 감지를 켰습니다.`, sourceDisabled: source => `${source === "KakaoTalk" ? "카카오톡" : source === "Line" ? "LINE" : source} 감지를 껐습니다.`, sourceSettingFailed: source => `${source === "KakaoTalk" ? "카카오톡" : source === "Line" ? "LINE" : source} 감지 설정을 저장하지 못했습니다.`,
+    messengerSetupTitle: "사용할 메신저 선택", messengerSetupDescription: "사용하는 메신저만 켜면 됩니다. 나중에 설정에서 변경할 수 있습니다.", messengerAvailable: "이 컴퓨터에서 감지할 수 있습니다", enableAllMessengers: "모두 켜기", completeMessengerSetup: "선택 완료", messengerSetupSaveFailed: "메신저 감지 설정을 저장하지 못했습니다.", detectionOffTitle: "메신저 감지가 꺼져 있습니다", detectionOffDescription: "사용할 메신저를 켜야 새 링크와 사진을 저장합니다", chooseMessengers: "메신저 선택",
   },
   "en-US": {
     tagline: "Moments scattered across your conversations, all in one place", all: "All", link: "Links", photo: "Photos", image: "Photo", typeLink: "Link", collection: "Collection", favorite: "Favorites",
@@ -121,6 +121,7 @@ const TRANSLATIONS = {
     discordNotRunning: "Discord is not running", discordRecoveryIssue: "Discord needs to be reconnected. Reconnect it in Settings.", discordRepairFailed: "Could not repair the Discord connection. Exit Discord and try again.", captureIssue: "Some input could not be processed. Detection is continuing.", favoriteChangeFailed: "Could not update favorites.", copyFailedShort: "Copy failed", copyHistorySaveFailed: "Copied, but the usage history could not be saved.", openOriginalFailed: "Could not open the original.", deleteSelectedFailed: "Could not delete the selected items.",
     themeApplied: mode => mode === "Dark" ? "Dark mode applied." : mode === "System" ? "System theme mode applied." : "Light mode applied.", themeSaveFailed: "Could not save the theme setting.", languageApplied: "Language changed.", languageSaveFailed: "Could not save the language setting.",
     sourceEnabled: source => `${source} detection is on.`, sourceDisabled: source => `${source} detection is off.`, sourceSettingFailed: source => `Could not save the ${source} detection setting.`,
+    messengerSetupTitle: "Choose messengers to detect", messengerSetupDescription: "Turn on only the messengers you use. You can change this later in Settings.", messengerAvailable: "Found on this computer", enableAllMessengers: "Turn on all", completeMessengerSetup: "Save selection", messengerSetupSaveFailed: "Could not save messenger detection settings.", detectionOffTitle: "Messenger detection is off", detectionOffDescription: "Turn on a messenger to save new links and photos", chooseMessengers: "Choose messengers",
   },
 };
 TRANSLATIONS["ja-JP"] = {
@@ -148,6 +149,7 @@ TRANSLATIONS["ja-JP"] = {
   appInfo: "アプリ情報", version: value => `バージョン ${value}`, developmentVersion: "開発版", checkForUpdates: "手動アップデート確認", checkForUpdatesDescription: "自動確認の待機時間に関係なく新しいバージョンを確認します", checkNow: "今すぐ確認", checkingForUpdates: "アップデートを確認しています。", appIsUpToDate: "現在、最新バージョンを使用しています。", updateReady: version => `${version} アップデートをインストールできます。`, updateCheckFailed: "アップデートを確認できませんでした。ネットワーク接続を確認してください。", copyrightNotice: "Copyright © 2026 NudeNyang", licenseSummary: "GNU GPL v3 に基づいて利用できます", viewLicense: "ライセンスを見る", licenseHeading: "ライセンスと第三者表記", licenseDescription: "Sentory の配布条件と同梱オープンソース構成要素", openLibrary: "ライブラリを開く", pauseDetection: "検出を一時停止", resumeDetection: "検出を再開", discordAutoConnect: "Discord 自動接続", discordReconnect: "Discord を再起動して接続", exitSentory: "Sentory を終了",
   trayDetecting: "Sentory - メッセンジャー検出中", trayPaused: "Sentory - 検出一時停止", trayDetectionOff: "Sentory - メッセンジャー検出オフ", trayStatus: status => `状態: ${status}`, doubleClick: "ダブルクリック", accessibilityMode: "アクセシビリティモードで開始", discordNotRunning: "Discord は実行されていません", discordRecoveryIssue: "Discord の接続復旧が必要です。設定から再接続してください。", discordRepairFailed: "Discord 接続を復旧できませんでした。Discord を終了して再試行してください。", captureIssue: "一部の入力を処理できませんでした。検出は継続しています。", favoriteChangeFailed: "お気に入りを変更できませんでした。", copyFailedShort: "コピー失敗", copyHistorySaveFailed: "コピーしましたが、使用履歴を保存できませんでした。", openOriginalFailed: "元のデータを開けませんでした。", deleteSelectedFailed: "選択した項目を削除できませんでした。",
   themeApplied: mode => mode === "Dark" ? "ダークモードを適用しました。" : mode === "System" ? "システムテーマモードを適用しました。" : "ライトモードを適用しました。", themeSaveFailed: "テーマ設定を保存できませんでした。", languageApplied: "言語を変更しました。", languageSaveFailed: "言語設定を保存できませんでした。", sourceEnabled: source => `${source === "KakaoTalk" ? "カカオトーク" : source} 検出をオンにしました。`, sourceDisabled: source => `${source === "KakaoTalk" ? "カカオトーク" : source} 検出をオフにしました。`, sourceSettingFailed: source => `${source === "KakaoTalk" ? "カカオトーク" : source} 検出設定を保存できませんでした。`,
+  messengerSetupTitle: "使用するメッセンジャーを選択", messengerSetupDescription: "使用するメッセンジャーだけをオンにします。後から設定で変更できます。", messengerAvailable: "このコンピューターで確認済み", enableAllMessengers: "すべてオン", completeMessengerSetup: "選択を保存", messengerSetupSaveFailed: "メッセンジャー検出設定を保存できませんでした。", detectionOffTitle: "メッセンジャー検出がオフです", detectionOffDescription: "新しいリンクや写真を保存するにはメッセンジャーをオンにしてください", chooseMessengers: "メッセンジャーを選択",
 };
 TRANSLATIONS["zh-CN"] = {
   ...TRANSLATIONS["en-US"],
@@ -174,6 +176,7 @@ TRANSLATIONS["zh-CN"] = {
   appInfo: "应用信息", version: value => `版本 ${value}`, developmentVersion: "开发版本", checkForUpdates: "手动检查更新", checkForUpdatesDescription: "无需等待自动检查间隔即可检查新版本", checkNow: "立即检查", checkingForUpdates: "正在检查更新。", appIsUpToDate: "当前已是最新版本。", updateReady: version => `可以安装 ${version} 更新。`, updateCheckFailed: "无法检查更新，请检查网络连接。", copyrightNotice: "Copyright © 2026 NudeNyang", licenseSummary: "依据 GNU GPL v3 使用", viewLicense: "查看许可协议", licenseHeading: "许可证与第三方声明", licenseDescription: "Sentory 的分发条款及所含开源组件", openLibrary: "打开收藏库", pauseDetection: "暂停检测", resumeDetection: "恢复检测", discordAutoConnect: "Discord 自动连接", discordReconnect: "重启并重新连接 Discord", exitSentory: "退出 Sentory",
   trayDetecting: "Sentory - 正在检测聊天应用", trayPaused: "Sentory - 检测已暂停", trayDetectionOff: "Sentory - 聊天应用检测已关闭", trayStatus: status => `状态：${status}`, doubleClick: "双击", accessibilityMode: "以辅助功能模式启动", discordNotRunning: "Discord 未运行", discordRecoveryIssue: "需要恢复 Discord 连接。请在设置中重新连接。", discordRepairFailed: "无法恢复 Discord 连接。请退出 Discord 后重试。", captureIssue: "部分输入无法处理，检测仍在继续。", favoriteChangeFailed: "无法更新收藏。", copyFailedShort: "复制失败", copyHistorySaveFailed: "已复制，但无法保存使用记录。", openOriginalFailed: "无法打开原文件。", deleteSelectedFailed: "无法删除所选项目。",
   themeApplied: mode => mode === "Dark" ? "已应用深色模式。" : mode === "System" ? "已应用系统主题模式。" : "已应用浅色模式。", themeSaveFailed: "无法保存主题设置。", languageApplied: "语言已更改。", languageSaveFailed: "无法保存语言设置。", sourceEnabled: source => `已开启 ${source} 检测。`, sourceDisabled: source => `已关闭 ${source} 检测。`, sourceSettingFailed: source => `无法保存 ${source} 检测设置。`,
+  messengerSetupTitle: "选择要检测的聊天应用", messengerSetupDescription: "只开启你使用的聊天应用，之后可以在设置中更改。", messengerAvailable: "已在此电脑上找到", enableAllMessengers: "全部开启", completeMessengerSetup: "保存选择", messengerSetupSaveFailed: "无法保存聊天应用检测设置。", detectionOffTitle: "聊天应用检测已关闭", detectionOffDescription: "请开启聊天应用以保存新的链接和图片", chooseMessengers: "选择聊天应用",
 };
 
 const state = {
@@ -223,6 +226,7 @@ const state = {
   pendingDiscordAutoRestart: null,
   discordAutoRestartConsentGranted: readDiscordAutoRestartConsent(),
   discordAutoRestartConsentPromise: null,
+  messengerSetupSources: new Set(),
 };
 
 const scroller = document.querySelector("#scroller");
@@ -302,6 +306,12 @@ const settingsScrollThumb = document.querySelector("#settings-scroll-indicator .
 const themeSetting = document.querySelector("#setting-theme");
 const languageSetting = document.querySelector("#setting-language");
 const settingsSources = document.querySelector("#settings-sources");
+const detectionOffBanner = document.querySelector("#detection-off-banner");
+const detectionOffAction = document.querySelector("#detection-off-action");
+const messengerSetupLayer = document.querySelector("#messenger-setup-layer");
+const messengerSetupSources = document.querySelector("#messenger-setup-sources");
+const messengerSetupAll = document.querySelector("#messenger-setup-all");
+const messengerSetupComplete = document.querySelector("#messenger-setup-complete");
 const startupDescription = document.querySelector("#startup-description");
 const startupToggle = document.querySelector("#startup-toggle");
 const syncMode = document.querySelector("#sync-mode");
@@ -518,6 +528,13 @@ function applyLocalizedUi(language) {
   document.querySelector("#settings-description").textContent = t("settingsDescription");
   document.querySelector("#general-heading").textContent = t("general");
   document.querySelector("#messenger-heading").textContent = t("messenger");
+  document.querySelector("#messenger-setup-title").textContent = t("messengerSetupTitle");
+  document.querySelector("#messenger-setup-description").textContent = t("messengerSetupDescription");
+  messengerSetupAll.textContent = t("enableAllMessengers");
+  messengerSetupComplete.textContent = t("completeMessengerSetup");
+  document.querySelector("#detection-off-title").textContent = t("detectionOffTitle");
+  document.querySelector("#detection-off-description").textContent = t("detectionOffDescription");
+  detectionOffAction.textContent = t("chooseMessengers");
   document.querySelector("#sync-section-heading").textContent = t("computerSync");
   document.querySelector("#sync-heading").textContent = t("cloudNasSharing");
   document.querySelector("#sync-description").textContent = t("syncDescription");
@@ -600,6 +617,8 @@ function applyLocalizedUi(language) {
   settingsClose.setAttribute("aria-label", t("close"));
   updateSelectionUi();
   renderSourceSettings();
+  renderMessengerSetup();
+  renderDetectionOffBanner();
   applyRuntimeStatus(state.runtimeStatus);
   applyThemeMode(state.settings?.themeMode || "Light");
   refreshLocalizedVisibleCards();
@@ -715,6 +734,7 @@ function applySettings(settings, { replaceTheme = false } = {}) {
     : "0";
   autoCleanupSelect.value = String(state.settings.autoCleanupDays || 0);
   renderSyncSettings();
+  renderMessengerSetupState();
   syncAllEnhancedSelects();
   void configureTray();
 }
@@ -1058,6 +1078,72 @@ function shouldShowDiscordReconnectNotice() {
   );
 }
 
+function renderDetectionOffBanner() {
+  const visible = Boolean(
+    state.settings?.messengerDetectionSetupCompleted
+    && !hasEnabledMessengerSource(state.settings),
+  );
+  detectionOffBanner.hidden = !visible;
+}
+
+function renderMessengerSetupState() {
+  const required = needsMessengerSetup(state.settings);
+  if (required && messengerSetupLayer.hidden) {
+    state.messengerSetupSources = new Set(
+      SOURCES.filter(source => Boolean(state.settings?.sources?.[source])),
+    );
+    messengerSetupLayer.hidden = false;
+    window.requestAnimationFrame(() => {
+      messengerSetupSources.querySelector("input")?.focus();
+    });
+  } else if (!required) {
+    messengerSetupLayer.hidden = true;
+  }
+  renderMessengerSetup();
+  renderDetectionOffBanner();
+}
+
+function renderMessengerSetup() {
+  if (!state.settings) return;
+  const fragment = document.createDocumentFragment();
+  for (const source of SOURCES) {
+    const available = Boolean(state.settings.availableSources?.[source]);
+    const row = document.createElement("div");
+    row.className = `setting-row source-setting${available ? " available" : ""}`;
+    const label = document.createElement("span");
+    const title = document.createElement("strong");
+    title.textContent = sourceLabel(source);
+    label.append(title);
+    if (available) {
+      const availability = document.createElement("small");
+      availability.className = "source-status source-available";
+      availability.textContent = t("messengerAvailable");
+      label.append(availability);
+    }
+    const control = document.createElement("div");
+    control.className = "source-control";
+    const switchLabel = document.createElement("label");
+    switchLabel.className = "switch";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = state.messengerSetupSources.has(source);
+    input.setAttribute("aria-label", sourceLabel(source));
+    const track = document.createElement("span");
+    track.className = "switch-track";
+    input.addEventListener("change", () => {
+      if (input.checked) state.messengerSetupSources.add(source);
+      else state.messengerSetupSources.delete(source);
+      renderMessengerSetup();
+    });
+    switchLabel.append(input, track);
+    control.append(switchLabel);
+    row.append(label, control);
+    fragment.append(row);
+  }
+  messengerSetupSources.replaceChildren(fragment);
+  messengerSetupAll.disabled = state.messengerSetupSources.size === SOURCES.length;
+}
+
 function renderSourceSettings() {
   if (!state.settings) return;
   const fragment = document.createDocumentFragment();
@@ -1103,6 +1189,7 @@ function renderSourceSettings() {
       }
       state.settings.sources[source] = enabled;
       renderSourceSettings();
+      renderDetectionOffBanner();
       const settings = await persistSettings({ [SOURCE_PATCH_KEYS[source]]: enabled });
       const displaySource = sourceLabel(source);
       showToast(settings ? t(enabled ? "sourceEnabled" : "sourceDisabled", displaySource) : t("sourceSettingFailed", displaySource));
@@ -2647,14 +2734,45 @@ themeButton.addEventListener("click", async () => {
   showToast(settings ? t("themeApplied", next) : t("themeSaveFailed"));
 });
 
-settingsButton.addEventListener("click", () => {
+function openSettings({ focusMessenger = false } = {}) {
   settingsLayer.hidden = false;
   renderSourceSettings();
   void loadStartupState();
   void loadDataStatistics();
   void loadSyncCandidates();
   updateScrollIndicatorFor(settingsScroll, settingsScrollThumb);
-  enhancedSelects.get(themeSetting)?.trigger.focus();
+  if (focusMessenger) {
+    window.requestAnimationFrame(() => {
+      document.querySelector("#messenger-heading").scrollIntoView({
+        block: "start",
+      });
+      settingsSources.querySelector("input")?.focus();
+      updateScrollIndicatorFor(settingsScroll, settingsScrollThumb);
+    });
+  } else {
+    enhancedSelects.get(themeSetting)?.trigger.focus();
+  }
+}
+
+settingsButton.addEventListener("click", () => openSettings());
+detectionOffAction.addEventListener(
+  "click",
+  () => openSettings({ focusMessenger: true }),
+);
+messengerSetupAll.addEventListener("click", () => {
+  state.messengerSetupSources = new Set(SOURCES);
+  renderMessengerSetup();
+});
+messengerSetupComplete.addEventListener("click", async () => {
+  messengerSetupAll.disabled = true;
+  messengerSetupComplete.disabled = true;
+  const settings = await persistSettings(
+    createMessengerSourcePatch(state.messengerSetupSources),
+  );
+  if (!settings) showToast(t("messengerSetupSaveFailed"));
+  messengerSetupAll.disabled = false;
+  messengerSetupComplete.disabled = false;
+  renderMessengerSetupState();
 });
 settingsClose.addEventListener("click", () => { settingsLayer.hidden = true; });
 settingsLayer.addEventListener("pointerdown", event => {
