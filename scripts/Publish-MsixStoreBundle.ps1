@@ -157,6 +157,25 @@ $packages = foreach ($architecture in $Architectures) {
     $targetDirectory = Join-Path `
         $tauriRoot `
         "src-tauri\target\$targetTriple\release"
+    $builtExecutable = Join-Path $targetDirectory "sentory-tauri.exe"
+    if (-not (Test-Path -LiteralPath $builtExecutable -PathType Leaf)) {
+        throw "Microsoft Store 채널 실행 파일을 찾지 못했습니다: $builtExecutable"
+    }
+    $channelProbe = Start-Process `
+        -FilePath $builtExecutable `
+        -ArgumentList "--verify-microsoft-store-channel" `
+        -PassThru
+    if (-not $channelProbe.WaitForExit(10000)) {
+        $channelProbe.Kill()
+        $channelProbe.WaitForExit()
+        throw ("Microsoft Store 채널 검사가 시간 안에 끝나지 않았습니다. " +
+            "-SkipBuild를 빼고 다시 빌드하세요: $builtExecutable")
+    }
+    $channelProbe.Refresh()
+    if ($channelProbe.ExitCode -ne 73) {
+        throw ("Microsoft Store 채널 실행 파일이 아닙니다. " +
+            "-SkipBuild를 빼고 다시 빌드하세요: $builtExecutable")
+    }
     $payload = Join-Path $inputRoot $architecture
     New-Item -ItemType Directory -Path $payload -Force | Out-Null
     $payloadFiles = [ordered]@{

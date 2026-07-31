@@ -9,6 +9,7 @@ const read = relativePath => readFileSync(
 
 const html = read("../web/index.html");
 const script = read("../web/app.js");
+const styles = read("../web/styles.css");
 const rust = read("../src-tauri/src/main.rs");
 const cargo = read("../src-tauri/Cargo.toml");
 const manifest = read("../../../installer/msix/AppxManifest.xml.template");
@@ -22,6 +23,7 @@ test("the Store channel has no in-app update path", () => {
   assert.match(html, /id="update-setting-row"[^>]*hidden/);
   assert.match(script, /distribution_channel/);
   assert.match(script, /updateSettingRow\.hidden = channel !== "github"/);
+  assert.match(styles, /\.setting-row\[hidden\]\s*\{\s*display:\s*none/);
   assert.match(rust, /if is_microsoft_store\(\)[\s\S]{0,180}앱 내 업데이트 확인을 제공하지 않습니다/);
 });
 
@@ -49,6 +51,14 @@ test("local executable MSIX review uses a signed test channel", () => {
   assert.match(installTestPackageScript, /Get-AuthenticodeSignature/);
   assert.match(installTestPackageScript, /Add-AppxPackage -Path \$bundle/);
   assert.doesNotMatch(installTestPackageScript, /AllowUnsigned/);
+});
+
+test("MSIX packaging rejects a stale GitHub-channel executable", () => {
+  assert.match(rust, /VERIFY_MICROSOFT_STORE_CHANNEL_ARGUMENT/);
+  assert.match(rust, /--verify-microsoft-store-channel/);
+  assert.match(bundleScript, /--verify-microsoft-store-channel/);
+  assert.match(bundleScript, /ExitCode -ne 73/);
+  assert.match(bundleScript, /Microsoft Store 채널 실행 파일이 아닙니다/);
 });
 
 test("Store startup uses the declared StartupTask instead of the Run key", () => {

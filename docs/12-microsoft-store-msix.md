@@ -71,6 +71,10 @@ $thumbprint = .\scripts\New-MsixTestCertificate.ps1
 `artifacts\store-test\Sentory-TestCertificate.cer`에 저장되고 개인키는 현재
 Windows 사용자의 인증서 저장소 밖으로 내보내지 않는다.
 
+패키징 직전에는 실행 파일의 Store 채널 검사를 다시 수행한다. 마지막 빌드가
+GitHub판이거나 채널을 확인할 수 없는 오래된 파일이면 `-SkipBuild`를 사용해도
+번들을 만들지 않는다.
+
 실행 중인 GitHub판 Sentory를 트레이에서 완전히 종료한 뒤 관리자 PowerShell에서
 다음 명령으로 인증서를 신뢰하고 패키지를 설치한다.
 
@@ -88,6 +92,8 @@ Windows 사용자의 인증서 저장소 밖으로 내보내지 않는다.
    첫 메신저 선택 화면은 새 Windows 계정이나 Windows Sandbox·VM처럼
    `%LOCALAPPDATA%\Sentory`가 없는 환경에서 확인한다.
 2. 설정의 앱 정보에 `수동 업데이트 확인`이 없는지 확인한다.
+   앱 안에는 제품 버전 `2.0.2`를 표시하고 Windows의 설치된 패키지 정보에는
+   MSIX 버전 `2.0.2.0`을 표시한다.
 3. `Windows 시작 시 실행`을 켠 뒤 작업 관리자의 `시작 앱`에 Sentory가 나타나는지
    확인하고, 다시 끄면 사용 안 함으로 바뀌는지 확인한다.
 4. Discord를 처음 켰을 때 한 번만 자동 재시작 동의를 받는지 확인한다. 동의 후

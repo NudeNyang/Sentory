@@ -31,6 +31,7 @@ const TRAY_MENU_WIDTH: f64 = 286.0;
 const TRAY_MENU_BASE_HEIGHT: f64 = 374.0;
 const TRAY_MENU_OPTIONAL_ROW_HEIGHT: f64 = 42.0;
 const VERIFY_INSTALLATION_ARGUMENT: &str = "--verify-installation";
+const VERIFY_MICROSOFT_STORE_CHANNEL_ARGUMENT: &str = "--verify-microsoft-store-channel";
 const RESTORE_DISCORD_STARTUP_ARGUMENT: &str = "--restore-discord-startup";
 const REQUEST_SHUTDOWN_ARGUMENT: &str = "--request-shutdown";
 
@@ -1665,6 +1666,12 @@ async fn write_store_startup_enabled(_enabled: bool) -> Result<(), String> {
 
 fn main() {
     let arguments = std::env::args().collect::<Vec<_>>();
+    if arguments
+        .iter()
+        .any(|argument| argument.eq_ignore_ascii_case(VERIFY_MICROSOFT_STORE_CHANNEL_ARGUMENT))
+    {
+        std::process::exit(if is_microsoft_store() { 73 } else { 74 });
+    }
     if arguments
         .iter()
         .any(|argument| argument.eq_ignore_ascii_case(VERIFY_INSTALLATION_ARGUMENT))

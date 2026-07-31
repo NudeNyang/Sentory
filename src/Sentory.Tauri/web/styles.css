@@ -777,6 +777,7 @@ body.selection-mode .favorite { display: none; }
   min-height: 72px;
   padding: 15px 18px;
 }
+.setting-row[hidden] { display: none; }
 .setting-row + .setting-row { border-top: 1px solid var(--line); }
 .setting-row > span { display: grid; gap: 4px; min-width: 0; }
 .setting-row strong { font-size: 13px; font-weight: 600; }
