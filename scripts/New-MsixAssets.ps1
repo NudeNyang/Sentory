@@ -30,8 +30,14 @@ try {
     $assets = [ordered]@{
         "StoreLogo.png" = 50
         "Square44x44Logo.png" = 44
-        "Square44x44Logo.targetsize-44_altform-unplated.png" = 44
         "Square150x150Logo.png" = 150
+    }
+    $targetSizes = @(16, 20, 24, 30, 32, 36, 40, 44, 48, 60, 64, 72, 80, 96, 256)
+    foreach ($targetSize in $targetSizes) {
+        $assets["Square44x44Logo.targetsize-$($targetSize)_altform-unplated.png"] =
+            $targetSize
+        $assets["Square44x44Logo.targetsize-$($targetSize)_altform-lightunplated.png"] =
+            $targetSize
     }
     foreach ($asset in $assets.GetEnumerator()) {
         $bitmap = [System.Drawing.Bitmap]::new(

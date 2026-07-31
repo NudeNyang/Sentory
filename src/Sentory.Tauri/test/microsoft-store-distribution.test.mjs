@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import test from "node:test";
 
 const read = relativePath => readFileSync(
@@ -15,9 +15,11 @@ const cargo = read("../src-tauri/Cargo.toml");
 const manifest = read("../../../installer/msix/AppxManifest.xml.template");
 const buildScript = read("../../../scripts/Build-Tauri.ps1");
 const bundleScript = read("../../../scripts/Publish-MsixStoreBundle.ps1");
+const packageScript = read("../../../scripts/Publish-MsixPackage.ps1");
 const certificateScript = read("../../../scripts/New-MsixTestCertificate.ps1");
 const installTestPackageScript = read("../../../scripts/Install-MsixTestPackage.ps1");
 const workflow = read("../../../.github/workflows/tauri-msix-store.yml");
+const msixAssetsUrl = new URL("../../../installer/msix/Assets/", import.meta.url);
 
 test("the Store channel has no in-app update path", () => {
   assert.match(html, /id="update-setting-row"[^>]*hidden/);
@@ -81,4 +83,27 @@ test("Store runtime does not expose the legacy Discord startup restore utility",
     rust,
     /RESTORE_DISCORD_STARTUP_ARGUMENT[\s\S]*?if is_microsoft_store\(\) \{[\s\S]*?exit\(2\)/,
   );
+});
+
+test("MSIX provides exact unplated icons for Windows shell surfaces", () => {
+  const assetNames = new Set(readdirSync(msixAssetsUrl));
+  const targetSizes = [16, 20, 24, 30, 32, 36, 40, 44, 48, 60, 64, 72, 80, 96, 256];
+
+  for (const size of targetSizes) {
+    for (const variant of ["unplated", "lightunplated"]) {
+      const name = `Square44x44Logo.targetsize-${size}_altform-${variant}.png`;
+      assert.ok(assetNames.has(name), `missing ${name}`);
+
+      const png = readFileSync(new URL(name, msixAssetsUrl));
+      assert.equal(png.readUInt32BE(16), size, `${name} width`);
+      assert.equal(png.readUInt32BE(20), size, `${name} height`);
+    }
+  }
+});
+
+test("MSIX packaging indexes qualified icon assets in resources.pri", () => {
+  assert.match(packageScript, /Find-WindowsSdkTool "makepri\.exe"/);
+  assert.match(packageScript, /createconfig/);
+  assert.match(packageScript, /makePri[\s\S]*?\bnew\b/);
+  assert.match(packageScript, /resources\.pri/);
 });

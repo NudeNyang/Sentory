@@ -181,6 +181,30 @@ $manifestPath = Join-Path $stageRoot "AppxManifest.xml"
 $manifest | Set-Content -LiteralPath $manifestPath -Encoding utf8NoBOM
 [xml](Get-Content -Raw -LiteralPath $manifestPath) | Out-Null
 
+$makePri = Find-WindowsSdkTool "makepri.exe"
+$priConfigPath = Join-Path $stageRoot "priconfig.xml"
+$resourcesPriPath = Join-Path $stageRoot "resources.pri"
+try {
+    & $makePri createconfig /cf $priConfigPath /dq en-US /o | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw "MakePri 설정 파일 생성에 실패했습니다."
+    }
+    & $makePri new `
+        /pr $stageRoot `
+        /cf $priConfigPath `
+        /of $resourcesPriPath `
+        /o |
+        Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw "MSIX 리소스 인덱스 생성에 실패했습니다."
+    }
+}
+finally {
+    if (Test-Path -LiteralPath $priConfigPath -PathType Leaf) {
+        Remove-Item -LiteralPath $priConfigPath -Force
+    }
+}
+
 $makeAppx = Find-WindowsSdkTool "makeappx.exe"
 New-Item -ItemType Directory -Path $outputRootFull -Force | Out-Null
 & $makeAppx pack /d $stageRoot /p $packagePath /o /v /h SHA256
