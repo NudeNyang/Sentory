@@ -1,0 +1,54 @@
+name: Tauri Microsoft Store MSIX
+
+on:
+  workflow_dispatch:
+    inputs:
+      package_version:
+        description: Four-part MSIX package version
+        required: true
+        default: 2.0.2.0
+
+permissions:
+  contents: read
+
+jobs:
+  build-store-bundle:
+    runs-on: windows-11-vs2026-arm
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v5
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/Sentory.Tauri/package-lock.json
+
+      - name: Set up Rust targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc,aarch64-pc-windows-msvc
+
+      - name: Build x64 and ARM64 Store bundle
+        shell: pwsh
+        run: |
+          .\scripts\Publish-MsixStoreBundle.ps1 `
+            -PackageVersion '${{ inputs.package_version }}' `
+            -OutputRoot artifacts\store
+
+      - name: Keep Store packages for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sentory-${{ inputs.package_version }}-store-msix
+          path: |
+            artifacts/store/*.msix
+            artifacts/store/*.msixbundle
+            artifacts/store/*.sha256
+            artifacts/store/msix-package-manifest.json
+          if-no-files-found: error

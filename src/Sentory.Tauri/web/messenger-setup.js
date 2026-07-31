@@ -18,8 +18,15 @@ export const MESSENGER_SOURCE_PATCH_KEYS = {
   WeChat: "weChatSupportEnabled",
 };
 
-export function createMessengerSourcePatch(enabledSources) {
-  const patch = { messengerDetectionSetupCompleted: true };
+export function createMessengerSourcePatch(
+  enabledSources,
+  discordAutoRestartConsentGranted = false,
+) {
+  const patch = {
+    messengerDetectionSetupCompleted: true,
+    discordAutoRestartConsentGranted:
+      enabledSources.has("Discord") && discordAutoRestartConsentGranted,
+  };
   for (const source of MESSENGER_SOURCES) {
     patch[MESSENGER_SOURCE_PATCH_KEYS[source]] = enabledSources.has(source);
   }

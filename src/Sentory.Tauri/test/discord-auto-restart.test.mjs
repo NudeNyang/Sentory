@@ -35,10 +35,7 @@ test("a disconnected paste or drop offers a visible manual restart", () => {
 });
 
 test("enabling Discord requires one-time automatic restart consent", () => {
-  assert.match(
-    script,
-    /const DISCORD_AUTO_RESTART_CONSENT_KEY = "sentory\.discord-auto-restart-consent\.v1";/,
-  );
+  assert.doesNotMatch(script, /DISCORD_AUTO_RESTART_CONSENT_KEY/);
   assert.match(
     script,
     /async function ensureDiscordAutoRestartConsent\([\s\S]*?discordAutoRestartConsentTitle[\s\S]*?discordAutoRestartConsentAction/,
@@ -66,10 +63,10 @@ test("Discord consent persists only after an enabled setting is saved", () => {
     /async function ensureDiscordAutoRestartConsent\([\s\S]*?\n}\r?\n\r?\nasync function scheduleDiscordAutomaticRestart/,
   )?.[0] ?? "";
 
-  assert.doesNotMatch(consentFunction, /saveDiscordAutoRestartConsent\(\)/);
+  assert.doesNotMatch(consentFunction, /settings_update/);
   assert.match(
     script,
-    /function syncDiscordAutoRestartConsentWithSettings\(\)[\s\S]*?needsMessengerSetup\(state\.settings\)[\s\S]*?clearDiscordAutoRestartConsent\(\)[\s\S]*?sources\?\.Discord[\s\S]*?saveDiscordAutoRestartConsent\(\)/,
+    /function syncDiscordAutoRestartConsentWithSettings\(\)[\s\S]*?needsMessengerSetup\(state\.settings\)[\s\S]*?clearDiscordAutoRestartConsent\(\)[\s\S]*?settings\.discordAutoRestartConsentGranted/,
   );
   assert.match(
     script,
@@ -88,13 +85,13 @@ test("automatic Discord restart is gated by the same consent", () => {
   );
 });
 
-test("an existing enabled Discord setting is grandfathered before pending restarts", () => {
+test("a persisted Discord consent is loaded before pending restarts", () => {
   assert.match(
     script,
     /async function loadSettings\(\)[\s\S]*?applySettings[\s\S]{0,160}syncDiscordAutoRestartConsentWithSettings\(\)[\s\S]{0,220}scheduleDiscordAutomaticRestart/,
   );
   assert.match(
     script,
-    /function syncDiscordAutoRestartConsentWithSettings\(\)[\s\S]*?settings\.sources\?\.Discord[\s\S]*?saveDiscordAutoRestartConsent\(\)/,
+    /function syncDiscordAutoRestartConsentWithSettings\(\)[\s\S]*?settings\.discordAutoRestartConsentGranted/,
   );
 });

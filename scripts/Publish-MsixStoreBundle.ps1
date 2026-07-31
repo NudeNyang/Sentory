@@ -2,22 +2,22 @@
 param(
     [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')]
     [string]$PackageVersion = "2.0.2.0",
-    [Parameter(Mandatory)]
-    [string]$X64PayloadArchive,
-    [Parameter(Mandatory)]
-    [string]$Arm64PayloadArchive,
     [string]$PackageIdentityName,
     [string]$Publisher,
     [string]$PublisherDisplayName,
     [string]$IdentityFile = "installer\msix\StoreIdentity.json",
     [string]$OutputRoot = "artifacts\store",
+    [ValidateSet("x64", "arm64")]
+    [string[]]$Architectures = @("x64", "arm64"),
     [string]$CertificateThumbprint,
-    [switch]$UnsignedTest
+    [switch]$UnsignedTest,
+    [switch]$SkipBuild
 )
 
 $ErrorActionPreference = "Stop"
 $repositoryRoot = [System.IO.Path]::GetFullPath(
     (Split-Path -Parent $PSScriptRoot))
+$tauriRoot = Join-Path $repositoryRoot "src\Sentory.Tauri"
 
 function Resolve-RepositoryPath {
     param([Parameter(Mandatory)][string]$Path)
@@ -71,6 +71,10 @@ function Find-WindowsSdkTool {
 if ($UnsignedTest -and -not [string]::IsNullOrWhiteSpace($CertificateThumbprint)) {
     throw "unsigned 시험용 번들은 인증서로 서명할 수 없습니다."
 }
+$Architectures = @($Architectures | Select-Object -Unique)
+if ($Architectures.Count -eq 0) {
+    throw "MSIX를 만들 아키텍처를 하나 이상 지정해야 합니다."
+}
 
 if (-not [string]::IsNullOrWhiteSpace($IdentityFile)) {
     $identityPath = Resolve-RepositoryPath $IdentityFile
@@ -112,16 +116,6 @@ $displayVersion = $PackageVersion.Substring(
     $PackageVersion.LastIndexOf('.'))
 $bundleName = "Sentory-$displayVersion-$channel.msixbundle"
 $bundlePath = Join-Path $outputRootFull $bundleName
-$archives = [ordered]@{
-    x64 = Resolve-RepositoryPath $X64PayloadArchive
-    arm64 = Resolve-RepositoryPath $Arm64PayloadArchive
-}
-foreach ($archive in $archives.Values) {
-    if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) {
-        throw "포터블 배포 ZIP을 찾지 못했습니다: $archive"
-    }
-}
-
 foreach ($path in @(
         $inputRoot,
         $bundleInput,
@@ -135,12 +129,59 @@ foreach ($path in @(
 New-Item -ItemType Directory -Path $inputRoot -Force | Out-Null
 New-Item -ItemType Directory -Path $bundleInput -Force | Out-Null
 
-$packages = foreach ($entry in $archives.GetEnumerator()) {
-    $payload = Join-Path $inputRoot $entry.Key
-    Expand-Archive -LiteralPath $entry.Value -DestinationPath $payload
+$packages = foreach ($architecture in $Architectures) {
+    if (-not $SkipBuild) {
+        & (Join-Path $PSScriptRoot "Build-Tauri.ps1") `
+            -Configuration Release `
+            -Architecture $architecture `
+            -DistributionChannel MicrosoftStore |
+            Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            throw "$architecture Microsoft Store 빌드에 실패했습니다."
+        }
+    }
+
+    $targetTriple = if ($architecture -eq "arm64") {
+        "aarch64-pc-windows-msvc"
+    }
+    else {
+        "x86_64-pc-windows-msvc"
+    }
+    $targetDirectory = Join-Path `
+        $tauriRoot `
+        "src-tauri\target\$targetTriple\release"
+    $payload = Join-Path $inputRoot $architecture
+    New-Item -ItemType Directory -Path $payload -Force | Out-Null
+    $payloadFiles = [ordered]@{
+        (Join-Path $targetDirectory "sentory-tauri.exe") =
+            (Join-Path $payload "Sentory.exe")
+        (Join-Path $targetDirectory "sentory-engine.exe") =
+            (Join-Path $payload "sentory-engine.exe")
+        (Join-Path $repositoryRoot "LICENSE.txt") =
+            (Join-Path $payload "LICENSE.txt")
+        (Join-Path $repositoryRoot "distribution\README-KO.txt") =
+            (Join-Path $payload "README-KO.txt")
+        (Join-Path $repositoryRoot "docs\privacy.md") =
+            (Join-Path $payload "PRIVACY.md")
+        (Join-Path $repositoryRoot "distribution\THIRD-PARTY-NOTICES.txt") =
+            (Join-Path $payload "THIRD-PARTY-NOTICES.txt")
+        (Join-Path $repositoryRoot "docs\model-provenance.md") =
+            (Join-Path $payload "MODEL-PROVENANCE.md")
+    }
+    foreach ($payloadFile in $payloadFiles.GetEnumerator()) {
+        if (-not (Test-Path -LiteralPath $payloadFile.Key -PathType Leaf)) {
+            throw "MSIX 페이로드 파일을 찾지 못했습니다: $($payloadFile.Key)"
+        }
+        Copy-Item -LiteralPath $payloadFile.Key -Destination $payloadFile.Value
+    }
+    Copy-Item `
+        -LiteralPath (Join-Path $repositoryRoot "distribution\licenses") `
+        -Destination (Join-Path $payload "licenses") `
+        -Recurse
+
     $arguments = @{
         PackageVersion = $PackageVersion
-        Architecture = $entry.Key
+        Architecture = $architecture
         PayloadDirectory = $payload
         PackageIdentityName = $PackageIdentityName
         Publisher = $Publisher
@@ -150,11 +191,11 @@ $packages = foreach ($entry in $archives.GetEnumerator()) {
     }
     $result = & (Join-Path $PSScriptRoot "Publish-MsixPackage.ps1") @arguments
     if ($LASTEXITCODE -ne 0) {
-        throw "$($entry.Key) MSIX 생성에 실패했습니다."
+        throw "$architecture MSIX 생성에 실패했습니다."
     }
     $package = @($result | Where-Object { Test-Path -LiteralPath $_ })[-1]
     if (-not $package) {
-        throw "$($entry.Key) MSIX 출력 경로를 확인하지 못했습니다."
+        throw "$architecture MSIX 출력 경로를 확인하지 못했습니다."
     }
     Copy-Item -LiteralPath $package -Destination $bundleInput
     Get-Item -LiteralPath $package
@@ -187,7 +228,7 @@ $summary = [ordered]@{
     channel = $channel
     identityName = $PackageIdentityName
     publisher = $effectivePublisher
-    architectures = @("x64", "arm64")
+    architectures = @($Architectures)
     signed = -not [string]::IsNullOrWhiteSpace($CertificateThumbprint)
     bundle = [ordered]@{
         name = $bundleName

@@ -102,7 +102,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
                      StringComparison.Ordinal))
         {
             _ocrRecognizer = new PaddleOcrImageTextRecognizer(
-                Path.Combine(paths.RootDirectory, "ocr-models"),
+                paths.OcrModelsDirectory,
                 new WindowsImageTextRecognizer());
             var ocrService = new OcrEnrichmentService(
                 repository,
@@ -380,6 +380,16 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
     public async Task<EngineUpdateCheckDto> CheckForUpdatesAsync(
         CancellationToken cancellationToken = default)
     {
+        if (string.Equals(
+                Environment.GetEnvironmentVariable(
+                    "SENTORY_DISTRIBUTION_CHANNEL"),
+                "microsoft-store",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Microsoft Store 배포판에서는 앱 내 업데이트 확인을 제공하지 않습니다.");
+        }
+
         using var client = new GitHubReleaseUpdateClient();
         var update = await client.CheckAsync(
             "2.0.2",
@@ -434,6 +444,9 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         ApplyIfPresent(
             patch.MessengerDetectionSetupCompleted,
             value => settings.MessengerDetectionSetupCompleted = value);
+        ApplyIfPresent(
+            patch.DiscordAutoRestartConsentGranted,
+            value => settings.DiscordAutoRestartConsentGranted = value);
         ApplyIfPresent(patch.StartWithWindows, value => settings.StartWithWindows = value);
         ApplyIfPresent(patch.AutoFavoriteEnabled, value => settings.AutoFavoriteEnabled = value);
         if (patch.AutoFavoriteCopyThreshold is { } threshold)
@@ -1353,6 +1366,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         settings.AutoFavoriteCopyThreshold,
         settings.AutoCleanupDays,
         settings.MessengerDetectionSetupCompleted,
+        settings.DiscordAutoRestartConsentGranted,
         CreateSourceStates(settings),
         MessengerAvailabilityProbe.Detect(),
         CreateSyncSettingsDto(settings));
@@ -1552,6 +1566,7 @@ public sealed record EngineSettingsDto(
     int AutoFavoriteCopyThreshold,
     int AutoCleanupDays,
     bool MessengerDetectionSetupCompleted,
+    bool DiscordAutoRestartConsentGranted,
     IReadOnlyDictionary<string, bool> Sources,
     IReadOnlyDictionary<string, bool> AvailableSources,
     EngineSyncSettingsDto Sync);
@@ -1583,6 +1598,7 @@ public sealed record EngineSettingsPatchDto(
     bool? LineSupportEnabled = null,
     bool? WeChatSupportEnabled = null,
     bool? MessengerDetectionSetupCompleted = null,
+    bool? DiscordAutoRestartConsentGranted = null,
     bool? StartWithWindows = null,
     bool? AutoFavoriteEnabled = null,
     int? AutoFavoriteCopyThreshold = null,

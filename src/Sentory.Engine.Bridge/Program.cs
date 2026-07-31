@@ -51,7 +51,8 @@ internal static class Program
             }
 
             var paths = SentoryDataPaths.FromEnvironmentOrCurrentUser(
-                Environment.GetEnvironmentVariable("SENTORY_DATA_ROOT"));
+                Environment.GetEnvironmentVariable("SENTORY_DATA_ROOT"),
+                Environment.GetEnvironmentVariable("SENTORY_LOCAL_DATA_ROOT"));
             var repository = new SqliteCaptureRepository(paths);
             await repository.InitializeAsync();
             var service = new GalleryBridgeService(repository, paths);

@@ -1,93 +1,152 @@
 # Microsoft Store MSIX 배포
 
-Sentory의 Store 배포판은 Tauri 호스트와 C# 엔진을 함께 넣은 데스크톱 MSIX다.
-x64와 ARM64를 각각 패키징하고 하나의 `msixbundle`로 묶는다. WPF 실행 파일은
-포함하지 않는다.
+Store판은 Tauri 호스트와 C# 엔진을 함께 넣은 데스크톱 MSIX다. x64와 ARM64를
+각각 만든 뒤 하나의 `msixbundle`로 묶는다. GitHub판 포터블 파일이나 설치
+프로그램을 MSIX 안에 다시 넣지 않으며 WPF 실행 파일도 포함하지 않는다.
 
-## 먼저 필요한 값
+## Store판 동작
 
-Partner Center에서 앱 이름을 예약한 뒤 `제품 관리 > 제품 ID`에 표시되는 다음
-세 값을 준비한다.
+- 업데이트 설치와 배포는 Microsoft Store가 맡는다. 앱 안의 GitHub 업데이트
+  확인 버튼과 Store 페이지 열기 기능은 표시하지 않으며, Store 빌드에서 업데이트
+  확인 명령을 직접 호출해도 거부한다.
+- `Windows 시작 시 실행`은 `HKCU\...\Run`을 쓰지 않는다. 매니페스트의
+  `windows.startupTask`와 Windows `StartupTask` API로만 켜고 끈다. 기본값은
+  꺼짐이며 사용자가 Sentory 설정에서 직접 켰을 때만 등록된다.
+- Discord를 다시 시작할 때는 현재 프로세스에 접근성 실행 옵션만 전달한다.
+  Discord의 로그인 시작 레지스트리를 새로 만들거나 바꾸지 않는다. GitHub 설치판
+  제거기에 남아 있는 구버전 복원 명령도 Store판에서는 실행할 수 없다.
+- GitHub판과 Store판은 같은 사용자 보관함을 사용하므로 동시에 실행하지 않는다.
+  Tauri 단일 실행 식별자도 같아서 먼저 실행된 한 인스턴스만 유지된다.
+
+## 데이터 위치
+
+제거 뒤에도 남아야 하는 데이터와 다시 만들 수 있는 로컬 데이터를 나눠 저장한다.
+
+| 종류 | 위치 | MSIX 제거 시 |
+|---|---|---|
+| 보관함 DB, 사진, 설정, 동기화 상태 | `%LOCALAPPDATA%\Sentory` | 유지 |
+| 로그, 링크 미리보기, OCR 모델 | `%LOCALAPPDATA%\Packages\<PFN>\LocalState\Sentory` | 제거될 수 있음 |
+
+Store판도 GitHub판과 같은 `%LOCALAPPDATA%\Sentory` 보관함을 읽는다. MSIX를
+지우거나 다시 설치해도 보관함과 설정이 남고, 패키지 영역의 로그와 캐시는 없어져도
+필요할 때 다시 만들어진다. Windows 설정의 앱 `초기화`는 패키지 영역을 지우므로
+문제 해결용으로만 사용한다.
+
+모든 기록을 직접 없애려면 Sentory를 완전히 종료한 뒤
+`%LOCALAPPDATA%\Sentory`를 삭제한다. Store판 제거만으로 이 폴더를 지우지 않는다.
+
+## 제품 identity
+
+Partner Center에서 앱 이름을 예약한 뒤 `제품 관리 > 제품 ID`의 다음 값을
+그대로 사용한다.
 
 - `Package/Identity/Name`
 - `Package/Identity/Publisher`
 - `Package/Properties/PublisherDisplayName`
 
-대소문자와 공백을 포함해 화면에 나온 값을 그대로 써야 한다. Sentory에 예약된
-실제 값은 [`installer/msix/StoreIdentity.json`](../installer/msix/StoreIdentity.json)에
-기록했다. 다른 Store 제품에 재사용할 때는
-[`StoreIdentity.example.json`](../installer/msix/StoreIdentity.example.json)을 참고해
-세 값을 바꿔야 한다.
+Sentory의 값은 [`installer/msix/StoreIdentity.json`](../installer/msix/StoreIdentity.json)에
+기록했다. 예제 형식은
+[`StoreIdentity.example.json`](../installer/msix/StoreIdentity.example.json)에서
+확인할 수 있다.
 
-## Store 제출용 번들 만들기
+## 검수용 x64 패키지
 
-2.0.2 공개 릴리즈의 포터블 ZIP을 내려받았다는 전제로 다음처럼 실행한다.
-
-```powershell
-.\scripts\Publish-MsixStoreBundle.ps1 `
-  -PackageVersion 2.0.2.0 `
-  -X64PayloadArchive artifacts\store-input\Sentory-win-x64-portable.zip `
-  -Arm64PayloadArchive artifacts\store-input\Sentory-win-arm64-portable.zip
-```
-
-결과는 `artifacts/store`에 생성된다.
-
-- `Sentory-2.0.2-store.msixbundle`: Partner Center 제출 파일
-- `Sentory-2.0.2-store.msixbundle.sha256`: 번들 SHA-256
-- `Sentory-2.0.2.0-store-x64.msix`: x64 개별 패키지
-- `Sentory-2.0.2.0-store-arm64.msix`: ARM64 개별 패키지
-- `msix-package-manifest.json`: identity와 각 파일의 크기·해시
-
-Store 제출용 MSIX는 로컬 인증서로 서명하지 않아도 된다. Microsoft Store가 인증
-후 패키지를 서명한다. Store 밖에 따로 배포하려면 Publisher와 주체가 일치하는 코드
-서명 인증서가 필요하며, 현재 사용자 인증서 저장소의 지문을
-`-CertificateThumbprint`에 넘기면 번들에 SHA-256 서명을 적용한다.
-
-## 설치 시험용 unsigned 번들
-
-Partner Center identity가 아직 없을 때는 다음 옵션으로 구조와 실행 파일 구성을
-검사할 수 있다.
+현재 PC에서 먼저 x64 unsigned 시험 번들을 만든다.
 
 ```powershell
 .\scripts\Publish-MsixStoreBundle.ps1 `
   -PackageVersion 2.0.2.0 `
-  -X64PayloadArchive artifacts\store-input\Sentory-win-x64-portable.zip `
-  -Arm64PayloadArchive artifacts\store-input\Sentory-win-arm64-portable.zip `
-  -PackageIdentityName NudeNyang.Sentory.Test `
-  -Publisher 'CN=NudeNyang' `
-  -PublisherDisplayName NudeNyang `
-  -IdentityFile '' `
+  -Architectures x64 `
+  -OutputRoot artifacts\store-test `
   -UnsignedTest
 ```
 
-이 모드에서는 Windows가 요구하는 unsigned OID를 Publisher 끝에 추가하고 결과
-파일 이름에도 `test`를 넣는다. 실행 파일이 들어 있는 unsigned 패키지를 직접
-설치하려면 관리자 PowerShell에서 `Add-AppxPackage -AllowUnsigned`가 필요하다.
-시험용 identity는 서명된 Store identity와 다르므로 제출 파일로 사용하면 안 된다.
+시험 패키지는 Store 제출 identity와 구분되는 unsigned OID를 붙인다. 실행 중인
+GitHub판 Sentory를 완전히 종료한 뒤 관리자 PowerShell에서 설치한다.
 
-## 패키지 구성과 인증 확인
+```powershell
+Add-AppxPackage `
+  -Path .\artifacts\store-test\Sentory-2.0.2-test.msixbundle `
+  -AllowUnsigned
+```
 
-- 매니페스트는 `Windows.FullTrustApplication`과 제한 기능 `runFullTrust`를
-  선언한다. Sentory가 클립보드, 전역 입력 감지와 메신저 프로세스 연동을 수행하는
-  데 필요한 데스크톱 권한이다.
-- 앱 데이터는 설치 폴더가 아닌 로컬 앱 데이터에 저장한다. MSIX에서는 AppData가
-  패키지별 저장소로 리디렉션되므로 Store 업데이트 사이에는 유지되지만, 기존
-  포터블판의 `%LOCALAPPDATA%\Sentory` 데이터가 자동으로 옮겨진다고 가정하면 안
-  된다. 포터블판에서 Store판으로 전환하는 사용자 데이터 이전은 별도 검수가
-  필요하다.
-- 패키징 스크립트는 앱과 엔진의 PE 아키텍처, identity 형식, 4단계 버전,
-  매니페스트 XML과 MakeAppx 의미 검증을 확인한다.
-- x64 시험 패키지는 WACK 전체 결과 `PASS`를 받았다. 선택 항목인 "차단된 실행
-  파일" 검사는 프로세스 실행 API와 실행 파일 안의 `cmd`, `PowerShell` 문자열을
-  찾아 `FAIL`로 표시했지만 전체 인증 결과에는 영향을 주지 않았다. WACK 자체도
-  현재 선택 검사이며 최종 인증 결과는 Partner Center 제출 과정에서 확인한다.
-- Store 등록 정보에는 설명과 스크린샷 한 장 이상이 필요하다. 이 항목은 MSIX
-  안이 아니라 Partner Center의 Store 등록 정보 화면에서 입력한다.
+검수 순서는 다음과 같다.
+
+1. 기존 GitHub판을 쓰던 PC에서는 같은 보관함과 설정이 그대로 열리는지 확인한다.
+   첫 메신저 선택 화면은 새 Windows 계정이나 Windows Sandbox·VM처럼
+   `%LOCALAPPDATA%\Sentory`가 없는 환경에서 확인한다.
+2. 설정의 앱 정보에 `수동 업데이트 확인`이 없는지 확인한다.
+3. `Windows 시작 시 실행`을 켠 뒤 작업 관리자의 `시작 앱`에 Sentory가 나타나는지
+   확인하고, 다시 끄면 사용 안 함으로 바뀌는지 확인한다.
+4. Discord를 처음 켰을 때 한 번만 자동 재시작 동의를 받는지 확인한다. 동의 후
+   Discord가 필요한 경우에만 15초 안내 뒤 다시 시작하는지도 확인한다.
+5. 링크와 사진을 하나씩 보내 보관함에 저장되는지 확인한다. 웹에서 복사한 글자
+   포함 이미지가 OCR 검색으로 찾아지는지도 확인한다.
+6. 앱을 제거한 뒤 `%LOCALAPPDATA%\Sentory`의 DB·사진·설정이 남아 있는지 확인한다.
+   같은 시험 패키지를 다시 설치해 기존 보관함이 열리는지 확인한다.
+
+시험판 제거 명령은 다음과 같다. 사용자 데이터 폴더는 건드리지 않는다.
+
+```powershell
+Get-AppxPackage -Name NudeNyang.Sentory |
+  Where-Object Publisher -Like '*OID.2.25.311729368913984317654407730594956997722*' |
+  Remove-AppxPackage
+```
+
+## 제출용 x64·ARM64 번들
+
+x64와 ARM64 C++ 빌드 도구가 모두 있는 환경에서는 다음 명령 하나로 Store 채널
+실행 파일과 번들을 만든다.
+
+```powershell
+.\scripts\Publish-MsixStoreBundle.ps1 -PackageVersion 2.0.2.0
+```
+
+기본 출력은 `artifacts/store`이다.
+
+- `Sentory-2.0.2-store.msixbundle`: Partner Center에 올릴 파일
+- `Sentory-2.0.2-store.msixbundle.sha256`: 번들 확인값
+- `Sentory-2.0.2.0-store-x64.msix`: x64 개별 패키지
+- `Sentory-2.0.2.0-store-arm64.msix`: ARM64 개별 패키지
+- `msix-package-manifest.json`: identity, 아키텍처, 크기와 SHA-256
+
+Store 제출용 파일은 로컬 인증서로 서명하지 않는다. 인증을 통과한 패키지는
+Microsoft Store가 서명한다. `-UnsignedTest`로 만든 파일은 제출하면 안 된다.
+
+현재 x64 개발 PC에는 Visual C++ ARM64 도구가 없으므로 x64 시험판은 로컬에서
+검수하고, 최종 ARM64는 네이티브 Windows ARM 러너에서 같은 커밋과
+`MicrosoftStore` 채널로 빌드해야 한다. 최종 번들을 만들기 전 두 실행 파일의 PE
+아키텍처와 패키지 매니페스트를 스크립트가 다시 검사한다. 저장소의
+`Tauri Microsoft Store MSIX` 워크플로를 수동 실행하면 x64·ARM64 제출용 번들을
+하나의 검수 artifact로 받을 수 있으며 GitHub Release에는 자동 게시하지 않는다.
+
+## Partner Center 제출
+
+Packages 화면에는 `Sentory-2.0.2-store.msixbundle` 하나만 올린다. 개별 MSIX,
+`.sha256`, JSON manifest와 unsigned 시험판은 제출하지 않는다.
+
+매니페스트는 `runFullTrust` 제한 기능을 사용한다. `제한된 기능` 설명에는 다음
+내용을 제품 동작에 맞게 적는다.
+
+> Sentory is a user-controlled desktop utility that detects paste, drop, and send actions
+> in supported Windows messenger applications and stores only the links and images the
+> user sends. Full-trust access is required for Windows UI Automation, global input event
+> observation, clipboard image handling, local OCR, a notification-area process, and
+> restarting Discord with an accessibility argument after explicit one-time consent. The
+> app does not read message history, collect unrelated clipboard contents, or upload the
+> user's library to a Sentory-operated server.
+
+인증 참고 사항에는 첫 실행에서 모든 메신저 감지가 꺼져 있고 검수자가 직접 켤 수
+있다는 점, Discord 자동 재시작은 최초 동의 뒤 필요한 경우에만 실행된다는 점,
+보관함 데이터는 로컬에 저장된다는 점을 덧붙인다.
+
+WACK은 현재 선택적인 사전 검사 도구이며 유지보수가 중단된 상태다. x64 검수판으로
+실행해 보는 것은 유용하지만 최종 판정은 Partner Center 인증 결과를 기준으로 한다.
 
 Microsoft 공식 참고 문서:
 
-- [제품 identity 확인](https://learn.microsoft.com/windows/apps/publish/view-app-identity-details)
-- [MakeAppx로 패키지 만들기](https://learn.microsoft.com/windows/msix/package/create-app-package-with-makeappx-tool)
-- [Microsoft Store의 MSIX 서명](https://learn.microsoft.com/windows/apps/package-and-deploy/code-signing-options)
-- [Windows 앱 인증 키트](https://learn.microsoft.com/windows/uwp/debug-test-perf/windows-app-certification-kit)
-- [패키징된 데스크톱 앱의 AppData 동작](https://learn.microsoft.com/windows/msix/desktop/desktop-to-uwp-prepare)
+- [MSIX 패키지와 로컬 검증](https://learn.microsoft.com/windows/msix/package/packaging-uwp-apps)
+- [패키징된 데스크톱 앱의 실행과 제거](https://learn.microsoft.com/windows/msix/desktop/desktop-to-uwp-behind-the-scenes)
+- [데스크톱 앱의 StartupTask 선언](https://learn.microsoft.com/windows/apps/desktop/modernize/desktop-to-uwp-extensions)
+- [제한된 기능 제출 설명](https://learn.microsoft.com/windows/apps/publish/publish-your-app/msix/manage-submission-options)
+- [MSIX 인증 절차](https://learn.microsoft.com/windows/apps/publish/publish-your-app/msix/app-certification-process)

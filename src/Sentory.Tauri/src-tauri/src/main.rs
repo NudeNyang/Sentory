@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 use std::fs::{create_dir_all, OpenOptions};
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -19,8 +19,14 @@ use tokio::sync::Mutex;
 use tokio::time::{interval, Duration};
 
 const MAXIMUM_GALLERY_ITEMS: u16 = 2_000;
+const DISTRIBUTION_CHANNEL: &str = if cfg!(feature = "microsoft-store") {
+    "microsoft-store"
+} else {
+    "github"
+};
 const STARTUP_REGISTRY_PATH: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 const STARTUP_VALUE_NAME: &str = "Sentory";
+const STARTUP_TASK_ID: &str = "SentoryStartupTask";
 const TRAY_MENU_WIDTH: f64 = 286.0;
 const TRAY_MENU_BASE_HEIGHT: f64 = 374.0;
 const TRAY_MENU_OPTIONAL_ROW_HEIGHT: f64 = 42.0;
@@ -208,10 +214,18 @@ impl EngineClient {
 }
 
 fn spawn_engine(app: &AppHandle) -> Result<EngineProcess, String> {
-    let command = app
+    let mut command = app
         .shell()
         .sidecar("sentory-engine")
         .map_err(|error| format!("C# 엔진 실행 파일을 찾지 못했습니다: {error}"))?;
+    command = command.env("SENTORY_DISTRIBUTION_CHANNEL", DISTRIBUTION_CHANNEL);
+    if is_microsoft_store() {
+        command = command.env("SENTORY_DATA_ROOT", store_durable_data_root()?.as_os_str());
+        command = command.env(
+            "SENTORY_LOCAL_DATA_ROOT",
+            store_local_data_root()?.as_os_str(),
+        );
+    }
     let (receiver, child) = command
         .arg("serve")
         .spawn()
@@ -540,6 +554,48 @@ fn is_allowed_external_url(url: &str) -> bool {
     )
 }
 
+fn is_microsoft_store() -> bool {
+    cfg!(feature = "microsoft-store")
+}
+
+#[tauri::command]
+fn distribution_channel() -> &'static str {
+    DISTRIBUTION_CHANNEL
+}
+
+#[cfg(windows)]
+fn store_application_data_root() -> Result<PathBuf, String> {
+    use windows::Storage::ApplicationData;
+
+    let folder = ApplicationData::Current()
+        .and_then(|data| data.LocalFolder())
+        .and_then(|folder| folder.Path())
+        .map_err(|error| format!("MSIX 로컬 데이터 폴더를 찾지 못했습니다: {error}"))?;
+    Ok(PathBuf::from(folder.to_string()))
+}
+
+#[cfg(not(windows))]
+fn store_application_data_root() -> Result<PathBuf, String> {
+    Err("Microsoft Store 데이터 폴더는 Windows에서만 사용할 수 있습니다.".to_string())
+}
+
+fn store_local_data_root() -> Result<PathBuf, String> {
+    Ok(store_application_data_root()?.join("Sentory"))
+}
+
+fn durable_data_root_from_store_local_folder(local_folder: &Path) -> Result<PathBuf, String> {
+    let local_app_data = local_folder
+        .parent()
+        .and_then(Path::parent)
+        .and_then(Path::parent)
+        .ok_or_else(|| "Microsoft Store 사용자 데이터 경로를 계산하지 못했습니다.".to_string())?;
+    Ok(local_app_data.join("Sentory"))
+}
+
+fn store_durable_data_root() -> Result<PathBuf, String> {
+    durable_data_root_from_store_local_folder(&store_application_data_root()?)
+}
+
 #[tauri::command]
 fn open_external_url(url: String) -> Result<(), String> {
     if !is_allowed_external_url(&url) {
@@ -616,6 +672,11 @@ async fn update_check(
     app: AppHandle,
     engine: State<'_, EngineClient>,
 ) -> Result<serde_json::Value, String> {
+    if is_microsoft_store() {
+        return Err(
+            "Microsoft Store 배포판에서는 앱 내 업데이트 확인을 제공하지 않습니다.".to_string(),
+        );
+    }
     engine
         .request(&app, "update-check", serde_json::Value::Null)
         .await
@@ -623,7 +684,7 @@ async fn update_check(
 
 #[tauri::command]
 async fn startup_get() -> Result<bool, String> {
-    read_startup_enabled()
+    read_startup_enabled().await
 }
 
 #[tauri::command]
@@ -632,7 +693,7 @@ async fn startup_set(
     engine: State<'_, EngineClient>,
     enabled: bool,
 ) -> Result<serde_json::Value, String> {
-    write_startup_enabled(enabled)?;
+    write_startup_enabled(enabled).await?;
     let settings = engine
         .request(
             &app,
@@ -1184,9 +1245,15 @@ fn append_diagnostic(event: &str, detail: &str) {
 }
 
 fn diagnostic_path() -> Option<PathBuf> {
+    if is_microsoft_store() {
+        return store_local_data_root()
+            .ok()
+            .map(|root| root.join("logs").join("tauri-ui.log"));
+    }
     std::env::var_os("LOCALAPPDATA").map(|local| {
         PathBuf::from(local)
             .join("Sentory")
+            .join("local-data")
             .join("logs")
             .join("tauri-ui.log")
     })
@@ -1269,7 +1336,8 @@ fn create_tray_menu_window(app: &tauri::App) -> tauri::Result<()> {
 }
 
 fn create_tray(app: &tauri::App) -> tauri::Result<()> {
-    let startup_enabled = read_startup_enabled().unwrap_or(false);
+    // 실제 상태는 프런트엔드 초기화가 끝난 뒤 tray_configure에서 동기화한다.
+    let startup_enabled = false;
     app.manage(TrayMenuState {
         snapshot: StdMutex::new(TrayMenuSnapshot {
             status_label: "상태: 감지 준비 완료".to_string(),
@@ -1431,8 +1499,8 @@ async fn tray_action(
             let _ = app.emit("runtime-status", status);
         }
         "startup" => {
-            let enabled = !read_startup_enabled().unwrap_or(false);
-            write_startup_enabled(enabled)?;
+            let enabled = !read_startup_enabled().await.unwrap_or(false);
+            write_startup_enabled(enabled).await?;
             let settings = engine
                 .request(
                     &app,
@@ -1481,8 +1549,22 @@ async fn tray_action(
     Ok(())
 }
 
+async fn read_startup_enabled() -> Result<bool, String> {
+    if is_microsoft_store() {
+        return read_store_startup_enabled().await;
+    }
+    read_registry_startup_enabled()
+}
+
+async fn write_startup_enabled(enabled: bool) -> Result<(), String> {
+    if is_microsoft_store() {
+        return write_store_startup_enabled(enabled).await;
+    }
+    write_registry_startup_enabled(enabled)
+}
+
 #[cfg(windows)]
-fn read_startup_enabled() -> Result<bool, String> {
+fn read_registry_startup_enabled() -> Result<bool, String> {
     use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
     use winreg::RegKey;
     let current_user = RegKey::predef(HKEY_CURRENT_USER);
@@ -1495,12 +1577,12 @@ fn read_startup_enabled() -> Result<bool, String> {
 }
 
 #[cfg(not(windows))]
-fn read_startup_enabled() -> Result<bool, String> {
+fn read_registry_startup_enabled() -> Result<bool, String> {
     Ok(false)
 }
 
 #[cfg(windows)]
-fn write_startup_enabled(enabled: bool) -> Result<(), String> {
+fn write_registry_startup_enabled(enabled: bool) -> Result<(), String> {
     use winreg::enums::HKEY_CURRENT_USER;
     use winreg::RegKey;
     let current_user = RegKey::predef(HKEY_CURRENT_USER);
@@ -1522,8 +1604,63 @@ fn write_startup_enabled(enabled: bool) -> Result<(), String> {
 }
 
 #[cfg(not(windows))]
-fn write_startup_enabled(_enabled: bool) -> Result<(), String> {
+fn write_registry_startup_enabled(_enabled: bool) -> Result<(), String> {
     Err("이 운영체제에서는 Windows 자동 실행을 사용할 수 없습니다.".to_string())
+}
+
+#[cfg(windows)]
+async fn read_store_startup_enabled() -> Result<bool, String> {
+    use windows::core::HSTRING;
+    use windows::ApplicationModel::{StartupTask, StartupTaskState};
+
+    let task = StartupTask::GetAsync(&HSTRING::from(STARTUP_TASK_ID))
+        .and_then(|operation| operation.get())
+        .map_err(|error| format!("Store 자동 실행 상태를 읽지 못했습니다: {error}"))?;
+    let state = task
+        .State()
+        .map_err(|error| format!("Store 자동 실행 상태를 읽지 못했습니다: {error}"))?;
+    Ok(state == StartupTaskState::Enabled || state == StartupTaskState::EnabledByPolicy)
+}
+
+#[cfg(not(windows))]
+async fn read_store_startup_enabled() -> Result<bool, String> {
+    Ok(false)
+}
+
+#[cfg(windows)]
+async fn write_store_startup_enabled(enabled: bool) -> Result<(), String> {
+    use windows::core::HSTRING;
+    use windows::ApplicationModel::{StartupTask, StartupTaskState};
+
+    let task = StartupTask::GetAsync(&HSTRING::from(STARTUP_TASK_ID))
+        .and_then(|operation| operation.get())
+        .map_err(|error| format!("Store 자동 실행 설정을 열지 못했습니다: {error}"))?;
+    if !enabled {
+        return task
+            .Disable()
+            .map_err(|error| format!("Store 자동 실행을 끄지 못했습니다: {error}"));
+    }
+
+    let state = task
+        .RequestEnableAsync()
+        .and_then(|operation| operation.get())
+        .map_err(|error| format!("Store 자동 실행을 켜지 못했습니다: {error}"))?;
+    match state {
+        StartupTaskState::Enabled | StartupTaskState::EnabledByPolicy => Ok(()),
+        StartupTaskState::DisabledByUser => Err(
+            "Windows 시작 앱 설정에서 Sentory가 꺼져 있습니다. 설정에서 직접 켜 주세요."
+                .to_string(),
+        ),
+        StartupTaskState::DisabledByPolicy => {
+            Err("조직 정책으로 Sentory 자동 실행이 차단되어 있습니다.".to_string())
+        }
+        _ => Err("Sentory 자동 실행이 허용되지 않았습니다.".to_string()),
+    }
+}
+
+#[cfg(not(windows))]
+async fn write_store_startup_enabled(_enabled: bool) -> Result<(), String> {
+    Err("Microsoft Store 자동 실행은 Windows에서만 사용할 수 있습니다.".to_string())
 }
 
 fn main() {
@@ -1538,6 +1675,9 @@ fn main() {
         .iter()
         .any(|argument| argument.eq_ignore_ascii_case(RESTORE_DISCORD_STARTUP_ARGUMENT))
     {
+        if is_microsoft_store() {
+            std::process::exit(2);
+        }
         std::process::exit(run_engine_utility("restore-discord-startup"));
     }
 
@@ -1671,6 +1811,7 @@ fn main() {
             data_cleanup,
             open_data_directory,
             open_external_url,
+            distribution_channel,
             license_text,
             window_theme_set,
             update_check,
@@ -1693,7 +1834,8 @@ fn main() {
 
 #[cfg(test)]
 mod tray_menu_tests {
-    use super::clamp_tray_menu_position;
+    use super::{clamp_tray_menu_position, durable_data_root_from_store_local_folder};
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn tray_menu_stays_inside_the_monitor_work_area() {
@@ -1706,6 +1848,19 @@ mod tray_menu_tests {
                 -1910.0, 20.0, 286.0, 374.0, -1920.0, 0.0, 1920.0, 1040.0, 12.0,
             ),
             (-1920, 0)
+        );
+    }
+
+    #[test]
+    fn store_durable_data_stays_outside_the_package_container() {
+        let root = durable_data_root_from_store_local_folder(Path::new(
+            r"C:\Users\tester\AppData\Local\Packages\NudeNyang.Sentory_123\LocalState",
+        ))
+        .expect("Store 데이터 루트를 계산해야 합니다.");
+
+        assert_eq!(
+            root,
+            PathBuf::from(r"C:\Users\tester\AppData\Local\Sentory")
         );
     }
 }

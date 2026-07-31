@@ -2316,17 +2316,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
     }
 
     private string? TryResolveContentPath(string relativePath)
-    {
-        var comparison = OperatingSystem.IsWindows()
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
-        var root = Path.GetFullPath(paths.RootDirectory)
-            .TrimEnd(Path.DirectorySeparatorChar) +
-            Path.DirectorySeparatorChar;
-        var target = Path.GetFullPath(
-            Path.Combine(paths.RootDirectory, relativePath));
-        return target.StartsWith(root, comparison) ? target : null;
-    }
+        => paths.TryResolveContentPath(relativePath);
 
     private static async Task ExecuteNonQueryAsync(
         SqliteConnection connection,

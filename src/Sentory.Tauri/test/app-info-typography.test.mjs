@@ -78,7 +78,10 @@ test("the public 2.0.2 identity has no preview or developer marker", () => {
   assert.match(tauriConfig, /"identifier": "com\.nudenyang\.sentory"/);
 });
 
-test("manual update checks open the verified GitHub release page", () => {
+test("manual update checks are exposed only on the GitHub channel", () => {
+  assert.match(html, /id="update-setting-row"[^>]*hidden/);
+  assert.match(script, /invoke\("distribution_channel"\)/);
+  assert.match(script, /updateSettingRow\.hidden = channel !== "github"/);
   assert.match(
     script,
     /invoke\("open_external_url", \{ url: result\.releasePage \}\)/,

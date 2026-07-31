@@ -2,7 +2,9 @@ param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Debug",
     [ValidateSet("x64", "arm64")]
-    [string]$Architecture = "x64"
+    [string]$Architecture = "x64",
+    [ValidateSet("GitHub", "MicrosoftStore")]
+    [string]$DistributionChannel = "GitHub"
 )
 
 $ErrorActionPreference = "Stop"
@@ -75,7 +77,18 @@ try {
         }
     }
 
-    npm run tauri -- build --no-bundle --target $targetTriple
+    $tauriArguments = @(
+        "run",
+        "tauri",
+        "--",
+        "build",
+        "--no-bundle",
+        "--target",
+        $targetTriple)
+    if ($DistributionChannel -eq "MicrosoftStore") {
+        $tauriArguments += @("--features", "microsoft-store")
+    }
+    & npm @tauriArguments
     if ($LASTEXITCODE -ne 0) {
         throw "Tauri 빌드에 실패했습니다."
     }
@@ -95,8 +108,9 @@ if (-not (Test-Path -LiteralPath $builtExecutable) -or
 }
 
 $canDeployToRoot =
-    ($Architecture -eq "x64" -and $hostArchitecture -eq "X64") -or
-    ($Architecture -eq "arm64" -and $hostArchitecture -eq "Arm64")
+    $DistributionChannel -eq "GitHub" -and (
+        ($Architecture -eq "x64" -and $hostArchitecture -eq "X64") -or
+        ($Architecture -eq "arm64" -and $hostArchitecture -eq "Arm64"))
 if ($canDeployToRoot) {
     $rootExecutable = Join-Path $repositoryRoot "Sentory.exe"
     $rootEngine = Join-Path $repositoryRoot "sentory-engine.exe"
@@ -108,5 +122,10 @@ if ($canDeployToRoot) {
     Write-Host "  $rootEngine"
 }
 else {
-    Write-Host "$Architecture 교차 빌드는 루트 실행 파일을 교체하지 않습니다."
+    if ($DistributionChannel -eq "MicrosoftStore") {
+        Write-Host "Microsoft Store 빌드는 루트의 GitHub판 실행 파일을 교체하지 않습니다."
+    }
+    else {
+        Write-Host "$Architecture 교차 빌드는 루트 실행 파일을 교체하지 않습니다."
+    }
 }

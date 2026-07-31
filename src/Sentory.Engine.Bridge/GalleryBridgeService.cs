@@ -423,13 +423,8 @@ public static class GalleryCardProjection
             return null;
         }
 
-        var root = Path.GetFullPath(paths.RootDirectory)
-            .TrimEnd(Path.DirectorySeparatorChar) +
-            Path.DirectorySeparatorChar;
-        var target = Path.GetFullPath(
-            Path.Combine(paths.RootDirectory, relativePath));
-        return target.StartsWith(root, StringComparison.OrdinalIgnoreCase) &&
-               File.Exists(target)
+        var target = paths.TryResolveContentPath(relativePath);
+        return target is not null && File.Exists(target)
             ? target
             : null;
     }

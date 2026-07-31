@@ -11,6 +11,7 @@ public enum DesktopPlatform
 
 public sealed record SentoryDataPaths(
     string RootDirectory,
+    string LocalDataDirectory,
     string DatabasePath,
     string ImagesDirectory,
     string LinkPreviewsDirectory)
@@ -19,14 +20,21 @@ public sealed record SentoryDataPaths(
         Path.Combine(RootDirectory, "gallery-settings.json");
 
     public string LogsDirectory =>
-        Path.Combine(RootDirectory, "logs");
+        Path.Combine(LocalDataDirectory, "logs");
+
+    public string OcrModelsDirectory =>
+        Path.Combine(LocalDataDirectory, "ocr-models");
 
     public static SentoryDataPaths FromEnvironmentOrCurrentUser(
-        string? overrideRoot)
+        string? overrideRoot,
+        string? overrideLocalDataRoot = null)
     {
         if (string.IsNullOrWhiteSpace(overrideRoot))
         {
-            return ForCurrentUser();
+            var current = ForCurrentUser();
+            return string.IsNullOrWhiteSpace(overrideLocalDataRoot)
+                ? current
+                : ForRoot(current.RootDirectory, overrideLocalDataRoot);
         }
 
         if (!Path.IsPathRooted(overrideRoot))
@@ -36,7 +44,7 @@ public sealed record SentoryDataPaths(
                 nameof(overrideRoot));
         }
 
-        return ForRoot(overrideRoot);
+        return ForRoot(overrideRoot, overrideLocalDataRoot);
     }
 
     public static SentoryDataPaths ForCurrentUser()
@@ -83,23 +91,79 @@ public sealed record SentoryDataPaths(
         return ForRoot(root);
     }
 
-    public static SentoryDataPaths ForRoot(string rootDirectory)
+    public static SentoryDataPaths ForRoot(
+        string rootDirectory,
+        string? localDataDirectory = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(rootDirectory);
         var root = Path.GetFullPath(rootDirectory);
+        var localData = string.IsNullOrWhiteSpace(localDataDirectory)
+            ? Path.Combine(root, "local-data")
+            : Path.GetFullPath(localDataDirectory);
         return new SentoryDataPaths(
             root,
+            localData,
             Path.Combine(root, "sentory.db"),
             Path.Combine(root, "images"),
-            Path.Combine(root, "link-previews"));
+            Path.Combine(localData, "link-previews"));
     }
 
     public void EnsureDirectories()
     {
         Directory.CreateDirectory(RootDirectory);
+        Directory.CreateDirectory(LocalDataDirectory);
         Directory.CreateDirectory(ImagesDirectory);
         Directory.CreateDirectory(LinkPreviewsDirectory);
         Directory.CreateDirectory(LogsDirectory);
+        Directory.CreateDirectory(OcrModelsDirectory);
+    }
+
+    public string? TryResolveContentPath(string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath) ||
+            Path.IsPathRooted(relativePath))
+        {
+            return null;
+        }
+
+        var normalized = relativePath.Replace(
+            Path.AltDirectorySeparatorChar,
+            Path.DirectorySeparatorChar);
+        var linkPreviewPrefix = $"link-previews{Path.DirectorySeparatorChar}";
+        var isLinkPreview = normalized.StartsWith(
+            linkPreviewPrefix,
+            OperatingSystem.IsWindows()
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal);
+        var baseDirectory = isLinkPreview
+            ? LocalDataDirectory
+            : RootDirectory;
+        var root = Path.GetFullPath(baseDirectory)
+            .TrimEnd(Path.DirectorySeparatorChar) +
+            Path.DirectorySeparatorChar;
+        var target = Path.GetFullPath(Path.Combine(baseDirectory, normalized));
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        if (!target.StartsWith(root, comparison))
+        {
+            return null;
+        }
+
+        if (!isLinkPreview || File.Exists(target))
+        {
+            return target;
+        }
+
+        var legacyRoot = Path.GetFullPath(RootDirectory)
+            .TrimEnd(Path.DirectorySeparatorChar) +
+            Path.DirectorySeparatorChar;
+        var legacyTarget = Path.GetFullPath(
+            Path.Combine(RootDirectory, normalized));
+        return legacyTarget.StartsWith(legacyRoot, comparison) &&
+            File.Exists(legacyTarget)
+            ? legacyTarget
+            : target;
     }
 
     private static DesktopPlatform GetCurrentPlatform()

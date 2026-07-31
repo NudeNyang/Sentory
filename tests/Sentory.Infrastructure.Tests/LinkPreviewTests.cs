@@ -126,8 +126,8 @@ public sealed class LinkPreviewTests : IDisposable
         Assert.Equal("Stored description", result.PageDescription);
         Assert.NotNull(result.SiteIconPath);
         Assert.NotNull(result.PreviewImagePath);
-        Assert.True(File.Exists(Path.Combine(_root, result.SiteIconPath!)));
-        Assert.True(File.Exists(Path.Combine(_root, result.PreviewImagePath!)));
+        Assert.True(File.Exists(paths.TryResolveContentPath(result.SiteIconPath!)!));
+        Assert.True(File.Exists(paths.TryResolveContentPath(result.PreviewImagePath!)!));
         var cached = fetcher.FindCachedArtwork("https://example.com/post");
         Assert.NotNull(cached);
         Assert.False(cached.IsSiteIcon);
@@ -171,7 +171,7 @@ public sealed class LinkPreviewTests : IDisposable
         Assert.Equal(LinkPreviewStatus.Available, result.Status);
         Assert.Equal("Large video page", result.PageTitle);
         Assert.NotNull(result.PreviewImagePath);
-        Assert.True(File.Exists(Path.Combine(_root, result.PreviewImagePath!)));
+        Assert.True(File.Exists(paths.TryResolveContentPath(result.PreviewImagePath!)!));
     }
 
     [Fact]
@@ -202,7 +202,7 @@ public sealed class LinkPreviewTests : IDisposable
         Assert.Equal(LinkPreviewStatus.Available, result.Status);
         Assert.NotNull(result.SiteIconPath);
         Assert.Null(result.PreviewImagePath);
-        Assert.True(File.Exists(Path.Combine(_root, result.SiteIconPath!)));
+        Assert.True(File.Exists(paths.TryResolveContentPath(result.SiteIconPath!)!));
         var cached = fetcher.FindCachedArtwork(
             "https://example.com/private");
         Assert.NotNull(cached);

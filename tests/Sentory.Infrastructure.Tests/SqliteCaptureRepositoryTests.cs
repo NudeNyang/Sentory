@@ -871,10 +871,12 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         Assert.True(settings.LineSupportEnabled);
         Assert.True(settings.WeChatSupportEnabled);
         Assert.False(settings.DiscordAccessibilityPrepared);
+        Assert.True(settings.DiscordAutoRestartConsentGranted);
         Assert.Null(settings.StartWithWindows);
         settings.IsDarkTheme = true;
         settings.ThemeMode = "Dark";
         settings.DiscordAccessibilityPrepared = true;
+        settings.DiscordAutoRestartConsentGranted = true;
         settings.StartWithWindows = false;
         settings.WindowLeft = 120;
         settings.WindowTop = 80;
@@ -895,6 +897,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         Assert.True(restored.LineSupportEnabled);
         Assert.True(restored.WeChatSupportEnabled);
         Assert.True(restored.DiscordAccessibilityPrepared);
+        Assert.True(restored.DiscordAutoRestartConsentGranted);
         Assert.False(restored.StartWithWindows);
         Assert.Equal(120, restored.WindowLeft);
         Assert.Equal(80, restored.WindowTop);

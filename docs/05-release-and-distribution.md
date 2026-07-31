@@ -60,6 +60,7 @@ Tauri 로컬 검수판은 다음 명령으로 만든다.
 설정의 `앱 정보`에서 `지금 확인`을 누르면 GitHub Releases를 즉시 조회한다. 새
 정식 버전이 있으면 공식 Release 페이지를 연다. 2.0.2 Tauri판은 앱 안에서
 패키지를 교체하지 않으므로 사용자가 설치형이나 포터블 파일을 직접 받는다.
+Microsoft Store판에는 이 버튼을 표시하지 않으며 Store가 업데이트를 배포한다.
 
 설치형 패키지는 Inno Setup 6으로 만듭니다. 빌드 PC에 컴파일러가 없으면 다음
 명령으로 설치할 수 있습니다.
@@ -79,6 +80,11 @@ winget install --id JRSoftware.InnoSetup -e
 포터블은 압축을 푼 폴더에서 실행합니다. 두 방식 모두 사용자 데이터는
 `%LOCALAPPDATA%\Sentory`에 저장하며, 프로그램을 제거하거나 실행 파일을
 교체해도 자동으로 삭제하지 않습니다.
+
+Microsoft Store판도 보관함 DB, 사진과 설정은 같은 폴더에 저장한다. 패키지 제거와
+분리해야 하는 로그, 링크 미리보기와 OCR 모델만 MSIX 패키지의
+`LocalState\Sentory`에 둔다. 자세한 제작·검수 절차는
+[`12-microsoft-store-msix.md`](./12-microsoft-store-msix.md)에 정리한다.
 
 ## 공개 저장소 갱신
 

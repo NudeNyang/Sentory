@@ -435,6 +435,12 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
 - Tauri 공개 배포는 x64·ARM64 self-contained 설치형과 포터블 패키지를 제공한다.
 - 설정의 수동 확인은 GitHub에서 더 높은 정식 버전을 찾으면 공식 Release
   페이지를 연다. 패키지 교체는 사용자가 직접 진행한다.
+- Microsoft Store판은 x64·ARM64 MSIX 번들만 제공한다. GitHub 업데이트 확인을
+  표시하지 않고 Store 배포를 업데이트 경로로 사용한다. 보관함 DB·사진·설정은
+  `%LOCALAPPDATA%\Sentory`에 유지하고 로그·링크 미리보기·OCR 모델은 패키지의
+  `LocalState\Sentory`에 둔다.
+- Microsoft Store판의 자동 실행은 매니페스트 `windows.startupTask`와
+  `StartupTask` API만 사용한다. Discord 로그인 시작 레지스트리는 변경하지 않는다.
 - 설치 프로그램은 1.x와 같은 AppId와 설치 위치를 사용해 기존 사용자
   데이터와 자동 실행 설정을 이어받는다.
 - Sentory의 원본 소스는 GNU GPL v3 전용(`GPL-3.0-only`)으로 공개한다.

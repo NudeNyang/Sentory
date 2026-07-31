@@ -62,6 +62,8 @@ public sealed class SentorySettings
 
     public bool DiscordAccessibilityPrepared { get; set; }
 
+    public bool DiscordAutoRestartConsentGranted { get; set; }
+
     public double? WindowLeft { get; set; }
 
     public double? WindowTop { get; set; }
@@ -314,6 +316,7 @@ public sealed class SentorySettingsStore(SentoryDataPaths paths)
                                JsonOptions) ??
                            new SentorySettings();
             MigrateLegacyMessengerDetectionSettings(json, settings);
+            MigrateDiscordAutoRestartConsent(json, settings);
             settings.Normalize();
             return settings;
         }
@@ -416,6 +419,23 @@ public sealed class SentorySettingsStore(SentoryDataPaths paths)
             root,
             nameof(SentorySettings.WeChatSupportEnabled),
             value => settings.WeChatSupportEnabled = value);
+    }
+
+    private static void MigrateDiscordAutoRestartConsent(
+        string json,
+        SentorySettings settings)
+    {
+        using var document = JsonDocument.Parse(json);
+        if (HasProperty(
+                document.RootElement,
+                nameof(SentorySettings.DiscordAutoRestartConsentGranted)))
+        {
+            return;
+        }
+
+        settings.DiscordAutoRestartConsentGranted =
+            settings.DiscordSupportEnabled ||
+            settings.DiscordAccessibilityPrepared;
     }
 
     private static void PreserveLegacyDefault(

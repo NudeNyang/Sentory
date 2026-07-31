@@ -29,7 +29,7 @@ test("fresh settings require setup and start with every source disabled", () => 
 
 test("setup patch persists every source and completion as one update", () => {
   assert.deepEqual(
-    createMessengerSourcePatch(new Set(["Discord", "Line"])),
+    createMessengerSourcePatch(new Set(["Discord", "Line"]), true),
     {
       discordSupportEnabled: true,
       kakaoTalkSupportEnabled: false,
@@ -39,6 +39,7 @@ test("setup patch persists every source and completion as one update", () => {
       lineSupportEnabled: true,
       weChatSupportEnabled: false,
       messengerDetectionSetupCompleted: true,
+      discordAutoRestartConsentGranted: true,
     },
   );
 });
@@ -46,7 +47,10 @@ test("setup patch persists every source and completion as one update", () => {
 test("onboarding and the disabled detection notice are wired into the UI", () => {
   assert.match(markup, /id="messenger-setup-layer"/);
   assert.match(markup, /id="detection-off-banner"/);
-  assert.match(script, /createMessengerSourcePatch\(state\.messengerSetupSources\)/);
+  assert.match(
+    script,
+    /createMessengerSourcePatch\([\s\S]*?state\.messengerSetupSources,[\s\S]*?state\.discordOnboardingConsentGranted/,
+  );
   assert.match(script, /needsMessengerSetup\(state\.settings\)/);
 });
 

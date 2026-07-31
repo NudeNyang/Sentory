@@ -23,7 +23,8 @@
       "assetProtocol": {
         "enable": true,
         "scope": [
-          "$LOCALDATA/Sentory/**"
+          "$LOCALDATA/Sentory/**",
+          "$LOCALDATA/Packages/*/LocalState/Sentory/**"
         ]
       }
     }

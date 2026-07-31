@@ -21,7 +21,6 @@ const TOOLTIP_DELAY_MS = 320;
 const SCROLL_INDICATOR_REVEAL_DISTANCE = 44;
 const SOURCES = MESSENGER_SOURCES;
 const SOURCE_PATCH_KEYS = MESSENGER_SOURCE_PATCH_KEYS;
-const DISCORD_AUTO_RESTART_CONSENT_KEY = "sentory.discord-auto-restart-consent.v1";
 const TRANSLATIONS = {
   "ko-KR": {
     tagline: "이야기 속, 흩어진 순간들을 한 곳에", all: "전체", link: "링크", photo: "사진", image: "사진", typeLink: "링크", collection: "묶음", favorite: "즐겨찾기",
@@ -224,7 +223,7 @@ const state = {
   discordAutoRestartActive: false,
   discordUnavailablePromptShown: false,
   pendingDiscordAutoRestart: null,
-  discordAutoRestartConsentGranted: readDiscordAutoRestartConsent(),
+  discordAutoRestartConsentGranted: false,
   discordOnboardingConsentGranted: false,
   discordAutoRestartConsentPromise: null,
   messengerSetupSources: new Set(),
@@ -334,6 +333,7 @@ const autoCleanupSave = document.querySelector("#auto-cleanup-save");
 const openDataFolder = document.querySelector("#open-data-folder");
 const deleteNonFavorites = document.querySelector("#delete-non-favorites");
 const updateCheck = document.querySelector("#update-check");
+const updateSettingRow = document.querySelector("#update-setting-row");
 const viewLicense = document.querySelector("#view-license");
 const licenseLayer = document.querySelector("#license-layer");
 const licenseClose = document.querySelector("#license-close");
@@ -1090,7 +1090,13 @@ async function persistLatestSourceSetting(source) {
     const enabled = state.pendingSourceSettings.get(source);
     try {
       const settings = await tauriCore().invoke("settings_update", {
-        patch: { [SOURCE_PATCH_KEYS[source]]: enabled },
+        patch: {
+          [SOURCE_PATCH_KEYS[source]]: enabled,
+          ...(source === "Discord" && enabled
+            ? { discordAutoRestartConsentGranted:
+                state.discordAutoRestartConsentGranted }
+            : {}),
+        },
       });
       if (state.pendingSourceSettings.get(source) !== enabled) {
         applySettings(settings);
@@ -1296,30 +1302,9 @@ async function performDiscordRepair(command, args = {}) {
   }
 }
 
-function readDiscordAutoRestartConsent() {
-  try {
-    return window.localStorage.getItem(DISCORD_AUTO_RESTART_CONSENT_KEY) === "accepted";
-  } catch {
-    return false;
-  }
-}
-
-function saveDiscordAutoRestartConsent() {
-  try {
-    window.localStorage.setItem(DISCORD_AUTO_RESTART_CONSENT_KEY, "accepted");
-  } catch {
-    // The in-memory consent still applies for this session.
-  }
-}
-
 function clearDiscordAutoRestartConsent() {
   state.discordAutoRestartConsentGranted = false;
   state.discordOnboardingConsentGranted = false;
-  try {
-    window.localStorage.removeItem(DISCORD_AUTO_RESTART_CONSENT_KEY);
-  } catch {
-    // The in-memory state still resets for this session.
-  }
 }
 
 function syncDiscordAutoRestartConsentWithSettings() {
@@ -1328,12 +1313,9 @@ function syncDiscordAutoRestartConsentWithSettings() {
     clearDiscordAutoRestartConsent();
     return;
   }
-  if (state.settings.sources?.Discord) {
-    state.discordAutoRestartConsentGranted = true;
-    saveDiscordAutoRestartConsent();
-    return;
-  }
-  state.discordAutoRestartConsentGranted = readDiscordAutoRestartConsent();
+  state.discordAutoRestartConsentGranted = Boolean(
+    state.settings.discordAutoRestartConsentGranted,
+  );
   state.discordOnboardingConsentGranted = false;
 }
 
@@ -2869,7 +2851,10 @@ messengerSetupComplete.addEventListener("click", async () => {
   messengerSetupAll.disabled = true;
   messengerSetupComplete.disabled = true;
   const settings = await persistSettings(
-    createMessengerSourcePatch(state.messengerSetupSources),
+    createMessengerSourcePatch(
+      state.messengerSetupSources,
+      state.discordOnboardingConsentGranted,
+    ),
   );
   if (!settings) showToast(t("messengerSetupSaveFailed"));
   messengerSetupAll.disabled = false;
@@ -3036,6 +3021,15 @@ updateCheck.addEventListener("click", async () => {
     updateCheck.disabled = false;
   }
 });
+
+async function configureDistributionUi() {
+  try {
+    const channel = await tauriCore().invoke("distribution_channel");
+    updateSettingRow.hidden = channel !== "github";
+  } catch {
+    updateSettingRow.hidden = true;
+  }
+}
 colorScheme.addEventListener("change", () => {
   if (state.settings?.themeMode === "System") applyThemeMode("System");
 });
@@ -3128,6 +3122,7 @@ bindOverlayScrollIndicator(licenseScrollRegion, licenseText, licenseScrollThumb)
 updateFilterUi();
 updateSortUi();
 updateSelectionUi();
+void configureDistributionUi();
 void (async () => {
   try {
     await connectEngineEvents();
