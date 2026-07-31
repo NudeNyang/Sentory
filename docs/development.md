@@ -431,7 +431,7 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
   저장한다.
 - Windows 기본 경로 `%LOCALAPPDATA%\Sentory`는 기존 사용자와의
   호환을 위해 변경하지 않는다.
-- Tauri 공개 배포는 x64 self-contained 설치형과 포터블 패키지를 제공한다.
+- Tauri 공개 배포는 x64·ARM64 self-contained 설치형과 포터블 패키지를 제공한다.
 - 설정의 수동 확인은 GitHub에서 더 높은 정식 버전을 찾으면 공식 Release
   페이지를 연다. 패키지 교체는 사용자가 직접 진행한다.
 - 설치 프로그램은 1.x와 같은 AppId와 설치 위치를 사용해 기존 사용자
@@ -439,8 +439,9 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
 - Sentory의 원본 소스는 GNU GPL v3 전용(`GPL-3.0-only`)으로 공개한다.
   바이너리 또는 수정본을 배포할 때는 해당 소스와 라이선스 고지를 GPL 조건에
   맞게 함께 제공한다.
-- 코드 서명은 인증서를 준비한 뒤 후속 배포에 적용한다. ARM64 Tauri 패키지는
-  Windows on ARM 장치에서 별도 검수한 뒤 추가한다.
+- 코드 서명은 인증서를 준비한 뒤 후속 배포에 적용한다. ARM64 패키지는 네이티브
+  ARM64 Windows 러너에서 빌드와 자체 점검을 거치며, 실제 메신저 통합 검수는
+  Windows on ARM 장치에서 별도로 진행한다.
 
 세부 구조와 이식 순서는
 [`03-cross-platform-and-distribution-readiness.md`](./03-cross-platform-and-distribution-readiness.md)에

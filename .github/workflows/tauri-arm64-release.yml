@@ -1,0 +1,84 @@
+name: Tauri ARM64 release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without the v prefix
+        required: true
+        default: 2.0.0
+      tag:
+        description: Existing GitHub Release tag
+        required: true
+        default: v2.0.0
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-upload:
+    runs-on: windows-11-vs2026-arm
+    steps:
+      - name: Check out release sources
+        uses: actions/checkout@v5
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/Sentory.Tauri/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-pc-windows-msvc
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          $isccCandidates = @(
+            (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe"),
+            (Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"),
+            (Join-Path $env:ProgramFiles "Inno Setup 6\ISCC.exe"))
+          if (-not ($isccCandidates | Where-Object { Test-Path -LiteralPath $_ })) {
+            winget install --id JRSoftware.InnoSetup --exact --silent `
+              --accept-package-agreements --accept-source-agreements
+          }
+
+      - name: Build ARM64 packages
+        shell: pwsh
+        run: |
+          .\scripts\Publish-TauriRelease.ps1 `
+            -Version '${{ inputs.version }}' `
+            -Architecture arm64 `
+            -SkipSourceArchive `
+            -SkipManifest
+
+      - name: Keep workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sentory-${{ inputs.version }}-win-arm64
+          path: |
+            artifacts/Sentory-win-arm64-portable.zip
+            artifacts/Sentory-win-arm64-portable.zip.sha256
+            artifacts/Sentory-win-arm64-setup.exe
+            artifacts/Sentory-win-arm64-setup.exe.sha256
+          if-no-files-found: error
+
+      - name: Add ARM64 files to the existing release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload '${{ inputs.tag }}' `
+            artifacts/Sentory-win-arm64-portable.zip `
+            artifacts/Sentory-win-arm64-portable.zip.sha256 `
+            artifacts/Sentory-win-arm64-setup.exe `
+            artifacts/Sentory-win-arm64-setup.exe.sha256 `
+            --clobber
