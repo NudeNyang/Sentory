@@ -41,7 +41,7 @@ test("enabling Discord requires one-time automatic restart consent", () => {
   );
   assert.match(
     script,
-    /async function ensureDiscordAutoRestartConsent\(\)[\s\S]*?discordAutoRestartConsentTitle[\s\S]*?discordAutoRestartConsentAction/,
+    /async function ensureDiscordAutoRestartConsent\([\s\S]*?discordAutoRestartConsentTitle[\s\S]*?discordAutoRestartConsentAction/,
   );
   assert.match(
     script,

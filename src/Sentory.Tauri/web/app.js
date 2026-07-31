@@ -225,6 +225,7 @@ const state = {
   discordUnavailablePromptShown: false,
   pendingDiscordAutoRestart: null,
   discordAutoRestartConsentGranted: readDiscordAutoRestartConsent(),
+  discordOnboardingConsentGranted: false,
   discordAutoRestartConsentPromise: null,
   messengerSetupSources: new Set(),
   pendingSourceSettings: new Map(),
@@ -1178,7 +1179,9 @@ function renderMessengerSetup() {
     track.className = "switch-track";
     input.addEventListener("change", async () => {
       if (source === "Discord" && input.checked) {
-        const confirmed = await ensureDiscordAutoRestartConsent();
+        const confirmed = await ensureDiscordAutoRestartConsent({
+          requireOnboardingPrompt: true,
+        });
         if (!confirmed) {
           input.checked = false;
           return;
@@ -1312,9 +1315,21 @@ function adoptDiscordAutoRestartConsentForExistingSetting() {
   saveDiscordAutoRestartConsent();
 }
 
-async function ensureDiscordAutoRestartConsent() {
-  if (state.discordAutoRestartConsentGranted) return true;
-  if (state.discordAutoRestartConsentPromise) return state.discordAutoRestartConsentPromise;
+async function ensureDiscordAutoRestartConsent(
+  { requireOnboardingPrompt = false } = {},
+) {
+  if (requireOnboardingPrompt
+      ? state.discordOnboardingConsentGranted
+      : state.discordAutoRestartConsentGranted) {
+    return true;
+  }
+  if (state.discordAutoRestartConsentPromise) {
+    const confirmed = await state.discordAutoRestartConsentPromise;
+    if (confirmed && requireOnboardingPrompt) {
+      state.discordOnboardingConsentGranted = true;
+    }
+    return confirmed;
+  }
   state.discordAutoRestartConsentPromise = (async () => {
     const confirmed = await askConfirmation(
       t("discordAutoRestartConsentTitle"),
@@ -1323,6 +1338,9 @@ async function ensureDiscordAutoRestartConsent() {
     );
     if (confirmed) {
       state.discordAutoRestartConsentGranted = true;
+      if (requireOnboardingPrompt) {
+        state.discordOnboardingConsentGranted = true;
+      }
       saveDiscordAutoRestartConsent();
     }
     return confirmed;
@@ -2811,7 +2829,9 @@ detectionOffAction.addEventListener(
 );
 messengerSetupAll.addEventListener("click", async () => {
   if (!state.messengerSetupSources.has("Discord")) {
-    const confirmed = await ensureDiscordAutoRestartConsent();
+    const confirmed = await ensureDiscordAutoRestartConsent({
+      requireOnboardingPrompt: true,
+    });
     if (!confirmed) {
       state.messengerSetupSources = new Set(
         SOURCES.filter((source) => source !== "Discord"),

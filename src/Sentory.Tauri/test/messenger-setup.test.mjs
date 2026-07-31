@@ -75,11 +75,19 @@ test("messenger toggles render immediately and save through the async latest-val
 test("Discord consent is required from both onboarding selection paths", () => {
   assert.match(
     script,
-    /function renderMessengerSetup\(\)[\s\S]*?source === "Discord" && input\.checked[\s\S]*?ensureDiscordAutoRestartConsent\(\)/,
+    /discordOnboardingConsentGranted: false/,
   );
   assert.match(
     script,
-    /messengerSetupAll\.addEventListener\("click", async \(\) => \{[\s\S]*?ensureDiscordAutoRestartConsent\(\)/,
+    /function renderMessengerSetup\(\)[\s\S]*?source === "Discord" && input\.checked[\s\S]*?ensureDiscordAutoRestartConsent\(\{\s*requireOnboardingPrompt: true,?\s*\}\)/,
+  );
+  assert.match(
+    script,
+    /messengerSetupAll\.addEventListener\("click", async \(\) => \{[\s\S]*?ensureDiscordAutoRestartConsent\(\{\s*requireOnboardingPrompt: true,?\s*\}\)/,
+  );
+  assert.match(
+    script,
+    /async function ensureDiscordAutoRestartConsent\([\s\S]*?requireOnboardingPrompt = false[\s\S]*?state\.discordOnboardingConsentGranted/,
   );
   assert.match(
     script,
