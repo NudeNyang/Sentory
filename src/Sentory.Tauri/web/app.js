@@ -227,6 +227,8 @@ const state = {
   discordAutoRestartConsentGranted: readDiscordAutoRestartConsent(),
   discordAutoRestartConsentPromise: null,
   messengerSetupSources: new Set(),
+  pendingSourceSettings: new Map(),
+  sourceSettingSaves: new Map(),
 };
 
 const scroller = document.querySelector("#scroller");
@@ -724,7 +726,10 @@ function syncAllEnhancedSelects() {
 }
 
 function applySettings(settings, { replaceTheme = false } = {}) {
-  state.settings = mergeSettingsSnapshot(state.settings, settings, { replaceTheme });
+  state.settings = mergeSettingsSnapshot(state.settings, settings, {
+    replaceTheme,
+    pendingSources: state.pendingSourceSettings,
+  });
   state.syncMode = state.settings.sync?.provider === "WebDav" ? "WebDav" : "Folder";
   languageSetting.value = state.settings.language || "auto";
   applyLocalizedUi(state.settings.language || "auto");
@@ -1058,6 +1063,53 @@ async function persistSettings(patch) {
   }
 }
 
+function updateSourceSetting(source, enabled) {
+  if (!state.settings?.sources) return;
+  state.pendingSourceSettings.set(source, enabled);
+  state.settings.sources[source] = enabled;
+  renderSourceSettings();
+  renderDetectionOffBanner();
+  scheduleSourceSettingSave(source);
+}
+
+function scheduleSourceSettingSave(source) {
+  if (state.sourceSettingSaves.has(source)) return;
+  const save = persistLatestSourceSetting(source).finally(() => {
+    state.sourceSettingSaves.delete(source);
+    if (state.pendingSourceSettings.has(source)) {
+      scheduleSourceSettingSave(source);
+    }
+  });
+  state.sourceSettingSaves.set(source, save);
+}
+
+async function persistLatestSourceSetting(source) {
+  while (state.pendingSourceSettings.has(source)) {
+    const enabled = state.pendingSourceSettings.get(source);
+    try {
+      const settings = await tauriCore().invoke("settings_update", {
+        patch: { [SOURCE_PATCH_KEYS[source]]: enabled },
+      });
+      if (state.pendingSourceSettings.get(source) !== enabled) {
+        applySettings(settings);
+        continue;
+      }
+
+      state.pendingSourceSettings.delete(source);
+      applySettings(settings);
+      showToast(t(
+        enabled ? "sourceEnabled" : "sourceDisabled",
+        sourceLabel(source),
+      ));
+    } catch {
+      if (state.pendingSourceSettings.get(source) !== enabled) continue;
+      state.pendingSourceSettings.delete(source);
+      await loadSettings();
+      showToast(t("sourceSettingFailed", sourceLabel(source)));
+    }
+  }
+}
+
 function sourceRuntimeLabel(source) {
   if (!state.settings?.sources?.[source]) return { text: t("disabledSource", sourceLabel(source)), tone: "" };
   if (state.runtimeStatus?.detectionPaused) return { text: t("detectionPaused"), tone: "" };
@@ -1181,12 +1233,7 @@ function renderSourceSettings() {
         }
         state.discordAutoRestartProcessId = null;
       }
-      state.settings.sources[source] = enabled;
-      renderSourceSettings();
-      renderDetectionOffBanner();
-      const settings = await persistSettings({ [SOURCE_PATCH_KEYS[source]]: enabled });
-      const displaySource = sourceLabel(source);
-      showToast(settings ? t(enabled ? "sourceEnabled" : "sourceDisabled", displaySource) : t("sourceSettingFailed", displaySource));
+      updateSourceSetting(source, enabled);
     });
     switchLabel.append(input, track);
     control.append(switchLabel);

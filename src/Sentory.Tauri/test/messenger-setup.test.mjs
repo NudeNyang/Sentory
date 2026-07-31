@@ -56,3 +56,18 @@ test("setup copy keeps only the later settings guidance", () => {
   assert.doesNotMatch(script, /이 컴퓨터에서 감지할 수 있습니다/);
   assert.doesNotMatch(script, /messengerAvailable/);
 });
+
+test("messenger toggles render immediately and save through the async latest-value queue", () => {
+  assert.match(
+    script,
+    /state\.pendingSourceSettings\.set\(source, enabled\);[\s\S]*renderSourceSettings\(\);[\s\S]*scheduleSourceSettingSave\(source\);/,
+  );
+  assert.match(
+    script,
+    /while \(state\.pendingSourceSettings\.has\(source\)\)/,
+  );
+  assert.match(
+    script,
+    /input\.addEventListener\("change", \(\) => \{[\s\S]*updateSourceSetting\(source, enabled\);/,
+  );
+});

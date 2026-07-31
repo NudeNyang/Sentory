@@ -21,3 +21,21 @@ test("an authoritative settings load may replace the current theme", () => {
     "Light",
   );
 });
+
+test("a delayed snapshot cannot roll back a pending messenger toggle", () => {
+  const current = {
+    themeMode: "Light",
+    sources: { Discord: true, Slack: false },
+  };
+  const delayed = {
+    themeMode: "Light",
+    sources: { Discord: false, Slack: false },
+  };
+
+  assert.deepEqual(
+    mergeSettingsSnapshot(current, delayed, {
+      pendingSources: new Map([["Discord", true]]),
+    }).sources,
+    { Discord: true, Slack: false },
+  );
+});
