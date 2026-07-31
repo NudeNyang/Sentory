@@ -51,6 +51,34 @@ test("enabling Discord requires one-time automatic restart consent", () => {
     script,
     /if \(!confirmed\) \{[\s\S]{0,120}input\.checked = false;[\s\S]{0,120}return;/,
   );
+  assert.match(
+    script,
+    /작성 중인 메시지가 취소되거나 통화가 종료될 수 있습니다\./,
+  );
+  assert.doesNotMatch(
+    script,
+    /작성 중인 메시지와 진행 중인 통화가 종료될 수 있습니다\./,
+  );
+});
+
+test("Discord consent persists only after an enabled setting is saved", () => {
+  const consentFunction = script.match(
+    /async function ensureDiscordAutoRestartConsent\([\s\S]*?\n}\r?\n\r?\nasync function scheduleDiscordAutomaticRestart/,
+  )?.[0] ?? "";
+
+  assert.doesNotMatch(consentFunction, /saveDiscordAutoRestartConsent\(\)/);
+  assert.match(
+    script,
+    /function syncDiscordAutoRestartConsentWithSettings\(\)[\s\S]*?needsMessengerSetup\(state\.settings\)[\s\S]*?clearDiscordAutoRestartConsent\(\)[\s\S]*?sources\?\.Discord[\s\S]*?saveDiscordAutoRestartConsent\(\)/,
+  );
+  assert.match(
+    script,
+    /async function persistSettings\(patch\)[\s\S]*?applySettings\(settings\);[\s\S]{0,120}syncDiscordAutoRestartConsentWithSettings\(\)/,
+  );
+  assert.match(
+    script,
+    /async function persistLatestSourceSetting\(source\)[\s\S]*?applySettings\(settings\);[\s\S]{0,160}syncDiscordAutoRestartConsentWithSettings\(\)/,
+  );
 });
 
 test("automatic Discord restart is gated by the same consent", () => {
@@ -63,10 +91,10 @@ test("automatic Discord restart is gated by the same consent", () => {
 test("an existing enabled Discord setting is grandfathered before pending restarts", () => {
   assert.match(
     script,
-    /async function loadSettings\(\)[\s\S]*?applySettings[\s\S]{0,160}adoptDiscordAutoRestartConsentForExistingSetting\(\)[\s\S]{0,220}scheduleDiscordAutomaticRestart/,
+    /async function loadSettings\(\)[\s\S]*?applySettings[\s\S]{0,160}syncDiscordAutoRestartConsentWithSettings\(\)[\s\S]{0,220}scheduleDiscordAutomaticRestart/,
   );
   assert.match(
     script,
-    /function adoptDiscordAutoRestartConsentForExistingSetting\(\)[\s\S]*?settings\?\.sources\?\.Discord[\s\S]*?saveDiscordAutoRestartConsent\(\)/,
+    /function syncDiscordAutoRestartConsentWithSettings\(\)[\s\S]*?settings\.sources\?\.Discord[\s\S]*?saveDiscordAutoRestartConsent\(\)/,
   );
 });

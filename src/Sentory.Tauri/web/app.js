@@ -41,9 +41,9 @@ const TRANSLATIONS = {
     close: "알림 닫기", detail: "Sentory 항목 상세", favoriteMarked: "★ 즐겨찾기", captureCount: "저장 횟수", copyCountLabel: "복사 횟수", messageSource: "마지막 출처", savedAt: "마지막 저장", photos: "사진", collectionLinks: "링크", previousPhoto: "이전 사진", nextPhoto: "다음 사진", copyCurrentPhoto: "현재 사진 복사", previousLink: "이전 링크", nextLink: "다음 링크", collectionItems: n => `항목 ${n.toLocaleString("ko-KR")}개`, collectionTitle: (photos, links) => `사진 ${photos.toLocaleString("ko-KR")}개 · 링크 ${links.toLocaleString("ko-KR")}개`,
     times: n => `${n.toLocaleString("ko-KR")}회`, openPhoto: "사진 열기", openLink: "링크 열기", openPreview: "원본 바로 열기", copyPhoto: "사진 복사", copyUrl: "URL 복사", copyCollection: "묶음 복사", delete: "삭제", openOriginal: "원본 열기", openOriginalFolder: "원본 폴더 열기", openOriginalLink: "원본 링크 열기", cancel: "취소", deleteQuestion: n => n === 1 ? "항목을 삭제할까요?" : `선택한 ${n.toLocaleString("ko-KR")}개 항목을 삭제할까요?`,
     deleteWarning: n => n === 1 ? "이 항목을 보관함에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다." : "선택한 항목과 저장된 사진 파일을 보관함에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다.", deleted: n => `${n.toLocaleString("ko-KR")}개 항목을 삭제했습니다.`,
-    repairQuestion: "Discord를 다시 연결할까요?", repairWarning: "Discord를 접근성 모드로 다시 시작합니다. 작성 중인 메시지와 진행 중인 통화가 종료될 수 있습니다.", restart: "다시 시작",
+    repairQuestion: "Discord를 다시 연결할까요?", repairWarning: "Discord를 접근성 모드로 다시 시작합니다. 작성 중인 메시지가 취소되거나 통화가 종료될 수 있습니다.", restart: "다시 시작",
     discordDefaultOffTitle: "Discord 감지는 기본으로 꺼져 있어요", discordDefaultOffMessage: "Discord 감지는 앱을 다시 시작해야 할 수 있어 처음에는 사용하지 않습니다. 필요하면 설정의 메신저 감지에서 직접 켤 수 있어요.", discordDefaultOffAction: "설정에서 확인",
-    discordAutoRestartConsentTitle: "Discord 자동 재시작을 허용할까요?", discordAutoRestartConsentMessage: "Discord 감지를 켜면 필요한 접근성 실행 옵션이 없을 때 15초 안내 후 Discord를 자동으로 다시 시작합니다.\n작성 중인 메시지와 진행 중인 통화가 종료될 수 있습니다.", discordAutoRestartConsentAction: "동의하고 켜기", discordAutoRestartConsentDeclined: "동의하지 않아 Discord 자동 재시작을 진행하지 않았습니다. 설정에서 직접 다시 연결할 수 있어요.",
+    discordAutoRestartConsentTitle: "Discord 자동 재시작을 허용할까요?", discordAutoRestartConsentMessage: "Discord 감지를 켜면 필요한 접근성 실행 옵션이 없을 때 15초 안내 후 Discord를 자동으로 다시 시작합니다.\n작성 중인 메시지가 취소되거나 통화가 종료될 수 있습니다.", discordAutoRestartConsentAction: "동의하고 켜기", discordAutoRestartConsentDeclined: "동의하지 않아 Discord 자동 재시작을 진행하지 않았습니다. 설정에서 직접 다시 연결할 수 있어요.",
     discordAutoRestartTitle: "Discord 감지 연결을 준비할게요", discordAutoRestartCountdown: seconds => `Discord에 필요한 접근성 인자가 없습니다.\n작성 중인 메시지와 통화를 보호하려면 취소해 주세요.\n${seconds}초 뒤 Discord를 자동으로 다시 시작합니다.`, discordAutoRestartCancelled: "Discord 자동 재시작을 취소했습니다. 설정에서 언제든 다시 연결할 수 있어요.",
     discordSendWarningTitle: "지금 보낸 항목은 저장되지 않았어요", discordSendWarningMessage: "Discord 감지가 연결되지 않은 상태에서 붙여넣기 또는 드롭이 감지됐습니다. 이후 항목을 저장하려면 Discord를 접근성 모드로 다시 시작해야 합니다.",
     repairing: "워커 복구 중", repaired: "Discord를 연결 복구 모드로 다시 시작했습니다.", settingsFailed: "Sentory를 시작하지 못했습니다",
@@ -1041,7 +1041,7 @@ async function configureTray() {
 async function loadSettings() {
   try {
     applySettings(await tauriCore().invoke("settings_get"), { replaceTheme: true });
-    adoptDiscordAutoRestartConsentForExistingSetting();
+    syncDiscordAutoRestartConsentWithSettings();
     if (state.pendingDiscordAutoRestart) {
       const pending = state.pendingDiscordAutoRestart;
       state.pendingDiscordAutoRestart = null;
@@ -1057,6 +1057,7 @@ async function persistSettings(patch) {
   try {
     const settings = await tauriCore().invoke("settings_update", { patch });
     applySettings(settings);
+    syncDiscordAutoRestartConsentWithSettings();
     return settings;
   } catch {
     await loadSettings();
@@ -1093,11 +1094,13 @@ async function persistLatestSourceSetting(source) {
       });
       if (state.pendingSourceSettings.get(source) !== enabled) {
         applySettings(settings);
+        syncDiscordAutoRestartConsentWithSettings();
         continue;
       }
 
       state.pendingSourceSettings.delete(source);
       applySettings(settings);
+      syncDiscordAutoRestartConsentWithSettings();
       showToast(t(
         enabled ? "sourceEnabled" : "sourceDisabled",
         sourceLabel(source),
@@ -1309,10 +1312,29 @@ function saveDiscordAutoRestartConsent() {
   }
 }
 
-function adoptDiscordAutoRestartConsentForExistingSetting() {
-  if (!state.settings?.sources?.Discord || state.discordAutoRestartConsentGranted) return;
-  state.discordAutoRestartConsentGranted = true;
-  saveDiscordAutoRestartConsent();
+function clearDiscordAutoRestartConsent() {
+  state.discordAutoRestartConsentGranted = false;
+  state.discordOnboardingConsentGranted = false;
+  try {
+    window.localStorage.removeItem(DISCORD_AUTO_RESTART_CONSENT_KEY);
+  } catch {
+    // The in-memory state still resets for this session.
+  }
+}
+
+function syncDiscordAutoRestartConsentWithSettings() {
+  if (!state.settings) return;
+  if (needsMessengerSetup(state.settings)) {
+    clearDiscordAutoRestartConsent();
+    return;
+  }
+  if (state.settings.sources?.Discord) {
+    state.discordAutoRestartConsentGranted = true;
+    saveDiscordAutoRestartConsent();
+    return;
+  }
+  state.discordAutoRestartConsentGranted = readDiscordAutoRestartConsent();
+  state.discordOnboardingConsentGranted = false;
 }
 
 async function ensureDiscordAutoRestartConsent(
@@ -1341,7 +1363,6 @@ async function ensureDiscordAutoRestartConsent(
       if (requireOnboardingPrompt) {
         state.discordOnboardingConsentGranted = true;
       }
-      saveDiscordAutoRestartConsent();
     }
     return confirmed;
   })();
