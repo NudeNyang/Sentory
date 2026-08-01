@@ -213,6 +213,7 @@ const state = {
   startupEnabled: false,
   dataStatistics: null,
   locale: "ko-KR",
+  versionSuffix: "",
   settingsBusy: false,
   syncMode: "Folder",
   syncCandidates: [],
@@ -563,7 +564,8 @@ function applyLocalizedUi(language) {
   document.querySelector("#auto-cleanup-title").textContent = t("autoCleanup");
   document.querySelector("#auto-cleanup-description").textContent = t("autoCleanupDefault");
   document.querySelector("#app-info-heading").textContent = t("appInfo");
-  document.querySelector("#version-label").textContent = t("version", "2.0.2");
+  document.querySelector("#version-label").textContent =
+    `${t("version", "2.0.2")}${state.versionSuffix}`;
   document.querySelector("#update-title").textContent = t("checkForUpdates");
   document.querySelector("#update-description").textContent = t("checkForUpdatesDescription");
   document.querySelector("#copyright-label").textContent = t("copyrightNotice");
@@ -3024,7 +3026,13 @@ updateCheck.addEventListener("click", async () => {
 
 async function configureDistributionUi() {
   try {
-    const channel = await tauriCore().invoke("distribution_channel");
+    const [channel, versionSuffix] = await Promise.all([
+      tauriCore().invoke("distribution_channel"),
+      tauriCore().invoke("build_version_suffix"),
+    ]);
+    state.versionSuffix = typeof versionSuffix === "string" ? versionSuffix : "";
+    document.querySelector("#version-label").textContent =
+      `${t("version", "2.0.2")}${state.versionSuffix}`;
     updateSettingRow.hidden = channel !== "github";
   } catch {
     updateSettingRow.hidden = true;

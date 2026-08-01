@@ -564,6 +564,15 @@ fn distribution_channel() -> &'static str {
     DISTRIBUTION_CHANNEL
 }
 
+#[tauri::command]
+fn build_version_suffix() -> &'static str {
+    if cfg!(feature = "developer-build") {
+        " · for Developers"
+    } else {
+        ""
+    }
+}
+
 #[cfg(windows)]
 fn store_application_data_root() -> Result<PathBuf, String> {
     use windows::Storage::ApplicationData;
@@ -1819,6 +1828,7 @@ fn main() {
             open_data_directory,
             open_external_url,
             distribution_channel,
+            build_version_suffix,
             license_text,
             window_theme_set,
             update_check,

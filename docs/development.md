@@ -117,6 +117,8 @@ Tauri 앱의 제목 표시줄 닫기는 앱을 종료하지 않고 창을 알림
   `시스템 테마 모드를 적용했습니다.`라고 안내한다.
 - 개발자 검수판의 `for Developers` 표시는 설정의 버전 문구 오른쪽에 같은
   글자 크기와 색상으로 표시하며 별도 캡슐이나 강조 배경을 사용하지 않는다.
+  `Build-TauriPreview.ps1`로 만든 빌드에만 런타임 표시하고, `Build-Tauri.ps1`로
+  만드는 공개 GitHub판과 Microsoft Store판에는 표시하지 않는다.
 
 ## Discord URL 캡처 필수 게이트
 

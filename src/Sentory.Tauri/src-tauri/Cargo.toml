@@ -6,6 +6,7 @@ edition = "2021"
 
 [features]
 default = []
+developer-build = []
 microsoft-store = []
 
 [build-dependencies]

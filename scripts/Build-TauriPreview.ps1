@@ -8,7 +8,8 @@ param(
 $ErrorActionPreference = "Stop"
 & (Join-Path $PSScriptRoot "Build-Tauri.ps1") `
     -Configuration $Configuration `
-    -Architecture $Architecture
+    -Architecture $Architecture `
+    -DeveloperBuild
 if ($LASTEXITCODE -ne 0) {
     throw "Tauri 개발자판 빌드에 실패했습니다."
 }

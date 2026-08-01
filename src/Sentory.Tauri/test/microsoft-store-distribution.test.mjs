@@ -31,7 +31,8 @@ test("the Store channel has no in-app update path", () => {
 
 test("Store packages are built from Store-channel source for x64 and ARM64", () => {
   assert.match(cargo, /microsoft-store\s*=\s*\[\]/);
-  assert.match(buildScript, /--features", "microsoft-store"/);
+  assert.match(buildScript, /\$features \+= "microsoft-store"/);
+  assert.match(buildScript, /\$tauriArguments \+= @\("--features"/);
   assert.match(bundleScript, /\[string\[\]\]\$Architectures = @\("x64", "arm64"\)/);
   assert.match(bundleScript, /foreach \(\$architecture in \$Architectures\)/);
   assert.match(bundleScript, /-DistributionChannel MicrosoftStore/);

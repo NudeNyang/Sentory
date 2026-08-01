@@ -4,10 +4,14 @@ param(
     [ValidateSet("x64", "arm64")]
     [string]$Architecture = "x64",
     [ValidateSet("GitHub", "MicrosoftStore")]
-    [string]$DistributionChannel = "GitHub"
+    [string]$DistributionChannel = "GitHub",
+    [switch]$DeveloperBuild
 )
 
 $ErrorActionPreference = "Stop"
+if ($DeveloperBuild -and $DistributionChannel -ne "GitHub") {
+    throw "개발자 검수 표시는 GitHub 채널 빌드에서만 사용할 수 있습니다."
+}
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $tauriRoot = Join-Path $repositoryRoot "src\Sentory.Tauri"
 $cargoBin = Join-Path $env:USERPROFILE ".cargo\bin"
@@ -85,8 +89,15 @@ try {
         "--no-bundle",
         "--target",
         $targetTriple)
+    $features = @()
     if ($DistributionChannel -eq "MicrosoftStore") {
-        $tauriArguments += @("--features", "microsoft-store")
+        $features += "microsoft-store"
+    }
+    if ($DeveloperBuild) {
+        $features += "developer-build"
+    }
+    if ($features.Count -gt 0) {
+        $tauriArguments += @("--features", ($features -join ","))
     }
     & npm @tauriArguments
     if ($LASTEXITCODE -ne 0) {

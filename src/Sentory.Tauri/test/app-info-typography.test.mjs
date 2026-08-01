@@ -6,6 +6,10 @@ const html = readFileSync(new URL("../web/index.html", import.meta.url), "utf8")
 const css = readFileSync(new URL("../web/styles.css", import.meta.url), "utf8");
 const script = readFileSync(new URL("../web/app.js", import.meta.url), "utf8");
 const tauriConfig = readFileSync(new URL("../src-tauri/tauri.conf.json", import.meta.url), "utf8");
+const cargo = readFileSync(new URL("../src-tauri/Cargo.toml", import.meta.url), "utf8");
+const rust = readFileSync(new URL("../src-tauri/src/main.rs", import.meta.url), "utf8");
+const buildScript = readFileSync(new URL("../../../scripts/Build-Tauri.ps1", import.meta.url), "utf8");
+const previewBuildScript = readFileSync(new URL("../../../scripts/Build-TauriPreview.ps1", import.meta.url), "utf8");
 
 test("app info typography keeps the WPF semantic roles", () => {
   for (const className of [
@@ -76,6 +80,18 @@ test("the public 2.0.2 identity has no preview or developer marker", () => {
   assert.doesNotMatch(`${html}\n${script}\n${tauriConfig}`, /for Developers|Tauri Preview|com\.sentory\.preview/);
   assert.match(tauriConfig, /"productName": "Sentory"/);
   assert.match(tauriConfig, /"identifier": "com\.nudenyang\.sentory"/);
+});
+
+test("developer review builds add the developer marker at runtime only", () => {
+  assert.match(cargo, /developer-build\s*=\s*\[\]/);
+  assert.match(buildScript, /\[switch\]\$DeveloperBuild/);
+  assert.match(buildScript, /"developer-build"/);
+  assert.match(previewBuildScript, /-DeveloperBuild/);
+  assert.match(rust, /cfg!\(feature = "developer-build"\)/);
+  assert.match(rust, /fn build_version_suffix\(\)/);
+  assert.match(rust, /for Developers/);
+  assert.match(script, /invoke\("build_version_suffix"\)/);
+  assert.match(script, /state\.versionSuffix/);
 });
 
 test("manual update checks are exposed only on the GitHub channel", () => {
