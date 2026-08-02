@@ -94,6 +94,23 @@ SmartScreen 경고가 나타날 수 있습니다. 이 저장소의 공식 Releas
 파일인지 확인하고, 필요하면 함께 제공되는 `.sha256` 파일과 SHA-256 값을
 비교해 주세요.
 
+## Code signing policy
+
+Sentory는 SignPath Foundation의 오픈소스 코드 서명 프로그램을 신청 중입니다.
+승인 이후 공식 Windows Release는 GitHub Actions에서 빌드하고, 담당자가 직접
+승인한 파일만 SignPath.io를 통해 서명합니다.
+
+**Free code signing provided by SignPath.io, certificate by SignPath Foundation.**
+
+- Committers and reviewers: [NudeNyang](https://github.com/NudeNyang)
+- Approvers: [NudeNyang](https://github.com/NudeNyang)
+- 개인정보 처리: [개인정보 및 로컬 데이터 안내](./docs/privacy.md)
+- 전체 정책과 현재 적용 상태: [Code signing policy](./docs/code-signing-policy.md)
+
+SignPath Foundation 명의의 유효한 Authenticode 서명이 있는 파일에만 이 코드
+서명 안내가 적용됩니다. 신청 승인과 서명 파이프라인 전환이 끝나기 전의 Release는
+계속 미서명 상태이며, 각 Release의 `.sha256` 파일로 무결성을 확인할 수 있습니다.
+
 ## 처음 사용하기
 
 1. Sentory를 실행합니다. 보관함 창과 작업 표시줄 아이콘이 함께 나타납니다.
@@ -173,6 +190,7 @@ Copyright © 2026 NudeNyang
 
 - [GNU GPL v3 전체 내용](./LICENSE.txt)
 - [개인정보 및 로컬 데이터](./docs/privacy.md)
+- [Code signing policy](./docs/code-signing-policy.md)
 - [제3자 구성 요소](./distribution/THIRD-PARTY-NOTICES.txt)
 - [변경 기록](./CHANGELOG.md)
 - [지원 정책](./docs/support.md)

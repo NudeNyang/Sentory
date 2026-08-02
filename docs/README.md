@@ -6,6 +6,7 @@
 
 - [English README](./README.en.md)
 - [개인정보 및 로컬 데이터](./privacy.md)
+- [Code signing policy](./code-signing-policy.md)
 - [지원 정책](./support.md)
 
 ## 개발 및 배포

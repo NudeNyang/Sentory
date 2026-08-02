@@ -92,6 +92,23 @@ The current binaries are not code-signed. Windows may show an Unknown Publisher 
 SmartScreen warning. Confirm that the file came from this repository's official
 Release, and compare its SHA-256 value with the accompanying `.sha256` file if needed.
 
+## Code signing policy
+
+Sentory is applying to the SignPath Foundation open-source code-signing program. Once
+the application is approved, official Windows releases will be built on GitHub-hosted
+Actions runners and signed through SignPath.io only after manual approval.
+
+**Free code signing provided by SignPath.io, certificate by SignPath Foundation.**
+
+- Committers and reviewers: [NudeNyang](https://github.com/NudeNyang)
+- Approvers: [NudeNyang](https://github.com/NudeNyang)
+- Privacy policy: [Privacy and local data](./privacy.md)
+- Full policy and current rollout status: [Code signing policy](./code-signing-policy.md)
+
+This statement applies only to files with a valid Authenticode signature issued in
+the name of SignPath Foundation. Releases published before approval and pipeline
+activation remain unsigned and can be checked with their accompanying SHA-256 files.
+
 ## Getting started
 
 1. Run Sentory. The library window and taskbar icon appear together.
@@ -164,6 +181,7 @@ Copyright © 2026 NudeNyang
 
 - [GNU GPL v3 license text](../LICENSE.txt)
 - [Privacy and local data](./privacy.md)
+- [Code signing policy](./code-signing-policy.md)
 - [Third-party notices](../distribution/THIRD-PARTY-NOTICES.txt)
 - [Changelog](../CHANGELOG.md)
 - [Support policy](./support.md)

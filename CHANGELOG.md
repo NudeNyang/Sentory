@@ -2,6 +2,14 @@
 
 ## 개발 중
 
+- SignPath Foundation 오픈소스 코드 서명 신청을 위해 README와 영문 안내에
+  `Code signing policy`, 담당 역할, 개인정보 정책과 현재 미서명 상태를 명시했다.
+- x64와 ARM64의 미서명 후보를 GitHub 호스팅 러너에서 만드는 수동 Actions
+  워크플로를 추가했다. 승인 전에는 Release로 배포하지 않고, SignPath 조직·정책·
+  Artifact Configuration과 CI 토큰이 발급된 뒤 서명 요청 단계를 연결한다.
+- 서명 대상, GitHub 출처 검증, 수동 승인, 제3자 구성 요소 제외, 최종 서명 뒤
+  SHA-256 재생성과 Authenticode 검증 절차를 배포 문서에 정리했다.
+
 ## 2.0.3 — 2026-08-02
 
 - 일본어와 중국어 화면의 카드 복사 횟수가 영어로 표시되던 문제를 고쳤다.

@@ -147,6 +147,36 @@ Tauri 정식판은 `Publish-TauriRelease.ps1`이 포터블 자체 점검을 실�
 배포에 사용하지 않습니다. 현재 업데이트 신뢰 경계는 GitHub 계정, Release 쓰기
 권한과 SHA-256 자산이므로 계정 다중 인증과 최소 권한을 유지해야 합니다.
 
+## SignPath Foundation 전환 준비
+
+SignPath Foundation 오픈소스 코드 서명을 신청하는 동안에는
+`.github/workflows/tauri-signpath-candidate.yml`을 수동 실행해 x64와 ARM64의
+미서명 후보를 GitHub 호스팅 러너에서 만든다. 이 후보는 GitHub Release에
+게시하지 않고 워크플로 artifact로만 보관한다. Foundation 승인 전에는 SignPath
+제공을 받았다고 표시하거나 미서명 파일을 서명본으로 안내하지 않는다.
+
+승인 후에는 다음 순서로 전환한다.
+
+1. SignPath GitHub App에 공식 저장소 접근 권한을 부여한다.
+2. SignPath 프로젝트에 GitHub.com Trusted Build System과 저장소를 연결한다.
+3. x64·ARM64 포터블과 Inno Setup 설치형 샘플로 Artifact Configuration을 만들고,
+   Sentory 소유 PE만 서명하며 제3자 구성 요소는 제외한다.
+4. 제품명 `Sentory`와 요청한 버전이 PE 메타데이터에 일치하도록 제한한다.
+5. `main`과 정식 태그에서 나온 GitHub 호스팅 러너 빌드만 release-signing 정책이
+   받도록 제한하고, 매 요청에 수동 승인을 요구한다.
+6. CI 제출 토큰은 GitHub Actions Secret에만 저장한다. 조직 ID, 프로젝트 slug,
+   정책 slug와 Artifact Configuration slug를 확정한 다음 SignPath 공식 Action을
+   후보 빌드와 연결한다.
+7. 내부 `Sentory.exe`와 `sentory-engine.exe`를 먼저 서명한 뒤 포터블 ZIP과 Inno
+   Setup 설치형을 만들고, 마지막으로 설치형 자체를 서명한다. 최종 파일에서
+   SHA-256과 `release-manifest.json`을 다시 만든다.
+8. `signtool verify /pa /all /v`로 모든 Sentory 실행 파일과 설치형의 서명, 인증서
+   체인과 타임스탬프를 확인한 뒤에만 GitHub Release를 공개한다.
+
+공개 저장소의 역할, 개인정보 안내와 검증 기준은
+[`code-signing-policy.md`](./code-signing-policy.md)에 둔다. Foundation 승인이
+끝나기 전의 Release와 2.0.3 이하 파일은 미서명 상태로 유지한다.
+
 ## 버전과 업데이트
 
 Sentory는 의미적 버전 형식을 사용한다. 2.0.3 Tauri판은 설정의 `지금 확인`을

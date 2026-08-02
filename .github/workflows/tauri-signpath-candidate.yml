@@ -1,0 +1,86 @@
+name: Tauri SignPath candidate build
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without the v prefix
+        required: true
+        default: 2.0.3
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  build-candidate:
+    name: Build ${{ matrix.architecture }} signing candidate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x64
+            runner: windows-2025
+            target: x86_64-pc-windows-msvc
+          - architecture: arm64
+            runner: windows-11-vs2026-arm
+            target: aarch64-pc-windows-msvc
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Check out release sources
+        uses: actions/checkout@v5
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/Sentory.Tauri/package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          $isccCandidates = @(
+            (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe"),
+            (Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"),
+            (Join-Path $env:ProgramFiles "Inno Setup 6\ISCC.exe"))
+          if (-not ($isccCandidates | Where-Object { Test-Path -LiteralPath $_ })) {
+            winget install --id JRSoftware.InnoSetup --exact --silent `
+              --accept-package-agreements --accept-source-agreements
+          }
+
+      - name: Build unsigned signing candidate
+        shell: pwsh
+        run: |
+          .\scripts\Publish-TauriRelease.ps1 `
+            -Version '${{ inputs.version }}' `
+            -Architecture '${{ matrix.architecture }}' `
+            -SkipSourceArchive `
+            -SkipManifest
+
+      - name: Upload unsigned candidate for origin verification
+        id: upload-unsigned-artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sentory-${{ inputs.version }}-${{ matrix.architecture }}-unsigned
+          path: |
+            artifacts/Sentory-win-${{ matrix.architecture }}-portable.zip
+            artifacts/Sentory-win-${{ matrix.architecture }}-setup.exe
+          if-no-files-found: error
+
+      # The SignPath submission step is intentionally added only after the Foundation
+      # application provisions the organization, project, signing policy, artifact
+      # configuration, GitHub App connection, and CI API token. Until then this manual
+      # workflow proves that both release architectures are built on GitHub-hosted
+      # runners and retains the unsigned candidates as workflow artifacts only.
