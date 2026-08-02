@@ -22,6 +22,17 @@ const translate = (key, ...args) => {
   return typeof value === "function" ? value(...args) : value;
 };
 
+function translationBlock(locale, nextLocale) {
+  const start = script.indexOf(`TRANSLATIONS["${locale}"] = {`);
+  const end = nextLocale
+    ? script.indexOf(`TRANSLATIONS["${nextLocale}"] = {`, start)
+    : script.indexOf("const state =", start);
+
+  assert.notEqual(start, -1, `${locale} translation block is missing`);
+  assert.notEqual(end, -1, `${locale} translation block end is missing`);
+  return script.slice(start, end);
+}
+
 test("generated image labels follow the selected language", () => {
   const item = {
     kind: "Image",
@@ -76,4 +87,12 @@ test("card and detail rendering use localized generated metadata", () => {
   assert.match(script, /localizedCardSubtitle\(item, t\)/);
   assert.match(script, /localizedMemberTitle\(member, t\)/);
   assert.match(script, /refreshLocalizedVisibleCards[\s\S]*?localizedCardTitle/);
+});
+
+test("Japanese and Chinese card copy counts do not fall back to English", () => {
+  const japanese = translationBlock("ja-JP", "zh-CN");
+  const chinese = translationBlock("zh-CN");
+
+  assert.match(japanese, /copyCount:\s*n\s*=>\s*`\$\{n\.toLocaleString\("ja-JP"\)\}回コピー`/);
+  assert.match(chinese, /copyCount:\s*n\s*=>\s*`已复制 \$\{n\.toLocaleString\("zh-CN"\)\} 次`/);
 });
