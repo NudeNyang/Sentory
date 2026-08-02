@@ -47,6 +47,14 @@ public sealed class GalleryPageRepositoryTests : IDisposable
             "image-context",
             now.AddDays(-3),
             ["test"]));
+        await repository.UpsertImageOcrAsync(new ImageOcrUpdate(
+            imageHash,
+            "홈 앱 및 게임",
+            "검색 홈 앱 및 게임 Sentory",
+            ImageOcrStatus.Completed,
+            "ko-KR",
+            "test-ocr",
+            now.AddDays(-3)));
         var middle = await repository.UpsertUrlAsync(CreateUrl(
             "https://middle.example/item",
             SourceApp.KakaoTalk,
@@ -73,6 +81,11 @@ public sealed class GalleryPageRepositoryTests : IDisposable
             kind: ContentKind.Image));
         Assert.Equal(1, photos.Total);
         Assert.Equal(image.ItemId, Assert.Single(photos.Items).ItemId);
+
+        var compactOcrSearch = await repository.GetGalleryPageAsync(Request(
+            now,
+            search: "홈앱및게임"));
+        Assert.Equal(image.ItemId, Assert.Single(compactOcrSearch.Items).ItemId);
 
         var searched = await repository.GetGalleryPageAsync(Request(
             now,

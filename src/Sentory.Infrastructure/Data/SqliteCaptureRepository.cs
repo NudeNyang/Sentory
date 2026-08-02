@@ -939,8 +939,18 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         var search = options.SearchText.Trim().ToLowerInvariant();
         if (search.Length > 0)
         {
+            var compactSearch = string.Concat(
+                search.Where(character => !char.IsWhiteSpace(character)));
+            var imageOcrDisplayName = CompactWhitespaceSql(
+                "lower(coalesce(image_ocr.display_name, ''))");
+            var imageOcrText = CompactWhitespaceSql(
+                "lower(coalesce(image_ocr.recognized_text, ''))");
+            var memberOcrDisplayName = CompactWhitespaceSql(
+                "lower(coalesce(member_ocr.display_name, ''))");
+            var memberOcrText = CompactWhitespaceSql(
+                "lower(coalesce(member_ocr.recognized_text, ''))");
             predicates.Add(
-                """
+                $"""
                 (instr(lower(items.original_url), $search) > 0 OR
                  instr(lower(items.normalized_key), $search) > 0 OR
                  instr(lower(items.domain), $search) > 0 OR
@@ -948,6 +958,8 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                  instr(lower(coalesce(items.page_description, '')), $search) > 0 OR
                  instr(lower(coalesce(image_ocr.display_name, '')), $search) > 0 OR
                  instr(lower(coalesce(image_ocr.recognized_text, '')), $search) > 0 OR
+                 instr({imageOcrDisplayName}, $searchCompact) > 0 OR
+                 instr({imageOcrText}, $searchCompact) > 0 OR
                  EXISTS (
                     SELECT 1
                     FROM collection_members AS search_members
@@ -958,15 +970,23 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                           instr(lower(search_members.normalized_key), $search) > 0 OR
                           instr(lower(search_members.domain), $search) > 0 OR
                           instr(lower(coalesce(member_ocr.display_name, '')), $search) > 0 OR
-                          instr(lower(coalesce(member_ocr.recognized_text, '')), $search) > 0)))
+                          instr(lower(coalesce(member_ocr.recognized_text, '')), $search) > 0 OR
+                          instr({memberOcrDisplayName}, $searchCompact) > 0 OR
+                          instr({memberOcrText}, $searchCompact) > 0)))
                 """);
             command.Parameters.AddWithValue("$search", search);
+            command.Parameters.AddWithValue("$searchCompact", compactSearch);
         }
 
         return predicates.Count == 0
             ? string.Empty
             : $"WHERE {string.Join(" AND ", predicates)}";
     }
+
+    private static string CompactWhitespaceSql(string expression) =>
+        $"replace(replace(replace(replace(replace(replace({expression}, " +
+        "' ', ''), char(9), ''), char(10), ''), char(13), ''), " +
+        "char(160), ''), char(12288), '')";
 
     private static DateTimeOffset? GetGalleryDateStart(
         DateTimeOffset now,

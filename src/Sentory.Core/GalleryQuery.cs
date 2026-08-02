@@ -112,6 +112,8 @@ public static class GalleryQuery
             return true;
         }
 
+        var compactOcrSearch = RemoveWhitespace(search);
+
         return item.OriginalUrl.Contains(
                    search,
                    StringComparison.OrdinalIgnoreCase) ||
@@ -127,23 +129,34 @@ public static class GalleryQuery
                (item.PageDescription?.Contains(
                     search,
                     StringComparison.OrdinalIgnoreCase) ?? false) ||
-               (item.OcrDisplayName?.Contains(
-                    search,
-                    StringComparison.OrdinalIgnoreCase) ?? false) ||
-               (item.OcrText?.Contains(
-                    search,
-                    StringComparison.OrdinalIgnoreCase) ?? false) ||
+               MatchesOcrText(item.OcrDisplayName, search, compactOcrSearch) ||
+               MatchesOcrText(item.OcrText, search, compactOcrSearch) ||
                (item.Members?.Any(member =>
                     member.OriginalUrl.Contains(search, StringComparison.OrdinalIgnoreCase) ||
                     member.NormalizedKey.Contains(search, StringComparison.OrdinalIgnoreCase) ||
                     member.Domain.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                    (member.OcrDisplayName?.Contains(
+                    MatchesOcrText(
+                        member.OcrDisplayName,
                         search,
-                        StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (member.OcrText?.Contains(
+                        compactOcrSearch) ||
+                    MatchesOcrText(
+                        member.OcrText,
                         search,
-                        StringComparison.OrdinalIgnoreCase) ?? false)) ?? false);
+                        compactOcrSearch)) ?? false);
     }
+
+    private static bool MatchesOcrText(
+        string? value,
+        string search,
+        string compactSearch) =>
+        !string.IsNullOrWhiteSpace(value) &&
+        (value.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+         compactSearch.Length > 0 && RemoveWhitespace(value).Contains(
+             compactSearch,
+             StringComparison.OrdinalIgnoreCase));
+
+    private static string RemoveWhitespace(string value) =>
+        string.Concat(value.Where(character => !char.IsWhiteSpace(character)));
 
     private static bool MatchesKind(
         CapturedItemSummary item,

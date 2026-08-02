@@ -283,6 +283,30 @@ public sealed class GalleryQueryTests
     }
 
     [Fact]
+    public void SearchesImageOcrTextWithoutTypingSpaces()
+    {
+        var image = Create(
+            string.Empty,
+            Now,
+            kind: ContentKind.Image) with
+        {
+            OcrDisplayName = "홈 앱 및 게임",
+            OcrText = "검색 홈 앱 및 게임 Sentory"
+        };
+
+        var results = GalleryQuery.Apply(
+            [image],
+            new GalleryQueryOptions(
+                ContentKind.Image,
+                "홈앱및게임",
+                GalleryDateRange.All,
+                GallerySortMode.Newest),
+            Now);
+
+        Assert.Equal(image.ItemId, Assert.Single(results).ItemId);
+    }
+
+    [Fact]
     public void CollectionMatchesMemberKindAndSearchText()
     {
         var collection = Create(

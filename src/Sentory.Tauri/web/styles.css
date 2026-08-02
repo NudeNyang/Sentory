@@ -195,6 +195,23 @@ button { color: inherit; }
 }
 
 .search-box input::placeholder { color: var(--soft); opacity: 1; }
+.search-box input::-webkit-search-cancel-button {
+  width: 14px;
+  height: 14px;
+  margin: 0 2px 0 8px;
+  -webkit-appearance: none;
+  appearance: none;
+  background:
+    linear-gradient(45deg, transparent 43%, currentColor 43% 57%, transparent 57%),
+    linear-gradient(-45deg, transparent 43%, currentColor 43% 57%, transparent 57%);
+  color: var(--soft);
+  opacity: 0.78;
+  cursor: pointer;
+}
+.search-box input::-webkit-search-cancel-button:hover {
+  color: var(--muted);
+  opacity: 1;
+}
 .search-box:focus-within { border-color: var(--card-hover); }
 
 .icon-button,
