@@ -6,11 +6,11 @@ on:
       version:
         description: Release version without the v prefix
         required: true
-        default: 2.0.2
+        default: 2.0.3
       tag:
         description: Existing GitHub Release tag
         required: true
-        default: v2.0.2
+        default: v2.0.3
 
 permissions:
   contents: write

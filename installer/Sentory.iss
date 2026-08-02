@@ -1,8 +1,8 @@
 #ifndef MyVersion
-  #define MyVersion "2.0.2"
+  #define MyVersion "2.0.3"
 #endif
 #ifndef MyNumericVersion
-  #define MyNumericVersion "2.0.2.0"
+  #define MyNumericVersion "2.0.3.0"
 #endif
 #ifndef MyArch
   #define MyArch "x64"
