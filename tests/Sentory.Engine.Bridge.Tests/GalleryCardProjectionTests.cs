@@ -28,6 +28,24 @@ public sealed class GalleryCardProjectionTests : IDisposable
         Assert.Equal("VRChat_2025-07-30_01-40-52", card.Title);
         Assert.Equal(imagePath, card.ArtworkPath);
         Assert.Equal("contain", card.ArtworkMode);
+        Assert.Null(card.GeneratedTitleKind);
+    }
+
+    [Fact]
+    public void Create_MarksGeneratedImageLabelsForUiLocalization()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var imagePath = CreateFile("images/clipboard.png");
+        var item = CreateImage(
+            Path.GetRelativePath(_root, imagePath),
+            string.Empty,
+            string.Empty);
+
+        var card = GalleryCardProjection.Create(item, paths);
+
+        Assert.Equal("ClipboardImage", card.GeneratedTitleKind);
+        Assert.Equal("ImageFormat", card.GeneratedSubtitleKind);
+        Assert.Equal("PNG", card.ImageFormat);
     }
 
     [Fact]
@@ -123,6 +141,7 @@ public sealed class GalleryCardProjectionTests : IDisposable
         Assert.Equal([0, 1], detail.Members.Select(member => member.Position));
         Assert.Equal("https://example.com/item", detail.Members[0].OriginalUrl);
         Assert.Equal(imagePath, detail.Members[1].ContentPath);
+        Assert.Null(detail.Members[1].GeneratedTitleKind);
     }
 
     private string CreateFile(string relativePath)

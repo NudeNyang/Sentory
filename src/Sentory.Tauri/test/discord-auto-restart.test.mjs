@@ -21,6 +21,11 @@ test("automatic Discord restart uses only the dedicated accessibility event", ()
     rust,
     /"discord-auto-restart-required"\s*=>\s*"discord-auto-restart-required"/,
   );
+  assert.match(
+    script,
+    /Discord에 필요한 접근성 실행 옵션이 없습니다\.[\\n]+작성 중인 메시지가 취소되거나 통화가 종료될 수 있습니다\./,
+  );
+  assert.doesNotMatch(script, /메시지와 통화를 보호하려면/);
 });
 
 test("a disconnected paste or drop offers a visible manual restart", () => {

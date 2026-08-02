@@ -235,7 +235,8 @@ public sealed record GalleryMemberDto(
     string OriginalUrl,
     string Domain,
     string? ContentPath,
-    string? MimeType);
+    string? MimeType,
+    string? GeneratedTitleKind);
 
 public sealed record GallerySnapshotDto(
     int ProtocolVersion,
@@ -266,7 +267,12 @@ public sealed record GalleryCardDto(
     int CopyCount,
     int CaptureCount,
     int MemberCount,
-    DateTimeOffset? LastCopiedAt);
+    DateTimeOffset? LastCopiedAt,
+    string? GeneratedTitleKind,
+    string? GeneratedSubtitleKind,
+    string? ImageFormat,
+    int ImageCount,
+    int UrlCount);
 
 public static class GalleryCardProjection
 {
@@ -279,26 +285,47 @@ public static class GalleryCardProjection
         var members = item.Members ?? [];
         var imageCount = members.Count(member => member.Kind == ContentKind.Image);
         var urlCount = members.Count(member => member.Kind == ContentKind.Url);
-        var title = isCollection
-            ? $"사진 {imageCount}개 · 링크 {urlCount}개"
-            : isImage
-                ? OcrTitleGenerator.CreateBestDisplayTitle(
-                    item.OriginalUrl,
-                    item.OcrDisplayName) ?? "클립보드 이미지"
-                : !string.IsNullOrWhiteSpace(item.PageTitle)
-                    ? item.PageTitle
-                    : string.IsNullOrWhiteSpace(item.Domain)
-                        ? "저장된 링크"
-                        : item.Domain;
-        var subtitle = isCollection
-            ? CreateCollectionSubtitle(members)
-            : isImage
-                ? !string.IsNullOrWhiteSpace(item.OcrText)
-                    ? CreateSnippet(item.OcrText)
-                    : $"{GetImageFormatLabel(item)} 이미지"
-                : !string.IsNullOrWhiteSpace(item.PageDescription)
-                    ? item.PageDescription
-                    : item.OriginalUrl;
+        var imageTitle = isImage
+            ? OcrTitleGenerator.CreateBestDisplayTitle(
+                item.OriginalUrl,
+                item.OcrDisplayName)
+            : null;
+        var generatedTitleKind = isCollection
+            ? "Collection"
+            : isImage && imageTitle is null
+                ? "ClipboardImage"
+                : !isImage && string.IsNullOrWhiteSpace(item.PageTitle) &&
+                    string.IsNullOrWhiteSpace(item.Domain)
+                    ? "SavedLink"
+                    : null;
+        var title = generatedTitleKind switch
+        {
+            "Collection" => $"사진 {imageCount}개 · 링크 {urlCount}개",
+            "ClipboardImage" => "클립보드 이미지",
+            "SavedLink" => "저장된 링크",
+            _ when isImage => imageTitle!,
+            _ when !string.IsNullOrWhiteSpace(item.PageTitle) => item.PageTitle,
+            _ => item.Domain
+        };
+        var collectionSubtitle = isCollection
+            ? CreateCollectionDomainSubtitle(members)
+            : null;
+        var imageFormat = isImage ? GetImageFormatLabel(item) : null;
+        var generatedSubtitleKind = isCollection && collectionSubtitle is null
+            ? "CollectionCount"
+            : isImage && string.IsNullOrWhiteSpace(item.OcrText)
+                ? "ImageFormat"
+                : null;
+        var subtitle = generatedSubtitleKind switch
+        {
+            "CollectionCount" => $"항목 {members.Count}개",
+            "ImageFormat" => $"{imageFormat} 이미지",
+            _ when isCollection => collectionSubtitle!,
+            _ when isImage => CreateSnippet(item.OcrText!),
+            _ when !string.IsNullOrWhiteSpace(item.PageDescription) =>
+                item.PageDescription,
+            _ => item.OriginalUrl
+        };
         var artwork = ResolveArtwork(item, paths);
         return new GalleryCardDto(
             item.ItemId.ToString("N"),
@@ -323,7 +350,12 @@ public static class GalleryCardProjection
             item.CopyCount,
             item.CaptureCount,
             members.Count,
-            item.LastCopiedAt);
+            item.LastCopiedAt,
+            generatedTitleKind,
+            generatedSubtitleKind,
+            imageFormat,
+            imageCount,
+            urlCount);
     }
 
     public static GalleryItemDetailDto CreateDetail(
@@ -331,20 +363,29 @@ public static class GalleryCardProjection
         SentoryDataPaths paths)
     {
         var members = (item.Members ?? [])
-            .Select(member => new GalleryMemberDto(
-                member.Position,
-                member.Kind.ToString(),
-                member.Kind == ContentKind.Image
+            .Select(member =>
+            {
+                var imageTitle = member.Kind == ContentKind.Image
                     ? OcrTitleGenerator.CreateBestDisplayTitle(
                         member.OriginalUrl,
-                        member.OcrDisplayName) ?? "이미지"
-                    : string.IsNullOrWhiteSpace(member.Domain)
-                        ? member.OriginalUrl
-                        : member.Domain,
-                member.OriginalUrl,
-                member.Domain,
-                ResolveStoredPath(member.ContentPath, paths),
-                member.MimeType))
+                        member.OcrDisplayName)
+                    : null;
+                return new GalleryMemberDto(
+                    member.Position,
+                    member.Kind.ToString(),
+                    member.Kind == ContentKind.Image
+                        ? imageTitle ?? "이미지"
+                        : string.IsNullOrWhiteSpace(member.Domain)
+                            ? member.OriginalUrl
+                            : member.Domain,
+                    member.OriginalUrl,
+                    member.Domain,
+                    ResolveStoredPath(member.ContentPath, paths),
+                    member.MimeType,
+                    member.Kind == ContentKind.Image && imageTitle is null
+                        ? "Image"
+                        : null);
+            })
             .ToArray();
         return new GalleryItemDetailDto(
             Create(item, paths),
@@ -429,7 +470,7 @@ public static class GalleryCardProjection
             : null;
     }
 
-    private static string CreateCollectionSubtitle(
+    private static string? CreateCollectionDomainSubtitle(
         IReadOnlyList<CapturedCollectionMember> members)
     {
         var domains = string.Join(
@@ -438,7 +479,7 @@ public static class GalleryCardProjection
                 .Select(member => member.Domain)
                 .Where(domain => !string.IsNullOrWhiteSpace(domain))
                 .Take(2));
-        return domains.Length > 0 ? domains : $"항목 {members.Count}개";
+        return domains.Length > 0 ? domains : null;
     }
 
     private static string CreateSnippet(string value)
