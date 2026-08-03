@@ -125,7 +125,7 @@ public sealed record CaptureResult(
     bool EventApplied,
     int CaptureCount,
     int ShareCount,
-    int RecentUsageSessionCount = 0);
+    int RecentExternalReuseCount = 0);
 
 public sealed record CapturedItemSummary(
     Guid ItemId,
@@ -159,7 +159,8 @@ public sealed record CapturedItemSummary(
     ImageOcrStatus? OcrStatus = null,
     string? OcrLanguage = null,
     int? PixelWidth = null,
-    int? PixelHeight = null);
+    int? PixelHeight = null,
+    int RecentExternalReuseCount = 0);
 
 public sealed record CapturedCollectionMember(
     int Position,

@@ -23,7 +23,8 @@ test("the changed card and open detail are patched in place", () => {
   const refresh = functionBody("refreshVisibleItemMetadata", "openItem");
   assert.match(refresh, /\.copy-usage/);
   assert.match(refresh, /\.favorite/);
-  assert.match(refresh, /detailCopyCount\.textContent/);
+  assert.match(refresh, /detailUsageCount\.textContent/);
+  assert.match(refresh, /detailUsageBreakdown\.textContent/);
   assert.match(refresh, /detailFavoriteMark\.hidden/);
 });
 

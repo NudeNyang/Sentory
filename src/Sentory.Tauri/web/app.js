@@ -42,7 +42,7 @@ const TRANSLATIONS = {
     copyCount: n => `복사 ${n}회`, selectedCount: n => `${n}개 선택`, visibleSelect: "전체 선택",
     clearSelection: "선택 취소", deleteSelected: "선택 항목 삭제", emptyFiltered: "검색 결과가 없습니다", emptyFilteredDescription: "다른 검색어나 필터로 다시 찾아보세요.", empty: "아직 보관된 항목이 없습니다", emptyDescription: "메신저에 URL이나 사진을 붙여넣어 보세요.",
     items: n => `${n.toLocaleString("ko-KR")}개`, loading: "보관함을 불러오는 중", loadFailed: "보관함을 불러오지 못했습니다",
-    close: "알림 닫기", detail: "Sentory 항목 상세", favoriteMarked: "★ 즐겨찾기", captureCount: "저장 횟수", copyCountLabel: "복사 횟수", messageSource: "마지막 출처", savedAt: "마지막 저장", photos: "사진", collectionLinks: "링크", previousPhoto: "이전 사진", nextPhoto: "다음 사진", copyCurrentPhoto: "현재 사진 복사", previousLink: "이전 링크", nextLink: "다음 링크", clipboardImage: "클립보드 이미지", savedLink: "저장된 링크", imageFormat: format => `${format} 이미지`, collectionItems: n => `항목 ${n.toLocaleString("ko-KR")}개`, collectionTitle: (photos, links) => `사진 ${photos.toLocaleString("ko-KR")}개 · 링크 ${links.toLocaleString("ko-KR")}개`,
+    close: "알림 닫기", detail: "Sentory 항목 상세", favoriteMarked: "★ 즐겨찾기", captureCount: "저장 횟수", usageCountLabel: "재사용 횟수", usageBreakdown: (copies, external) => `복사 ${copies.toLocaleString("ko-KR")}회 · 외부 재사용 ${external.toLocaleString("ko-KR")}회`, messageSource: "마지막 출처", savedAt: "마지막 저장", photos: "사진", collectionLinks: "링크", previousPhoto: "이전 사진", nextPhoto: "다음 사진", copyCurrentPhoto: "현재 사진 복사", previousLink: "이전 링크", nextLink: "다음 링크", clipboardImage: "클립보드 이미지", savedLink: "저장된 링크", imageFormat: format => `${format} 이미지`, collectionItems: n => `항목 ${n.toLocaleString("ko-KR")}개`, collectionTitle: (photos, links) => `사진 ${photos.toLocaleString("ko-KR")}개 · 링크 ${links.toLocaleString("ko-KR")}개`,
     times: n => `${n.toLocaleString("ko-KR")}회`, openPhoto: "사진 열기", openLink: "링크 열기", openPreview: "원본 바로 열기", copyPhoto: "사진 복사", copyUrl: "URL 복사", copyCollection: "묶음 복사", delete: "삭제", openOriginal: "원본 열기", openOriginalFolder: "원본 폴더 열기", openOriginalLink: "원본 링크 열기", cancel: "취소", deleteQuestion: n => n === 1 ? "항목을 삭제할까요?" : `선택한 ${n.toLocaleString("ko-KR")}개 항목을 삭제할까요?`,
     deleteWarning: n => n === 1 ? "이 항목을 보관함에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다." : "선택한 항목과 저장된 사진 파일을 보관함에서 삭제합니다.\n이 작업은 되돌릴 수 없습니다.", deleted: n => `${n.toLocaleString("ko-KR")}개 항목을 삭제했습니다.`,
     repairQuestion: "Discord를 다시 연결할까요?", repairWarning: "Discord를 접근성 모드로 다시 시작합니다. 작성 중인 메시지가 취소되거나 통화가 종료될 수 있습니다.", restart: "다시 시작",
@@ -91,7 +91,7 @@ const TRANSLATIONS = {
     favoriteAddAction: "Add to favorites", favoriteRemoveAction: "Remove from favorites", savedOnInput: "Saved on paste", savedOnSend: "Saved on send", copyCount: n => `Copied ${n} times`, selectedCount: n => `${n} selected`,
     visibleSelect: "Select all", clearSelection: "Clear selection", deleteSelected: "Delete selected", emptyFiltered: "No results found", emptyFilteredDescription: "Try another search term or filter.",
     empty: "Nothing saved yet", emptyDescription: "Paste a URL or photo into a messenger.", items: n => `${n.toLocaleString("en-US")} items`, loading: "Loading library", loadFailed: "Could not load the library",
-    close: "Dismiss notification", detail: "Sentory Item Details", favoriteMarked: "★ Favorite", captureCount: "Times saved", copyCountLabel: "Times copied", messageSource: "Latest source", savedAt: "Last saved", photos: "Photos", collectionLinks: "Links", previousPhoto: "Previous photo", nextPhoto: "Next photo", copyCurrentPhoto: "Copy current photo", previousLink: "Previous link", nextLink: "Next link", clipboardImage: "Clipboard image", savedLink: "Saved link", imageFormat: format => `${format} image`, collectionItems: n => `${n.toLocaleString("en-US")} items`, collectionTitle: (photos, links) => `${photos.toLocaleString("en-US")} photos · ${links.toLocaleString("en-US")} links`, times: n => `${n.toLocaleString("en-US")}`, openPhoto: "Open photo", openLink: "Open link", copyPhoto: "Copy photo", copyUrl: "Copy URL", copyCollection: "Copy collection",
+    close: "Dismiss notification", detail: "Sentory Item Details", favoriteMarked: "★ Favorite", captureCount: "Times saved", usageCountLabel: "Times reused", usageBreakdown: (copies, external) => `Copied ${copies.toLocaleString("en-US")} · Reused externally ${external.toLocaleString("en-US")}`, messageSource: "Latest source", savedAt: "Last saved", photos: "Photos", collectionLinks: "Links", previousPhoto: "Previous photo", nextPhoto: "Next photo", copyCurrentPhoto: "Copy current photo", previousLink: "Previous link", nextLink: "Next link", clipboardImage: "Clipboard image", savedLink: "Saved link", imageFormat: format => `${format} image`, collectionItems: n => `${n.toLocaleString("en-US")} items`, collectionTitle: (photos, links) => `${photos.toLocaleString("en-US")} photos · ${links.toLocaleString("en-US")} links`, times: n => `${n.toLocaleString("en-US")}`, openPhoto: "Open photo", openLink: "Open link", copyPhoto: "Copy photo", copyUrl: "Copy URL", copyCollection: "Copy collection",
     delete: "Delete", openPreview: "Open original", openOriginal: "Open original", openOriginalFolder: "Open containing folder", openOriginalLink: "Open original link", cancel: "Cancel", deleteQuestion: n => n === 1 ? "Delete this item?" : `Delete ${n} selected items?`,
     deleteWarning: n => n === 1 ? "This item will be removed from the library.\nThis cannot be undone." : "The selected items and saved photo files will be removed from the library.\nThis cannot be undone.", deleted: n => `Deleted ${n} items.`, repairQuestion: "Reconnect Discord?",
     repairWarning: "Discord will restart in accessibility mode. Draft messages and active calls may be ended.", restart: "Restart", repairing: "Recovering worker",
@@ -138,7 +138,7 @@ TRANSLATIONS["ja-JP"] = {
   detected: "検出準備完了", disabled: "使用しない", disabledSource: source => `${source === "KakaoTalk" ? "カカオトーク" : source} 検出を使用していません`, detectionPaused: "検出一時停止中", connecting: "接続準備中", recovering: "ワーカーを復旧中", reconnect: "Discord の再接続が必要", repair: "再接続", discordDetection: "Discord 検出",
   savedOnInput: "入力時に保存", savedOnSend: "送信時に保存", photoCopied: "写真をコピーしました。", urlCopied: "URL をコピーしました。", collectionCopied: "まとめた項目をクリップボードにコピーしました。", addFavorite: "お気に入りに追加しました。", removeFavorite: "お気に入りから削除しました。", favoriteAddAction: "お気に入りに追加", favoriteRemoveAction: "お気に入りから削除", copyCount: n => `${n.toLocaleString("ja-JP")}回コピー`,
   selectedCount: n => `${n.toLocaleString("ja-JP")}件選択`, visibleSelect: "すべて選択", clearSelection: "選択を解除", deleteSelected: "選択項目を削除", emptyFiltered: "検索結果がありません", emptyFilteredDescription: "別の検索語やフィルターをお試しください。", empty: "まだ保存された項目はありません", emptyDescription: "メッセンジャーに URL や写真を貼り付けてみてください。", loading: "ライブラリを読み込み中", loadFailed: "ライブラリを読み込めませんでした",
-  close: "通知を閉じる", detail: "Sentory 項目の詳細", favoriteMarked: "★ お気に入り", captureCount: "保存回数", copyCountLabel: "コピー回数", messageSource: "最後の送信元", savedAt: "最終保存", photos: "写真", collectionLinks: "リンク", previousPhoto: "前の写真", nextPhoto: "次の写真", copyCurrentPhoto: "現在の写真をコピー", previousLink: "前のリンク", nextLink: "次のリンク", clipboardImage: "クリップボードの画像", savedLink: "保存したリンク", imageFormat: format => `${format} 画像`, collectionItems: n => `${n.toLocaleString("ja-JP")}件`, collectionTitle: (photos, links) => `写真 ${photos.toLocaleString("ja-JP")}件・リンク ${links.toLocaleString("ja-JP")}件`, times: n => `${n.toLocaleString("ja-JP")}回`, openPhoto: "写真を開く", openLink: "リンクを開く", openPreview: "元をすぐ開く", copyPhoto: "写真をコピー", copyUrl: "URL をコピー", copyCollection: "まとめてコピー", delete: "削除", openOriginal: "元を開く", openOriginalFolder: "元のフォルダーを開く", openOriginalLink: "元のリンクを開く", cancel: "キャンセル",
+  close: "通知を閉じる", detail: "Sentory 項目の詳細", favoriteMarked: "★ お気に入り", captureCount: "保存回数", usageCountLabel: "再利用回数", usageBreakdown: (copies, external) => `コピー ${copies.toLocaleString("ja-JP")}回・外部で再利用 ${external.toLocaleString("ja-JP")}回`, messageSource: "最後の送信元", savedAt: "最終保存", photos: "写真", collectionLinks: "リンク", previousPhoto: "前の写真", nextPhoto: "次の写真", copyCurrentPhoto: "現在の写真をコピー", previousLink: "前のリンク", nextLink: "次のリンク", clipboardImage: "クリップボードの画像", savedLink: "保存したリンク", imageFormat: format => `${format} 画像`, collectionItems: n => `${n.toLocaleString("ja-JP")}件`, collectionTitle: (photos, links) => `写真 ${photos.toLocaleString("ja-JP")}件・リンク ${links.toLocaleString("ja-JP")}件`, times: n => `${n.toLocaleString("ja-JP")}回`, openPhoto: "写真を開く", openLink: "リンクを開く", openPreview: "元をすぐ開く", copyPhoto: "写真をコピー", copyUrl: "URL をコピー", copyCollection: "まとめてコピー", delete: "削除", openOriginal: "元を開く", openOriginalFolder: "元のフォルダーを開く", openOriginalLink: "元のリンクを開く", cancel: "キャンセル",
   deleteQuestion: n => n === 1 ? "この項目を削除しますか？" : `選択した ${n.toLocaleString("ja-JP")}件を削除しますか？`, deleteWarning: n => n === 1 ? "この項目をライブラリから削除します。\nこの操作は元に戻せません。" : "選択した項目と保存された写真ファイルをライブラリから削除します。\nこの操作は元に戻せません。", deleted: n => `${n.toLocaleString("ja-JP")}件を削除しました。`,
   repairQuestion: "Discord を再接続しますか？", repairWarning: "Discord をアクセシビリティモードで再起動します。作成中のメッセージや通話が終了する場合があります。", restart: "再起動", repaired: "Discord を接続復旧モードで再起動しました。",
   discordAutoRestartConsentTitle: "Discord の自動再起動を許可しますか？", discordAutoRestartConsentMessage: "Discord 検出をオンにすると、必要なアクセシビリティ起動オプションがない場合に15秒間の案内後、Discord を自動的に再起動します。\n作成中のメッセージや通話が終了する場合があります。", discordAutoRestartConsentAction: "同意してオンにする", discordAutoRestartConsentDeclined: "同意されなかったため、Discord の自動再起動は行いませんでした。設定から手動で再接続できます。",
@@ -165,7 +165,7 @@ TRANSLATIONS["zh-CN"] = {
   detected: "检测已就绪", disabled: "未使用", disabledSource: source => `${source === "WeChat" ? "微信" : source} 检测已关闭`, detectionPaused: "检测已暂停", connecting: "正在准备连接", recovering: "正在恢复工作进程", reconnect: "需要重新连接 Discord", repair: "重新连接", discordDetection: "Discord 检测",
   savedOnInput: "粘贴时保存", savedOnSend: "发送时保存", photoCopied: "图片已复制。", urlCopied: "URL 已复制。", collectionCopied: "组合项目已复制到剪贴板。", addFavorite: "已添加到收藏。", removeFavorite: "已从收藏中移除。", favoriteAddAction: "添加到收藏", favoriteRemoveAction: "从收藏中移除", copyCount: n => `已复制 ${n.toLocaleString("zh-CN")} 次`,
   selectedCount: n => `已选择 ${n.toLocaleString("zh-CN")} 项`, visibleSelect: "全选", clearSelection: "取消选择", deleteSelected: "删除所选项目", emptyFiltered: "没有搜索结果", emptyFilteredDescription: "请尝试其他关键词或筛选条件。", empty: "尚未保存任何项目", emptyDescription: "请在聊天应用中粘贴链接或图片。", loading: "正在加载收藏库", loadFailed: "无法加载收藏库",
-  close: "关闭通知", detail: "Sentory 项目详情", favoriteMarked: "★ 已收藏", captureCount: "保存次数", copyCountLabel: "复制次数", messageSource: "最近来源", savedAt: "最后保存", photos: "图片", collectionLinks: "链接", previousPhoto: "上一张图片", nextPhoto: "下一张图片", copyCurrentPhoto: "复制当前图片", previousLink: "上一个链接", nextLink: "下一个链接", clipboardImage: "剪贴板图片", savedLink: "已保存的链接", imageFormat: format => `${format} 图片`, collectionItems: n => `${n.toLocaleString("zh-CN")} 项`, collectionTitle: (photos, links) => `${photos.toLocaleString("zh-CN")} 张图片 · ${links.toLocaleString("zh-CN")} 个链接`, times: n => `${n.toLocaleString("zh-CN")} 次`, openPhoto: "打开图片", openLink: "打开链接", openPreview: "直接打开原文件", copyPhoto: "复制图片", copyUrl: "复制 URL", copyCollection: "复制组合", delete: "删除", openOriginal: "打开原文件", openOriginalFolder: "打开原文件所在文件夹", openOriginalLink: "打开原链接", cancel: "取消",
+  close: "关闭通知", detail: "Sentory 项目详情", favoriteMarked: "★ 已收藏", captureCount: "保存次数", usageCountLabel: "重复使用次数", usageBreakdown: (copies, external) => `复制 ${copies.toLocaleString("zh-CN")} 次 · 在外部重复使用 ${external.toLocaleString("zh-CN")} 次`, messageSource: "最近来源", savedAt: "最后保存", photos: "图片", collectionLinks: "链接", previousPhoto: "上一张图片", nextPhoto: "下一张图片", copyCurrentPhoto: "复制当前图片", previousLink: "上一个链接", nextLink: "下一个链接", clipboardImage: "剪贴板图片", savedLink: "已保存的链接", imageFormat: format => `${format} 图片`, collectionItems: n => `${n.toLocaleString("zh-CN")} 项`, collectionTitle: (photos, links) => `${photos.toLocaleString("zh-CN")} 张图片 · ${links.toLocaleString("zh-CN")} 个链接`, times: n => `${n.toLocaleString("zh-CN")} 次`, openPhoto: "打开图片", openLink: "打开链接", openPreview: "直接打开原文件", copyPhoto: "复制图片", copyUrl: "复制 URL", copyCollection: "复制组合", delete: "删除", openOriginal: "打开原文件", openOriginalFolder: "打开原文件所在文件夹", openOriginalLink: "打开原链接", cancel: "取消",
   deleteQuestion: n => n === 1 ? "要删除此项目吗？" : `要删除所选的 ${n.toLocaleString("zh-CN")} 个项目吗？`, deleteWarning: n => n === 1 ? "将从收藏库中删除此项目。\n此操作无法撤销。" : "将从收藏库中删除所选项目及保存的图片文件。\n此操作无法撤销。", deleted: n => `已删除 ${n.toLocaleString("zh-CN")} 个项目。`,
   repairQuestion: "要重新连接 Discord 吗？", repairWarning: "Discord 将以无障碍模式重启。正在编辑的消息和通话可能会结束。", restart: "重新启动", repaired: "Discord 已以连接恢复模式重新启动。",
   discordAutoRestartConsentTitle: "允许自动重启 Discord 吗？", discordAutoRestartConsentMessage: "开启 Discord 检测后，如果缺少所需的无障碍启动选项，Sentory 会先显示 15 秒提示，然后自动重启 Discord。\n正在编辑的消息和通话可能会结束。", discordAutoRestartConsentAction: "同意并开启", discordAutoRestartConsentDeclined: "由于未获得同意，未自动重启 Discord。你可以在设置中手动重新连接。",
@@ -291,7 +291,8 @@ const detailLinkPrevious = document.querySelector("#detail-link-previous");
 const detailLinkNext = document.querySelector("#detail-link-next");
 const detailLinkDots = document.querySelector("#detail-link-dots");
 const detailCaptureCount = document.querySelector("#detail-capture-count");
-const detailCopyCount = document.querySelector("#detail-copy-count");
+const detailUsageCount = document.querySelector("#detail-usage-count");
+const detailUsageBreakdown = document.querySelector("#detail-usage-breakdown");
 const detailSource = document.querySelector("#detail-source");
 const detailDate = document.querySelector("#detail-date");
 const detailDelivery = document.querySelector("#detail-delivery");
@@ -579,7 +580,7 @@ function applyLocalizedUi(language) {
   document.querySelector("#auto-cleanup-description").textContent = t("autoCleanupDefault");
   document.querySelector("#app-info-heading").textContent = t("appInfo");
   document.querySelector("#version-label").textContent =
-    `${t("version", "2.0.3")}${state.versionSuffix}`;
+    `${t("version", "2.0.4")}${state.versionSuffix}`;
   document.querySelector("#update-title").textContent = t("checkForUpdates");
   document.querySelector("#update-description").textContent = t("checkForUpdatesDescription");
   document.querySelector("#copyright-label").textContent = t("copyrightNotice");
@@ -625,7 +626,7 @@ function applyLocalizedUi(language) {
   setTooltip(detailLinkNext, t("nextLink"));
   detailLinkNext.setAttribute("aria-label", t("nextLink"));
   detailCaptureCount.closest("div").querySelector("dt").textContent = t("captureCount");
-  detailCopyCount.closest("div").querySelector("dt").textContent = t("copyCountLabel");
+  detailUsageCount.closest("div").querySelector("dt").textContent = t("usageCountLabel");
   detailSource.closest("div").querySelector("dt").textContent = t("messageSource");
   detailDate.closest("div").querySelector("dt").textContent = t("savedAt");
   detailDelete.textContent = t("delete");
@@ -1950,7 +1951,8 @@ function populateDetails(detail) {
     ? t("collectionItems", (detail.members ?? []).length)
     : localizedCardSubtitle(card, t);
   detailCaptureCount.textContent = t("times", card.captureCount);
-  detailCopyCount.textContent = t("times", card.copyCount);
+  detailUsageCount.textContent = t("times", card.copyCount + card.externalReuseCount);
+  detailUsageBreakdown.textContent = t("usageBreakdown", card.copyCount, card.externalReuseCount);
   detailSource.textContent = sourceLabel(card.sourceApp);
   detailDate.textContent = new Intl.DateTimeFormat(state.locale, { dateStyle: "long", timeStyle: "short" }).format(new Date(card.lastCapturedAt));
   detailDelivery.textContent = localizedStatus(card);
@@ -2178,7 +2180,8 @@ function refreshVisibleItemMetadata(item) {
     }
   }
   if (state.detailItem?.card.itemId === item.itemId) {
-    detailCopyCount.textContent = t("times", item.copyCount);
+    detailUsageCount.textContent = t("times", item.copyCount + item.externalReuseCount);
+    detailUsageBreakdown.textContent = t("usageBreakdown", item.copyCount, item.externalReuseCount);
     detailFavoriteMark.hidden = !item.isFavorite;
   }
   if (state.contextItemId === item.itemId) refreshCardContextMenu();
@@ -3053,7 +3056,7 @@ async function configureDistributionUi() {
     ]);
     state.versionSuffix = typeof versionSuffix === "string" ? versionSuffix : "";
     document.querySelector("#version-label").textContent =
-      `${t("version", "2.0.3")}${state.versionSuffix}`;
+      `${t("version", "2.0.4")}${state.versionSuffix}`;
     updateSettingRow.hidden = channel !== "github";
   } catch {
     updateSettingRow.hidden = true;

@@ -759,6 +759,7 @@ body.selection-mode .favorite { display: none; }
 .detail-stat-grid > div { min-height: 74px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
 .detail-stat-grid dt { color: var(--soft); font-size: 10.5px; }
 .detail-stat-grid dd { margin: 4px 0 0; color: var(--text); font-size: 14px; font-weight: 600; }
+.detail-stat-grid .detail-usage-breakdown { display: block; margin-top: 1px; color: var(--soft); font-size: 9px; line-height: 1; white-space: nowrap; }
 .detail-stat-grid > div:nth-child(n + 3) dd { font-size: 13px; }
 .detail-info .detail-delivery { margin-top: 18px; color: var(--soft); font-size: 11px; }
 .detail-actions { display: grid; grid-template-columns: auto 1fr auto auto; gap: 6px; align-items: center; }

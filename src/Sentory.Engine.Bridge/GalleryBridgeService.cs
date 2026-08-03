@@ -153,7 +153,8 @@ public sealed class GalleryBridgeService(
         var settings = new SentorySettingsStore(paths).Load();
         if (settings.AutoFavoriteEnabled &&
             !isFavorite &&
-            copyCount >= settings.AutoFavoriteCopyThreshold &&
+            copyCount + item.RecentExternalReuseCount >=
+                settings.AutoFavoriteCopyThreshold &&
             item.Kind is ContentKind.Url or ContentKind.Image or ContentKind.Collection)
         {
             isFavorite = await repository.SetFavoriteAsync(
@@ -265,6 +266,7 @@ public sealed record GalleryCardDto(
     string? SiteIconPath,
     bool IsFavorite,
     int CopyCount,
+    int ExternalReuseCount,
     int CaptureCount,
     int MemberCount,
     DateTimeOffset? LastCopiedAt,
@@ -348,6 +350,7 @@ public static class GalleryCardProjection
             ResolveStoredPath(item.SiteIconPath, paths),
             item.IsFavorite,
             item.CopyCount,
+            item.RecentExternalReuseCount,
             item.CaptureCount,
             members.Count,
             item.LastCopiedAt,

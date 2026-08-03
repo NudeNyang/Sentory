@@ -49,6 +49,26 @@ public sealed class GalleryCardProjectionTests : IDisposable
     }
 
     [Fact]
+    public void Create_ProjectsCopyAndExternalReuseCounts()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var imagePath = CreateFile("images/usage.png");
+        var item = CreateImage(
+            Path.GetRelativePath(_root, imagePath),
+            "usage.png",
+            "usage") with
+        {
+            CopyCount = 1,
+            RecentExternalReuseCount = 2
+        };
+
+        var card = GalleryCardProjection.Create(item, paths);
+
+        Assert.Equal(1, card.CopyCount);
+        Assert.Equal(2, card.ExternalReuseCount);
+    }
+
+    [Fact]
     public void ResolveStoredPath_RejectsFileOutsideDataRoot()
     {
         var paths = SentoryDataPaths.ForRoot(_root);

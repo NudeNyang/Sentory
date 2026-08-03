@@ -663,14 +663,20 @@ public sealed class SyncMetadataService(
                 favorite_changed_at = $changedAt
             WHERE id = $itemId
               AND is_favorite = 0
-              AND (
-                  copy_count >= $threshold OR
-                  (SELECT COUNT(*)
-                   FROM usage_sessions
-                   WHERE item_id = $itemId
-                     AND julianday(last_event_at) >= julianday($cutoff))
-                      >= $threshold
-              );
+              AND copy_count + (
+                  SELECT COUNT(*)
+                  FROM usage_sessions AS recent_usage
+                  WHERE recent_usage.item_id = $itemId
+                    AND julianday(recent_usage.last_event_at) >=
+                        julianday($cutoff)
+                    AND recent_usage.session_id <> (
+                        SELECT first_usage.session_id
+                        FROM usage_sessions AS first_usage
+                        WHERE first_usage.item_id = $itemId
+                        ORDER BY julianday(first_usage.session_started_at),
+                                 first_usage.session_id
+                        LIMIT 1)
+              ) >= $threshold;
             """;
         command.Parameters.AddWithValue(
             "$itemId",
@@ -706,14 +712,20 @@ public sealed class SyncMetadataService(
                 favorite_changed_at = $changedAt
             WHERE kind IN ($urlKind, $imageKind)
               AND is_favorite = 0
-              AND (
-                  copy_count >= $threshold OR
-                  (SELECT COUNT(*)
-                   FROM usage_sessions
-                   WHERE item_id = items.id
-                     AND julianday(last_event_at) >= julianday($cutoff))
-                      >= $threshold
-              );
+              AND copy_count + (
+                  SELECT COUNT(*)
+                  FROM usage_sessions AS recent_usage
+                  WHERE recent_usage.item_id = items.id
+                    AND julianday(recent_usage.last_event_at) >=
+                        julianday($cutoff)
+                    AND recent_usage.session_id <> (
+                        SELECT first_usage.session_id
+                        FROM usage_sessions AS first_usage
+                        WHERE first_usage.item_id = items.id
+                        ORDER BY julianday(first_usage.session_started_at),
+                                 first_usage.session_id
+                        LIMIT 1)
+              ) >= $threshold;
             """;
         command.Parameters.AddWithValue(
             "$urlKind",

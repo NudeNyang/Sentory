@@ -894,7 +894,8 @@ public sealed class LocalFolderSyncIntegrationTests : IDisposable
         foreach (var capturedAt in new[]
                  {
                      DateTimeOffset.Parse("2026-07-27T09:00:00+09:00"),
-                     DateTimeOffset.Parse("2026-07-27T16:00:00+09:00")
+                     DateTimeOffset.Parse("2026-07-27T16:00:00+09:00"),
+                     DateTimeOffset.Parse("2026-07-27T23:00:00+09:00")
                  })
         {
             await replicaA.Captures.UpsertUrlAsync(
@@ -950,7 +951,7 @@ public sealed class LocalFolderSyncIntegrationTests : IDisposable
                 CaptureMethod.DiscordConfirmedSend,
                 DeliveryStatus.Confirmed,
                 "external-session-test",
-                DateTimeOffset.Parse("2026-07-27T23:00:00+09:00"),
+                DateTimeOffset.Parse("2026-07-28T06:00:00+09:00"),
                 ["url-match"]));
         await runtimeA.RunOnceAsync(replicaA.Journal.DeviceId, sharedFolder);
         await runtimeB.RunOnceAsync(replicaB.Journal.DeviceId, sharedFolder);

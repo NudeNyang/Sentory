@@ -51,7 +51,7 @@ public sealed class GalleryBridgeMutationTests : IDisposable
     }
 
     [Fact]
-    public async Task RepeatedCopyAutomaticallyFavoritesSinglePhotoOrLink()
+    public async Task CopiesAfterInitialCaptureAutomaticallyFavoriteSinglePhotoOrLink()
     {
         var paths = SentoryDataPaths.ForRoot(_root);
         var repository = new SqliteCaptureRepository(paths);
@@ -78,11 +78,13 @@ public sealed class GalleryBridgeMutationTests : IDisposable
         var service = new GalleryBridgeService(repository, paths);
         var id = captured.ItemId.ToString("N");
 
-        var first = await service.RecordCopyAsync(id);
-        var second = await service.RecordCopyAsync(id);
+        var firstCopy = await service.RecordCopyAsync(id);
+        var secondCopy = await service.RecordCopyAsync(id);
 
-        Assert.False(first.IsFavorite);
-        Assert.True(second.IsFavorite);
+        Assert.False(firstCopy.IsFavorite);
+        Assert.Equal(1, firstCopy.CopyCount);
+        Assert.True(secondCopy.IsFavorite);
+        Assert.Equal(2, secondCopy.CopyCount);
         Assert.True((await repository.GetGalleryItemAsync(captured.ItemId))!.IsFavorite);
     }
 

@@ -412,7 +412,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             request,
             itemId,
             cancellationToken);
-        var recentUsageSessionCount = await RecordUsageSessionAsync(
+        var recentExternalReuseCount = await RecordUsageSessionAsync(
             connection,
             transaction,
             itemId,
@@ -423,7 +423,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             transaction,
             itemId,
             ContentKind.Url,
-            recentUsageSessionCount,
+            recentExternalReuseCount,
             cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
@@ -433,7 +433,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             true,
             captureCount,
             shareCount,
-            recentUsageSessionCount);
+            recentExternalReuseCount);
     }
 
     public async Task<CaptureResult> UpsertImageAsync(
@@ -525,7 +525,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             request.CapturedAt,
             request.ConfirmationSignals,
             cancellationToken);
-        var recentUsageSessionCount = await RecordUsageSessionAsync(
+        var recentExternalReuseCount = await RecordUsageSessionAsync(
             connection,
             transaction,
             itemId,
@@ -536,7 +536,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             transaction,
             itemId,
             ContentKind.Image,
-            recentUsageSessionCount,
+            recentExternalReuseCount,
             cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
@@ -546,7 +546,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             true,
             captureCount,
             shareCount,
-            recentUsageSessionCount);
+            recentExternalReuseCount);
     }
 
     public async Task<CaptureResult> UpsertCollectionAsync(
@@ -709,7 +709,19 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                     WHERE item_id = items.id) AS source_apps,
                    image_ocr.display_name, image_ocr.recognized_text,
                    image_ocr.status, image_ocr.language,
-                   image_width, image_height
+                   image_width, image_height,
+                   (SELECT COUNT(*)
+                    FROM usage_sessions AS recent_usage
+                    WHERE recent_usage.item_id = items.id
+                      AND julianday(recent_usage.last_event_at) >=
+                          julianday($usageCutoff)
+                      AND recent_usage.session_id <> (
+                          SELECT first_usage.session_id
+                          FROM usage_sessions AS first_usage
+                          WHERE first_usage.item_id = items.id
+                          ORDER BY julianday(first_usage.session_started_at),
+                                   first_usage.session_id
+                          LIMIT 1)) AS recent_external_reuse_count
             FROM items
             LEFT JOIN image_ocr
               ON image_ocr.content_hash = lower(items.content_hash)
@@ -717,6 +729,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             LIMIT $limit;
             """;
         command.Parameters.AddWithValue("$limit", limit);
+        AddUsageCutoffParameter(command);
 
         var results = new List<CapturedItemSummary>();
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
@@ -798,7 +811,19 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                     WHERE item_id = items.id) AS source_apps,
                    image_ocr.display_name, image_ocr.recognized_text,
                    image_ocr.status, image_ocr.language,
-                   image_width, image_height
+                   image_width, image_height,
+                   (SELECT COUNT(*)
+                    FROM usage_sessions AS recent_usage
+                    WHERE recent_usage.item_id = items.id
+                      AND julianday(recent_usage.last_event_at) >=
+                          julianday($usageCutoff)
+                      AND recent_usage.session_id <> (
+                          SELECT first_usage.session_id
+                          FROM usage_sessions AS first_usage
+                          WHERE first_usage.item_id = items.id
+                          ORDER BY julianday(first_usage.session_started_at),
+                                   first_usage.session_id
+                          LIMIT 1)) AS recent_external_reuse_count
             FROM items
             LEFT JOIN image_ocr
               ON image_ocr.content_hash = lower(items.content_hash)
@@ -808,6 +833,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             """;
         pageCommand.Parameters.AddWithValue("$limit", request.Limit);
         pageCommand.Parameters.AddWithValue("$offset", request.Offset);
+        AddUsageCutoffParameter(pageCommand);
 
         var results = new List<CapturedItemSummary>(request.Limit);
         await using (var reader =
@@ -861,7 +887,19 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                     WHERE item_id = items.id) AS source_apps,
                    image_ocr.display_name, image_ocr.recognized_text,
                    image_ocr.status, image_ocr.language,
-                   image_width, image_height
+                   image_width, image_height,
+                   (SELECT COUNT(*)
+                    FROM usage_sessions AS recent_usage
+                    WHERE recent_usage.item_id = items.id
+                      AND julianday(recent_usage.last_event_at) >=
+                          julianday($usageCutoff)
+                      AND recent_usage.session_id <> (
+                          SELECT first_usage.session_id
+                          FROM usage_sessions AS first_usage
+                          WHERE first_usage.item_id = items.id
+                          ORDER BY julianday(first_usage.session_started_at),
+                                   first_usage.session_id
+                          LIMIT 1)) AS recent_external_reuse_count
             FROM items
             LEFT JOIN image_ocr
               ON image_ocr.content_hash = lower(items.content_hash)
@@ -869,6 +907,7 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             LIMIT 1;
             """;
         command.Parameters.AddWithValue("$itemId", itemId.ToString());
+        AddUsageCutoffParameter(command);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
         {
@@ -1078,8 +1117,14 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 : Enum.Parse<ImageOcrStatus>(reader.GetString(27)),
             OcrLanguage: reader.IsDBNull(28) ? null : reader.GetString(28),
             PixelWidth: reader.IsDBNull(29) ? null : reader.GetInt32(29),
-            PixelHeight: reader.IsDBNull(30) ? null : reader.GetInt32(30));
+            PixelHeight: reader.IsDBNull(30) ? null : reader.GetInt32(30),
+            RecentExternalReuseCount: reader.GetInt32(31));
     }
+
+    private static void AddUsageCutoffParameter(SqliteCommand command) =>
+        command.Parameters.AddWithValue(
+            "$usageCutoff",
+            (DateTimeOffset.UtcNow - RecentUsageWindow).ToString("O"));
 
     private static IReadOnlyList<SourceApp> ParseSourceApps(
         string? value,
@@ -2767,9 +2812,16 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         count.CommandText =
             """
             SELECT COUNT(*)
-            FROM usage_sessions
-            WHERE item_id = $itemId
-              AND julianday(last_event_at) >= julianday($cutoff);
+            FROM usage_sessions AS recent_usage
+            WHERE recent_usage.item_id = $itemId
+              AND julianday(recent_usage.last_event_at) >= julianday($cutoff)
+              AND recent_usage.session_id <> (
+                  SELECT first_usage.session_id
+                  FROM usage_sessions AS first_usage
+                  WHERE first_usage.item_id = $itemId
+                  ORDER BY julianday(first_usage.session_started_at),
+                           first_usage.session_id
+                  LIMIT 1);
             """;
         count.Parameters.AddWithValue("$itemId", itemId.ToString("D"));
         count.Parameters.AddWithValue(
@@ -2784,13 +2836,12 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
         System.Data.Common.DbTransaction transaction,
         Guid itemId,
         ContentKind kind,
-        int recentUsageSessionCount,
+        int recentExternalReuseCount,
         CancellationToken cancellationToken)
     {
         var configuration =
             Volatile.Read(ref _autoFavoriteConfiguration);
         if (!configuration.Enabled ||
-            recentUsageSessionCount < configuration.UsageThreshold ||
             kind is not (ContentKind.Url or ContentKind.Image))
         {
             return;
@@ -2804,9 +2855,16 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
             SET is_favorite = 1,
                 favorite_changed_at = $changedAt
             WHERE id = $itemId
-              AND is_favorite = 0;
+              AND is_favorite = 0
+              AND copy_count + $externalReuseCount >= $threshold;
             """;
         command.Parameters.AddWithValue("$itemId", itemId.ToString("D"));
+        command.Parameters.AddWithValue(
+            "$externalReuseCount",
+            recentExternalReuseCount);
+        command.Parameters.AddWithValue(
+            "$threshold",
+            configuration.UsageThreshold);
         command.Parameters.AddWithValue(
             "$changedAt",
             DateTimeOffset.UtcNow.ToString("O"));
@@ -2880,13 +2938,20 @@ public sealed class SqliteCaptureRepository(SentoryDataPaths paths)
                 favorite_changed_at = $changedAt
             WHERE kind IN ('Url', 'Image')
               AND is_favorite = 0
-              AND id IN (
-                  SELECT item_id
-                  FROM usage_sessions
-                  WHERE julianday(last_event_at) >= julianday($cutoff)
-                  GROUP BY item_id
-                  HAVING COUNT(*) >= $threshold
-              );
+              AND copy_count + (
+                  SELECT COUNT(*)
+                  FROM usage_sessions AS recent_usage
+                  WHERE recent_usage.item_id = items.id
+                    AND julianday(recent_usage.last_event_at) >=
+                        julianday($cutoff)
+                    AND recent_usage.session_id <> (
+                        SELECT first_usage.session_id
+                        FROM usage_sessions AS first_usage
+                        WHERE first_usage.item_id = items.id
+                        ORDER BY julianday(first_usage.session_started_at),
+                                 first_usage.session_id
+                        LIMIT 1)
+              ) >= $threshold;
             """;
         command.Parameters.AddWithValue(
             "$cutoff",

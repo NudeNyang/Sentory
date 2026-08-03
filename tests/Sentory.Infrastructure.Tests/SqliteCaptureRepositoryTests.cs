@@ -340,13 +340,13 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
             firstCapturedAt.AddHours(5)));
         var item = Assert.Single(await repository.GetRecentAsync(10));
 
-        Assert.Equal(1, first.RecentUsageSessionCount);
-        Assert.Equal(1, second.RecentUsageSessionCount);
+        Assert.Equal(0, first.RecentExternalReuseCount);
+        Assert.Equal(0, second.RecentExternalReuseCount);
         Assert.False(item.IsFavorite);
     }
 
     [Fact]
-    public async Task SeparateUsageSessionsAutomaticallyAddFavorite()
+    public async Task SeparateReuseSessionsAutomaticallyAddFavorite()
     {
         var repository = CreateRepository();
         repository.ConfigureAutomaticFavorites(
@@ -367,10 +367,53 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
             {
                 CapturedAt = firstCapturedAt.AddHours(7)
             });
+        var third = await repository.UpsertImageAsync(
+            CreateImageRequest(Guid.NewGuid(), bytes, hash) with
+            {
+                CapturedAt = firstCapturedAt.AddHours(14)
+            });
         var item = Assert.Single(await repository.GetRecentAsync(10));
 
-        Assert.Equal(1, first.RecentUsageSessionCount);
-        Assert.Equal(2, second.RecentUsageSessionCount);
+        Assert.Equal(0, first.RecentExternalReuseCount);
+        Assert.Equal(1, second.RecentExternalReuseCount);
+        Assert.Equal(2, third.RecentExternalReuseCount);
+        Assert.True(item.IsFavorite);
+    }
+
+    [Fact]
+    public async Task CopyAndExternalReuseCombineForAutomaticFavorite()
+    {
+        var repository = CreateRepository();
+        repository.ConfigureAutomaticFavorites(
+            enabled: true,
+            usageThreshold: 3);
+        await repository.InitializeAsync();
+        var firstCapturedAt = DateTimeOffset.UtcNow.AddDays(-1);
+
+        var first = await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/combined-usage",
+            DeliveryStatus.Confirmed,
+            firstCapturedAt));
+        Assert.True(await repository.RecordCopyAsync(
+            first.ItemId,
+            firstCapturedAt.AddMinutes(1)));
+        var second = await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/combined-usage",
+            DeliveryStatus.Confirmed,
+            firstCapturedAt.AddHours(7)));
+        var third = await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/combined-usage",
+            DeliveryStatus.Confirmed,
+            firstCapturedAt.AddHours(14)));
+        var item = Assert.Single(await repository.GetRecentAsync(10));
+
+        Assert.Equal(1, second.RecentExternalReuseCount);
+        Assert.Equal(2, third.RecentExternalReuseCount);
+        Assert.Equal(2, item.RecentExternalReuseCount);
+        Assert.Equal(1, item.CopyCount);
         Assert.True(item.IsFavorite);
     }
 
@@ -396,7 +439,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
             firstCapturedAt.AddDays(31)));
         var item = Assert.Single(await repository.GetRecentAsync(10));
 
-        Assert.Equal(1, recent.RecentUsageSessionCount);
+        Assert.Equal(1, recent.RecentExternalReuseCount);
         Assert.False(item.IsFavorite);
     }
 
@@ -513,6 +556,11 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
             "https://example.com/backfill",
             DeliveryStatus.Confirmed,
             firstCapturedAt.AddHours(7)));
+        await repository.UpsertUrlAsync(CreateRequest(
+            Guid.NewGuid(),
+            "https://example.com/backfill",
+            DeliveryStatus.Confirmed,
+            firstCapturedAt.AddHours(14)));
         await using (var connection = new SqliteConnection(
                          $"Data Source={paths.DatabasePath}"))
         {
@@ -533,6 +581,7 @@ public sealed class SqliteCaptureRepositoryTests : IDisposable
         await migrated.InitializeAsync();
         var item = Assert.Single(await migrated.GetRecentAsync(10));
 
+        Assert.Equal(2, item.RecentExternalReuseCount);
         Assert.True(item.IsFavorite);
     }
 
