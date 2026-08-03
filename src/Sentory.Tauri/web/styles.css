@@ -35,7 +35,7 @@
 }
 
 :root:lang(ko) {
-  --ui-font-family: "Malgun Gothic", "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  --ui-font-family: "Segoe UI Variable Text", "Segoe UI", "Malgun Gothic", sans-serif;
 }
 
 :root:lang(ja) {
@@ -117,7 +117,7 @@ button { color: inherit; }
 .identity h1 {
   margin: 0;
   color: var(--text);
-  font-family: "Malgun Gothic", "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Malgun Gothic", sans-serif;
   font-size: 25px;
   font-weight: 600;
   line-height: 1.2;

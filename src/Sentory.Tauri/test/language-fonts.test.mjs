@@ -6,7 +6,10 @@ const styles = readFileSync(new URL("../web/styles.css", import.meta.url), "utf8
 const script = readFileSync(new URL("../web/app.js", import.meta.url), "utf8");
 
 test("each supported language uses one native UI family for mixed text", () => {
-  assert.match(styles, /:root:lang\(ko\)[^{]*\{[^}]*"Malgun Gothic"/s);
+  assert.match(
+    styles,
+    /:root:lang\(ko\)[^{]*\{[^}]*"Segoe UI Variable Text",\s*"Segoe UI",\s*"Malgun Gothic"/s,
+  );
   assert.match(styles, /:root:lang\(en\)[^{]*\{[^}]*"Segoe UI Variable Text"/s);
   assert.match(styles, /:root:lang\(ja\)[^{]*\{[^}]*"Yu Gothic UI"/s);
   assert.match(styles, /:root:lang\(zh-CN\)[^{]*\{[^}]*"Microsoft YaHei UI"/s);
@@ -21,9 +24,9 @@ test("changing the language updates the root lang before rendering labels", () =
   );
 });
 
-test("the Sentory brand title keeps the Korean UI font in every language", () => {
+test("the Sentory brand title keeps the original Korean UI stack in every language", () => {
   assert.match(
     styles,
-    /\.identity h1\s*\{[^}]*font-family:\s*"Malgun Gothic",\s*"Segoe UI Variable Text",\s*"Segoe UI",\s*sans-serif;/s,
+    /\.identity h1\s*\{[^}]*font-family:\s*"Segoe UI Variable Text",\s*"Segoe UI",\s*"Malgun Gothic",\s*sans-serif;/s,
   );
 });
