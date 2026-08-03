@@ -30,3 +30,18 @@ test("the Sentory brand title keeps the original Korean UI stack in every langua
     /\.identity h1\s*\{[^}]*font-family:\s*"Segoe UI Variable Text",\s*"Segoe UI",\s*"Malgun Gothic",\s*sans-serif;/s,
   );
 });
+
+test("Chinese uses a lighter shared emphasis weight without changing the brand", () => {
+  assert.match(styles, /--ui-semibold-weight:\s*600/);
+  assert.match(
+    styles,
+    /:root:lang\(zh-CN\)[^{]*\{[^}]*--ui-semibold-weight:\s*500/s,
+  );
+  assert.ok(
+    (styles.match(/font-weight:\s*var\(--ui-semibold-weight\)/g) ?? []).length >= 30,
+  );
+  assert.match(
+    styles,
+    /\.identity h1\s*\{[^}]*font-weight:\s*600/s,
+  );
+});

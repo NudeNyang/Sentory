@@ -29,15 +29,17 @@ test("app info typography keeps the WPF semantic roles", () => {
 test("app info typography matches the WPF font sizes and weights", () => {
   const expectedRules = [
     ["#app-info-heading", "font-size: 12px"],
-    [".app-product-name", "font-size: 14px", "font-weight: 600"],
+    [".app-product-name", "font-size: 14px", "font-weight: var\\(--ui-semibold-weight\\)"],
     [".app-version", "font-size: 11px"],
     [".app-links", "font-size: 10px"],
-    [".app-author-link", "font-weight: 600"],
-    [".app-update-title", "font-size: 11px", "font-weight: 600"],
+    [".app-author-link", "font-weight: var\\(--ui-semibold-weight\\)"],
+    [".app-update-title", "font-size: 11px", "font-weight: var\\(--ui-semibold-weight\\)"],
     [".app-update-description", "font-size: 10.5px"],
     [".app-copyright", "font-size: 10.5px", "font-weight: 400"],
     [".app-license-summary", "font-size: 11px"],
   ];
+
+  assert.match(css, /--ui-semibold-weight:\s*600/);
 
   for (const [selector, ...declarations] of expectedRules) {
     const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
