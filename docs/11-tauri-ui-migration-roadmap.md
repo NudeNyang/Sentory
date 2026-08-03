@@ -236,7 +236,8 @@ Tauri UI는 추정한 새 디자인이 아니라 실행 중인 WPF 1.5.1과
 - 혼합 언어 문구에서도 글자별 굵기가 달라지지 않도록 루트 `lang`에 따라 한국어
   Malgun Gothic, 일본어 Yu Gothic UI, 중국어 Microsoft YaHei UI, 영어 Segoe UI를
   전체 UI의 첫 폰트로 선택한다. 아이콘 전용 Segoe Fluent Icons는 유지하고 일반
-  텍스트의 합성 굵기는 사용하지 않는다.
+  텍스트의 합성 굵기는 사용하지 않는다. 좌측 상단 `Sentory` 브랜드 제목만은
+  언어 변경으로 형태가 달라지지 않도록 항상 Malgun Gothic 스택으로 표시한다.
 
 ### 3. 배포 전환
 

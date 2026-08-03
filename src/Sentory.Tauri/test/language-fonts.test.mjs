@@ -20,3 +20,10 @@ test("changing the language updates the root lang before rendering labels", () =
     /state\.locale = resolveLocale\(language\);\s*document\.documentElement\.lang = state\.locale;/,
   );
 });
+
+test("the Sentory brand title keeps the Korean UI font in every language", () => {
+  assert.match(
+    styles,
+    /\.identity h1\s*\{[^}]*font-family:\s*"Malgun Gothic",\s*"Segoe UI Variable Text",\s*"Segoe UI",\s*sans-serif;/s,
+  );
+});
