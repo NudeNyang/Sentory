@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+\.\d+$')]
-    [string]$PackageVersion = "2.0.3.0",
+    [string]$PackageVersion = "2.0.4.0",
     [string]$PackageIdentityName,
     [string]$Publisher,
     [string]$PublisherDisplayName,
@@ -229,7 +229,7 @@ $packages = foreach ($architecture in $Architectures) {
 }
 
 $makeAppx = Find-WindowsSdkTool "makeappx.exe"
-& $makeAppx bundle /d $bundleInput /p $bundlePath /o /v
+& $makeAppx bundle /d $bundleInput /p $bundlePath /bv $PackageVersion /o /v
 if ($LASTEXITCODE -ne 0) {
     throw "MakeAppx가 MSIX 번들을 만들지 못했습니다."
 }

@@ -43,6 +43,13 @@ test("Store packages are built from Store-channel source for x64 and ARM64", () 
   assert.doesNotMatch(workflow, /gh release|release upload/i);
 });
 
+test("Store bundle keeps the requested four-part package version", () => {
+  assert.match(
+    bundleScript,
+    /bundle \/d \$bundleInput \/p \$bundlePath \/bv \$PackageVersion \/o \/v/,
+  );
+});
+
 test("local executable MSIX review uses a signed test channel", () => {
   assert.match(bundleScript, /\[switch\]\$SignedTest/);
   assert.match(bundleScript, /if \(\$SignedTest -and \[string\]::IsNullOrWhiteSpace\(\$CertificateThumbprint\)\)/);

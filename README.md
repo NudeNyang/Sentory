@@ -70,14 +70,14 @@ Sentory가 운영하는 서버로 보관 데이터를 보내지 않으며 분석
 
 ## 다운로드
 
-현재 정식 버전은 **2.0.3**입니다. Windows 10/11 x64와 ARM64에서 사용할 수
+현재 정식 버전은 **2.0.4**입니다. Windows 10/11 x64와 ARM64에서 사용할 수
 있습니다.
 [Releases](https://github.com/NudeNyang/Sentory/releases)에서 설치형이나 포터블
 파일을 내려받으면 됩니다. macOS와 Linux판의 배포 일정은 아직 정해지지
 않았습니다.
 
-OCR 검색과 다국어 표시에서 달라진 내용은
-[2.0.3 릴리즈 노트](./docs/releases/2.0.3.md)에 정리되어 있습니다.
+재사용 횟수와 다국어 글꼴에서 달라진 내용은
+[2.0.4 릴리즈 노트](./docs/releases/2.0.4.md)에 정리되어 있습니다.
 
 | 사용 환경 | 설치형 | 포터블 |
 | --- | --- | --- |
@@ -165,8 +165,8 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.3 -Architecture x64
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.3 -Architecture arm64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.4 -Architecture x64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.4 -Architecture arm64
 ```
 
 배포 스크립트는 선택한 Windows 아키텍처의 설치형과 포터블 패키지, SHA-256
