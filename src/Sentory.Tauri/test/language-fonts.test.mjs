@@ -1,0 +1,22 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+
+const styles = readFileSync(new URL("../web/styles.css", import.meta.url), "utf8");
+const script = readFileSync(new URL("../web/app.js", import.meta.url), "utf8");
+
+test("each supported language uses one native UI family for mixed text", () => {
+  assert.match(styles, /:root:lang\(ko\)[^{]*\{[^}]*"Malgun Gothic"/s);
+  assert.match(styles, /:root:lang\(en\)[^{]*\{[^}]*"Segoe UI Variable Text"/s);
+  assert.match(styles, /:root:lang\(ja\)[^{]*\{[^}]*"Yu Gothic UI"/s);
+  assert.match(styles, /:root:lang\(zh-CN\)[^{]*\{[^}]*"Microsoft YaHei UI"/s);
+  assert.match(styles, /font-family:\s*var\(--ui-font-family\)/);
+  assert.match(styles, /font-synthesis:\s*none/);
+});
+
+test("changing the language updates the root lang before rendering labels", () => {
+  assert.match(
+    script,
+    /state\.locale = resolveLocale\(language\);\s*document\.documentElement\.lang = state\.locale;/,
+  );
+});

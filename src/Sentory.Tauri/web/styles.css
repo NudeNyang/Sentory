@@ -1,6 +1,8 @@
 :root {
   color-scheme: light;
-  font-family: "Segoe UI Variable Text", "Segoe UI", "Malgun Gothic", sans-serif;
+  --ui-font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  font-family: var(--ui-font-family);
+  font-synthesis: none;
   --window: #e9e4dc;
   --header: #f2eee7;
   --surface: #f7f3ec;
@@ -26,6 +28,22 @@
   --scroll: rgba(117, 102, 85, 0.46);
   background: var(--window);
   color: var(--text);
+}
+
+:root:lang(en) {
+  --ui-font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif;
+}
+
+:root:lang(ko) {
+  --ui-font-family: "Malgun Gothic", "Segoe UI Variable Text", "Segoe UI", sans-serif;
+}
+
+:root:lang(ja) {
+  --ui-font-family: "Yu Gothic UI", "Meiryo UI", "Segoe UI Variable Text", "Segoe UI", sans-serif;
+}
+
+:root:lang(zh-CN) {
+  --ui-font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI Variable Text", "Segoe UI", sans-serif;
 }
 
 :root[data-theme="dark"] {
