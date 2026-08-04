@@ -681,6 +681,7 @@ fn window_theme_set(app: AppHandle, dark: bool) -> Result<(), String> {
 async fn update_check(
     app: AppHandle,
     engine: State<'_, EngineClient>,
+    manual: bool,
 ) -> Result<serde_json::Value, String> {
     if is_microsoft_store() {
         return Err(
@@ -688,8 +689,41 @@ async fn update_check(
         );
     }
     engine
-        .request(&app, "update-check", serde_json::Value::Null)
+        .request(
+            &app,
+            "update-check",
+            serde_json::json!({ "manual": manual }),
+        )
         .await
+}
+
+#[tauri::command]
+async fn update_install(
+    app: AppHandle,
+    engine: State<'_, EngineClient>,
+) -> Result<serde_json::Value, String> {
+    if is_microsoft_store() {
+        return Err(
+            "Microsoft Store 배포판에서는 앱 내 업데이트 설치를 제공하지 않습니다.".to_string(),
+        );
+    }
+
+    let result = engine
+        .request(
+            &app,
+            "update-install",
+            serde_json::json!({ "hostProcessId": std::process::id() }),
+        )
+        .await?;
+    app.state::<AppLifecycleState>()
+        .exiting
+        .store(true, Ordering::Release);
+    let exit_app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        exit_app.exit(0);
+    });
+    Ok(result)
 }
 
 #[tauri::command]
@@ -1042,6 +1076,8 @@ fn runtime_event_name(event_type: &str) -> &'static str {
         "gallery-changed" => "gallery-changed",
         "sync-status" => "sync-status",
         "sync-issue" => "sync-issue",
+        "update-ready" => "update-ready",
+        "update-failed" => "update-failed",
         _ => "runtime-status",
     }
 }
@@ -1832,6 +1868,7 @@ fn main() {
             license_text,
             window_theme_set,
             update_check,
+            update_install,
             startup_get,
             startup_set,
             tray_configure,

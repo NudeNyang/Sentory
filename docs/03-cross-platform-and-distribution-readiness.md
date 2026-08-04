@@ -56,12 +56,12 @@ macOS와 Linux에서 바로 실행되는 앱이 완성된 것은 아니다.
 
 ## Windows 배포
 
-2.0.4 정식판은 Tauri 호스트와 self-contained C# 엔진을 묶은 x64·ARM64 설치형과
+2.0.5 정식판은 Tauri 호스트와 self-contained C# 엔진을 묶은 x64·ARM64 설치형과
 포터블 패키지로 배포한다. .NET 런타임을 따로 설치할 필요는 없다.
 
 ```powershell
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.4 -Architecture x64
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.4 -Architecture arm64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.5 -Architecture x64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.5 -Architecture arm64
 ```
 
 결과 위치:
@@ -79,10 +79,11 @@ artifacts\release-manifest.json
 확인한다. 자체 점검 데이터는 끝난 뒤 삭제하며 실제 사용자 데이터에는
 접근하지 않는다.
 
-받는 사람은 ZIP을 완전히 푼 뒤 `Sentory.exe`를 실행한다. 설정의 수동 확인은 새
-정식 버전이 있으면 공식 GitHub Release 페이지를 연다. 데이터는
-`%LOCALAPPDATA%\Sentory`에 있으므로 설치형이나 포터블 실행 파일을 교체해도
-유지된다.
+받는 사람은 ZIP을 완전히 푼 뒤 `Sentory.exe`를 실행한다. GitHub판은 시작 뒤와
+6시간마다 새 정식 버전을 확인하고 현재 아키텍처와 설치 방식에 맞는 패키지를
+내려받는다. SHA-256 검증을 통과한 뒤에만 설치 버튼을 표시하며, 설치형은 Inno
+Setup을 실행하고 포터블은 앱 폴더의 파일을 교체한 다음 Sentory를 다시 연다.
+데이터는 `%LOCALAPPDATA%\Sentory`에 있으므로 업데이트해도 유지된다.
 
 공개 배포 전에는 다음 작업이 추가로 필요하다.
 

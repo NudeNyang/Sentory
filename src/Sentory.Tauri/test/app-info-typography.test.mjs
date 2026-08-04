@@ -10,6 +10,7 @@ const cargo = readFileSync(new URL("../src-tauri/Cargo.toml", import.meta.url), 
 const rust = readFileSync(new URL("../src-tauri/src/main.rs", import.meta.url), "utf8");
 const buildScript = readFileSync(new URL("../../../scripts/Build-Tauri.ps1", import.meta.url), "utf8");
 const previewBuildScript = readFileSync(new URL("../../../scripts/Build-TauriPreview.ps1", import.meta.url), "utf8");
+const engineRuntime = readFileSync(new URL("../../Sentory.Engine.Bridge/EngineRuntimeHost.cs", import.meta.url), "utf8");
 
 test("app info typography keeps the WPF semantic roles", () => {
   for (const className of [
@@ -76,9 +77,9 @@ test("app info profile links never add an underline on hover", () => {
   );
 });
 
-test("the 2.0.4 developer baseline has no hard-coded marker", () => {
-  assert.match(html, /id="version-label"[^>]*>버전 2\.0\.4<\/small>/);
-  assert.match(script, /t\("version", "2\.0\.4"\)/);
+test("the 2.0.5 developer baseline has no hard-coded marker", () => {
+  assert.match(html, /id="version-label"[^>]*>버전 2\.0\.5<\/small>/);
+  assert.match(script, /t\("version", "2\.0\.5"\)/);
   assert.doesNotMatch(`${html}\n${script}\n${tauriConfig}`, /for Developers|Tauri Preview|com\.sentory\.preview/);
   assert.match(tauriConfig, /"productName": "Sentory"/);
   assert.match(tauriConfig, /"identifier": "com\.nudenyang\.sentory"/);
@@ -96,12 +97,15 @@ test("developer review builds add the developer marker at runtime only", () => {
   assert.match(script, /state\.versionSuffix/);
 });
 
-test("manual update checks are exposed only on the GitHub channel", () => {
+test("automatic updates are exposed only on the GitHub channel", () => {
   assert.match(html, /id="update-setting-row"[^>]*hidden/);
   assert.match(script, /invoke\("distribution_channel"\)/);
   assert.match(script, /updateSettingRow\.hidden = channel !== "github"/);
-  assert.match(
-    script,
-    /invoke\("open_external_url", \{ url: result\.releasePage \}\)/,
-  );
+  assert.match(script, /invoke\("update_check", \{ manual \}\)/);
+  assert.match(script, /6 \* 60 \* 60 \* 1000/);
+  assert.match(script, /invoke\("update_install"\)/);
+  assert.match(engineRuntime, /Task\.Run\(\s*\(\) => DownloadUpdateAsync/);
+  assert.match(rust, /"update-ready" => "update-ready"/);
+  assert.match(script, /listen\("update-ready"/);
+  assert.doesNotMatch(script, /url: result\.releasePage/);
 });

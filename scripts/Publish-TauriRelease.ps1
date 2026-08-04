@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$')]
-    [string]$Version = "2.0.4",
+    [string]$Version = "2.0.5",
     [string]$OutputRoot = "artifacts",
     [ValidateSet("x64", "arm64")]
     [string]$Architecture = "x64",
@@ -18,6 +18,9 @@ $cargoManifestPath = Join-Path $tauriRoot "src-tauri\Cargo.toml"
 $packageManifestPath = Join-Path $tauriRoot "package.json"
 $webAppPath = Join-Path $tauriRoot "web\app.js"
 $webHtmlPath = Join-Path $tauriRoot "web\index.html"
+$engineRuntimePath = Join-Path `
+    $repositoryRoot `
+    "src\Sentory.Engine.Bridge\EngineRuntimeHost.cs"
 $targetTriple = if ($Architecture -eq "arm64") {
     "aarch64-pc-windows-msvc"
 }
@@ -79,17 +82,21 @@ $escapedVersion = [regex]::Escape($Version)
 $tauriConfig = Get-Content -Raw -LiteralPath $tauriConfigPath
 $cargoManifest = Get-Content -Raw -LiteralPath $cargoManifestPath
 $packageManifest = Get-Content -Raw -LiteralPath $packageManifestPath
+$engineRuntime = Get-Content -Raw -LiteralPath $engineRuntimePath
 $publicIdentity = @(
     $tauriConfig,
     $cargoManifest,
     $packageManifest,
+    $engineRuntime,
     (Get-Content -Raw -LiteralPath $webAppPath),
     (Get-Content -Raw -LiteralPath $webHtmlPath)) -join "`n"
 if ($tauriConfig -notmatch '"productName"\s*:\s*"Sentory"' -or
     $tauriConfig -notmatch '"identifier"\s*:\s*"com\.nudenyang\.sentory"' -or
     $tauriConfig -notmatch ('"version"\s*:\s*"' + $escapedVersion + '"') -or
     $cargoManifest -notmatch ('version\s*=\s*"' + $escapedVersion + '"') -or
-    $packageManifest -notmatch ('"version"\s*:\s*"' + $escapedVersion + '"')) {
+    $packageManifest -notmatch ('"version"\s*:\s*"' + $escapedVersion + '"') -or
+    $engineRuntime -notmatch (
+        'CurrentVersion\s*=\s*"' + $escapedVersion + '"')) {
     throw "Tauri 제품 정보와 배포 버전이 일치하지 않습니다: $Version"
 }
 if ($publicIdentity -match 'for Developers|Tauri Preview|com\.sentory\.preview') {

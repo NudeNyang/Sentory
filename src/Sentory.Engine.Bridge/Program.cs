@@ -19,6 +19,11 @@ internal static class Program
     {
         try
         {
+            if (UpdateApplier.IsApplyCommand(args))
+            {
+                return await UpdateApplier.RunAsync(args);
+            }
+
             if (args.Contains(
                     DiscordWorkerClient.WorkerArgument,
                     StringComparer.OrdinalIgnoreCase))

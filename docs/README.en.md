@@ -70,13 +70,12 @@ same storage.
 
 ## Download
 
-The current stable version is **2.0.4**. It runs on x64 and ARM64 Windows 10 and 11.
+The current stable version is **2.0.5**. It runs on x64 and ARM64 Windows 10 and 11.
 Download the installer or portable package from
 [Releases](https://github.com/NudeNyang/Sentory/releases). There is no release schedule
 yet for macOS or Linux.
 
-See the [Sentory 2.0.4 release notes](./releases/2.0.4.md) for reuse counts and
-multilingual font changes.
+See the [Sentory 2.0.5 release notes](./releases/2.0.5.md) for automatic update details.
 
 | System | Installer | Portable |
 | --- | --- | --- |
@@ -120,9 +119,11 @@ activation remain unsigned and can be checked with their accompanying SHA-256 fi
 New installations enable Start with Windows by default. You can turn it off from
 Sentory settings or the tray menu, and later updates preserve your choice.
 
-Use `Check now` in settings to compare your version with the latest stable GitHub
-Release. When an update is available, Sentory opens the official Release page. You can
-verify downloaded packages with the accompanying SHA-256 files.
+Sentory checks the latest stable GitHub Release after startup and every six hours. It
+downloads the package matching the current architecture and installation type, verifies
+the SHA-256 value, and offers an install action in settings. Installation closes Sentory,
+replaces the application files, and starts it again. `Check now` skips the six-hour wait.
+Microsoft Store builds continue to receive updates through the Store.
 
 All messenger detection switches start off on a new installation. Choose the messengers
 you use on the first screen; existing installations keep their saved choices.
@@ -157,8 +158,8 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.4 -Architecture x64
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.4 -Architecture arm64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.5 -Architecture x64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.5 -Architecture arm64
 ```
 
 The release script creates the installer and portable package for the selected Windows

@@ -70,7 +70,7 @@ const TRANSLATIONS = {
     openDataFolder: "데이터 폴더 열기", openDataFolderFailed: "데이터 폴더를 열지 못했습니다.", deleteNonFavorites: "즐겨찾기 제외 항목 모두 삭제", allNonFavoriteItems: "즐겨찾기가 아닌 모든 항목",
     nothingToCleanup: "정리할 항목이 없습니다.", cleanupHeading: "항목을 정리할까요?", cleanupMessage: (total, links, photos, size) => `즐겨찾기가 아닌 모든 항목 ${total.toLocaleString("ko-KR")}개를 삭제할까요?\n\n링크 ${links.toLocaleString("ko-KR")}개 · 사진 ${photos.toLocaleString("ko-KR")}개 (${size})\n즐겨찾기는 삭제되지 않습니다.`,
     deleteAll: "모두 삭제", cleanupCancelled: "정리를 취소했습니다.", cleanupComplete: n => `${n.toLocaleString("ko-KR")}개 항목을 정리했습니다.`, cleanupPartial: n => `${n.toLocaleString("ko-KR")}개를 정리했지만 일부 사진 파일은 다음 실행 때 다시 정리합니다.`, cleanupFailed: "데이터를 정리하지 못했습니다.", checkingCleanup: "삭제 대상을 확인하고 있습니다...",
-    appInfo: "앱 정보", version: value => `버전 ${value}`, developmentVersion: "개발 버전", checkForUpdates: "수동 업데이트 확인", checkForUpdatesDescription: "자동 확인 대기 시간과 관계없이 새 버전을 확인합니다", checkNow: "지금 확인", checkingForUpdates: "업데이트를 확인하고 있습니다.", appIsUpToDate: "현재 최신 버전을 사용하고 있습니다.", updateReady: version => `${version} 업데이트를 설치할 수 있습니다.`, updateCheckFailed: "업데이트를 확인하지 못했습니다. 네트워크 연결을 확인해 주세요.",
+    appInfo: "앱 정보", version: value => `버전 ${value}`, developmentVersion: "개발 버전", checkForUpdates: "자동 업데이트", checkForUpdatesDescription: "새 버전을 자동으로 내려받고 설치 준비가 끝나면 알려드립니다", checkNow: "지금 확인", checkingForUpdates: "업데이트를 확인하고 있습니다.", appIsUpToDate: "현재 최신 버전을 사용하고 있습니다.", updateDownloading: version => `${version} 업데이트를 내려받고 있습니다.`, updateReady: version => `${version} 업데이트 설치 준비가 끝났습니다.`, updateReadyDescription: "다운로드와 무결성 확인을 마쳤습니다", installUpdate: "업데이트 설치", installUpdateQuestion: version => `${version} 업데이트를 설치할까요?`, installUpdateMessage: "Sentory를 종료하고 업데이트한 뒤 자동으로 다시 실행합니다.", installingUpdate: "Sentory를 종료하고 업데이트를 설치합니다.", updateInstallFailed: "업데이트 설치를 시작하지 못했습니다.", updateCheckFailed: "업데이트를 확인하지 못했습니다. 네트워크 연결을 확인해 주세요.",
     copyrightNotice: "Copyright © 2026 NudeNyang", licenseSummary: "GNU GPL v3에 따라 이용 가능", viewLicense: "라이선스 보기", licenseHeading: "라이선스 및 제3자 고지", licenseDescription: "Sentory의 배포 조건과 포함된 오픈소스 구성 요소", openLibrary: "보관함 열기", pauseDetection: "감지 일시정지", resumeDetection: "감지 다시 시작", discordAutoConnect: "Discord 자동 연결", discordReconnect: "Discord 재시작 후 연결", exitSentory: "Sentory 종료",
     trayDetecting: "Sentory - 메신저 감지 중", trayPaused: "Sentory - 감지 일시정지됨", trayDetectionOff: "Sentory - 메신저 감지 꺼짐", trayStatus: status => `상태: ${status}`, doubleClick: "더블클릭", accessibilityMode: "접근성 모드로 시작",
     discordNotRunning: "Discord 미실행", discordRecoveryIssue: "Discord 연결 복구가 필요합니다. 설정에서 다시 연결해 주세요.", discordRepairFailed: "Discord 연결을 복구하지 못했습니다. Discord를 종료한 뒤 다시 시도해 주세요.", captureIssue: "일부 입력을 처리하지 못했습니다. 감지는 계속됩니다.", favoriteChangeFailed: "즐겨찾기를 변경하지 못했습니다.", copyFailedShort: "복사 실패", copyHistorySaveFailed: "복사했지만 사용 기록을 저장하지 못했습니다.", openOriginalFailed: "원본을 열지 못했습니다.", deleteSelectedFailed: "선택한 항목을 삭제하지 못했습니다.",
@@ -119,7 +119,7 @@ const TRANSLATIONS = {
     openDataFolder: "Open data folder", openDataFolderFailed: "Could not open the data folder.", deleteNonFavorites: "Delete all except favorites", allNonFavoriteItems: "all non-favorite items",
     nothingToCleanup: "There is nothing to clean up.", cleanupHeading: "Clean up items?", cleanupMessage: (total, links, photos, size) => `Delete ${total.toLocaleString("en-US")} all non-favorite items?\n\nLinks ${links.toLocaleString("en-US")} · Photos ${photos.toLocaleString("en-US")} (${size})\nFavorites will not be deleted.`,
     deleteAll: "Delete all", cleanupCancelled: "Cleanup cancelled.", cleanupComplete: n => `Cleaned up ${n.toLocaleString("en-US")} items.`, cleanupPartial: n => `Cleaned up ${n.toLocaleString("en-US")} items; some photo files will be retried next time.`, cleanupFailed: "Could not clean up the data.", checkingCleanup: "Checking items to delete...",
-    appInfo: "About", version: value => `Version ${value}`, developmentVersion: "Development build", checkForUpdates: "Manual update check", checkForUpdatesDescription: "Check for a new version without waiting for the automatic interval", checkNow: "Check now", checkingForUpdates: "Checking for updates.", appIsUpToDate: "Sentory is up to date.", updateReady: version => `Update ${version} is ready to install.`, updateCheckFailed: "Could not check for updates. Check your network connection.",
+    appInfo: "About", version: value => `Version ${value}`, developmentVersion: "Development build", checkForUpdates: "Automatic updates", checkForUpdatesDescription: "Download new versions automatically and notify you when they are ready", checkNow: "Check now", checkingForUpdates: "Checking for updates.", appIsUpToDate: "Sentory is up to date.", updateDownloading: version => `Downloading update ${version}.`, updateReady: version => `Update ${version} is ready to install.`, updateReadyDescription: "Download and integrity verification completed", installUpdate: "Install update", installUpdateQuestion: version => `Install update ${version}?`, installUpdateMessage: "Sentory will close, update, and start again automatically.", installingUpdate: "Closing Sentory and installing the update.", updateInstallFailed: "Could not start the update installation.", updateCheckFailed: "Could not check for updates. Check your network connection.",
     copyrightNotice: "Copyright © 2026 NudeNyang", licenseSummary: "Licensed under GNU GPL v3", viewLicense: "View license", licenseHeading: "Licenses and third-party notices", licenseDescription: "Distribution terms and included open-source components", openLibrary: "Open library", pauseDetection: "Pause detection", resumeDetection: "Resume detection", discordAutoConnect: "Discord auto-connect", discordReconnect: "Restart and reconnect Discord", exitSentory: "Exit Sentory",
     trayDetecting: "Sentory - Detecting messengers", trayPaused: "Sentory - Detection paused", trayDetectionOff: "Sentory - Detection off", trayStatus: status => `Status: ${status}`, doubleClick: "Double-click", accessibilityMode: "Starts in accessibility mode",
     discordNotRunning: "Discord is not running", discordRecoveryIssue: "Discord needs to be reconnected. Reconnect it in Settings.", discordRepairFailed: "Could not repair the Discord connection. Exit Discord and try again.", captureIssue: "Some input could not be processed. Detection is continuing.", favoriteChangeFailed: "Could not update favorites.", copyFailedShort: "Copy failed", copyHistorySaveFailed: "Copied, but the usage history could not be saved.", openOriginalFailed: "Could not open the original.", deleteSelectedFailed: "Could not delete the selected items.",
@@ -150,7 +150,7 @@ TRANSLATIONS["ja-JP"] = {
   autoFavorite: "自動お気に入り", autoFavoriteDescription: "同じリンクや写真を繰り返し使用するとお気に入りに追加します", autoFavoriteOff: "使用しない", autoFavoriteCount: n => `${n}回の繰り返し使用後に追加`, autoFavoriteDisabled: "自動お気に入りを使用しません。", autoFavoriteSaved: n => `${n}回繰り返し使用すると自動的にお気に入りへ追加します。`, autoFavoriteSaveFailed: "自動お気に入りの設定を保存できませんでした。",
   autoCleanup: "自動整理", autoCleanupDefault: "初期設定では使用しません", cleanupOff: "自動整理を使用しない", cleanup7: "7日を基準に整理", cleanup30: "30日を基準に整理", cleanup90: "90日を基準に整理", cleanup180: "180日を基準に整理", autoCleanupDisabled: "自動整理を使用しません。", autoCleanupSaved: n => `${n}日基準の自動整理を保存しました。`, autoCleanupSaveFailed: "自動整理設定を保存できませんでした。", saveSettings: "設定を保存",
   openDataFolder: "データフォルダーを開く", openDataFolderFailed: "データフォルダーを開けませんでした。", deleteNonFavorites: "お気に入り以外をすべて削除", allNonFavoriteItems: "お気に入り以外のすべての項目", nothingToCleanup: "整理する項目はありません。", cleanupHeading: "項目を整理しますか？", cleanupMessage: (total, links, photos, size) => `お気に入り以外のすべての項目 ${total.toLocaleString("ja-JP")}件を削除しますか？\n\nリンク ${links.toLocaleString("ja-JP")}件 · 写真 ${photos.toLocaleString("ja-JP")}件 (${size})\nお気に入りは削除されません。`, deleteAll: "すべて削除", cleanupCancelled: "整理をキャンセルしました。", cleanupComplete: n => `${n.toLocaleString("ja-JP")}件を整理しました。`, cleanupPartial: n => `${n.toLocaleString("ja-JP")}件を整理しましたが、一部の写真ファイルは次回再試行します。`, cleanupFailed: "データを整理できませんでした。", checkingCleanup: "削除対象を確認しています...",
-  appInfo: "アプリ情報", version: value => `バージョン ${value}`, developmentVersion: "開発版", checkForUpdates: "手動アップデート確認", checkForUpdatesDescription: "自動確認の待機時間に関係なく新しいバージョンを確認します", checkNow: "今すぐ確認", checkingForUpdates: "アップデートを確認しています。", appIsUpToDate: "現在、最新バージョンを使用しています。", updateReady: version => `${version} アップデートをインストールできます。`, updateCheckFailed: "アップデートを確認できませんでした。ネットワーク接続を確認してください。", copyrightNotice: "Copyright © 2026 NudeNyang", licenseSummary: "GNU GPL v3 に基づいて利用できます", viewLicense: "ライセンスを見る", licenseHeading: "ライセンスと第三者表記", licenseDescription: "Sentory の配布条件と同梱オープンソース構成要素", openLibrary: "ライブラリを開く", pauseDetection: "検出を一時停止", resumeDetection: "検出を再開", discordAutoConnect: "Discord 自動接続", discordReconnect: "Discord を再起動して接続", exitSentory: "Sentory を終了",
+  appInfo: "アプリ情報", version: value => `バージョン ${value}`, developmentVersion: "開発版", checkForUpdates: "自動アップデート", checkForUpdatesDescription: "新しいバージョンを自動的にダウンロードし、準備ができたらお知らせします", checkNow: "今すぐ確認", checkingForUpdates: "アップデートを確認しています。", appIsUpToDate: "現在、最新バージョンを使用しています。", updateDownloading: version => `${version} アップデートをダウンロードしています。`, updateReady: version => `${version} アップデートをインストールできます。`, updateReadyDescription: "ダウンロードと整合性の確認が完了しました", installUpdate: "アップデートをインストール", installUpdateQuestion: version => `${version} アップデートをインストールしますか？`, installUpdateMessage: "Sentoryを終了してアップデートした後、自動的に再起動します。", installingUpdate: "Sentoryを終了してアップデートをインストールします。", updateInstallFailed: "アップデートのインストールを開始できませんでした。", updateCheckFailed: "アップデートを確認できませんでした。ネットワーク接続を確認してください。", copyrightNotice: "Copyright © 2026 NudeNyang", licenseSummary: "GNU GPL v3 に基づいて利用できます", viewLicense: "ライセンスを見る", licenseHeading: "ライセンスと第三者表記", licenseDescription: "Sentory の配布条件と同梱オープンソース構成要素", openLibrary: "ライブラリを開く", pauseDetection: "検出を一時停止", resumeDetection: "検出を再開", discordAutoConnect: "Discord 自動接続", discordReconnect: "Discord を再起動して接続", exitSentory: "Sentory を終了",
   trayDetecting: "Sentory - メッセンジャー検出中", trayPaused: "Sentory - 検出一時停止", trayDetectionOff: "Sentory - メッセンジャー検出オフ", trayStatus: status => `状態: ${status}`, doubleClick: "ダブルクリック", accessibilityMode: "アクセシビリティモードで開始", discordNotRunning: "Discord は実行されていません", discordRecoveryIssue: "Discord の接続復旧が必要です。設定から再接続してください。", discordRepairFailed: "Discord 接続を復旧できませんでした。Discord を終了して再試行してください。", captureIssue: "一部の入力を処理できませんでした。検出は継続しています。", favoriteChangeFailed: "お気に入りを変更できませんでした。", copyFailedShort: "コピー失敗", copyHistorySaveFailed: "コピーしましたが、使用履歴を保存できませんでした。", openOriginalFailed: "元のデータを開けませんでした。", deleteSelectedFailed: "選択した項目を削除できませんでした。",
   themeApplied: mode => mode === "Dark" ? "ダークモードを適用しました。" : mode === "System" ? "システムテーマモードを適用しました。" : "ライトモードを適用しました。", themeSaveFailed: "テーマ設定を保存できませんでした。", languageApplied: "言語を変更しました。", languageSaveFailed: "言語設定を保存できませんでした。", sourceEnabled: source => `${source === "KakaoTalk" ? "カカオトーク" : source} 検出をオンにしました。`, sourceDisabled: source => `${source === "KakaoTalk" ? "カカオトーク" : source} 検出をオフにしました。`, sourceSettingFailed: source => `${source === "KakaoTalk" ? "カカオトーク" : source} 検出設定を保存できませんでした。`,
   messengerSetupTitle: "使用するメッセンジャーを選択", messengerSetupDescription: "後から設定で変更できます。", enableAllMessengers: "すべてオン", completeMessengerSetup: "選択を保存", messengerSetupSaveFailed: "メッセンジャー検出設定を保存できませんでした。", detectionOffTitle: "メッセンジャー検出がオフです", detectionOffDescription: "新しいリンクや写真を保存するにはメッセンジャーをオンにしてください", chooseMessengers: "メッセンジャーを選択",
@@ -177,7 +177,7 @@ TRANSLATIONS["zh-CN"] = {
   autoFavorite: "自动收藏", autoFavoriteDescription: "同一链接或图片被重复使用后自动收藏", autoFavoriteOff: "不使用", autoFavoriteCount: n => `重复使用 ${n} 次后收藏`, autoFavoriteDisabled: "已关闭自动收藏。", autoFavoriteSaved: n => `重复使用 ${n} 次后将自动添加到收藏。`, autoFavoriteSaveFailed: "无法保存自动收藏设置。",
   autoCleanup: "自动清理", autoCleanupDefault: "默认关闭", cleanupOff: "不使用自动清理", cleanup7: "清理超过 7 天的项目", cleanup30: "清理超过 30 天的项目", cleanup90: "清理超过 90 天的项目", cleanup180: "清理超过 180 天的项目", autoCleanupDisabled: "自动清理已关闭。", autoCleanupSaved: n => `已保存按 ${n} 天自动清理的设置。`, autoCleanupSaveFailed: "无法保存自动清理设置。", saveSettings: "保存设置",
   openDataFolder: "打开数据文件夹", openDataFolderFailed: "无法打开数据文件夹。", deleteNonFavorites: "删除除收藏外的所有项目", allNonFavoriteItems: "所有非收藏项目", nothingToCleanup: "没有可清理的项目。", cleanupHeading: "要清理项目吗？", cleanupMessage: (total, links, photos, size) => `要删除 ${total.toLocaleString("zh-CN")} 个所有非收藏项目吗？\n\n链接 ${links.toLocaleString("zh-CN")} · 图片 ${photos.toLocaleString("zh-CN")}（${size}）\n收藏项目不会被删除。`, deleteAll: "全部删除", cleanupCancelled: "已取消清理。", cleanupComplete: n => `已清理 ${n.toLocaleString("zh-CN")} 个项目。`, cleanupPartial: n => `已清理 ${n.toLocaleString("zh-CN")} 个项目；部分图片文件将在下次启动时重试。`, cleanupFailed: "无法清理数据。", checkingCleanup: "正在检查要删除的项目…",
-  appInfo: "应用信息", version: value => `版本 ${value}`, developmentVersion: "开发版本", checkForUpdates: "手动检查更新", checkForUpdatesDescription: "无需等待自动检查间隔即可检查新版本", checkNow: "立即检查", checkingForUpdates: "正在检查更新。", appIsUpToDate: "当前已是最新版本。", updateReady: version => `可以安装 ${version} 更新。`, updateCheckFailed: "无法检查更新，请检查网络连接。", copyrightNotice: "Copyright © 2026 NudeNyang", licenseSummary: "依据 GNU GPL v3 使用", viewLicense: "查看许可协议", licenseHeading: "许可证与第三方声明", licenseDescription: "Sentory 的分发条款及所含开源组件", openLibrary: "打开收藏库", pauseDetection: "暂停检测", resumeDetection: "恢复检测", discordAutoConnect: "Discord 自动连接", discordReconnect: "重启并重新连接 Discord", exitSentory: "退出 Sentory",
+  appInfo: "应用信息", version: value => `版本 ${value}`, developmentVersion: "开发版本", checkForUpdates: "自动更新", checkForUpdatesDescription: "自动下载新版本，并在准备完成后通知你", checkNow: "立即检查", checkingForUpdates: "正在检查更新。", appIsUpToDate: "当前已是最新版本。", updateDownloading: version => `正在下载 ${version} 更新。`, updateReady: version => `可以安装 ${version} 更新。`, updateReadyDescription: "下载和完整性检查已完成", installUpdate: "安装更新", installUpdateQuestion: version => `要安装 ${version} 更新吗？`, installUpdateMessage: "Sentory 将退出并完成更新，然后自动重新启动。", installingUpdate: "正在退出 Sentory 并安装更新。", updateInstallFailed: "无法开始安装更新。", updateCheckFailed: "无法检查更新，请检查网络连接。", copyrightNotice: "Copyright © 2026 NudeNyang", licenseSummary: "依据 GNU GPL v3 使用", viewLicense: "查看许可协议", licenseHeading: "许可证与第三方声明", licenseDescription: "Sentory 的分发条款及所含开源组件", openLibrary: "打开收藏库", pauseDetection: "暂停检测", resumeDetection: "恢复检测", discordAutoConnect: "Discord 自动连接", discordReconnect: "重启并重新连接 Discord", exitSentory: "退出 Sentory",
   trayDetecting: "Sentory - 正在检测聊天应用", trayPaused: "Sentory - 检测已暂停", trayDetectionOff: "Sentory - 聊天应用检测已关闭", trayStatus: status => `状态：${status}`, doubleClick: "双击", accessibilityMode: "以辅助功能模式启动", discordNotRunning: "Discord 未运行", discordRecoveryIssue: "需要恢复 Discord 连接。请在设置中重新连接。", discordRepairFailed: "无法恢复 Discord 连接。请退出 Discord 后重试。", captureIssue: "部分输入无法处理，检测仍在继续。", favoriteChangeFailed: "无法更新收藏。", copyFailedShort: "复制失败", copyHistorySaveFailed: "已复制，但无法保存使用记录。", openOriginalFailed: "无法打开原文件。", deleteSelectedFailed: "无法删除所选项目。",
   themeApplied: mode => mode === "Dark" ? "已应用深色模式。" : mode === "System" ? "已应用系统主题模式。" : "已应用浅色模式。", themeSaveFailed: "无法保存主题设置。", languageApplied: "语言已更改。", languageSaveFailed: "无法保存语言设置。", sourceEnabled: source => `已开启 ${source} 检测。`, sourceDisabled: source => `已关闭 ${source} 检测。`, sourceSettingFailed: source => `无法保存 ${source} 检测设置。`,
   messengerSetupTitle: "选择要检测的聊天应用", messengerSetupDescription: "之后可以在设置中更改。", enableAllMessengers: "全部开启", completeMessengerSetup: "保存选择", messengerSetupSaveFailed: "无法保存聊天应用检测设置。", detectionOffTitle: "聊天应用检测已关闭", detectionOffDescription: "请开启聊天应用以保存新的链接和图片", chooseMessengers: "选择聊天应用",
@@ -219,6 +219,10 @@ const state = {
   dataStatistics: null,
   locale: "ko-KR",
   versionSuffix: "",
+  updateReadyVersion: null,
+  updateDownloadVersion: null,
+  updateCheckInProgress: false,
+  updateCheckTimer: 0,
   settingsBusy: false,
   syncMode: "Folder",
   syncCandidates: [],
@@ -580,9 +584,7 @@ function applyLocalizedUi(language) {
   document.querySelector("#auto-cleanup-description").textContent = t("autoCleanupDefault");
   document.querySelector("#app-info-heading").textContent = t("appInfo");
   document.querySelector("#version-label").textContent =
-    `${t("version", "2.0.4")}${state.versionSuffix}`;
-  document.querySelector("#update-title").textContent = t("checkForUpdates");
-  document.querySelector("#update-description").textContent = t("checkForUpdatesDescription");
+    `${t("version", "2.0.5")}${state.versionSuffix}`;
   document.querySelector("#copyright-label").textContent = t("copyrightNotice");
   document.querySelector("#license-summary").textContent = t("licenseSummary");
   viewLicense.textContent = t("viewLicense");
@@ -592,7 +594,7 @@ function applyLocalizedUi(language) {
   autoCleanupSave.textContent = t("saveSettings");
   openDataFolder.textContent = t("openDataFolder");
   deleteNonFavorites.textContent = t("deleteNonFavorites");
-  updateCheck.textContent = t("checkNow");
+  renderUpdateState();
   themeSetting.options[0].textContent = t("light");
   themeSetting.options[1].textContent = t("dark");
   themeSetting.options[2].textContent = t("system");
@@ -1531,6 +1533,19 @@ async function connectEngineEvents() {
   });
   await listen("sync-issue", event => {
     if (event.payload?.message) showToast(event.payload.message);
+  });
+  await listen("update-ready", event => {
+    const version = event.payload?.version;
+    if (!version) return;
+    state.updateDownloadVersion = null;
+    state.updateReadyVersion = version;
+    renderUpdateState();
+    showToast(t("updateReady", version));
+  });
+  await listen("update-failed", () => {
+    state.updateDownloadVersion = null;
+    renderUpdateState();
+    showToast(t("updateCheckFailed"));
   });
 }
 
@@ -3031,21 +3046,75 @@ deleteNonFavorites.addEventListener("click", async () => {
     deleteNonFavorites.disabled = false;
   }
 });
-updateCheck.addEventListener("click", async () => {
-  updateCheck.disabled = true;
-  showToast(t("checkingForUpdates"));
+function renderUpdateState() {
+  const ready = Boolean(state.updateReadyVersion);
+  const downloading = Boolean(state.updateDownloadVersion);
+  document.querySelector("#update-title").textContent = ready
+    ? t("updateReady", state.updateReadyVersion)
+    : downloading
+      ? t("updateDownloading", state.updateDownloadVersion)
+      : t("checkForUpdates");
+  document.querySelector("#update-description").textContent = ready
+    ? t("updateReadyDescription")
+    : t("checkForUpdatesDescription");
+  updateCheck.textContent = t(ready ? "installUpdate" : "checkNow");
+  updateCheck.disabled = state.updateCheckInProgress || downloading;
+}
+
+async function checkForUpdates(manual) {
+  if (state.updateCheckInProgress || state.updateReadyVersion) return;
+  state.updateCheckInProgress = true;
+  renderUpdateState();
+  if (manual) showToast(t("checkingForUpdates"));
   try {
-    const result = await tauriCore().invoke("update_check");
-    showToast(result.updateAvailable ? t("updateReady", result.version) : t("appIsUpToDate"));
-    if (result.updateAvailable && result.releasePage) {
-      await tauriCore().invoke("ui_diagnostic", { event: "update-available", detail: result.releasePage });
-      await tauriCore().invoke("open_external_url", { url: result.releasePage });
+    const result = await tauriCore().invoke("update_check", { manual });
+    if (result.readyToInstall && result.version) {
+      state.updateDownloadVersion = null;
+      state.updateReadyVersion = result.version;
+      showToast(t("updateReady", result.version));
+      await tauriCore().invoke("ui_diagnostic", {
+        event: "update-ready",
+        detail: `${result.version}:${result.packageKind ?? "unknown"}`,
+      });
+    } else if (result.updateAvailable && result.version) {
+      state.updateDownloadVersion = result.version;
+      if (manual) showToast(t("updateDownloading", result.version));
+    } else if (manual && result.checked) {
+      showToast(t("appIsUpToDate"));
     }
   } catch {
-    showToast(t("updateCheckFailed"));
+    if (manual) showToast(t("updateCheckFailed"));
   } finally {
-    updateCheck.disabled = false;
+    state.updateCheckInProgress = false;
+    renderUpdateState();
   }
+}
+
+async function installPreparedUpdate() {
+  const version = state.updateReadyVersion;
+  if (!version || state.updateCheckInProgress) return;
+  const accepted = await askConfirmation(
+    t("installUpdateQuestion", version),
+    t("installUpdateMessage"),
+    { okText: t("installUpdate"), danger: false });
+  if (!accepted) return;
+
+  state.updateCheckInProgress = true;
+  renderUpdateState();
+  showToast(t("installingUpdate"));
+  try {
+    await tauriCore().invoke("update_install");
+  } catch {
+    state.updateCheckInProgress = false;
+    renderUpdateState();
+    showToast(t("updateInstallFailed"));
+  }
+}
+
+updateCheck.addEventListener("click", () => {
+  void (state.updateReadyVersion
+    ? installPreparedUpdate()
+    : checkForUpdates(true));
 });
 
 async function configureDistributionUi() {
@@ -3056,8 +3125,15 @@ async function configureDistributionUi() {
     ]);
     state.versionSuffix = typeof versionSuffix === "string" ? versionSuffix : "";
     document.querySelector("#version-label").textContent =
-      `${t("version", "2.0.4")}${state.versionSuffix}`;
+      `${t("version", "2.0.5")}${state.versionSuffix}`;
     updateSettingRow.hidden = channel !== "github";
+    if (channel === "github") {
+      window.setTimeout(() => void checkForUpdates(false), 6000);
+      window.clearInterval(state.updateCheckTimer);
+      state.updateCheckTimer = window.setInterval(
+        () => void checkForUpdates(false),
+        6 * 60 * 60 * 1000);
+    }
   } catch {
     updateSettingRow.hidden = true;
   }

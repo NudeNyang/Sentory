@@ -4,7 +4,7 @@
 
 - 제품명: Sentory
 - 제작자·게시자: NudeNyang
-- 현재 배포 버전: `2.0.4`
+- 현재 배포 버전: `2.0.5`
 - 라이선스: GNU General Public License v3.0 only (`GPL-3.0-only`)
 - 현재 배포 운영체제: Windows 10/11 64비트
 - 지원 아키텍처: x64, ARM64
@@ -28,8 +28,8 @@ Sentory의 원본 소스 코드는 GPL-3.0-only로 공개합니다. 사용, 연�
 
 ```powershell
 git status --short
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.4 -Architecture x64
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.4 -Architecture arm64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.5 -Architecture x64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.5 -Architecture arm64
 ```
 
 `Publish-TauriRelease.ps1`은 제품명과 버전, 앱 식별자를 확인하고 `for
@@ -53,14 +53,17 @@ Tauri 로컬 검수판은 다음 명령으로 만든다.
 | `Sentory-win-x64-portable.zip` | Intel·AMD Windows 포터블 |
 | `Sentory-win-arm64-setup.exe` | Windows on ARM 설치형 |
 | `Sentory-win-arm64-portable.zip` | Windows on ARM 포터블 |
-| `Sentory-2.0.4-source.zip` | 해당 바이너리에 대응하는 전체 소스 |
+| `Sentory-2.0.5-source.zip` | 해당 바이너리에 대응하는 전체 소스 |
 
 각 배포 파일의 `.sha256` 확인값과 `release-manifest.json`도 함께 생성된다.
 
-설정의 `앱 정보`에서 `지금 확인`을 누르면 GitHub Releases를 즉시 조회한다. 새
-정식 버전이 있으면 공식 Release 페이지를 연다. 2.0.4 Tauri판은 앱 안에서
-패키지를 교체하지 않으므로 사용자가 설치형이나 포터블 파일을 직접 받는다.
-Microsoft Store판에는 이 버튼을 표시하지 않으며 Store가 업데이트를 배포한다.
+GitHub판은 실행 6초 뒤 첫 자동 확인을 시작하고 이후 6시간마다 GitHub Releases를
+조회한다. 새 정식 버전이 있으면 현재 아키텍처와 설치 방식에 맞는 파일을 임시
+폴더로 내려받고 SHA-256을 검증한다. 설정의 `지금 확인`은 이 간격을 건너뛴다.
+준비된 업데이트는 설정에서 설치할 수 있다. 별도 헬퍼가 Tauri 호스트와 C# 엔진의
+종료를 확인한 다음 설치형은 Inno Setup으로 교체하고, 포터블은 압축을 푼 파일을
+현재 폴더에 덮어쓴다. 두 방식 모두 끝나면 Sentory를 다시 연다. Microsoft
+Store판에는 업데이트 행을 표시하지 않으며 Store가 업데이트를 배포한다.
 
 설치형 패키지는 Inno Setup 6으로 만듭니다. 빌드 PC에 컴파일러가 없으면 다음
 명령으로 설치할 수 있습니다.
@@ -90,7 +93,7 @@ Microsoft Store판도 보관함 DB, 사진과 설정은 같은 폴더에 저장�
 
 공개 저장소에는 최소한 다음 항목을 같은 버전으로 올립니다.
 
-- 전체 소스 코드와 `v2.0.4` 태그
+- 전체 소스 코드와 `v2.0.5` 태그
 - `LICENSE.txt`의 GNU GPL v3 전문
 - `README.md`, `docs/README.en.md`
 - `docs/privacy.md`, `distribution/THIRD-PARTY-NOTICES.txt`, `CHANGELOG.md`,
@@ -114,7 +117,7 @@ GitHub가 자동으로 제공하는 “Source code” 파일만 이용해도 소
 7. 다른 앱에서 다룬 내용이 저장되지 않는지 확인합니다.
 8. x64와 ARM64 설치형·포터블을 각각 같은 아키텍처의 Windows에서 실행합니다.
 9. 앱 정보에 `for Developers`나 `Preview`가 없는지 확인합니다.
-10. `v2.0.4` 태그가 배포 파일을 만든 커밋을 가리키는지 확인합니다.
+10. `v2.0.5` 태그가 배포 파일을 만든 커밋을 가리키는지 확인합니다.
 11. Release 자산의 SHA-256 값과 `release-manifest.json`을 대조합니다.
 
 Tauri 정식판은 `Publish-TauriRelease.ps1`이 포터블 자체 점검을 실행하며
@@ -175,14 +178,15 @@ SignPath Foundation 오픈소스 코드 서명을 신청하는 동안에는
 
 공개 저장소의 역할, 개인정보 안내와 검증 기준은
 [`code-signing-policy.md`](./code-signing-policy.md)에 둔다. Foundation 승인이
-끝나기 전의 Release와 2.0.4 이하 파일은 미서명 상태로 유지한다.
+끝나기 전의 Release와 2.0.5 이하 파일은 미서명 상태로 유지한다.
 
 ## 버전과 업데이트
 
-Sentory는 의미적 버전 형식을 사용한다. 2.0.4 Tauri판은 설정의 `지금 확인`을
-눌렀을 때 GitHub Releases에서 같은 채널의 더 높은 버전이 있는지 확인한다. 새
-버전이 있으면 HTTPS 공식 Release 페이지를 열며 패키지 설치는 사용자가 직접
-진행한다.
+Sentory는 의미적 버전 형식을 사용한다. 2.0.5 Tauri판은 GitHub Releases에서 같은
+채널의 더 높은 버전을 자동으로 찾는다. 설치형은 `setup.exe`, 포터블은
+`portable.zip`을 고르고 GitHub가 제공한 digest 또는 함께 게시한 `.sha256` 파일로
+검증한다. 다운로드 크기는 256MB로 제한하며 검증이 끝난 파일만 설치 헬퍼에
+넘긴다. 실패한 확인 시각은 지워 다음 실행에서 다시 시도할 수 있게 한다.
 
 버전 선택과 동기화는 Codex가 맡습니다. 변경 범위에 따라 의미적 버전의 다음
 번호를 정하고 프로젝트, 설치 프로그램, 배포 스크립트, 테스트와 문서의 버전을

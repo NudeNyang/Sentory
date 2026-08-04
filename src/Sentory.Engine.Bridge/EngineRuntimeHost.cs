@@ -18,6 +18,7 @@ namespace Sentory.Engine.Bridge;
 
 public sealed class EngineRuntimeHost : IAsyncDisposable
 {
+    private const string CurrentVersion = "2.0.5";
     private readonly SqliteCaptureRepository _repository;
     private readonly SentoryDataPaths _paths;
     private readonly SentorySettingsStore _settingsStore;
@@ -31,11 +32,13 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
     private readonly SemaphoreSlim _linkPreviewWakeSignal = new(0, 1);
     private readonly SemaphoreSlim _ocrWakeSignal = new(0, 1);
     private readonly SemaphoreSlim _syncWakeSignal = new(0, 1);
+    private readonly SemaphoreSlim _updateCheckGate = new(1, 1);
     private readonly SyncRuntimeStatusTracker _syncStatusTracker = new();
     private readonly ConcurrentQueue<EngineRuntimeEventDto> _events = new();
     private readonly TaskCompletionSource _ready = new(
         TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly object _stateGate = new();
+    private readonly object _updateStateGate = new();
     private readonly object _webDavStoreGate = new();
     private readonly CancellationTokenSource _lifetime = new();
     private readonly Thread _dispatcherThread;
@@ -48,6 +51,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
     private Task? _linkPreviewTask;
     private Task? _ocrTask;
     private Task? _syncTask;
+    private Task? _updateDownloadTask;
     private LocalFolderSyncRuntimeService? _syncRuntimeService;
     private WebDavSyncObjectStore? _webDavStore;
     private string? _webDavStoreConfiguration;
@@ -57,6 +61,8 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
     private string? _lastIssue;
     private bool _started;
     private int _disposed;
+    private ReleaseUpdate? _availableUpdate;
+    private string? _downloadedUpdatePackage;
 
     public EngineRuntimeHost(
         SqliteCaptureRepository repository,
@@ -378,6 +384,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
     public string GetDataDirectory() => _paths.RootDirectory;
 
     public async Task<EngineUpdateCheckDto> CheckForUpdatesAsync(
+        bool manual,
         CancellationToken cancellationToken = default)
     {
         if (string.Equals(
@@ -390,19 +397,171 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
                 "Microsoft Store 배포판에서는 앱 내 업데이트 확인을 제공하지 않습니다.");
         }
 
-        using var client = new GitHubReleaseUpdateClient();
-        var update = await client.CheckAsync(
-            "2.0.4",
-            RuntimeInformation.ProcessArchitecture,
-            UpdatePackageKind.Portable,
-            cancellationToken);
-        return update is null
-            ? new EngineUpdateCheckDto(false, null, null)
-            : new EngineUpdateCheckDto(
-                true,
-                update.Version,
-                update.ReleasePage.AbsoluteUri);
+        await _updateCheckGate.WaitAsync(cancellationToken);
+        try
+        {
+            lock (_updateStateGate)
+            {
+                if (_availableUpdate is { } readyUpdate &&
+                    _downloadedUpdatePackage is { } readyPackage &&
+                    File.Exists(readyPackage))
+                {
+                    return ReadyUpdate(readyUpdate);
+                }
+
+                if (_availableUpdate is { } downloadingUpdate &&
+                    _updateDownloadTask is { IsCompleted: false })
+                {
+                    return PendingUpdate(downloadingUpdate);
+                }
+            }
+
+            var settings = _settingsStore.Load();
+            var now = DateTimeOffset.UtcNow;
+            if (!UpdateCheckSchedule.ShouldCheck(
+                    settings.LastUpdateCheckAt,
+                    now,
+                    manual))
+            {
+                return new EngineUpdateCheckDto(
+                    Checked: false,
+                    UpdateAvailable: false,
+                    ReadyToInstall: false,
+                    Version: null,
+                    ReleasePage: null,
+                    PackageKind: null);
+            }
+
+            settings.LastUpdateCheckAt = now;
+            _settingsStore.Save(settings);
+            var packageKind = UpdatePackageKindDetector.Resolve(
+                AppContext.BaseDirectory);
+
+            using var client = new GitHubReleaseUpdateClient();
+            var update = await client.CheckAsync(
+                CurrentVersion,
+                RuntimeInformation.ProcessArchitecture,
+                packageKind,
+                cancellationToken);
+            if (update is null)
+            {
+                return new EngineUpdateCheckDto(
+                    Checked: true,
+                    UpdateAvailable: false,
+                    ReadyToInstall: false,
+                    Version: null,
+                    ReleasePage: null,
+                    PackageKind: null);
+            }
+
+            settings.LastUpdateCheckAt = null;
+            _settingsStore.Save(settings);
+            lock (_updateStateGate)
+            {
+                _availableUpdate = update;
+                _downloadedUpdatePackage = null;
+                _updateDownloadTask = Task.Run(
+                    () => DownloadUpdateAsync(update, _lifetime.Token),
+                    _lifetime.Token);
+            }
+            return PendingUpdate(update);
+        }
+        catch
+        {
+            var settings = _settingsStore.Load();
+            settings.LastUpdateCheckAt = null;
+            _settingsStore.Save(settings);
+            throw;
+        }
+        finally
+        {
+            _updateCheckGate.Release();
+        }
     }
+
+    public EngineUpdateInstallDto InstallPreparedUpdate(int hostProcessId)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(hostProcessId);
+        ReleaseUpdate update;
+        string? package;
+        lock (_updateStateGate)
+        {
+            update = _availableUpdate ?? throw new InvalidOperationException(
+                "설치할 업데이트가 준비되지 않았습니다.");
+            package = _downloadedUpdatePackage;
+        }
+        if (string.IsNullOrWhiteSpace(package) || !File.Exists(package))
+        {
+            throw new FileNotFoundException(
+                "다운로드한 업데이트 패키지를 찾지 못했습니다.",
+                package);
+        }
+
+        _ = UpdateApplier.PrepareAndLaunch(
+            package,
+            update.PackageKind,
+            hostProcessId);
+        return new EngineUpdateInstallDto(true, update.Version);
+    }
+
+    private async Task DownloadUpdateAsync(
+        ReleaseUpdate update,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var directory = Path.Combine(
+                Path.GetTempPath(),
+                "Sentory",
+                "downloads",
+                update.Version);
+            using var client = new GitHubReleaseUpdateClient();
+            var package = await client.DownloadAsync(
+                update,
+                directory,
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            lock (_updateStateGate)
+            {
+                _downloadedUpdatePackage = package;
+            }
+            Enqueue("update-ready", ReadyUpdate(update));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            lock (_updateStateGate)
+            {
+                _availableUpdate = null;
+                _downloadedUpdatePackage = null;
+            }
+            Enqueue("update-failed", new { message = exception.Message });
+        }
+    }
+
+    private static EngineUpdateCheckDto ReadyUpdate(ReleaseUpdate update) =>
+        new(
+            Checked: true,
+            UpdateAvailable: true,
+            ReadyToInstall: true,
+            Version: update.Version,
+            ReleasePage: update.ReleasePage.AbsoluteUri,
+            PackageKind: update.PackageKind == UpdatePackageKind.Installer
+                ? "installer"
+                : "portable");
+
+    private static EngineUpdateCheckDto PendingUpdate(ReleaseUpdate update) =>
+        new(
+            Checked: true,
+            UpdateAvailable: true,
+            ReadyToInstall: false,
+            Version: update.Version,
+            ReleasePage: update.ReleasePage.AbsoluteUri,
+            PackageKind: update.PackageKind == UpdatePackageKind.Installer
+                ? "installer"
+                : "portable");
 
     public async Task<EngineRuntimeStatusDto> TogglePauseAsync()
     {
@@ -1503,6 +1662,16 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
             {
             }
         }
+        if (_updateDownloadTask is not null)
+        {
+            try
+            {
+                await _updateDownloadTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
         try
         {
             await _ready.Task;
@@ -1554,6 +1723,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         _linkPreviewWakeSignal.Dispose();
         _ocrWakeSignal.Dispose();
         _syncWakeSignal.Dispose();
+        _updateCheckGate.Dispose();
         _lifetime.Dispose();
     }
 }
@@ -1619,9 +1789,16 @@ public sealed record EngineRuntimePollDto(
     IReadOnlyList<EngineRuntimeEventDto> Events);
 
 public sealed record EngineUpdateCheckDto(
+    bool Checked,
     bool UpdateAvailable,
+    bool ReadyToInstall,
     string? Version,
-    string? ReleasePage);
+    string? ReleasePage,
+    string? PackageKind);
+
+public sealed record EngineUpdateInstallDto(
+    bool Launched,
+    string Version);
 
 public sealed record EngineCaptureEventDto(
     string Kind,

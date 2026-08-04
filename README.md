@@ -42,7 +42,7 @@ Sentory는 메신저에서 주고받은 링크와 사진을 따로 모아 두는
 - 페이지 제목, 사이트 아이콘, 대표 이미지와 설명을 포함한 링크 미리보기
 - 라이트·다크 테마와 한국어·영어·일본어·중국어 UI
 - 새 설치에서 기본 활성화되는 Windows 시작 시 자동 실행과 트레이 메뉴
-- 설정에서 GitHub 최신 Release를 확인하고 공식 다운로드 페이지 열기
+- GitHub 최신 Release 자동 확인, SHA-256 검증과 앱 안에서 업데이트 설치
 - OneDrive, Google Drive, Dropbox, MEGA 또는 직접 고른 폴더를 이용한
   Windows 컴퓨터 간 보관함 동기화
 - NAS의 WebDAV 공유 폴더를 이용한 사진·링크 동기화
@@ -70,14 +70,14 @@ Sentory가 운영하는 서버로 보관 데이터를 보내지 않으며 분석
 
 ## 다운로드
 
-현재 정식 버전은 **2.0.4**입니다. Windows 10/11 x64와 ARM64에서 사용할 수
+현재 정식 버전은 **2.0.5**입니다. Windows 10/11 x64와 ARM64에서 사용할 수
 있습니다.
 [Releases](https://github.com/NudeNyang/Sentory/releases)에서 설치형이나 포터블
 파일을 내려받으면 됩니다. macOS와 Linux판의 배포 일정은 아직 정해지지
 않았습니다.
 
-재사용 횟수와 다국어 글꼴에서 달라진 내용은
-[2.0.4 릴리즈 노트](./docs/releases/2.0.4.md)에 정리되어 있습니다.
+자동 업데이트에서 달라진 내용은
+[2.0.5 릴리즈 노트](./docs/releases/2.0.5.md)에 정리되어 있습니다.
 
 | 사용 환경 | 설치형 | 포터블 |
 | --- | --- | --- |
@@ -123,9 +123,11 @@ SignPath Foundation 명의의 유효한 Authenticode 서명이 있는 파일에�
 설정 화면이나 트레이 메뉴에서 끌 수 있으며, 이후 업데이트에서도 선택한 상태가
 유지됩니다.
 
-설정의 `지금 확인`을 누르면 GitHub의 최신 정식 버전을 확인합니다. 새 버전이
-있으면 공식 Release 페이지를 열며, 받은 파일은 함께 제공되는 SHA-256 값으로
-확인할 수 있습니다.
+Sentory는 실행 뒤와 6시간마다 GitHub의 최신 정식 버전을 확인합니다. 새 버전이
+있으면 현재 PC와 설치 방식에 맞는 패키지를 내려받아 SHA-256을 확인합니다. 준비가
+끝난 뒤 설정에서 설치를 누르면 앱을 종료하고 파일을 교체한 다음 자동으로 다시
+실행합니다. `지금 확인`을 누르면 6시간 간격을 기다리지 않고 바로 확인합니다.
+Microsoft Store판 업데이트는 Store가 처리합니다.
 
 새로 설치하면 일곱 메신저 감지가 모두 꺼진 상태로 시작합니다. 첫 실행 선택창에서
 사용할 메신저만 고를 수 있으며 `모두 켜기`도 제공합니다. 기존 사용자의 저장된
@@ -165,8 +167,8 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.4 -Architecture x64
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.4 -Architecture arm64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.5 -Architecture x64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.5 -Architecture arm64
 ```
 
 배포 스크립트는 선택한 Windows 아키텍처의 설치형과 포터블 패키지, SHA-256

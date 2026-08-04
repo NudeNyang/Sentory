@@ -136,7 +136,13 @@ public sealed class BridgeServer(
                 cancellationToken),
             "data-directory" => RequireRuntime().GetDataDirectory(),
             "update-check" => await RequireRuntime().CheckForUpdatesAsync(
+                request.Payload.Deserialize<UpdateCheckRequest>(JsonOptions)
+                    ?.Manual ?? false,
                 cancellationToken),
+            "update-install" => RequireRuntime().InstallPreparedUpdate(
+                request.Payload.Deserialize<UpdateInstallRequest>(JsonOptions)
+                    ?.HostProcessId ?? throw new ArgumentException(
+                        "Sentory 프로세스 ID를 읽지 못했습니다.")),
             "shutdown" => new { status = "stopping" },
             _ => throw new ArgumentException(
                 $"지원하지 않는 브리지 명령입니다: {request.Command}")
@@ -224,3 +230,7 @@ public sealed record SyncWebDavRequest(
 public sealed record SyncToggleRequest(bool Enabled);
 
 public sealed record DiscordAutoRepairRequest(int ExpectedProcessId);
+
+public sealed record UpdateCheckRequest(bool Manual);
+
+public sealed record UpdateInstallRequest(int HostProcessId);
