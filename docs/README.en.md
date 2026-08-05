@@ -75,6 +75,11 @@ Download the installer or portable package from
 [Releases](https://github.com/NudeNyang/Sentory/releases). There is no release schedule
 yet for macOS or Linux.
 
+The GitHub edition will remain free. A paid
+[Microsoft Store edition](https://apps.microsoft.com/detail/9N6S69D3667D) is also
+available for anyone who prefers Store-managed installation and updates or wants to
+support development.
+
 See the [Sentory 2.0.5 release notes](./releases/2.0.5.md) for automatic update details.
 
 | System | Installer | Portable |

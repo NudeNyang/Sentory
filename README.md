@@ -76,6 +76,10 @@ Sentory가 운영하는 서버로 보관 데이터를 보내지 않으며 분석
 파일을 내려받으면 됩니다. macOS와 Linux판의 배포 일정은 아직 정해지지
 않았습니다.
 
+GitHub판은 앞으로도 무료로 제공합니다. 설치와 업데이트를 Microsoft Store에서
+관리하고 싶거나 개발을 응원하고 싶다면
+[Microsoft Store 후원판](https://apps.microsoft.com/detail/9N6S69D3667D)도 있습니다.
+
 자동 업데이트에서 달라진 내용은
 [2.0.5 릴리즈 노트](./docs/releases/2.0.5.md)에 정리되어 있습니다.
 
