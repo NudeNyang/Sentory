@@ -737,6 +737,37 @@ img {
   line-height: 1.65;
 }
 
+.github-star {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.github-star div {
+  display: grid;
+  gap: 5px;
+}
+
+.github-star strong {
+  font-size: 15px;
+}
+
+.github-star p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.github-star .button {
+  min-height: 44px;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+
 .faq {
   display: grid;
   grid-template-columns: minmax(260px, 0.56fr) minmax(0, 1fr);
@@ -1173,6 +1204,16 @@ img {
 
   .download-options > a {
     min-height: 82px;
+  }
+
+  .github-star {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .github-star .button {
+    width: 100%;
   }
 
   .faq-list summary {

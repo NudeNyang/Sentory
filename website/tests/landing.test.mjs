@@ -70,3 +70,10 @@ test("수동 GitHub Pages 배포 전에 랜딩페이지 테스트를 실행한�
   assert.match(deployWorkflow, /actions\/upload-pages-artifact@v4/);
   assert.match(deployWorkflow, /actions\/deploy-pages@v4/);
 });
+
+test("다운로드 CTA는 직접 파일 대신 최신 GitHub 릴리즈로 안내한다", () => {
+  assert.doesNotMatch(html, /releases\/latest\/download/);
+  assert.ok((html.match(/https:\/\/github\.com\/NudeNyang\/Sentory\/releases\/latest/g) || []).length >= 5);
+  assert.match(html, />GitHub에서 다운로드<\/a>/);
+  assert.match(html, />GitHub에서 Star<\/a>/);
+});
