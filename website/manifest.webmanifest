@@ -1,0 +1,16 @@
+{
+  "name": "Sentory",
+  "short_name": "Sentory",
+  "description": "메신저에서 붙여넣거나 보낸 링크와 사진을 모아주는 Windows 앱",
+  "start_url": "./",
+  "display": "browser",
+  "background_color": "#e9e4dc",
+  "theme_color": "#e9e4dc",
+  "icons": [
+    {
+      "src": "./assets/sentory-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png"
+    }
+  ]
+}

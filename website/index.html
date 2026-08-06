@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sentory - 메신저에서 보낸 링크와 사진을 모아주는 Windows 앱</title>
+    <meta
+      name="description"
+      content="Discord, Slack, WhatsApp, Telegram, 카카오톡, LINE, WeChat의 링크와 사진을 로컬에 보관하고 다시 검색하세요."
+    />
+    <meta name="theme-color" content="#e9e4dc" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#151719" media="(prefers-color-scheme: dark)" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ko_KR" />
+    <meta property="og:site_name" content="Sentory" />
+    <meta property="og:title" content="Sentory - 대화 속 링크와 사진을 다시 찾는 곳" />
+    <meta
+      property="og:description"
+      content="지원 메신저에서 붙여넣거나 보낸 링크와 사진을 모아 검색하고 다시 꺼내 쓰세요."
+    />
+    <meta property="og:url" content="https://nudenyang.github.io/Sentory/" />
+    <meta property="og:image" content="https://nudenyang.github.io/Sentory/assets/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Sentory 보관함과 앱 아이콘" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="canonical" href="https://nudenyang.github.io/Sentory/" />
+    <link rel="icon" type="image/png" href="./assets/sentory-icon.png" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="preload" as="image" href="./assets/sentory-gallery.jpg" fetchpriority="high" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Sentory",
+        "description": "지원 메신저에서 붙여넣거나 보낸 링크와 사진을 로컬에 보관하고 검색하는 Windows 앱",
+        "operatingSystem": "Windows 10, Windows 11",
+        "applicationCategory": "UtilitiesApplication",
+        "softwareVersion": "2.0.5",
+        "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+        "codeRepository": "https://github.com/NudeNyang/Sentory",
+        "downloadUrl": "https://github.com/NudeNyang/Sentory/releases/latest/download/Sentory-win-x64-setup.exe",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "KRW"
+        }
+      }
+    </script>
+    <script src="./script.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">본문으로 이동</a>
+
+    <header class="site-header">
+      <nav class="nav-shell" aria-label="주요 메뉴">
+        <a class="brand" href="#top" aria-label="Sentory 처음으로">
+          <img src="./assets/sentory-icon.png" width="34" height="34" alt="" />
+          <span>Sentory</span>
+        </a>
+
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="nav-links">
+          메뉴
+        </button>
+
+        <div class="nav-links" id="nav-links">
+          <a href="#features">기능</a>
+          <a href="#privacy">개인정보</a>
+          <a href="#faq">FAQ</a>
+          <a href="https://github.com/NudeNyang/Sentory" target="_blank" rel="noreferrer">GitHub</a>
+          <button class="theme-toggle" type="button" aria-label="어두운 테마로 전환">어둡게</button>
+          <a
+            class="nav-download"
+            href="https://github.com/NudeNyang/Sentory/releases/latest/download/Sentory-win-x64-setup.exe"
+          >다운로드</a>
+        </div>
+      </nav>
+    </header>
+
+    <main id="main-content">
+      <section class="hero" id="top">
+        <div class="hero-copy">
+          <h1><span>대화 속 링크와 사진,</span><span>다시 찾을 땐 한곳에서.</span></h1>
+          <p>Discord, Slack, 카카오톡 등에서 붙여넣거나 보낸 링크와 사진을 모아 검색하고 다시 꺼내 쓰세요.</p>
+          <div class="hero-actions" aria-label="Sentory 시작하기">
+            <a
+              class="button button-primary"
+              href="https://github.com/NudeNyang/Sentory/releases/latest/download/Sentory-win-x64-setup.exe"
+            >다운로드</a>
+            <a class="button button-secondary" href="https://github.com/NudeNyang/Sentory" target="_blank" rel="noreferrer">GitHub</a>
+          </div>
+        </div>
+
+        <div class="hero-visual" aria-label="Sentory 실제 화면">
+          <div class="app-window">
+            <img
+              src="./assets/sentory-gallery.jpg"
+              width="1600"
+              height="1194"
+              alt="링크와 사진 카드가 정리된 Sentory 보관함 실제 화면"
+              fetchpriority="high"
+            />
+          </div>
+        </div>
+      </section>
+
+      <section class="messenger-strip" aria-labelledby="messenger-title">
+        <p id="messenger-title">지원 메신저</p>
+        <div class="messenger-logos">
+          <img src="./assets/messengers/discord.svg" width="30" height="30" alt="Discord" />
+          <img src="./assets/messengers/slack.svg" width="30" height="30" alt="Slack" />
+          <img src="./assets/messengers/whatsapp.svg" width="30" height="30" alt="WhatsApp" />
+          <img src="./assets/messengers/telegram.svg" width="30" height="30" alt="Telegram" />
+          <img src="./assets/messengers/kakaotalk.svg" width="30" height="30" alt="카카오톡" />
+          <img src="./assets/messengers/line.svg" width="30" height="30" alt="LINE" />
+          <img src="./assets/messengers/wechat.svg" width="30" height="30" alt="WeChat" />
+        </div>
+      </section>
+
+      <section class="story section-shell reveal" aria-labelledby="story-title">
+        <div class="story-heading">
+          <h2 id="story-title">보내고 잊어도,<br />필요할 때 찾을 수 있게.</h2>
+          <p>대화방을 거슬러 올라가는 대신 제목, URL, 도메인과 사진 속 글자로 보관함을 검색하세요.</p>
+        </div>
+
+        <ol class="story-flow">
+          <li>
+            <strong>붙여넣고 보내기</strong>
+            <span>평소처럼 지원 메신저를 사용합니다.</span>
+          </li>
+          <li>
+            <strong>자동으로 모으기</strong>
+            <span>링크와 사진이 카드 또는 묶음으로 저장됩니다.</span>
+          </li>
+          <li>
+            <strong>검색하고 다시 쓰기</strong>
+            <span>복사하거나 원본을 열어 바로 이어서 사용합니다.</span>
+          </li>
+        </ol>
+
+        <figure class="search-figure">
+          <img
+            src="./assets/sentory-search.jpg"
+            width="1500"
+            height="490"
+            alt="검색창과 링크, 사진 카드가 보이는 Sentory 실제 화면"
+            loading="lazy"
+          />
+        </figure>
+      </section>
+
+      <section class="features section-shell" id="features" aria-labelledby="features-title">
+        <div class="section-heading reveal">
+          <h2 id="features-title">보관함을 만드는 기준부터 다릅니다.</h2>
+          <p>모든 클립보드 기록을 쌓지 않고, 지원 메신저에서 필요한 순간만 골라 기억합니다.</p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature feature-search reveal">
+            <div>
+              <h3>사진 속 글자까지 검색</h3>
+              <p>다국어 OCR이 사진에 자동으로 이름을 붙여 이미지 내용도 검색할 수 있습니다.</p>
+            </div>
+            <img
+              src="./assets/sentory-gallery.jpg"
+              width="1600"
+              height="1194"
+              alt="서로 다른 언어의 이미지 카드가 검색 가능한 Sentory 보관함"
+              loading="lazy"
+            />
+          </article>
+
+          <article class="feature feature-local reveal">
+            <div class="local-mark" aria-hidden="true">LOCAL</div>
+            <div>
+              <h3>내 컴퓨터에 저장</h3>
+              <p>보관 데이터는 Sentory 운영 서버가 아니라 사용자의 Windows PC에 남습니다.</p>
+            </div>
+          </article>
+
+          <article class="feature feature-collection reveal">
+            <div>
+              <h3>한 번에 보낸 자료는 함께</h3>
+              <p>여러 링크와 사진을 묶음 카드로 보관하고 한꺼번에 다시 복사할 수 있습니다.</p>
+            </div>
+            <div class="collection-stats" aria-label="묶음 기능 요약">
+              <strong>링크 + 사진</strong>
+              <span>묶어서 보관</span>
+            </div>
+          </article>
+
+          <article class="feature feature-sync reveal">
+            <img src="./assets/sentory-icon.png" width="128" height="128" alt="" loading="lazy" />
+            <div>
+              <h3>내가 고른 저장소로 동기화</h3>
+              <p>OneDrive, Google Drive, Dropbox, MEGA, 로컬 폴더와 NAS WebDAV를 사용할 수 있습니다.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="privacy section-shell reveal" id="privacy" aria-labelledby="privacy-title">
+        <div class="privacy-statement">
+          <p>Private by design</p>
+          <h2 id="privacy-title"><span>보관함은</span><span>내 컴퓨터에 남습니다.</span></h2>
+        </div>
+        <div class="privacy-details">
+          <p>Sentory는 광고 추적기와 분석 도구를 넣지 않습니다. 사진 OCR도 Windows에서 로컬로 처리합니다.</p>
+          <ul>
+            <li>로컬 SQLite와 이미지 폴더에 저장</li>
+            <li>사진 OCR을 기기에서 처리</li>
+            <li>메신저별 감지를 따로 설정</li>
+            <li>선택한 클라우드 또는 NAS에 직접 동기화</li>
+          </ul>
+          <code>%LOCALAPPDATA%\Sentory</code>
+          <a href="https://github.com/NudeNyang/Sentory/blob/main/docs/privacy.md" target="_blank" rel="noreferrer">개인정보 안내 보기</a>
+        </div>
+      </section>
+
+      <section class="download section-shell reveal" id="download" aria-labelledby="download-title">
+        <div class="download-lead">
+          <img src="./assets/sentory-icon.png" width="132" height="132" alt="Sentory 앱 아이콘" loading="lazy" />
+          <h2 id="download-title">바로 써볼 수 있습니다.</h2>
+          <p>Windows 10과 11의 x64, ARM64 PC를 지원합니다. GitHub판은 무료로 제공합니다.</p>
+          <a
+            class="button button-primary download-main"
+            href="https://github.com/NudeNyang/Sentory/releases/latest/download/Sentory-win-x64-setup.exe"
+          >Windows x64 설치</a>
+        </div>
+
+        <div class="download-options">
+          <a href="https://github.com/NudeNyang/Sentory/releases/latest/download/Sentory-win-x64-portable.zip">
+            <span>
+              <strong>포터블 ZIP</strong>
+              <small>설치 없이 실행</small>
+            </span>
+            <span aria-hidden="true">↗</span>
+          </a>
+          <a href="https://github.com/NudeNyang/Sentory/releases/latest">
+            <span>
+              <strong>Windows on ARM</strong>
+              <small>ARM64 설치형과 포터블</small>
+            </span>
+            <span aria-hidden="true">↗</span>
+          </a>
+          <a href="https://apps.microsoft.com/detail/9N6S69D3667D" target="_blank" rel="noreferrer">
+            <span>
+              <strong>Microsoft Store 후원판</strong>
+              <small>설치와 업데이트를 Store에서 관리</small>
+            </span>
+            <span aria-hidden="true">↗</span>
+          </a>
+          <a href="https://github.com/NudeNyang/Sentory/releases" target="_blank" rel="noreferrer">
+            <span>
+              <strong>릴리즈와 SHA-256</strong>
+              <small>배포 파일과 확인값 보기</small>
+            </span>
+            <span aria-hidden="true">↗</span>
+          </a>
+          <p class="download-notice">현재 GitHub 배포 파일에는 코드 서명이 없어 SmartScreen 경고가 표시될 수 있습니다. 공식 Release와 SHA-256 확인값을 함께 제공합니다.</p>
+        </div>
+      </section>
+
+      <section class="faq section-shell" id="faq" aria-labelledby="faq-title">
+        <div class="section-heading reveal">
+          <h2 id="faq-title">자주 묻는 질문</h2>
+        </div>
+        <div class="faq-list reveal">
+          <details>
+            <summary>모든 클립보드 내용을 저장하나요?</summary>
+            <p>아닙니다. 지원 메신저의 채팅 입력 영역을 확인한 뒤 정해진 조건에 맞는 링크와 사진만 저장합니다.</p>
+          </details>
+          <details>
+            <summary>메시지를 보내지 않아도 저장되나요?</summary>
+            <p>Discord, Slack, WhatsApp, Telegram, LINE, WeChat은 실제 전송 뒤 저장합니다. 카카오톡은 채팅창에 붙여넣거나 탐색기에서 드롭한 시점에 저장합니다.</p>
+          </details>
+          <details>
+            <summary>데이터는 어디에 저장되나요?</summary>
+            <p>기본 보관함은 %LOCALAPPDATA%\Sentory에 저장됩니다. Sentory 운영 서버로 보관 데이터를 보내지 않습니다.</p>
+          </details>
+          <details>
+            <summary>컴퓨터끼리 동기화할 수 있나요?</summary>
+            <p>직접 고른 클라우드 폴더나 NAS WebDAV를 연결하면 Windows 컴퓨터 사이에서 사진, 링크와 사용 상태를 맞출 수 있습니다.</p>
+          </details>
+          <details>
+            <summary>macOS와 Linux에서도 사용할 수 있나요?</summary>
+            <p>현재 정식 배포는 Windows 10과 11의 x64, ARM64만 지원합니다. macOS와 Linux 배포 일정은 아직 정해지지 않았습니다.</p>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div>
+        <a class="brand footer-brand" href="#top">
+          <img src="./assets/sentory-icon.png" width="30" height="30" alt="" loading="lazy" />
+          <span>Sentory</span>
+        </a>
+        <p>이야기 속, 흩어진 순간들을 한 곳에</p>
+      </div>
+      <nav aria-label="하단 메뉴">
+        <a href="https://github.com/NudeNyang/Sentory" target="_blank" rel="noreferrer">소스 코드</a>
+        <a href="https://github.com/NudeNyang/Sentory/blob/main/docs/support.md" target="_blank" rel="noreferrer">지원</a>
+        <a href="https://github.com/NudeNyang/Sentory/blob/main/LICENSE.txt" target="_blank" rel="noreferrer">GPLv3</a>
+      </nav>
+      <p>Copyright © 2026 NudeNyang</p>
+    </footer>
+  </body>
+</html>
