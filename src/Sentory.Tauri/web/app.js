@@ -204,6 +204,7 @@ const state = {
   selectionMode: false,
   selectedIds: new Set(),
   selectionDrag: null,
+  cardTextDrag: null,
   autoScrollFrame: 0,
   autoScrollPausedUntil: 0,
   detailItem: null,
@@ -1766,6 +1767,27 @@ function closeCardContextMenu() {
   state.contextItemId = null;
 }
 
+function beginCardTextDrag(event) {
+  if (event.button !== 0 || event.target.closest("button, .artwork")) return;
+  state.cardTextDrag = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+  };
+}
+
+function moveCardTextDrag(event) {
+  const drag = state.cardTextDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return;
+  if (Math.abs(event.clientX - drag.startX) < 4 &&
+      Math.abs(event.clientY - drag.startY) < 4) return;
+  state.suppressCardClick = true;
+}
+
+function endCardTextDrag(event) {
+  if (state.cardTextDrag?.pointerId === event.pointerId) state.cardTextDrag = null;
+}
+
 function createCard(item, index) {
   const card = document.createElement("article");
   card.className = `card${state.selectedIds.has(item.itemId) ? " selected" : ""}`;
@@ -1776,6 +1798,7 @@ function createCard(item, index) {
   const displayTitle = localizedCardTitle(item, t);
   const displaySubtitle = localizedCardSubtitle(item, t);
   card.setAttribute("aria-label", `${localizedType(item)}, ${displayTitle}, ${localizedDate(item.lastCapturedAt)}`);
+  card.addEventListener("pointerdown", beginCardTextDrag);
   card.addEventListener("click", () => {
     if (state.suppressCardClick) return;
     if (state.selectionMode) toggleSelection(item.itemId);
@@ -2801,6 +2824,9 @@ galleryRegion.addEventListener("pointercancel", endSelectionDrag);
 document.addEventListener("pointerdown", () => {
   if (!state.selectionDrag) state.suppressCardClick = false;
 }, true);
+document.addEventListener("pointermove", moveCardTextDrag);
+document.addEventListener("pointerup", endCardTextDrag);
+document.addEventListener("pointercancel", endCardTextDrag);
 document.addEventListener("selectstart", event => {
   if (document.body.classList.contains("selection-dragging")) event.preventDefault();
 });

@@ -64,3 +64,23 @@ test("selection drag release does not click the card under the pointer", () => {
     /document\.addEventListener\("pointerdown",\s*\(\)\s*=>\s*\{[\s\S]*?!state\.selectionDrag[\s\S]*?state\.suppressCardClick\s*=\s*false[\s\S]*?\},\s*true\)/,
   );
 });
+
+test("dragging selectable card text does not open the card", () => {
+  const createCard = script.slice(
+    script.indexOf("function createCard"),
+    script.indexOf("function patchCard"),
+  );
+
+  assert.match(createCard, /card\.addEventListener\("pointerdown",\s*beginCardTextDrag\)/);
+  assert.match(
+    script,
+    /function beginCardTextDrag\(event\)[\s\S]*?event\.target\.closest\("button, \.artwork"\)[\s\S]*?state\.cardTextDrag\s*=\s*\{/,
+  );
+  assert.match(
+    script,
+    /function moveCardTextDrag\(event\)[\s\S]*?Math\.abs\([\s\S]*?<\s*4[\s\S]*?state\.suppressCardClick\s*=\s*true/,
+  );
+  assert.match(script, /document\.addEventListener\("pointermove",\s*moveCardTextDrag\)/);
+  assert.match(script, /document\.addEventListener\("pointerup",\s*endCardTextDrag\)/);
+  assert.match(script, /document\.addEventListener\("pointercancel",\s*endCardTextDrag\)/);
+});
