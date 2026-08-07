@@ -32,7 +32,7 @@ test("custom tray surface keeps the WPF action order", () => {
 test("custom tray surface matches the compact WPF dimensions", () => {
   assert.match(
     css,
-    /\.tray-card\s*\{[^}]*height:\s*100%[^}]*margin:\s*0[^}]*padding:\s*20px[^}]*border:\s*1px solid color-mix\(in srgb, var\(--accent\) 82%, var\(--text\)\)[^}]*border-radius:\s*8px/s,
+    /\.tray-card\s*\{[^}]*margin:\s*10px[^}]*padding:\s*10px[^}]*border:\s*1px solid color-mix\(in srgb, var\(--accent\) 82%, var\(--text\)\)[^}]*border-radius:\s*15px/s,
   );
   assert.match(css, /\.tray-action\s*\{[^}]*height:\s*42px[^}]*border-radius:\s*9px[^}]*font-size:\s*12px/s);
   assert.match(css, /\.tray-title\s*\{[^}]*font-size:\s*16px[^}]*font-weight:\s*600/s);
@@ -47,6 +47,13 @@ test("right click opens a custom Tauri window and actions stay connected", () =>
   assert.deepEqual(JSON.parse(capability).windows, ["main", "tray-menu"]);
 });
 
+test("left click restores the main Sentory window", () => {
+  assert.match(
+    rust,
+    /TrayIconEvent::Click\s*\{[\s\S]*button:\s*MouseButton::Left[\s\S]*button_state:\s*MouseButtonState::Up[\s\S]*show_main_window\(tray\.app_handle\(\)\)/,
+  );
+});
+
 test("tray surface does not depend on transparent WebView composition", () => {
   assert.match(
     rust,
@@ -56,4 +63,15 @@ test("tray surface does not depend on transparent WebView composition", () => {
   assert.match(rust, /\.background_color\(Color\(247, 243, 236, 255\)\)/);
   assert.match(rust, /apply_tray_window_style\(&window\)/);
   assert.match(css, /html,\s*body\s*\{[^}]*background:\s*var\(--surface\)/s);
+});
+
+test("opaque tray window is clipped to the original rounded card bounds", () => {
+  assert.match(rust, /const TRAY_MENU_INSET:\s*f64\s*=\s*10\.0/);
+  assert.match(rust, /const TRAY_MENU_RADIUS:\s*f64\s*=\s*15\.0/);
+  assert.match(rust, /CreateRoundRectRgn[\s\S]*SetWindowRgn/);
+  const showTray = rust.slice(
+    rust.indexOf("fn show_tray_menu"),
+    rust.indexOf("fn hide_tray_menu"),
+  );
+  assert.match(showTray, /apply_tray_window_style\(&window\)/);
 });

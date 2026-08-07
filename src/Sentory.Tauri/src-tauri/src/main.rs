@@ -31,6 +31,8 @@ const STARTUP_TASK_ID: &str = "SentoryStartupTask";
 const TRAY_MENU_WIDTH: f64 = 286.0;
 const TRAY_MENU_BASE_HEIGHT: f64 = 374.0;
 const TRAY_MENU_OPTIONAL_ROW_HEIGHT: f64 = 42.0;
+const TRAY_MENU_INSET: f64 = 10.0;
+const TRAY_MENU_RADIUS: f64 = 15.0;
 const VERIFY_INSTALLATION_ARGUMENT: &str = "--verify-installation";
 const VERIFY_MICROSOFT_STORE_CHANNEL_ARGUMENT: &str = "--verify-microsoft-store-channel";
 const RESTORE_DISCORD_STARTUP_ARGUMENT: &str = "--restore-discord-startup";
@@ -1369,6 +1371,22 @@ fn update_pause_menu(app: &AppHandle, status: &serde_json::Value) {
 #[cfg(windows)]
 fn apply_tray_window_style(window: &tauri::WebviewWindow) -> Result<(), String> {
     use std::ffi::c_void;
+    #[link(name = "gdi32")]
+    extern "system" {
+        fn CreateRoundRectRgn(
+            left: i32,
+            top: i32,
+            right: i32,
+            bottom: i32,
+            width: i32,
+            height: i32,
+        ) -> *mut c_void;
+        fn DeleteObject(object: *mut c_void) -> i32;
+    }
+    #[link(name = "user32")]
+    extern "system" {
+        fn SetWindowRgn(hwnd: *mut c_void, region: *mut c_void, redraw: i32) -> i32;
+    }
     #[link(name = "dwmapi")]
     extern "system" {
         fn DwmSetWindowAttribute(
@@ -1379,15 +1397,40 @@ fn apply_tray_window_style(window: &tauri::WebviewWindow) -> Result<(), String> 
         ) -> i32;
     }
     const WINDOW_CORNER_PREFERENCE: u32 = 33;
-    const ROUND_CORNERS: i32 = 2;
+    const DO_NOT_ROUND_CORNERS: i32 = 1;
     let hwnd = window
         .hwnd()
         .map_err(|error| format!("트레이 창 핸들을 읽지 못했습니다: {error}"))?;
+    let size = window
+        .outer_size()
+        .map_err(|error| format!("트레이 창 크기를 읽지 못했습니다: {error}"))?;
+    let scale = window
+        .scale_factor()
+        .map_err(|error| format!("트레이 창 배율을 읽지 못했습니다: {error}"))?;
+    let inset = TRAY_MENU_INSET * scale;
+    let diameter = (TRAY_MENU_RADIUS * 2.0 * scale).round() as i32;
+    let region = unsafe {
+        CreateRoundRectRgn(
+            inset.round() as i32,
+            inset.round() as i32,
+            (size.width as f64 - inset).round() as i32,
+            (size.height as f64 - inset).round() as i32,
+            diameter,
+            diameter,
+        )
+    };
+    if region.is_null() {
+        return Err("트레이 창의 둥근 영역을 만들지 못했습니다.".to_string());
+    }
+    if unsafe { SetWindowRgn(hwnd.0 as *mut c_void, region, 1) } == 0 {
+        let _ = unsafe { DeleteObject(region) };
+        return Err("트레이 창의 둥근 영역을 적용하지 못했습니다.".to_string());
+    }
     let _ = unsafe {
         DwmSetWindowAttribute(
             hwnd.0 as *mut c_void,
             WINDOW_CORNER_PREFERENCE,
-            (&ROUND_CORNERS as *const i32).cast(),
+            (&DO_NOT_ROUND_CORNERS as *const i32).cast(),
             std::mem::size_of::<i32>() as u32,
         )
     };
@@ -1455,8 +1498,9 @@ fn create_tray(app: &tauri::App) -> tauri::Result<()> {
                 .clone(),
         )
         .on_tray_icon_event(|tray, event| match event {
-            TrayIconEvent::DoubleClick {
+            TrayIconEvent::Click {
                 button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
                 ..
             } => show_main_window(tray.app_handle()),
             TrayIconEvent::Click {
@@ -1534,6 +1578,7 @@ fn show_tray_menu(app: &AppHandle, position: tauri::PhysicalPosition<f64>) {
         );
         let _ = window.set_position(PhysicalPosition::new(left, top));
     }
+    let _ = apply_tray_window_style(&window);
     emit_tray_state(app);
     let _ = window.show();
     let _ = window.set_focus();
