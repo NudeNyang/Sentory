@@ -29,7 +29,7 @@ const STARTUP_REGISTRY_PATH: &str = r"Software\Microsoft\Windows\CurrentVersion\
 const STARTUP_VALUE_NAME: &str = "Sentory";
 const STARTUP_TASK_ID: &str = "SentoryStartupTask";
 const TRAY_MENU_WIDTH: f64 = 286.0;
-const TRAY_MENU_BASE_HEIGHT: f64 = 374.0;
+const TRAY_MENU_BASE_HEIGHT: f64 = 362.0;
 const TRAY_MENU_OPTIONAL_ROW_HEIGHT: f64 = 42.0;
 const TRAY_MENU_INSET: f64 = 10.0;
 const TRAY_MENU_RADIUS: f64 = 15.0;
@@ -1413,8 +1413,8 @@ fn apply_tray_window_style(window: &tauri::WebviewWindow) -> Result<(), String> 
         CreateRoundRectRgn(
             inset.round() as i32,
             inset.round() as i32,
-            (size.width as f64 - inset).round() as i32,
-            (size.height as f64 - inset).round() as i32,
+            (size.width as f64 - inset).round() as i32 + 1,
+            (size.height as f64 - inset).round() as i32 + 1,
             diameter,
             diameter,
         )
@@ -1603,13 +1603,19 @@ fn tray_hide(app: AppHandle) {
     hide_tray_menu(&app);
 }
 
+fn tray_action_closes_menu(action: &str) -> bool {
+    matches!(action, "open" | "open-data" | "exit")
+}
+
 #[tauri::command]
 async fn tray_action(
     app: AppHandle,
     engine: State<'_, EngineClient>,
     action: String,
 ) -> Result<(), String> {
-    hide_tray_menu(&app);
+    if tray_action_closes_menu(&action) {
+        hide_tray_menu(&app);
+    }
     match action.as_str() {
         "open" => show_main_window(&app),
         "exit" => {
@@ -1969,7 +1975,10 @@ fn main() {
 
 #[cfg(test)]
 mod tray_menu_tests {
-    use super::{clamp_tray_menu_position, durable_data_root_from_store_local_folder};
+    use super::{
+        clamp_tray_menu_position, durable_data_root_from_store_local_folder,
+        tray_action_closes_menu,
+    };
     use std::path::{Path, PathBuf};
 
     #[test]
@@ -1997,5 +2006,15 @@ mod tray_menu_tests {
             root,
             PathBuf::from(r"C:\Users\tester\AppData\Local\Sentory")
         );
+    }
+
+    #[test]
+    fn only_navigation_and_exit_actions_close_the_tray_menu() {
+        for action in ["open", "open-data", "exit"] {
+            assert!(tray_action_closes_menu(action));
+        }
+        for action in ["pause", "startup", "discord", "repair"] {
+            assert!(!tray_action_closes_menu(action));
+        }
     }
 }

@@ -30,6 +30,7 @@ test("custom tray surface keeps the WPF action order", () => {
 });
 
 test("custom tray surface matches the compact WPF dimensions", () => {
+  assert.match(rust, /const TRAY_MENU_BASE_HEIGHT:\s*f64\s*=\s*362\.0/);
   assert.match(
     css,
     /\.tray-card\s*\{[^}]*margin:\s*10px[^}]*padding:\s*10px[^}]*border:\s*1px solid color-mix\(in srgb, var\(--accent\) 82%, var\(--text\)\)[^}]*border-radius:\s*15px/s,
@@ -69,9 +70,28 @@ test("opaque tray window is clipped to the original rounded card bounds", () => 
   assert.match(rust, /const TRAY_MENU_INSET:\s*f64\s*=\s*10\.0/);
   assert.match(rust, /const TRAY_MENU_RADIUS:\s*f64\s*=\s*15\.0/);
   assert.match(rust, /CreateRoundRectRgn[\s\S]*SetWindowRgn/);
+  assert.match(
+    rust,
+    /\(size\.width as f64 - inset\)\.round\(\) as i32 \+ 1[\s\S]*\(size\.height as f64 - inset\)\.round\(\) as i32 \+ 1/,
+  );
   const showTray = rust.slice(
     rust.indexOf("fn show_tray_menu"),
     rust.indexOf("fn hide_tray_menu"),
   );
   assert.match(showTray, /apply_tray_window_style\(&window\)/);
+});
+
+test("only navigation and exit actions close the tray menu", () => {
+  assert.match(
+    rust,
+    /fn tray_action_closes_menu\(action:\s*&str\)[\s\S]*matches!\(action,\s*"open"\s*\|\s*"open-data"\s*\|\s*"exit"\)/,
+  );
+  const trayAction = rust.slice(
+    rust.indexOf("async fn tray_action"),
+    rust.indexOf("async fn read_startup_enabled"),
+  );
+  assert.match(
+    trayAction,
+    /if tray_action_closes_menu\(&action\)\s*\{\s*hide_tray_menu\(&app\);\s*\}/,
+  );
 });
