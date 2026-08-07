@@ -91,6 +91,38 @@ public sealed class OcrTextBlockPostProcessorTests
             processed.Blocks.Select(block => block.Text));
     }
 
+    [Fact]
+    public void RemovesAnIconMisreadAsSingleJamoBeforeALatinWord()
+    {
+        OcrDetectedTextBlock[] blocks =
+        [
+            Block(
+                "실행은 기존 ㄷDiscord 번역 오버레이 바로가기를 더블클릭하면 돼.",
+                10,
+                20,
+                900,
+                55),
+            Block("ㄷㄷ Discord가 다시 켜졌네", 10, 90, 500, 55),
+            Block("키보드에서 ㄷ 키를 누르세요", 10, 160, 500, 55),
+            Block("C# · C++ · ©2026", 10, 230, 500, 55)
+        ];
+
+        var processed = OcrTextBlockPostProcessor.Process(
+            blocks,
+            1000,
+            700,
+            joinVerticalColumns: false);
+
+        Assert.Equal(
+            [
+                "실행은 기존 Discord 번역 오버레이 바로가기를 더블클릭하면 돼.",
+                "ㄷㄷ Discord가 다시 켜졌네",
+                "키보드에서 ㄷ 키를 누르세요",
+                "C# · C++ · ©2026"
+            ],
+            processed.Blocks.Select(block => block.Text));
+    }
+
     private static OcrDetectedTextBlock Block(
         string text,
         int x,

@@ -26,11 +26,17 @@ internal static class OcrTextBlockPostProcessor
         int imageHeight,
         bool joinVerticalColumns)
     {
+        var cleanedBlocks = blocks
+            .Select(block => block with
+            {
+                Text = RemoveIconLikeJamoPrefix(block.Text)
+            })
+            .ToArray();
         var suppressedKeys = FindRepeatedOverlayKeys(
-            blocks,
+            cleanedBlocks,
             imageWidth,
             imageHeight);
-        var retained = blocks
+        var retained = cleanedBlocks
             .Where(block =>
                 IsMeaningfulText(block.Text) &&
                 !suppressedKeys.Contains(Canonicalize(block.Text)))
@@ -42,6 +48,41 @@ internal static class OcrTextBlockPostProcessor
             joinVerticalColumns);
         return new ProcessedOcrTextBlocks(retained, preferred);
     }
+
+    private static string RemoveIconLikeJamoPrefix(string text)
+    {
+        if (text.Length < 2)
+        {
+            return text;
+        }
+
+        var builder = new StringBuilder(text.Length);
+        for (var index = 0; index < text.Length; index++)
+        {
+            var character = text[index];
+            var followsWordCharacter = index > 0 &&
+                (char.IsLetterOrDigit(text[index - 1]) ||
+                 IsHangulCompatibilityJamo(text[index - 1]));
+            var precedesLatinWord = index + 1 < text.Length &&
+                IsAsciiLetter(text[index + 1]);
+            if (IsHangulCompatibilityJamo(character) &&
+                !followsWordCharacter &&
+                precedesLatinWord)
+            {
+                continue;
+            }
+
+            builder.Append(character);
+        }
+
+        return builder.ToString();
+    }
+
+    private static bool IsHangulCompatibilityJamo(char character) =>
+        character is >= '\u3130' and <= '\u318f';
+
+    private static bool IsAsciiLetter(char character) =>
+        character is >= 'A' and <= 'Z' or >= 'a' and <= 'z';
 
     private static bool IsMeaningfulText(string text)
     {

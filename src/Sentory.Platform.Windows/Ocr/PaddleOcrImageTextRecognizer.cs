@@ -8,7 +8,7 @@ public sealed class PaddleOcrImageTextRecognizer :
     IImageTextRecognizer,
     IDisposable
 {
-    public const string PaddleEngineName = "PaddleOCR.PP-OCRv5.Mobile.2026-07-r8";
+    public const string PaddleEngineName = "PaddleOCR.PP-OCRv5.Mobile.2026-08-r9";
 
     private readonly object _gate = new();
     private readonly PaddleOcrModelCache _modelCache;
