@@ -1,6 +1,5 @@
 :root {
   color-scheme: light;
-  --window: #e9e4dc;
   --surface: #f7f3ec;
   --status: #e2ddd5;
   --text: #292722;
@@ -9,12 +8,10 @@
   --line: #cec7bc;
   --accent: #756655;
   --danger: #b85a52;
-  --shadow: rgb(39 34 29 / 24%);
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --window: #27241f;
   --surface: #332f29;
   --status: #403b34;
   --text: #f2ede5;
@@ -23,7 +20,6 @@
   --line: #575047;
   --accent: #c0ad96;
   --danger: #e1847b;
-  --shadow: rgb(0 0 0 / 42%);
 }
 
 * {
@@ -36,7 +32,7 @@ body {
   height: 100%;
   margin: 0;
   overflow: hidden;
-  background: var(--window);
+  background: var(--surface);
   color: var(--text);
   font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif;
   -webkit-user-select: none;
@@ -48,12 +44,12 @@ button {
 }
 
 .tray-card {
-  margin: 10px;
-  padding: 10px;
-  border: 1px solid var(--accent);
-  border-radius: 15px;
+  height: 100%;
+  margin: 0;
+  padding: 20px;
+  border: 1px solid color-mix(in srgb, var(--accent) 82%, var(--text));
+  border-radius: 8px;
   background: var(--surface);
-  box-shadow: 0 5px 20px var(--shadow);
 }
 
 .tray-header {

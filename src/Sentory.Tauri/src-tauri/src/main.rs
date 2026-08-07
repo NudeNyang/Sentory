@@ -1406,7 +1406,7 @@ fn create_tray_menu_window(app: &tauri::App) -> tauri::Result<()> {
         .resizable(false)
         .decorations(false)
         .transparent(false)
-        .background_color(Color(233, 228, 220, 255))
+        .background_color(Color(247, 243, 236, 255))
         .shadow(false)
         .always_on_top(true)
         .skip_taskbar(true)

@@ -30,7 +30,10 @@ test("custom tray surface keeps the WPF action order", () => {
 });
 
 test("custom tray surface matches the compact WPF dimensions", () => {
-  assert.match(css, /\.tray-card\s*\{[^}]*margin:\s*10px[^}]*padding:\s*10px[^}]*border-radius:\s*15px/s);
+  assert.match(
+    css,
+    /\.tray-card\s*\{[^}]*height:\s*100%[^}]*margin:\s*0[^}]*padding:\s*20px[^}]*border:\s*1px solid color-mix\(in srgb, var\(--accent\) 82%, var\(--text\)\)[^}]*border-radius:\s*8px/s,
+  );
   assert.match(css, /\.tray-action\s*\{[^}]*height:\s*42px[^}]*border-radius:\s*9px[^}]*font-size:\s*12px/s);
   assert.match(css, /\.tray-title\s*\{[^}]*font-size:\s*16px[^}]*font-weight:\s*600/s);
 });
@@ -50,6 +53,7 @@ test("tray surface does not depend on transparent WebView composition", () => {
     /WebviewWindowBuilder::new[\s\S]*"tray-menu"[\s\S]*\.transparent\(false\)[\s\S]*\.background_color\(Color\(/,
   );
   assert.doesNotMatch(rust, /"tray-menu"[\s\S]*?\.transparent\(true\)/);
+  assert.match(rust, /\.background_color\(Color\(247, 243, 236, 255\)\)/);
   assert.match(rust, /apply_tray_window_style\(&window\)/);
-  assert.match(css, /html,\s*body\s*\{[^}]*background:\s*var\(--window\)/s);
+  assert.match(css, /html,\s*body\s*\{[^}]*background:\s*var\(--surface\)/s);
 });
