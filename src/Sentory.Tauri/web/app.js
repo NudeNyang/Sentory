@@ -2398,6 +2398,9 @@ function sourceLabel(source) {
 
 function beginSelectionDrag(event) {
   if (event.button !== 0 || event.target.closest("button, .card")) return;
+  event.preventDefault();
+  document.body.classList.add("selection-dragging");
+  galleryRegion.setPointerCapture(event.pointerId);
   const bounds = galleryRegion.getBoundingClientRect();
   const x = event.clientX - bounds.left;
   const y = event.clientY - bounds.top;
@@ -2426,7 +2429,7 @@ function moveSelectionDrag(event) {
     if (!state.selectionMode) setSelectionMode(true);
     drag.active = true;
     state.suppressCardClick = true;
-    galleryRegion.setPointerCapture(event.pointerId);
+    document.getSelection()?.removeAllRanges();
     selectionRectangle.hidden = false;
     state.autoScrollFrame = requestAnimationFrame(autoScrollSelection);
   }
@@ -2440,12 +2443,15 @@ function endSelectionDrag(event) {
     updateSelectionDrag();
     selectionRectangle.hidden = true;
     cancelAnimationFrame(state.autoScrollFrame);
-    if (galleryRegion.hasPointerCapture(event.pointerId)) galleryRegion.releasePointerCapture(event.pointerId);
-    window.setTimeout(() => { state.suppressCardClick = false; }, 0);
   } else if (drag.startedInSelectionMode) {
     setSelectionMode(false);
   }
+  if (galleryRegion.hasPointerCapture(event.pointerId)) galleryRegion.releasePointerCapture(event.pointerId);
   state.selectionDrag = null;
+  window.setTimeout(() => {
+    document.getSelection()?.removeAllRanges();
+    document.body.classList.remove("selection-dragging");
+  }, 0);
 }
 
 function updateSelectionDrag() {
@@ -2792,6 +2798,12 @@ galleryRegion.addEventListener("pointerdown", beginSelectionDrag);
 galleryRegion.addEventListener("pointermove", moveSelectionDrag);
 galleryRegion.addEventListener("pointerup", endSelectionDrag);
 galleryRegion.addEventListener("pointercancel", endSelectionDrag);
+document.addEventListener("pointerdown", () => {
+  if (!state.selectionDrag) state.suppressCardClick = false;
+}, true);
+document.addEventListener("selectstart", event => {
+  if (document.body.classList.contains("selection-dragging")) event.preventDefault();
+});
 galleryRegion.addEventListener("wheel", () => {
   if (state.selectionDrag?.active) state.autoScrollPausedUntil = performance.now() + 180;
 }, { passive: true });

@@ -86,6 +86,11 @@ body {
   background: var(--window);
 }
 
+body.selection-dragging {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 button,
 input,
 select { font: inherit; }
