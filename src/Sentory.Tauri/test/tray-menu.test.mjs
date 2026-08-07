@@ -43,3 +43,13 @@ test("right click opens a custom Tauri window and actions stay connected", () =>
   assert.match(script, /listen\("tray-state"/);
   assert.deepEqual(JSON.parse(capability).windows, ["main", "tray-menu"]);
 });
+
+test("tray surface does not depend on transparent WebView composition", () => {
+  assert.match(
+    rust,
+    /WebviewWindowBuilder::new[\s\S]*"tray-menu"[\s\S]*\.transparent\(false\)[\s\S]*\.background_color\(Color\(/,
+  );
+  assert.doesNotMatch(rust, /"tray-menu"[\s\S]*?\.transparent\(true\)/);
+  assert.match(rust, /apply_tray_window_style\(&window\)/);
+  assert.match(css, /html,\s*body\s*\{[^}]*background:\s*var\(--window\)/s);
+});

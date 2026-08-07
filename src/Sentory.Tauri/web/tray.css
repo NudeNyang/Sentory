@@ -36,7 +36,7 @@ body {
   height: 100%;
   margin: 0;
   overflow: hidden;
-  background: transparent;
+  background: var(--window);
   color: var(--text);
   font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif;
   -webkit-user-select: none;

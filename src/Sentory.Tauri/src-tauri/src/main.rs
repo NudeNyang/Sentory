@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex as StdMutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::async_runtime::Receiver;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::window::Color;
 use tauri::{
     AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, State, WebviewUrl,
     WebviewWindowBuilder, WindowEvent,
@@ -1365,19 +1366,54 @@ fn update_pause_menu(app: &AppHandle, status: &serde_json::Value) {
     emit_tray_state(app);
 }
 
+#[cfg(windows)]
+fn apply_tray_window_style(window: &tauri::WebviewWindow) -> Result<(), String> {
+    use std::ffi::c_void;
+    #[link(name = "dwmapi")]
+    extern "system" {
+        fn DwmSetWindowAttribute(
+            hwnd: *mut c_void,
+            attribute: u32,
+            value: *const c_void,
+            value_size: u32,
+        ) -> i32;
+    }
+    const WINDOW_CORNER_PREFERENCE: u32 = 33;
+    const ROUND_CORNERS: i32 = 2;
+    let hwnd = window
+        .hwnd()
+        .map_err(|error| format!("트레이 창 핸들을 읽지 못했습니다: {error}"))?;
+    let _ = unsafe {
+        DwmSetWindowAttribute(
+            hwnd.0 as *mut c_void,
+            WINDOW_CORNER_PREFERENCE,
+            (&ROUND_CORNERS as *const i32).cast(),
+            std::mem::size_of::<i32>() as u32,
+        )
+    };
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn apply_tray_window_style(_window: &tauri::WebviewWindow) -> Result<(), String> {
+    Ok(())
+}
+
 fn create_tray_menu_window(app: &tauri::App) -> tauri::Result<()> {
-    WebviewWindowBuilder::new(app, "tray-menu", WebviewUrl::App("tray.html".into()))
+    let window = WebviewWindowBuilder::new(app, "tray-menu", WebviewUrl::App("tray.html".into()))
         .title("Sentory")
         .inner_size(TRAY_MENU_WIDTH, TRAY_MENU_BASE_HEIGHT)
         .resizable(false)
         .decorations(false)
-        .transparent(true)
+        .transparent(false)
+        .background_color(Color(233, 228, 220, 255))
         .shadow(false)
         .always_on_top(true)
         .skip_taskbar(true)
         .focused(false)
         .visible(false)
         .build()?;
+    let _ = apply_tray_window_style(&window);
     Ok(())
 }
 
