@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$')]
-    [string]$Version = "2.0.5",
+    [string]$Version = "2.0.6",
     [string]$OutputRoot = "artifacts",
     [ValidateSet("x64", "arm64")]
     [string]$Architecture = "x64",

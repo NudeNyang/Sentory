@@ -585,7 +585,7 @@ function applyLocalizedUi(language) {
   document.querySelector("#auto-cleanup-description").textContent = t("autoCleanupDefault");
   document.querySelector("#app-info-heading").textContent = t("appInfo");
   document.querySelector("#version-label").textContent =
-    `${t("version", "2.0.5")}${state.versionSuffix}`;
+    `${t("version", "2.0.6")}${state.versionSuffix}`;
   document.querySelector("#copyright-label").textContent = t("copyrightNotice");
   document.querySelector("#license-summary").textContent = t("licenseSummary");
   viewLicense.textContent = t("viewLicense");
@@ -3163,7 +3163,7 @@ async function configureDistributionUi() {
     ]);
     state.versionSuffix = typeof versionSuffix === "string" ? versionSuffix : "";
     document.querySelector("#version-label").textContent =
-      `${t("version", "2.0.5")}${state.versionSuffix}`;
+      `${t("version", "2.0.6")}${state.versionSuffix}`;
     updateSettingRow.hidden = channel !== "github";
     if (channel === "github") {
       window.setTimeout(() => void checkForUpdates(false), 6000);

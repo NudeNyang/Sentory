@@ -58,7 +58,7 @@ Store Publisher와 같은 Subject를 가진 로컬 검수 인증서를 준비한
 $thumbprint = .\scripts\New-MsixTestCertificate.ps1
 
 .\scripts\Publish-MsixStoreBundle.ps1 `
-  -PackageVersion 2.0.5.0 `
+  -PackageVersion 2.0.6.0 `
   -Architectures x64 `
   -OutputRoot artifacts\store-test `
   -SignedTest `
@@ -98,8 +98,8 @@ Windows가 기본 아이콘에 색상 배경을 붙일 수 있으므로 수동 �
    첫 메신저 선택 화면은 새 Windows 계정이나 Windows Sandbox·VM처럼
    `%LOCALAPPDATA%\Sentory`가 없는 환경에서 확인한다.
 2. 설정의 앱 정보에 `자동 업데이트`가 없는지 확인한다.
-   앱 안에는 제품 버전 `2.0.5`를 표시하고 Windows의 설치된 패키지 정보에는
-   MSIX 버전 `2.0.5.0`을 표시한다.
+   앱 안에는 제품 버전 `2.0.6`을 표시하고 Windows의 설치된 패키지 정보에는
+   MSIX 버전 `2.0.6.0`을 표시한다.
 3. 작업 표시줄과 작업 표시줄 우클릭 메뉴의 Sentory 아이콘에 별도 색상 배경이
    붙지 않고 투명하게 표시되는지 확인한다. 밝은 테마와 어두운 테마에서 각각 본다.
 4. `Windows 시작 시 실행`을 켠 뒤 작업 관리자의 `시작 앱`에 Sentory가 나타나는지
@@ -133,22 +133,22 @@ x64와 ARM64 C++ 빌드 도구가 모두 있는 환경에서는 다음 명령 �
 실행 파일과 번들을 만든다.
 
 ```powershell
-.\scripts\Publish-MsixStoreBundle.ps1 -PackageVersion 2.0.5.0
+.\scripts\Publish-MsixStoreBundle.ps1 -PackageVersion 2.0.6.0
 ```
 
 기본 출력은 `artifacts/store`이다.
 
-- `Sentory-2.0.5-store.msixbundle`: Partner Center에 올릴 파일
-- `Sentory-2.0.5-store.msixbundle.sha256`: 번들 확인값
-- `Sentory-2.0.5.0-store-x64.msix`: x64 개별 패키지
-- `Sentory-2.0.5.0-store-arm64.msix`: ARM64 개별 패키지
+- `Sentory-2.0.6-store.msixbundle`: Partner Center에 올릴 파일
+- `Sentory-2.0.6-store.msixbundle.sha256`: 번들 확인값
+- `Sentory-2.0.6.0-store-x64.msix`: x64 개별 패키지
+- `Sentory-2.0.6.0-store-arm64.msix`: ARM64 개별 패키지
 - `msix-package-manifest.json`: identity, 아키텍처, 크기와 SHA-256
 
 Store 제출용 파일은 로컬 검수 인증서로 서명하지 않는다. 인증을 통과한 패키지는
 Microsoft Store가 서명한다. `-SignedTest`나 `-UnsignedTest`로 만든 파일은
 제출하면 안 된다.
 
-패키징 스크립트는 MakeAppx의 `/bv` 값에도 `2.0.5.0`을 넘긴다. 따라서 개별 x64·
+패키징 스크립트는 MakeAppx의 `/bv` 값에도 `2.0.6.0`을 넘긴다. 따라서 개별 x64·
 ARM64 패키지뿐 아니라 바깥 MSIX 번들의 버전도 같은 4자리 값으로 고정된다.
 
 현재 x64 개발 PC에는 Visual C++ ARM64 도구가 없으므로 x64 시험판은 로컬에서
@@ -160,7 +160,7 @@ ARM64 패키지뿐 아니라 바깥 MSIX 번들의 버전도 같은 4자리 값�
 
 ## Partner Center 제출
 
-Packages 화면에는 `Sentory-2.0.5-store.msixbundle` 하나만 올린다. 개별 MSIX,
+Packages 화면에는 `Sentory-2.0.6-store.msixbundle` 하나만 올린다. 개별 MSIX,
 `.sha256`, JSON manifest, 검수 인증서와 시험판은 제출하지 않는다.
 
 매니페스트는 `runFullTrust` 제한 기능을 사용한다. `제한된 기능` 설명에는 다음

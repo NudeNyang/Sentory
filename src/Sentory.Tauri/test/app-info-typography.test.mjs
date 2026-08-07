@@ -77,9 +77,9 @@ test("app info profile links never add an underline on hover", () => {
   );
 });
 
-test("the 2.0.5 developer baseline has no hard-coded marker", () => {
-  assert.match(html, /id="version-label"[^>]*>버전 2\.0\.5<\/small>/);
-  assert.match(script, /t\("version", "2\.0\.5"\)/);
+test("the 2.0.6 developer baseline has no hard-coded marker", () => {
+  assert.match(html, /id="version-label"[^>]*>버전 2\.0\.6<\/small>/);
+  assert.match(script, /t\("version", "2\.0\.6"\)/);
   assert.doesNotMatch(`${html}\n${script}\n${tauriConfig}`, /for Developers|Tauri Preview|com\.sentory\.preview/);
   assert.match(tauriConfig, /"productName": "Sentory"/);
   assert.match(tauriConfig, /"identifier": "com\.nudenyang\.sentory"/);
