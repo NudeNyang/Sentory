@@ -95,7 +95,7 @@ test("지원 메신저 로고는 각 공식 다운로드 페이지로 연결한�
 });
 
 test("동기화 기능 문구를 명확히 하고 중복 개인정보 섹션은 제거한다", () => {
-  assert.match(html, /클라우드 · NAS를 통해 다른 컴퓨터와 동기화/);
+  assert.match(html, /클라우드 · NAS를 통해 다른 컴퓨터와 동기화도 가능/);
   assert.doesNotMatch(html, /내가 고른 저장소로 동기화/);
   assert.doesNotMatch(html, /id="privacy"/);
   assert.doesNotMatch(html, /href="#privacy"/);
