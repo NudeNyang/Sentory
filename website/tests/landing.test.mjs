@@ -130,10 +130,27 @@ test("히어로 설명은 공통 메신저와 언어권별 대표 메신저를 �
 });
 
 test("다크 모드, 모션 축소와 모바일 레이아웃을 지원한다", () => {
+  const mobileStyles = css.match(/@media \(max-width: 767px\)\s*\{[\s\S]*?\n\}/)?.[0] || "";
   assert.match(css, /@media \(prefers-color-scheme: dark\)/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(css, /@media \(max-width: 767px\)/);
+  assert.match(mobileStyles, /\.nav-shell\s*\{[\s\S]*?height:\s*64px/);
+  assert.match(mobileStyles, /\.hero-copy h1\s*\{[\s\S]*?font-size:\s*clamp\(34px, 9\.3vw, 40px\)/);
+  assert.match(mobileStyles, /\.hero-actions \.button\s*\{[\s\S]*?min-height:\s*48px/);
+  assert.match(mobileStyles, /\.language-strip button\s*\{[\s\S]*?min-height:\s*44px/);
+  assert.match(mobileStyles, /\.feature-search\s*\{[\s\S]*?min-height:\s*450px/);
+  assert.match(css, /@media \(max-width: 560px\)[\s\S]*?\.messenger-logos\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4, 1fr\)/);
+  assert.match(css, /@media \(max-width: 360px\)/);
   assert.doesNotMatch(css, /height:\s*100vh/);
+});
+
+test("언어별 줄바꿈 규칙으로 모바일에서 단어와 금칙 문자를 보호한다", () => {
+  assert.match(css, /:root\[lang="ko"\] body\s*\{[\s\S]*?overflow-wrap:\s*break-word;[\s\S]*?word-break:\s*keep-all;/);
+  assert.match(css, /:root\[lang="en"\] body\s*\{[\s\S]*?word-break:\s*normal;[\s\S]*?hyphens:\s*none;/);
+  assert.match(css, /:root\[lang="en"\] \.hero-copy p,[\s\S]*?:root\[lang="en"\] \.faq-list details p\s*\{[\s\S]*?word-break:\s*normal;[\s\S]*?hyphens:\s*none;/);
+  assert.match(css, /:root\[lang="ja"\] body,[\s\S]*?:root\[lang="zh-CN"\] body\s*\{[\s\S]*?overflow-wrap:\s*anywhere;[\s\S]*?line-break:\s*strict;/);
+  assert.match(css, /:root\[lang="ja"\] \.hero-copy p,[\s\S]*?:root\[lang="zh-CN"\] \.faq-list details p\s*\{[\s\S]*?word-break:\s*normal;[\s\S]*?line-break:\s*strict;/);
+  assert.match(css, /\.story-flow span,[\s\S]*?\.faq-list details p\s*\{[\s\S]*?text-wrap:\s*pretty;/);
 });
 
 test("저장된 선택이 없으면 밝은 테마로 시작한다", () => {
