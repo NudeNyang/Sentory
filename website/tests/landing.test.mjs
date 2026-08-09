@@ -74,6 +74,35 @@ test("기능 섹션은 지원 메신저에서 정리하는 항목을 담백하�
   assert.doesNotMatch(html, /보관함을 만드는 기준부터 다릅니다/);
 });
 
+test("지원 메신저 로고는 각 공식 다운로드 페이지로 연결한다", () => {
+  const messengerStrip = html.match(/<section class="messenger-strip"[\s\S]*?<\/section>/)?.[0] || "";
+  const links = [
+    "https://discord.com/download",
+    "https://slack.com/downloads/windows",
+    "https://www.whatsapp.com/download/",
+    "https://telegram.org/desktop/download",
+    "https://www.kakaocorp.com/page/service/service/KakaoTalk?lang=ko",
+    "https://www.line.me/ko/",
+    "https://windows.weixin.qq.com/"
+  ];
+
+  assert.equal((messengerStrip.match(/<a\b/g) || []).length, links.length);
+  links.forEach((link) => assert.match(messengerStrip, new RegExp(`href="${link.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`)));
+  assert.equal((messengerStrip.match(/target="_blank"/g) || []).length, links.length);
+  assert.equal((messengerStrip.match(/rel="noreferrer"/g) || []).length, links.length);
+  assert.equal((messengerStrip.match(/공식 다운로드 페이지 열기 \(새 탭\)/g) || []).length, links.length);
+  assert.match(css, /\.messenger-logos a:focus-visible/);
+});
+
+test("동기화 기능 문구를 명확히 하고 중복 개인정보 섹션은 제거한다", () => {
+  assert.match(html, /클라우드 · NAS를 통해서 다른 컴퓨터와 동기화/);
+  assert.doesNotMatch(html, /내가 고른 저장소로 동기화/);
+  assert.doesNotMatch(html, /id="privacy"/);
+  assert.doesNotMatch(html, /href="#privacy"/);
+  assert.doesNotMatch(css, /\.privacy(?:\b|-)/);
+  assert.match(html, /<summary>데이터는 어디에 저장되나요\?<\/summary>/);
+});
+
 test("스크롤 이벤트 대신 IntersectionObserver를 사용한다", () => {
   assert.match(script, /IntersectionObserver/);
   assert.doesNotMatch(script, /addEventListener\(["']scroll["']/);

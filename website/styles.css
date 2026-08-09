@@ -360,6 +360,19 @@ img {
   max-width: 690px;
 }
 
+.messenger-logos a {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-control);
+}
+
+.messenger-logos a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .messenger-logos img {
   opacity: 0.67;
   filter: var(--logo-filter);
@@ -368,7 +381,8 @@ img {
     transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.messenger-logos img:hover {
+.messenger-logos a:hover img,
+.messenger-logos a:focus-visible img {
   opacity: 1;
   transform: translateY(-2px);
 }
@@ -388,7 +402,6 @@ img {
 
 .story-heading h2,
 .section-heading h2,
-.privacy h2,
 .download h2 {
   max-width: 760px;
   margin: 0;
@@ -619,88 +632,6 @@ img {
   border-radius: 28%;
   box-shadow: 0 18px 40px var(--shadow);
   transform: rotate(-4deg);
-}
-
-.privacy {
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.75fr);
-  gap: clamp(60px, 10vw, 140px);
-  align-items: start;
-  margin-top: 30px;
-  padding-right: clamp(28px, 6vw, 70px);
-  padding-left: clamp(28px, 6vw, 70px);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-.privacy-statement > p {
-  margin: 0 0 20px;
-  color: var(--accent);
-  font-size: 14px;
-  font-weight: 720;
-  letter-spacing: 0.02em;
-}
-
-.privacy h2 {
-  font-size: clamp(36px, 4.2vw, 56px);
-}
-
-.privacy h2 span {
-  display: block;
-  white-space: nowrap;
-}
-
-.privacy-details > p {
-  margin: 3px 0 28px;
-  color: var(--muted);
-  font-size: 17px;
-  line-height: 1.75;
-}
-
-.privacy-details ul {
-  display: grid;
-  gap: 15px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.privacy-details li {
-  position: relative;
-  padding-left: 20px;
-  color: var(--text);
-}
-
-.privacy-details li::before {
-  position: absolute;
-  top: 0.78em;
-  left: 0;
-  width: 8px;
-  height: 2px;
-  background: var(--accent);
-  content: "";
-}
-
-.privacy-details code {
-  display: block;
-  width: fit-content;
-  margin: 31px 0 20px;
-  padding: 9px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--page);
-  color: var(--muted);
-  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
-  font-size: 13px;
-}
-
-.privacy-details > a {
-  color: var(--accent);
-  font-weight: 700;
-  text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--accent) 44%, transparent);
-  text-underline-offset: 5px;
 }
 
 .download {
@@ -1064,18 +995,9 @@ img {
     min-height: clamp(300px, 58vw, 460px);
   }
 
-  .privacy,
   .download,
   .faq {
     grid-template-columns: 1fr;
-  }
-
-  .privacy {
-    gap: 46px;
-  }
-
-  .privacy h2 span {
-    white-space: normal;
   }
 
   .download-options {
@@ -1159,7 +1081,6 @@ img {
 
   .story-heading h2,
   .section-heading h2,
-  .privacy h2,
   .download h2 {
     font-size: clamp(34px, 9vw, 45px);
   }
@@ -1229,14 +1150,6 @@ img {
     width: 88px;
   }
 
-  .privacy {
-    gap: 38px;
-    margin-top: 16px;
-    padding-right: 24px;
-    padding-left: 24px;
-  }
-
-  .privacy-details > p,
   .download-lead p {
     font-size: 16px;
   }
