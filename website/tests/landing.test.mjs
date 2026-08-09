@@ -95,12 +95,17 @@ test("지원 메신저 로고는 각 공식 다운로드 페이지로 연결한�
 });
 
 test("동기화 기능 문구를 명확히 하고 중복 개인정보 섹션은 제거한다", () => {
+  const localFeature = html.match(/<article class="feature feature-local reveal">[\s\S]*?<\/article>/)?.[0] || "";
+  assert.match(localFeature, /내 컴퓨터에 직접 보관합니다\./);
+  assert.match(localFeature, /Sentory는 별도 운영 서버 없이 동작하며, 보관 데이터는 사용자의 Windows PC에 남습니다\./);
+  assert.doesNotMatch(html, /Sentory 운영 서버가 아니라|Sentory 운영 서버로/);
   assert.match(html, /클라우드 · NAS를 통해 다른 컴퓨터와 동기화도 가능/);
   assert.doesNotMatch(html, /내가 고른 저장소로 동기화/);
   assert.doesNotMatch(html, /id="privacy"/);
   assert.doesNotMatch(html, /href="#privacy"/);
   assert.doesNotMatch(css, /\.privacy(?:\b|-)/);
   assert.match(html, /<summary>데이터는 어디에 저장되나요\?<\/summary>/);
+  assert.match(html, /기본 보관함은 %LOCALAPPDATA%\\Sentory에 저장되며, Sentory는 별도 운영 서버 없이 동작합니다\./);
 });
 
 test("스크롤 이벤트 대신 IntersectionObserver를 사용한다", () => {
