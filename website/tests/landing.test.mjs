@@ -77,3 +77,10 @@ test("다운로드 CTA는 직접 파일 대신 최신 GitHub 릴리즈로 안내
   assert.match(html, />GitHub에서 다운로드<\/a>/);
   assert.match(html, />GitHub에서 Star<\/a>/);
 });
+
+test("히어로는 중복 없이 하나의 다운로드 CTA만 제공한다", () => {
+  const heroActions = html.match(/<div class="hero-actions"[\s\S]*?<\/div>/)?.[0] || "";
+  assert.equal((heroActions.match(/<a\b/g) || []).length, 1);
+  assert.match(heroActions, />GitHub에서 다운로드<\/a>/);
+  assert.doesNotMatch(heroActions, />GitHub<\/a>/);
+});
