@@ -90,6 +90,7 @@ test("한국어를 기본으로 네 가지 언어를 빠짐없이 제공한다",
 
 test("앱 지원 언어를 별도 안내하고 언어 선택기를 반응형으로 표시한다", () => {
   const languageStrip = html.match(/<section class="language-strip"[\s\S]*?<\/section>/)?.[0] || "";
+  const activeLanguageButton = css.match(/\.language-strip button\[aria-pressed="true"\]\s*\{[\s\S]*?\}/)?.[0] || "";
   assert.match(languageStrip, /앱 지원 언어/);
   ["한국어", "English", "日本語", "简体中文"].forEach((language) => assert.match(languageStrip, new RegExp(language)));
   assert.equal((languageStrip.match(/data-language-shortcut=/g) || []).length, 4);
@@ -101,6 +102,9 @@ test("앱 지원 언어를 별도 안내하고 언어 선택기를 반응형으�
   assert.match(css, /\.messenger-logos\s*\{[\s\S]*?max-width:\s*690px/);
   assert.match(css, /\.language-strip ul\s*\{[\s\S]*?width:\s*min\(100%, 690px\)/);
   assert.match(css, /\.language-strip button\[aria-pressed="true"\]/);
+  assert.match(activeLanguageButton, /background:\s*var\(--surface-strong\)/);
+  assert.match(activeLanguageButton, /color:\s*var\(--text\)/);
+  assert.doesNotMatch(activeLanguageButton, /--accent/);
   assert.match(css, /\.language-strip\s*\{/);
   assert.match(css, /@media \(max-width: 767px\)[\s\S]*?\.language-strip/);
   assert.match(script, /event\.key === "Escape"/);
@@ -109,6 +113,20 @@ test("앱 지원 언어를 별도 안내하고 언어 선택기를 반응형으�
   assert.match(script, /event\.key === "End"/);
   assert.match(script, /languageShortcuts\.forEach/);
   assert.match(script, /button\.dataset\.languageShortcut/);
+});
+
+test("히어로 설명은 공통 메신저와 언어권별 대표 메신저를 함께 안내한다", () => {
+  const expectedMessengers = {
+    ko: ["Discord", "Slack", "카카오톡"],
+    en: ["Discord", "Slack", "WhatsApp"],
+    ja: ["Discord", "Slack", "LINE"],
+    "zh-CN": ["Discord", "Slack", "WeChat"]
+  };
+
+  Object.entries(expectedMessengers).forEach(([locale, messengers]) => {
+    const description = translations[locale]["hero.description"];
+    messengers.forEach((messenger) => assert.match(description, new RegExp(messenger)));
+  });
 });
 
 test("다크 모드, 모션 축소와 모바일 레이아웃을 지원한다", () => {

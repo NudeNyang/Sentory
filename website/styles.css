@@ -531,13 +531,13 @@ img {
 }
 
 .language-strip button:hover {
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  background: color-mix(in srgb, var(--surface-strong) 62%, transparent);
   color: var(--text);
 }
 
 .language-strip button[aria-pressed="true"] {
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
-  color: var(--accent-ink);
+  background: var(--surface-strong);
+  color: var(--text);
 }
 
 .messenger-logos {
