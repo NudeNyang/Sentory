@@ -103,9 +103,9 @@ test("OCR 기능 카드에 실제 검색과 상세 화면을 함께 표시한다
   const shotRule = css.match(/\.feature-shot\s*\{[\s\S]*?\}/)?.[0] || "";
   const searchShotRule = css.match(/\.feature-shot-search\s*\{[\s\S]*?\}/)?.[0] || "";
   const detailShotRule = css.match(/\.feature-shot-detail\s*\{[\s\S]*?\}/)?.[0] || "";
-  assert.match(shotRule, /border-radius:\s*0/);
-  assert.doesNotMatch(searchShotRule, /transform:\s*rotate/);
-  assert.doesNotMatch(detailShotRule, /transform:\s*rotate/);
+  assert.match(shotRule, /border-radius:\s*var\(--radius-control\)/);
+  assert.match(searchShotRule, /transform:\s*rotate\(-0\.55deg\)/);
+  assert.match(detailShotRule, /transform:\s*rotate\(0\.65deg\)/);
 });
 
 test("수동 GitHub Pages 배포 전에 랜딩페이지 테스트를 실행한다", () => {

@@ -528,7 +528,7 @@ img {
   overflow: hidden;
   margin: 0;
   border: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: var(--radius-control);
   background: var(--surface-strong);
   box-shadow: 0 20px 46px var(--shadow);
 }
@@ -544,6 +544,7 @@ img {
   left: 0;
   z-index: 1;
   width: min(88%, 650px);
+  transform: rotate(-0.55deg);
 }
 
 .feature-shot-detail {
@@ -551,6 +552,7 @@ img {
   bottom: -1px;
   z-index: 2;
   width: min(70%, 520px);
+  transform: rotate(0.65deg);
 }
 
 .feature-local {
