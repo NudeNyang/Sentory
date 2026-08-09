@@ -29,7 +29,7 @@
     <link rel="icon" type="image/png" href="./assets/sentory-icon.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="preload" as="image" href="./assets/sentory-gallery.jpg" fetchpriority="high" />
-    <link rel="stylesheet" href="./styles.css?v=20260809-demo" />
+    <link rel="stylesheet" href="./styles.css?v=20260809-ocr" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -170,13 +170,26 @@
               <h3>사진 속 글자까지 검색</h3>
               <p>다국어 OCR이 사진에 자동으로 이름을 붙여 이미지 내용도 검색할 수 있습니다.</p>
             </div>
-            <img
-              src="./assets/sentory-gallery.jpg"
-              width="1600"
-              height="1194"
-              alt="서로 다른 언어의 이미지 카드가 검색 가능한 Sentory 보관함"
-              loading="lazy"
-            />
+            <div class="feature-search-media">
+              <figure class="feature-shot feature-shot-search">
+                <img
+                  src="./assets/sentory-ocr-search.png"
+                  width="2308"
+                  height="1552"
+                  alt="검색어 sol로 사진 속 글자가 포함된 항목을 찾은 Sentory 검색 결과"
+                  loading="lazy"
+                />
+              </figure>
+              <figure class="feature-shot feature-shot-detail">
+                <img
+                  src="./assets/sentory-ocr-detail.png"
+                  width="2301"
+                  height="1543"
+                  alt="Token use 이미지의 OCR 제목과 재사용 정보를 보여주는 Sentory 상세 화면"
+                  loading="lazy"
+                />
+              </figure>
+            </div>
           </article>
 
           <article class="feature feature-local reveal">

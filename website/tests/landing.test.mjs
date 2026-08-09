@@ -91,6 +91,17 @@ test("사용 흐름 영상은 문구가 보인 뒤 1초 후 재생한다", () =>
   assert.match(css, /video::\-webkit-media-controls/);
 });
 
+test("OCR 기능 카드에 실제 검색과 상세 화면을 함께 표시한다", () => {
+  const feature = html.match(/<article class="feature feature-search reveal">[\s\S]*?<\/article>/)?.[0] || "";
+  assert.equal((feature.match(/<img\b/g) || []).length, 2);
+  assert.match(feature, /assets\/sentory-ocr-search\.png/);
+  assert.match(feature, /assets\/sentory-ocr-detail\.png/);
+  assert.doesNotMatch(feature, /assets\/sentory-gallery\.jpg/);
+  assert.match(css, /\.feature-search-media/);
+  assert.match(css, /\.feature-shot-search/);
+  assert.match(css, /\.feature-shot-detail/);
+});
+
 test("수동 GitHub Pages 배포 전에 랜딩페이지 테스트를 실행한다", () => {
   assert.match(deployWorkflow, /workflow_dispatch:/);
   assert.match(deployWorkflow, /working-directory: website\s+run: npm test/);
