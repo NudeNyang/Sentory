@@ -58,7 +58,6 @@ if ("IntersectionObserver" in window) {
   revealElements.forEach((element) => element.classList.add("is-visible"));
 }
 
-const storyHeading = document.querySelector(".story-heading");
 const storyDemo = document.querySelector("[data-scroll-autoplay]");
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -88,29 +87,48 @@ if (storyDemo) {
   });
 }
 
-if (storyHeading && storyDemo && "IntersectionObserver" in window) {
-  const demoObserver = new IntersectionObserver(
-    async ([entry]) => {
-      if (!entry.isIntersecting || reducedMotion.matches || storyDemo.dataset.autoplayState === "playing") return;
+if (storyDemo && "IntersectionObserver" in window) {
+  let playTimer = null;
 
-      try {
-        await storyDemo.play();
-        storyDemo.dataset.autoplayState = "playing";
-        demoObserver.unobserve(storyHeading);
-      } catch {
-        storyDemo.dataset.autoplayState = "manual";
+  const cancelScheduledPlay = () => {
+    if (playTimer === null) return;
+    window.clearTimeout(playTimer);
+    playTimer = null;
+    storyDemo.dataset.autoplayState = "idle";
+  };
+
+  const demoObserver = new IntersectionObserver(
+    ([entry]) => {
+      if (!entry.isIntersecting || entry.intersectionRatio < 0.12 || reducedMotion.matches) {
+        cancelScheduledPlay();
+        return;
       }
+
+      if (playTimer !== null || storyDemo.dataset.autoplayState === "playing") return;
+      storyDemo.dataset.autoplayState = "waiting";
+      playTimer = window.setTimeout(async () => {
+        playTimer = null;
+
+        try {
+          await storyDemo.play();
+          storyDemo.dataset.autoplayState = "playing";
+          demoObserver.unobserve(storyDemo);
+        } catch {
+          storyDemo.dataset.autoplayState = "manual";
+        }
+      }, 300);
     },
-    { threshold: 0 }
+    { threshold: [0, 0.12], rootMargin: "0px 0px -20% 0px" }
   );
 
   reducedMotion.addEventListener("change", () => {
     if (!reducedMotion.matches) return;
+    cancelScheduledPlay();
     storyDemo.pause();
     storyDemo.dataset.autoplayState = "manual";
   });
 
-  demoObserver.observe(storyHeading);
+  demoObserver.observe(storyDemo);
 } else if (storyDemo) {
   storyDemo.dataset.autoplayState = "manual";
 }

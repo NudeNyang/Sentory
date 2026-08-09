@@ -113,7 +113,7 @@ test("스크롤 이벤트 대신 IntersectionObserver를 사용한다", () => {
   assert.doesNotMatch(script, /addEventListener\(["']scroll["']/);
 });
 
-test("사용 흐름 영상은 문구가 화면에 들어오면 바로 재생한다", () => {
+test("사용 흐름 영상은 일부가 보인 상태가 잠시 유지되면 재생한다", () => {
   assert.match(html, /보내고 잊어버려도,<br \/>필요할 때 다시 찾을 수 있게\./);
 
   const video = html.match(/<video[\s\S]*?<\/video>/)?.[0] || "";
@@ -129,10 +129,13 @@ test("사용 흐름 영상은 문구가 화면에 들어오면 바로 재생한�
 
   assert.equal(existsSync(resolve(siteDirectory, "assets", "sentory-demo.mp4")), true);
   assert.equal(existsSync(resolve(siteDirectory, "assets", "sentory-demo-poster.jpg")), true);
-  assert.match(script, /storyHeading/);
   assert.match(script, /storyDemo\.play\(\)/);
-  assert.match(script, /\{ threshold: 0 \}/);
-  assert.doesNotMatch(script, /setTimeout|playTimer|data-delayed-autoplay/);
+  assert.match(script, /entry\.intersectionRatio < 0\.12/);
+  assert.match(script, /\{ threshold: \[0, 0\.12\], rootMargin: "0px 0px -20% 0px" \}/);
+  assert.match(script, /}, 300\);/);
+  assert.match(script, /demoObserver\.observe\(storyDemo\)/);
+  assert.match(script, /demoObserver\.unobserve\(storyDemo\)/);
+  assert.doesNotMatch(script, /storyHeading|data-delayed-autoplay/);
   assert.match(script, /storyDemo\.addEventListener\("click"/);
   assert.match(css, /\.search-figure\s*\{[\s\S]*?max-width:\s*100%/);
   assert.match(css, /\.search-figure video\s*\{[\s\S]*?max-width:\s*100%/);
