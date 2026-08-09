@@ -29,6 +29,16 @@
     <link rel="icon" type="image/png" href="./assets/sentory-icon.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="preload" as="image" href="./assets/sentory-gallery.jpg" fetchpriority="high" />
+    <script>
+      (() => {
+        try {
+          const savedTheme = localStorage.getItem("sentory-site-theme");
+          document.documentElement.dataset.theme = savedTheme === "dark" ? "dark" : "light";
+        } catch {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
     <link rel="stylesheet" href="./styles.css?v=20260809-ocr-layered" />
     <script type="application/ld+json">
       {
@@ -49,7 +59,7 @@
         }
       }
     </script>
-    <script src="./script.js?v=20260809-demo" defer></script>
+    <script src="./script.js?v=20260809-light-default" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">본문으로 이동</a>
@@ -160,8 +170,8 @@
 
       <section class="features section-shell" id="features" aria-labelledby="features-title">
         <div class="section-heading reveal">
-          <h2 id="features-title">보관함을 만드는 기준부터 다릅니다.</h2>
-          <p>모든 클립보드 기록을 쌓지 않고, 지원 메신저에서 필요한 순간만 골라 기억합니다.</p>
+          <h2 id="features-title">필요한 기록만 모아둡니다.</h2>
+          <p>Discord, Slack 등 지원 메신저에서 전송한 항목만 자동으로 정리합니다.</p>
         </div>
 
         <div class="feature-grid">

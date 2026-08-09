@@ -3,10 +3,9 @@ root.classList.add("js");
 const themeToggle = document.querySelector(".theme-toggle");
 const menuToggle = document.querySelector(".menu-toggle");
 const navLinks = document.querySelector(".nav-links");
-const colorScheme = window.matchMedia("(prefers-color-scheme: dark)");
 
 function currentTheme() {
-  return root.dataset.theme || (colorScheme.matches ? "dark" : "light");
+  return root.dataset.theme || "light";
 }
 
 function syncThemeLabel() {
@@ -15,21 +14,18 @@ function syncThemeLabel() {
   themeToggle.setAttribute("aria-label", isDark ? "밝은 테마로 전환" : "어두운 테마로 전환");
 }
 
-const savedTheme = localStorage.getItem("sentory-site-theme");
-if (savedTheme === "light" || savedTheme === "dark") {
-  root.dataset.theme = savedTheme;
-}
+if (root.dataset.theme !== "light" && root.dataset.theme !== "dark") root.dataset.theme = "light";
 syncThemeLabel();
 
 themeToggle.addEventListener("click", () => {
   const nextTheme = currentTheme() === "dark" ? "light" : "dark";
   root.dataset.theme = nextTheme;
-  localStorage.setItem("sentory-site-theme", nextTheme);
+  try {
+    localStorage.setItem("sentory-site-theme", nextTheme);
+  } catch {
+    // 저장소를 사용할 수 없어도 현재 페이지의 테마 전환은 유지한다.
+  }
   syncThemeLabel();
-});
-
-colorScheme.addEventListener("change", () => {
-  if (!root.dataset.theme) syncThemeLabel();
 });
 
 menuToggle.addEventListener("click", () => {

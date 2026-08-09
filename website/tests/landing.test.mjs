@@ -60,6 +60,20 @@ test("다크 모드, 모션 축소와 모바일 레이아웃을 지원한다", (
   assert.doesNotMatch(css, /height:\s*100vh/);
 });
 
+test("저장된 선택이 없으면 밝은 테마로 시작한다", () => {
+  const themeInitializer = html.match(/<script>\s*\(\(\) => \{[\s\S]*?sentory-site-theme[\s\S]*?<\/script>/)?.[0] || "";
+  assert.match(themeInitializer, /savedTheme === "dark" \? "dark" : "light"/);
+  assert.ok(html.indexOf(themeInitializer) < html.indexOf("styles.css"));
+  assert.match(script, /return root\.dataset\.theme \|\| "light"/);
+  assert.doesNotMatch(script, /colorScheme\.matches/);
+});
+
+test("기능 섹션은 지원 메신저에서 정리하는 항목을 담백하게 설명한다", () => {
+  assert.match(html, /<h2 id="features-title">필요한 기록만 모아둡니다\.<\/h2>/);
+  assert.match(html, /Discord, Slack 등 지원 메신저에서 전송한 항목만 자동으로 정리합니다\./);
+  assert.doesNotMatch(html, /보관함을 만드는 기준부터 다릅니다/);
+});
+
 test("스크롤 이벤트 대신 IntersectionObserver를 사용한다", () => {
   assert.match(script, /IntersectionObserver/);
   assert.doesNotMatch(script, /addEventListener\(["']scroll["']/);
