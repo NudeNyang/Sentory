@@ -446,6 +446,8 @@ img {
 .search-figure {
   position: relative;
   overflow: hidden;
+  width: 100%;
+  max-width: 100%;
   margin: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -453,9 +455,20 @@ img {
   box-shadow: 0 26px 68px color-mix(in srgb, var(--shadow) 72%, transparent);
 }
 
-.search-figure img {
+.search-figure video {
+  display: block;
   width: 100%;
+  max-width: 100%;
   height: auto;
+  aspect-ratio: 16 / 9;
+  background: #151719;
+  object-fit: contain;
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+
+.search-figure video::-webkit-media-controls {
+  display: none !important;
 }
 
 .features {
@@ -1130,11 +1143,6 @@ img {
   .search-figure {
     margin-right: -8px;
     margin-left: -8px;
-  }
-
-  .search-figure img {
-    width: 155%;
-    max-width: none;
   }
 
   .features {

@@ -43,7 +43,8 @@ test("참조하는 로컬 자산이 모두 존재한다", () => {
   const references = [...html.matchAll(/(?:src|href)="(\.\/(?:assets\/|styles\.css|script\.js|manifest\.webmanifest)[^"]*)"/g)];
   assert.ok(references.length > 0);
   references.forEach(([, reference]) => {
-    assert.ok(existsSync(resolve(siteDirectory, reference.slice(2))), `${reference} 파일이 필요합니다.`);
+    const localPath = reference.slice(2).split(/[?#]/, 1)[0];
+    assert.ok(existsSync(resolve(siteDirectory, localPath)), `${reference} 파일이 필요합니다.`);
   });
 });
 
@@ -62,6 +63,32 @@ test("다크 모드, 모션 축소와 모바일 레이아웃을 지원한다", (
 test("스크롤 이벤트 대신 IntersectionObserver를 사용한다", () => {
   assert.match(script, /IntersectionObserver/);
   assert.doesNotMatch(script, /addEventListener\(["']scroll["']/);
+});
+
+test("사용 흐름 영상은 문구가 보인 뒤 1초 후 재생한다", () => {
+  assert.match(html, /보내고 잊어버려도,<br \/>필요할 때 다시 찾을 수 있게\./);
+
+  const video = html.match(/<video[\s\S]*?<\/video>/)?.[0] || "";
+  assert.match(video, /data-delayed-autoplay/);
+  assert.match(video, /width="1920"/);
+  assert.match(video, /height="1080"/);
+  assert.match(video, /poster="\.\/assets\/sentory-demo-poster\.jpg"/);
+  assert.match(video, /muted/);
+  assert.match(video, /playsinline/);
+  assert.doesNotMatch(video, /(?:^|\s)autoplay(?:\s|=|>)/);
+  assert.doesNotMatch(video, /(?:^|\s)controls(?:\s|=|>)/);
+  assert.match(video, /src="\.\/assets\/sentory-demo\.mp4"/);
+
+  assert.equal(existsSync(resolve(siteDirectory, "assets", "sentory-demo.mp4")), true);
+  assert.equal(existsSync(resolve(siteDirectory, "assets", "sentory-demo-poster.jpg")), true);
+  assert.match(script, /storyHeading/);
+  assert.match(script, /storyDemo\.play\(\)/);
+  assert.match(script, /}, 1000\);/);
+  assert.match(script, /storyDemo\.addEventListener\("click"/);
+  assert.match(css, /\.search-figure\s*\{[\s\S]*?max-width:\s*100%/);
+  assert.match(css, /\.search-figure video\s*\{[\s\S]*?max-width:\s*100%/);
+  assert.match(css, /object-fit:\s*contain/);
+  assert.match(css, /video::\-webkit-media-controls/);
 });
 
 test("수동 GitHub Pages 배포 전에 랜딩페이지 테스트를 실행한다", () => {

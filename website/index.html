@@ -29,7 +29,7 @@
     <link rel="icon" type="image/png" href="./assets/sentory-icon.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="preload" as="image" href="./assets/sentory-gallery.jpg" fetchpriority="high" />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260809-demo" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -49,7 +49,7 @@
         }
       }
     </script>
-    <script src="./script.js" defer></script>
+    <script src="./script.js?v=20260809-demo" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main-content">본문으로 이동</a>
@@ -120,7 +120,7 @@
 
       <section class="story section-shell reveal" aria-labelledby="story-title">
         <div class="story-heading">
-          <h2 id="story-title">보내고 잊어도,<br />필요할 때 찾을 수 있게.</h2>
+          <h2 id="story-title">보내고 잊어버려도,<br />필요할 때 다시 찾을 수 있게.</h2>
           <p>대화방을 거슬러 올라가는 대신 제목, URL, 도메인과 사진 속 글자로 보관함을 검색하세요.</p>
         </div>
 
@@ -140,13 +140,21 @@
         </ol>
 
         <figure class="search-figure">
-          <img
-            src="./assets/sentory-search.jpg"
-            width="1500"
-            height="490"
-            alt="검색창과 링크, 사진 카드가 보이는 Sentory 실제 화면"
-            loading="lazy"
-          />
+          <video
+            data-delayed-autoplay
+            width="1920"
+            height="1080"
+            poster="./assets/sentory-demo-poster.jpg"
+            preload="metadata"
+            muted
+            playsinline
+            disablepictureinpicture
+            tabindex="0"
+            aria-label="Sentory 실제 사용 영상. 클릭하면 재생하거나 일시정지할 수 있습니다."
+          >
+            <source src="./assets/sentory-demo.mp4" type="video/mp4" />
+            브라우저에서 Sentory 사용 영상을 재생할 수 없습니다.
+          </video>
         </figure>
       </section>
 
