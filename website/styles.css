@@ -412,6 +412,12 @@ img {
   text-wrap: balance;
 }
 
+.download-lead h2 {
+  font-size: clamp(36px, 3.8vw, 52px);
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
 .story-heading p,
 .section-heading p {
   max-width: 660px;
@@ -636,8 +642,8 @@ img {
 
 .download {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(440px, 1.1fr);
-  gap: clamp(54px, 8vw, 110px);
+  grid-template-columns: minmax(0, 1.05fr) minmax(440px, 0.95fr);
+  gap: clamp(48px, 6vw, 84px);
   align-items: center;
 }
 

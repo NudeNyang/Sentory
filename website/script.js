@@ -59,7 +59,7 @@ if ("IntersectionObserver" in window) {
 }
 
 const storyHeading = document.querySelector(".story-heading");
-const storyDemo = document.querySelector("[data-delayed-autoplay]");
+const storyDemo = document.querySelector("[data-scroll-autoplay]");
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 async function toggleStoryDemoPlayback() {
@@ -89,42 +89,23 @@ if (storyDemo) {
 }
 
 if (storyHeading && storyDemo && "IntersectionObserver" in window) {
-  let playTimer = null;
-
-  const cancelDelayedPlay = () => {
-    if (playTimer === null) return;
-    window.clearTimeout(playTimer);
-    playTimer = null;
-    storyDemo.dataset.autoplayState = "idle";
-  };
-
   const demoObserver = new IntersectionObserver(
-    ([entry]) => {
-      if (!entry.isIntersecting || entry.intersectionRatio < 0.6 || reducedMotion.matches) {
-        cancelDelayedPlay();
-        return;
+    async ([entry]) => {
+      if (!entry.isIntersecting || reducedMotion.matches || storyDemo.dataset.autoplayState === "playing") return;
+
+      try {
+        await storyDemo.play();
+        storyDemo.dataset.autoplayState = "playing";
+        demoObserver.unobserve(storyHeading);
+      } catch {
+        storyDemo.dataset.autoplayState = "manual";
       }
-
-      if (playTimer !== null || storyDemo.dataset.autoplayState === "playing") return;
-      storyDemo.dataset.autoplayState = "waiting";
-      playTimer = window.setTimeout(async () => {
-        playTimer = null;
-
-        try {
-          await storyDemo.play();
-          storyDemo.dataset.autoplayState = "playing";
-          demoObserver.unobserve(storyHeading);
-        } catch {
-          storyDemo.dataset.autoplayState = "manual";
-        }
-      }, 1000);
     },
-    { threshold: [0, 0.6] }
+    { threshold: 0 }
   );
 
   reducedMotion.addEventListener("change", () => {
     if (!reducedMotion.matches) return;
-    cancelDelayedPlay();
     storyDemo.pause();
     storyDemo.dataset.autoplayState = "manual";
   });

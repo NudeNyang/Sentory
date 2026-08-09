@@ -108,11 +108,11 @@ test("스크롤 이벤트 대신 IntersectionObserver를 사용한다", () => {
   assert.doesNotMatch(script, /addEventListener\(["']scroll["']/);
 });
 
-test("사용 흐름 영상은 문구가 보인 뒤 1초 후 재생한다", () => {
+test("사용 흐름 영상은 문구가 화면에 들어오면 바로 재생한다", () => {
   assert.match(html, /보내고 잊어버려도,<br \/>필요할 때 다시 찾을 수 있게\./);
 
   const video = html.match(/<video[\s\S]*?<\/video>/)?.[0] || "";
-  assert.match(video, /data-delayed-autoplay/);
+  assert.match(video, /data-scroll-autoplay/);
   assert.match(video, /width="1920"/);
   assert.match(video, /height="1080"/);
   assert.match(video, /poster="\.\/assets\/sentory-demo-poster\.jpg"/);
@@ -126,7 +126,8 @@ test("사용 흐름 영상은 문구가 보인 뒤 1초 후 재생한다", () =>
   assert.equal(existsSync(resolve(siteDirectory, "assets", "sentory-demo-poster.jpg")), true);
   assert.match(script, /storyHeading/);
   assert.match(script, /storyDemo\.play\(\)/);
-  assert.match(script, /}, 1000\);/);
+  assert.match(script, /\{ threshold: 0 \}/);
+  assert.doesNotMatch(script, /setTimeout|playTimer|data-delayed-autoplay/);
   assert.match(script, /storyDemo\.addEventListener\("click"/);
   assert.match(css, /\.search-figure\s*\{[\s\S]*?max-width:\s*100%/);
   assert.match(css, /\.search-figure video\s*\{[\s\S]*?max-width:\s*100%/);
@@ -159,11 +160,16 @@ test("수동 GitHub Pages 배포 전에 랜딩페이지 테스트를 실행한�
 });
 
 test("다운로드 CTA는 직접 파일 대신 최신 GitHub 릴리즈로 안내한다", () => {
+  const downloadHeadingRule = css.match(/\.download-lead h2\s*\{[\s\S]*?\}/)?.[0] || "";
+  const downloadLayoutRule = css.match(/\.download\s*\{[\s\S]*?\}/)?.[0] || "";
   assert.doesNotMatch(html, /releases\/latest\/download/);
   assert.ok((html.match(/https:\/\/github\.com\/NudeNyang\/Sentory\/releases\/latest/g) || []).length >= 5);
   assert.match(html, /Sentory는 무료 오픈소스 프로그램입니다\./);
   assert.match(html, /설치 파일과 포터블 버전은 GitHub Releases에서 받을 수 있습니다\./);
   assert.doesNotMatch(html, /바로 써볼 수 있습니다|GitHub판은 무료로 제공합니다/);
+  assert.match(downloadHeadingRule, /font-size:\s*clamp\(36px, 3\.8vw, 52px\)/);
+  assert.match(downloadHeadingRule, /word-break:\s*keep-all/);
+  assert.match(downloadLayoutRule, /grid-template-columns:\s*minmax\(0, 1\.05fr\) minmax\(440px, 0\.95fr\)/);
   assert.match(html, />GitHub에서 다운로드<\/a>/);
   assert.match(html, />GitHub에서 Star<\/a>/);
 });
