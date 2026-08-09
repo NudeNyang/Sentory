@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { SUPPORTED_LANGUAGES, translations } from "../translations.js";
 
 const testDirectory = dirname(fileURLToPath(import.meta.url));
 const siteDirectory = resolve(testDirectory, "..");
@@ -51,6 +52,63 @@ test("참조하는 로컬 자산이 모두 존재한다", () => {
 test("금지된 대시와 빈 링크를 사용하지 않는다", () => {
   assert.doesNotMatch(html, /[—–]/);
   assert.doesNotMatch(html, /href="#"/);
+  Object.values(translations).forEach((dictionary) => {
+    Object.values(dictionary).forEach((value) => assert.doesNotMatch(value, /[—–]/));
+  });
+});
+
+test("한국어를 기본으로 네 가지 언어를 빠짐없이 제공한다", () => {
+  assert.match(html, /<html lang="ko">/);
+  assert.deepEqual(SUPPORTED_LANGUAGES, ["ko", "en", "ja", "zh-CN"]);
+  assert.deepEqual(Object.keys(translations), SUPPORTED_LANGUAGES);
+
+  const koreanKeys = Object.keys(translations.ko).sort();
+  SUPPORTED_LANGUAGES.forEach((language) => {
+    assert.deepEqual(Object.keys(translations[language]).sort(), koreanKeys);
+    koreanKeys.forEach((key) => assert.ok(translations[language][key].trim(), `${language}.${key} 번역이 필요합니다.`));
+  });
+
+  const markupKeys = [
+    ...html.matchAll(/data-i18n(?:-(?:aria-label|aria-template|alt|content))?="([^"]+)"/g)
+  ].map(([, key]) => key);
+  markupKeys.forEach((key) => assert.ok(translations.ko[key], `${key} 번역 키가 필요합니다.`));
+
+  assert.match(html, /data-language-option="ko" aria-selected="true">한국어<\/button>/);
+  assert.match(html, /data-language-option="en" aria-selected="false">English<\/button>/);
+  assert.match(html, /data-language-option="ja" aria-selected="false">日本語<\/button>/);
+  assert.match(html, /data-language-option="zh-CN" aria-selected="false">简体中文<\/button>/);
+  assert.match(html, /aria-haspopup="listbox"/);
+  assert.match(html, /role="listbox"/);
+  assert.match(script, /SUPPORTED_LANGUAGES\.includes\(savedLanguage\) \? savedLanguage : "ko"/);
+  assert.match(script, /root\.lang = nextLanguage/);
+  assert.match(script, /localStorage\.setItem\("sentory-site-language", nextLanguage\)/);
+  assert.match(script, /document\.title = translate\("meta\.title", nextLanguage\)/);
+  assert.equal(existsSync(resolve(siteDirectory, "translations.js")), true);
+  assert.equal(translations.ja["hero.title1"], "送ったリンクや画像を、");
+  assert.match(css, /:root\[lang="ja"\] \.hero-copy h1 span,[\s\S]*?overflow-wrap:\s*anywhere;[\s\S]*?white-space:\s*normal;/);
+});
+
+test("앱 지원 언어를 별도 안내하고 언어 선택기를 반응형으로 표시한다", () => {
+  const languageStrip = html.match(/<section class="language-strip"[\s\S]*?<\/section>/)?.[0] || "";
+  assert.match(languageStrip, /앱 지원 언어/);
+  ["한국어", "English", "日本語", "简体中文"].forEach((language) => assert.match(languageStrip, new RegExp(language)));
+  assert.equal((languageStrip.match(/data-language-shortcut=/g) || []).length, 4);
+  assert.match(languageStrip, /data-language-shortcut="ko" aria-pressed="true"/);
+  assert.match(html, /"featureList": "한국어, 영어, 일본어, 중국어 UI"/);
+  assert.match(css, /\.language-trigger\s*\{/);
+  assert.match(css, /\.language-options\s*\{/);
+  assert.match(css, /\.language-options button\[aria-selected="true"\]/);
+  assert.match(css, /\.messenger-logos\s*\{[\s\S]*?max-width:\s*690px/);
+  assert.match(css, /\.language-strip ul\s*\{[\s\S]*?width:\s*min\(100%, 690px\)/);
+  assert.match(css, /\.language-strip button\[aria-pressed="true"\]/);
+  assert.match(css, /\.language-strip\s*\{/);
+  assert.match(css, /@media \(max-width: 767px\)[\s\S]*?\.language-strip/);
+  assert.match(script, /event\.key === "Escape"/);
+  assert.match(script, /ArrowDown/);
+  assert.match(script, /event\.key === "Home"/);
+  assert.match(script, /event\.key === "End"/);
+  assert.match(script, /languageShortcuts\.forEach/);
+  assert.match(script, /button\.dataset\.languageShortcut/);
 });
 
 test("다크 모드, 모션 축소와 모바일 레이아웃을 지원한다", () => {
@@ -69,7 +127,7 @@ test("저장된 선택이 없으면 밝은 테마로 시작한다", () => {
 });
 
 test("기능 섹션은 지원 메신저에서 정리하는 항목을 담백하게 설명한다", () => {
-  assert.match(html, /<h2 id="features-title">필요한 기록만 모아둡니다\.<\/h2>/);
+  assert.match(html, /<h2 id="features-title" data-i18n="features\.title">필요한 기록만 모아둡니다\.<\/h2>/);
   assert.match(html, /Discord, Slack 등 지원 메신저에서 전송한 항목만 자동으로 정리합니다\./);
   assert.doesNotMatch(html, /보관함을 만드는 기준부터 다릅니다/);
 });
@@ -104,7 +162,7 @@ test("동기화 기능 문구를 명확히 하고 중복 개인정보 섹션은 
   assert.doesNotMatch(html, /id="privacy"/);
   assert.doesNotMatch(html, /href="#privacy"/);
   assert.doesNotMatch(css, /\.privacy(?:\b|-)/);
-  assert.match(html, /<summary>데이터는 어디에 저장되나요\?<\/summary>/);
+  assert.match(html, /<summary data-i18n="faq\.storageQuestion">데이터는 어디에 저장되나요\?<\/summary>/);
   assert.match(html, /기본 보관함은 %LOCALAPPDATA%\\Sentory에 저장되며, Sentory는 별도 운영 서버 없이 동작합니다\./);
 });
 
@@ -114,7 +172,14 @@ test("스크롤 이벤트 대신 IntersectionObserver를 사용한다", () => {
 });
 
 test("사용 흐름 영상은 일부가 보인 상태가 잠시 유지되면 재생한다", () => {
-  assert.match(html, /보내고 잊어버려도,<br \/>필요할 때 다시 찾을 수 있게\./);
+  assert.match(html, /data-i18n="story\.title1">보내고 잊어버려도,/);
+  assert.match(html, /data-i18n="story\.title2">필요할 때 다시 찾을 수 있게\./);
+  assert.match(html, /평소처럼 메신저에서 링크나 사진을 보냅니다\./);
+  assert.match(html, /링크와 사진은 카드로 정리되고, 여러 항목은 한 묶음으로 모입니다\./);
+  assert.match(html, /필요한 항목을 찾아 복사하거나 원본을 열어 사용합니다\./);
+  assert.doesNotMatch(html, /평소처럼 지원 메신저를 사용합니다\./);
+  assert.doesNotMatch(html, /링크와 사진이 카드 또는 묶음으로 저장됩니다\./);
+  assert.doesNotMatch(html, /복사하거나 원본을 열어 바로 이어서 사용합니다\./);
 
   const video = html.match(/<video[\s\S]*?<\/video>/)?.[0] || "";
   assert.match(video, /data-scroll-autoplay/);

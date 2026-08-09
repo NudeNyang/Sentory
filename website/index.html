@@ -6,16 +6,18 @@
     <title>Sentory - 메신저에서 보낸 링크와 사진을 모아주는 Windows 앱</title>
     <meta
       name="description"
+      data-i18n-content="meta.description"
       content="Discord, Slack, WhatsApp, Telegram, 카카오톡, LINE, WeChat의 링크와 사진을 로컬에 보관하고 다시 검색하세요."
     />
     <meta name="theme-color" content="#e9e4dc" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#151719" media="(prefers-color-scheme: dark)" />
     <meta property="og:type" content="website" />
-    <meta property="og:locale" content="ko_KR" />
+    <meta property="og:locale" data-i18n-content="meta.ogLocale" content="ko_KR" />
     <meta property="og:site_name" content="Sentory" />
-    <meta property="og:title" content="Sentory - 대화 속 링크와 사진을 다시 찾는 곳" />
+    <meta property="og:title" data-i18n-content="meta.ogTitle" content="Sentory - 대화 속 링크와 사진을 다시 찾는 곳" />
     <meta
       property="og:description"
+      data-i18n-content="meta.ogDescription"
       content="지원 메신저에서 붙여넣거나 보낸 링크와 사진을 모아 검색하고 다시 꺼내 쓰세요."
     />
     <meta property="og:url" content="https://nudenyang.github.io/Sentory/" />
@@ -23,7 +25,7 @@
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Sentory 보관함과 앱 아이콘" />
+    <meta property="og:image:alt" data-i18n-content="meta.ogImageAlt" content="Sentory 보관함과 앱 아이콘" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="canonical" href="https://nudenyang.github.io/Sentory/" />
     <link rel="icon" type="image/png" href="./assets/sentory-icon.png" />
@@ -39,7 +41,7 @@
         }
       })();
     </script>
-    <link rel="stylesheet" href="./styles.css?v=20260809-download-heading" />
+    <link rel="stylesheet" href="./styles.css?v=20260809-i18n" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -52,6 +54,7 @@
         "license": "https://www.gnu.org/licenses/gpl-3.0.html",
         "codeRepository": "https://github.com/NudeNyang/Sentory",
         "downloadUrl": "https://github.com/NudeNyang/Sentory/releases/latest",
+        "featureList": "한국어, 영어, 일본어, 중국어 UI",
         "offers": {
           "@type": "Offer",
           "price": "0",
@@ -59,30 +62,51 @@
         }
       }
     </script>
-    <script src="./script.js?v=20260809-video-viewport-trigger" defer></script>
+    <script type="module" src="./script.js?v=20260809-i18n"></script>
   </head>
   <body>
-    <a class="skip-link" href="#main-content">본문으로 이동</a>
+    <a class="skip-link" href="#main-content" data-i18n="skip.main">본문으로 이동</a>
 
     <header class="site-header">
-      <nav class="nav-shell" aria-label="주요 메뉴">
-        <a class="brand" href="#top" aria-label="Sentory 처음으로">
+      <nav class="nav-shell" aria-label="주요 메뉴" data-i18n-aria-label="nav.aria">
+        <a class="brand" href="#top" aria-label="Sentory 처음으로" data-i18n-aria-label="nav.homeAria">
           <img src="./assets/sentory-icon.png" width="34" height="34" alt="" />
           <span>Sentory</span>
         </a>
 
-        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="nav-links">
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="nav-links" data-i18n="nav.menu">
           메뉴
         </button>
 
         <div class="nav-links" id="nav-links">
-          <a href="#features">기능</a>
+          <a href="#features" data-i18n="nav.features">기능</a>
           <a href="#faq">FAQ</a>
           <a href="https://github.com/NudeNyang/Sentory" target="_blank" rel="noreferrer">GitHub</a>
+          <div class="language-picker" data-language-picker>
+            <button
+              class="language-trigger"
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+              aria-controls="language-options"
+              aria-label="언어"
+              data-i18n-aria-label="nav.language"
+            >
+              <span data-language-current>한국어</span>
+              <span class="language-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="language-options" id="language-options" role="listbox" aria-label="언어" data-i18n-aria-label="nav.language" hidden>
+              <button type="button" role="option" data-language-option="ko" aria-selected="true">한국어</button>
+              <button type="button" role="option" data-language-option="en" aria-selected="false">English</button>
+              <button type="button" role="option" data-language-option="ja" aria-selected="false">日本語</button>
+              <button type="button" role="option" data-language-option="zh-CN" aria-selected="false">简体中文</button>
+            </div>
+          </div>
           <button class="theme-toggle" type="button" aria-label="어두운 테마로 전환">어둡게</button>
           <a
             class="nav-download"
             href="https://github.com/NudeNyang/Sentory/releases/latest"
+            data-i18n="nav.latest"
           >최신 버전</a>
         </div>
       </nav>
@@ -91,23 +115,25 @@
     <main id="main-content">
       <section class="hero" id="top">
         <div class="hero-copy">
-          <h1><span>대화 속 링크와 사진,</span><span>다시 찾을 땐 한곳에서.</span></h1>
-          <p>Discord, Slack, 카카오톡 등에서 붙여넣거나 보낸 링크와 사진을 모아 검색하고 다시 꺼내 쓰세요.</p>
-          <div class="hero-actions" aria-label="Sentory 시작하기">
+          <h1><span data-i18n="hero.title1">대화 속 링크와 사진,</span><span data-i18n="hero.title2">다시 찾을 땐 한곳에서.</span></h1>
+          <p data-i18n="hero.description">Discord, Slack, 카카오톡 등에서 붙여넣거나 보낸 링크와 사진을 모아 검색하고 다시 꺼내 쓰세요.</p>
+          <div class="hero-actions" aria-label="Sentory 시작하기" data-i18n-aria-label="hero.actionsAria">
             <a
               class="button button-primary"
               href="https://github.com/NudeNyang/Sentory/releases/latest"
+              data-i18n="hero.download"
             >GitHub에서 다운로드</a>
           </div>
         </div>
 
-        <div class="hero-visual" aria-label="Sentory 실제 화면">
+        <div class="hero-visual" aria-label="Sentory 실제 화면" data-i18n-aria-label="hero.visualAria">
           <div class="app-window">
             <img
               src="./assets/sentory-gallery.jpg"
               width="1600"
               height="1194"
               alt="링크와 사진 카드가 정리된 Sentory 보관함 실제 화면"
+              data-i18n-alt="hero.imageAlt"
               fetchpriority="high"
             />
           </div>
@@ -115,50 +141,60 @@
       </section>
 
       <section class="messenger-strip" aria-labelledby="messenger-title">
-        <p id="messenger-title">지원 메신저</p>
+        <p id="messenger-title" data-i18n="messengers.title">지원 메신저</p>
         <div class="messenger-logos">
-          <a href="https://discord.com/download" target="_blank" rel="noreferrer" aria-label="Discord 공식 다운로드 페이지 열기 (새 탭)">
+          <a href="https://discord.com/download" target="_blank" rel="noreferrer" aria-label="Discord 공식 다운로드 페이지 열기 (새 탭)" data-i18n-aria-template="messengers.downloadAria" data-i18n-service="Discord">
             <img src="./assets/messengers/discord.svg" width="30" height="30" alt="Discord" />
           </a>
-          <a href="https://slack.com/downloads/windows" target="_blank" rel="noreferrer" aria-label="Slack 공식 다운로드 페이지 열기 (새 탭)">
+          <a href="https://slack.com/downloads/windows" target="_blank" rel="noreferrer" aria-label="Slack 공식 다운로드 페이지 열기 (새 탭)" data-i18n-aria-template="messengers.downloadAria" data-i18n-service="Slack">
             <img src="./assets/messengers/slack.svg" width="30" height="30" alt="Slack" />
           </a>
-          <a href="https://www.whatsapp.com/download/" target="_blank" rel="noreferrer" aria-label="WhatsApp 공식 다운로드 페이지 열기 (새 탭)">
+          <a href="https://www.whatsapp.com/download/" target="_blank" rel="noreferrer" aria-label="WhatsApp 공식 다운로드 페이지 열기 (새 탭)" data-i18n-aria-template="messengers.downloadAria" data-i18n-service="WhatsApp">
             <img src="./assets/messengers/whatsapp.svg" width="30" height="30" alt="WhatsApp" />
           </a>
-          <a href="https://telegram.org/desktop/download" target="_blank" rel="noreferrer" aria-label="Telegram 공식 다운로드 페이지 열기 (새 탭)">
+          <a href="https://telegram.org/desktop/download" target="_blank" rel="noreferrer" aria-label="Telegram 공식 다운로드 페이지 열기 (새 탭)" data-i18n-aria-template="messengers.downloadAria" data-i18n-service="Telegram">
             <img src="./assets/messengers/telegram.svg" width="30" height="30" alt="Telegram" />
           </a>
-          <a href="https://www.kakaocorp.com/page/service/service/KakaoTalk?lang=ko" target="_blank" rel="noreferrer" aria-label="카카오톡 공식 다운로드 페이지 열기 (새 탭)">
+          <a href="https://www.kakaocorp.com/page/service/service/KakaoTalk?lang=ko" target="_blank" rel="noreferrer" aria-label="카카오톡 공식 다운로드 페이지 열기 (새 탭)" data-i18n-aria-template="messengers.downloadAria" data-i18n-service="KakaoTalk">
             <img src="./assets/messengers/kakaotalk.svg" width="30" height="30" alt="카카오톡" />
           </a>
-          <a href="https://www.line.me/ko/" target="_blank" rel="noreferrer" aria-label="LINE 공식 다운로드 페이지 열기 (새 탭)">
+          <a href="https://www.line.me/ko/" target="_blank" rel="noreferrer" aria-label="LINE 공식 다운로드 페이지 열기 (새 탭)" data-i18n-aria-template="messengers.downloadAria" data-i18n-service="LINE">
             <img src="./assets/messengers/line.svg" width="30" height="30" alt="LINE" />
           </a>
-          <a href="https://windows.weixin.qq.com/" target="_blank" rel="noreferrer" aria-label="WeChat 공식 다운로드 페이지 열기 (새 탭)">
+          <a href="https://windows.weixin.qq.com/" target="_blank" rel="noreferrer" aria-label="WeChat 공식 다운로드 페이지 열기 (새 탭)" data-i18n-aria-template="messengers.downloadAria" data-i18n-service="WeChat">
             <img src="./assets/messengers/wechat.svg" width="30" height="30" alt="WeChat" />
           </a>
         </div>
       </section>
 
+      <section class="language-strip" aria-labelledby="language-support-title">
+        <p id="language-support-title" data-i18n="languages.title">앱 지원 언어</p>
+        <ul aria-label="Sentory 앱 지원 언어" data-i18n-aria-label="languages.aria">
+          <li><button type="button" data-language-shortcut="ko" aria-pressed="true">한국어</button></li>
+          <li><button type="button" data-language-shortcut="en" aria-pressed="false">English</button></li>
+          <li><button type="button" data-language-shortcut="ja" aria-pressed="false">日本語</button></li>
+          <li><button type="button" data-language-shortcut="zh-CN" aria-pressed="false">简体中文</button></li>
+        </ul>
+      </section>
+
       <section class="story section-shell reveal" aria-labelledby="story-title">
         <div class="story-heading">
-          <h2 id="story-title">보내고 잊어버려도,<br />필요할 때 다시 찾을 수 있게.</h2>
-          <p>대화방을 거슬러 올라가는 대신 제목, URL, 도메인과 사진 속 글자로 보관함을 검색하세요.</p>
+          <h2 id="story-title"><span data-i18n="story.title1">보내고 잊어버려도,</span><span data-i18n="story.title2">필요할 때 다시 찾을 수 있게.</span></h2>
+          <p data-i18n="story.description">대화방을 거슬러 올라가는 대신 제목, URL, 도메인과 사진 속 글자로 보관함을 검색하세요.</p>
         </div>
 
         <ol class="story-flow">
           <li>
-            <strong>붙여넣고 보내기</strong>
-            <span>평소처럼 지원 메신저를 사용합니다.</span>
+            <strong data-i18n="story.sendTitle">붙여넣고 보내기</strong>
+            <span data-i18n="story.sendBody">평소처럼 메신저에서 링크나 사진을 보냅니다.</span>
           </li>
           <li>
-            <strong>자동으로 모으기</strong>
-            <span>링크와 사진이 카드 또는 묶음으로 저장됩니다.</span>
+            <strong data-i18n="story.collectTitle">자동으로 모으기</strong>
+            <span data-i18n="story.collectBody">링크와 사진은 카드로 정리되고, 여러 항목은 한 묶음으로 모입니다.</span>
           </li>
           <li>
-            <strong>검색하고 다시 쓰기</strong>
-            <span>복사하거나 원본을 열어 바로 이어서 사용합니다.</span>
+            <strong data-i18n="story.reuseTitle">검색하고 다시 쓰기</strong>
+            <span data-i18n="story.reuseBody">필요한 항목을 찾아 복사하거나 원본을 열어 사용합니다.</span>
           </li>
         </ol>
 
@@ -174,24 +210,25 @@
             disablepictureinpicture
             tabindex="0"
             aria-label="Sentory 실제 사용 영상. 클릭하면 재생하거나 일시정지할 수 있습니다."
+            data-i18n-aria-label="story.videoAria"
           >
             <source src="./assets/sentory-demo.mp4" type="video/mp4" />
-            브라우저에서 Sentory 사용 영상을 재생할 수 없습니다.
+            <span data-i18n="story.videoFallback">브라우저에서 Sentory 사용 영상을 재생할 수 없습니다.</span>
           </video>
         </figure>
       </section>
 
       <section class="features section-shell" id="features" aria-labelledby="features-title">
         <div class="section-heading reveal">
-          <h2 id="features-title">필요한 기록만 모아둡니다.</h2>
-          <p>Discord, Slack 등 지원 메신저에서 전송한 항목만 자동으로 정리합니다.</p>
+          <h2 id="features-title" data-i18n="features.title">필요한 기록만 모아둡니다.</h2>
+          <p data-i18n="features.description">Discord, Slack 등 지원 메신저에서 전송한 항목만 자동으로 정리합니다.</p>
         </div>
 
         <div class="feature-grid">
           <article class="feature feature-search reveal">
             <div>
-              <h3>사진 속 글자까지 검색</h3>
-              <p>다국어 OCR이 사진에 자동으로 이름을 붙여 이미지 내용도 검색할 수 있습니다.</p>
+              <h3 data-i18n="features.searchTitle">사진 속 글자까지 검색</h3>
+              <p data-i18n="features.searchBody">다국어 OCR이 사진에 자동으로 이름을 붙여 이미지 내용도 검색할 수 있습니다.</p>
             </div>
             <div class="feature-search-media">
               <figure class="feature-shot feature-shot-search">
@@ -200,6 +237,7 @@
                   width="2308"
                   height="1552"
                   alt="검색어 sol로 사진 속 글자가 포함된 항목을 찾은 Sentory 검색 결과"
+                  data-i18n-alt="features.searchAlt"
                   loading="lazy"
                 />
               </figure>
@@ -209,6 +247,7 @@
                   width="2301"
                   height="1543"
                   alt="Token use 이미지의 OCR 제목과 재사용 정보를 보여주는 Sentory 상세 화면"
+                  data-i18n-alt="features.detailAlt"
                   loading="lazy"
                 />
               </figure>
@@ -218,27 +257,27 @@
           <article class="feature feature-local reveal">
             <div class="local-mark" aria-hidden="true">LOCAL</div>
             <div>
-              <h3>내 컴퓨터에 직접 보관합니다.</h3>
-              <p>Sentory는 별도 운영 서버 없이 동작하며, 보관 데이터는 사용자의 Windows PC에 남습니다.</p>
+              <h3 data-i18n="features.localTitle">내 컴퓨터에 직접 보관합니다.</h3>
+              <p data-i18n="features.localBody">Sentory는 별도 운영 서버 없이 동작하며, 보관 데이터는 사용자의 Windows PC에 남습니다.</p>
             </div>
           </article>
 
           <article class="feature feature-collection reveal">
             <div>
-              <h3>한 번에 보낸 자료는 함께</h3>
-              <p>여러 링크와 사진을 묶음 카드로 보관하고 한꺼번에 다시 복사할 수 있습니다.</p>
+              <h3 data-i18n="features.collectionTitle">한 번에 보낸 자료는 함께</h3>
+              <p data-i18n="features.collectionBody">여러 링크와 사진을 묶음 카드로 보관하고 한꺼번에 다시 복사할 수 있습니다.</p>
             </div>
-            <div class="collection-stats" aria-label="묶음 기능 요약">
-              <strong>링크 + 사진</strong>
-              <span>묶어서 보관</span>
+            <div class="collection-stats" aria-label="묶음 기능 요약" data-i18n-aria-label="features.collectionAria">
+              <strong data-i18n="features.collectionLabel">링크 + 사진</strong>
+              <span data-i18n="features.collectionValue">묶어서 보관</span>
             </div>
           </article>
 
           <article class="feature feature-sync reveal">
             <img src="./assets/sentory-icon.png" width="128" height="128" alt="" loading="lazy" />
             <div>
-              <h3>클라우드 · NAS를 통해 다른 컴퓨터와 동기화도 가능</h3>
-              <p>OneDrive, Google Drive, Dropbox, MEGA, 로컬 폴더와 NAS WebDAV를 사용할 수 있습니다.</p>
+              <h3 data-i18n="features.syncTitle">클라우드 · NAS를 통해 다른 컴퓨터와 동기화도 가능</h3>
+              <p data-i18n="features.syncBody">OneDrive, Google Drive, Dropbox, MEGA, 로컬 폴더와 NAS WebDAV를 사용할 수 있습니다.</p>
             </div>
           </article>
         </div>
@@ -246,79 +285,80 @@
 
       <section class="download section-shell reveal" id="download" aria-labelledby="download-title">
         <div class="download-lead">
-          <img src="./assets/sentory-icon.png" width="132" height="132" alt="Sentory 앱 아이콘" loading="lazy" />
-          <h2 id="download-title">Sentory는 무료 오픈소스 프로그램입니다.</h2>
-          <p>Windows 10·11의 x64와 ARM64 PC를 지원합니다. 설치 파일과 포터블 버전은 GitHub Releases에서 받을 수 있습니다.</p>
+          <img src="./assets/sentory-icon.png" width="132" height="132" alt="Sentory 앱 아이콘" data-i18n-alt="download.appAlt" loading="lazy" />
+          <h2 id="download-title" data-i18n="download.title">Sentory는 무료 오픈소스 프로그램입니다.</h2>
+          <p data-i18n="download.description">Windows 10·11의 x64와 ARM64 PC를 지원합니다. 설치 파일과 포터블 버전은 GitHub Releases에서 받을 수 있습니다.</p>
           <a
             class="button button-primary download-main"
             href="https://github.com/NudeNyang/Sentory/releases/latest"
+            data-i18n="download.cta"
           >GitHub 최신 릴리즈</a>
         </div>
 
         <div class="download-options">
           <a href="https://github.com/NudeNyang/Sentory/releases/latest">
             <span>
-              <strong>포터블 ZIP</strong>
-              <small>최신 릴리즈에서 파일 선택</small>
+              <strong data-i18n="download.portableTitle">포터블 ZIP</strong>
+              <small data-i18n="download.portableBody">최신 릴리즈에서 파일 선택</small>
             </span>
             <span aria-hidden="true">↗</span>
           </a>
           <a href="https://github.com/NudeNyang/Sentory/releases/latest">
             <span>
-              <strong>Windows on ARM</strong>
-              <small>ARM64 설치형과 포터블</small>
+              <strong data-i18n="download.armTitle">Windows on ARM</strong>
+              <small data-i18n="download.armBody">ARM64 설치형과 포터블</small>
             </span>
             <span aria-hidden="true">↗</span>
           </a>
           <a href="https://apps.microsoft.com/detail/9N6S69D3667D" target="_blank" rel="noreferrer">
             <span>
-              <strong>Microsoft Store 후원판</strong>
-              <small>설치와 업데이트를 Store에서 관리</small>
+              <strong data-i18n="download.storeTitle">Microsoft Store 후원판</strong>
+              <small data-i18n="download.storeBody">설치와 업데이트를 Store에서 관리</small>
             </span>
             <span aria-hidden="true">↗</span>
           </a>
           <a href="https://github.com/NudeNyang/Sentory/releases" target="_blank" rel="noreferrer">
             <span>
-              <strong>릴리즈와 SHA-256</strong>
-              <small>배포 파일과 확인값 보기</small>
+              <strong data-i18n="download.checksumTitle">릴리즈와 SHA-256</strong>
+              <small data-i18n="download.checksumBody">배포 파일과 확인값 보기</small>
             </span>
             <span aria-hidden="true">↗</span>
           </a>
-          <p class="download-notice">현재 GitHub 배포 파일에는 코드 서명이 없어 SmartScreen 경고가 표시될 수 있습니다. 공식 Release와 SHA-256 확인값을 함께 제공합니다.</p>
-          <aside class="github-star" aria-label="Sentory 오픈소스 개발 응원">
+          <p class="download-notice" data-i18n="download.notice">현재 GitHub 배포 파일에는 코드 서명이 없어 SmartScreen 경고가 표시될 수 있습니다. 공식 Release와 SHA-256 확인값을 함께 제공합니다.</p>
+          <aside class="github-star" aria-label="Sentory 오픈소스 개발 응원" data-i18n-aria-label="download.starAria">
             <div>
-              <strong>오픈소스 개발 응원하기</strong>
-              <p>Sentory가 유용했다면 GitHub Star로 알려주세요.</p>
+              <strong data-i18n="download.starTitle">오픈소스 개발 응원하기</strong>
+              <p data-i18n="download.starBody">Sentory가 유용했다면 GitHub Star로 알려주세요.</p>
             </div>
-            <a class="button button-secondary" href="https://github.com/NudeNyang/Sentory" target="_blank" rel="noreferrer">GitHub에서 Star</a>
+            <a class="button button-secondary" href="https://github.com/NudeNyang/Sentory" target="_blank" rel="noreferrer" data-i18n="download.starButton">GitHub에서 Star</a>
           </aside>
         </div>
       </section>
 
       <section class="faq section-shell" id="faq" aria-labelledby="faq-title">
         <div class="section-heading reveal">
-          <h2 id="faq-title">자주 묻는 질문</h2>
+          <h2 id="faq-title" data-i18n="faq.title">자주 묻는 질문</h2>
         </div>
         <div class="faq-list reveal">
           <details>
-            <summary>모든 클립보드 내용을 저장하나요?</summary>
-            <p>아닙니다. 지원 메신저의 채팅 입력 영역을 확인한 뒤 정해진 조건에 맞는 링크와 사진만 저장합니다.</p>
+            <summary data-i18n="faq.clipboardQuestion">모든 클립보드 내용을 저장하나요?</summary>
+            <p data-i18n="faq.clipboardAnswer">아닙니다. 지원 메신저의 채팅 입력 영역을 확인한 뒤 정해진 조건에 맞는 링크와 사진만 저장합니다.</p>
           </details>
           <details>
-            <summary>메시지를 보내지 않아도 저장되나요?</summary>
-            <p>Discord, Slack, WhatsApp, Telegram, LINE, WeChat은 실제 전송 뒤 저장합니다. 카카오톡은 채팅창에 붙여넣거나 탐색기에서 드롭한 시점에 저장합니다.</p>
+            <summary data-i18n="faq.sendQuestion">메시지를 보내지 않아도 저장되나요?</summary>
+            <p data-i18n="faq.sendAnswer">Discord, Slack, WhatsApp, Telegram, LINE, WeChat은 실제 전송 뒤 저장합니다. 카카오톡은 채팅창에 붙여넣거나 탐색기에서 드롭한 시점에 저장합니다.</p>
           </details>
           <details>
-            <summary>데이터는 어디에 저장되나요?</summary>
-            <p>기본 보관함은 %LOCALAPPDATA%\Sentory에 저장되며, Sentory는 별도 운영 서버 없이 동작합니다.</p>
+            <summary data-i18n="faq.storageQuestion">데이터는 어디에 저장되나요?</summary>
+            <p data-i18n="faq.storageAnswer">기본 보관함은 %LOCALAPPDATA%\Sentory에 저장되며, Sentory는 별도 운영 서버 없이 동작합니다.</p>
           </details>
           <details>
-            <summary>컴퓨터끼리 동기화할 수 있나요?</summary>
-            <p>직접 고른 클라우드 폴더나 NAS WebDAV를 연결하면 Windows 컴퓨터 사이에서 사진, 링크와 사용 상태를 맞출 수 있습니다.</p>
+            <summary data-i18n="faq.syncQuestion">컴퓨터끼리 동기화할 수 있나요?</summary>
+            <p data-i18n="faq.syncAnswer">직접 고른 클라우드 폴더나 NAS WebDAV를 연결하면 Windows 컴퓨터 사이에서 사진, 링크와 사용 상태를 맞출 수 있습니다.</p>
           </details>
           <details>
-            <summary>macOS와 Linux에서도 사용할 수 있나요?</summary>
-            <p>현재 정식 배포는 Windows 10과 11의 x64, ARM64만 지원합니다. macOS와 Linux 배포 일정은 아직 정해지지 않았습니다.</p>
+            <summary data-i18n="faq.platformQuestion">macOS와 Linux에서도 사용할 수 있나요?</summary>
+            <p data-i18n="faq.platformAnswer">현재 정식 배포는 Windows 10과 11의 x64, ARM64만 지원합니다. macOS와 Linux 배포 일정은 아직 정해지지 않았습니다.</p>
           </details>
         </div>
       </section>
@@ -330,11 +370,11 @@
           <img src="./assets/sentory-icon.png" width="30" height="30" alt="" loading="lazy" />
           <span>Sentory</span>
         </a>
-        <p>이야기 속, 흩어진 순간들을 한 곳에</p>
+        <p data-i18n="footer.tagline">이야기 속, 흩어진 순간들을 한 곳에</p>
       </div>
-      <nav aria-label="하단 메뉴">
-        <a href="https://github.com/NudeNyang/Sentory" target="_blank" rel="noreferrer">소스 코드</a>
-        <a href="https://github.com/NudeNyang/Sentory/blob/main/docs/support.md" target="_blank" rel="noreferrer">지원</a>
+      <nav aria-label="하단 메뉴" data-i18n-aria-label="footer.aria">
+        <a href="https://github.com/NudeNyang/Sentory" target="_blank" rel="noreferrer" data-i18n="footer.source">소스 코드</a>
+        <a href="https://github.com/NudeNyang/Sentory/blob/main/docs/support.md" target="_blank" rel="noreferrer" data-i18n="footer.support">지원</a>
         <a href="https://github.com/NudeNyang/Sentory/blob/main/LICENSE.txt" target="_blank" rel="noreferrer">GPLv3</a>
       </nav>
       <p>Copyright © 2026 NudeNyang</p>
