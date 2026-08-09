@@ -161,6 +161,9 @@ test("수동 GitHub Pages 배포 전에 랜딩페이지 테스트를 실행한�
 test("다운로드 CTA는 직접 파일 대신 최신 GitHub 릴리즈로 안내한다", () => {
   assert.doesNotMatch(html, /releases\/latest\/download/);
   assert.ok((html.match(/https:\/\/github\.com\/NudeNyang\/Sentory\/releases\/latest/g) || []).length >= 5);
+  assert.match(html, /Sentory는 무료 오픈소스 프로그램입니다\./);
+  assert.match(html, /설치 파일과 포터블 버전은 GitHub Releases에서 받을 수 있습니다\./);
+  assert.doesNotMatch(html, /바로 써볼 수 있습니다|GitHub판은 무료로 제공합니다/);
   assert.match(html, />GitHub에서 다운로드<\/a>/);
   assert.match(html, />GitHub에서 Star<\/a>/);
 });
