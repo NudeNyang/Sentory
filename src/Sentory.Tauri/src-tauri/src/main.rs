@@ -1316,6 +1316,27 @@ fn show_main_window(app: &AppHandle) {
     }
 }
 
+#[cfg(windows)]
+fn show_main_window_minimized(window: &tauri::WebviewWindow) -> tauri::Result<()> {
+    use std::ffi::c_void;
+    #[link(name = "user32")]
+    extern "system" {
+        fn ShowWindow(hwnd: *mut c_void, command: i32) -> i32;
+    }
+    const SW_SHOWMINNOACTIVE: i32 = 7;
+    let hwnd = window.hwnd()?;
+    unsafe {
+        ShowWindow(hwnd.0 as *mut c_void, SW_SHOWMINNOACTIVE);
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn show_main_window_minimized(window: &tauri::WebviewWindow) -> tauri::Result<()> {
+    window.show()?;
+    window.minimize()
+}
+
 fn emit_tray_state(app: &AppHandle) {
     let Some(tray) = app.try_state::<TrayMenuState>() else {
         return;
@@ -1846,6 +1867,7 @@ fn main() {
             create_tray(app)?;
             if let Some(window) = app.get_webview_window("main") {
                 let _ = apply_window_title_bar(&window, false);
+                show_main_window_minimized(&window)?;
             }
             let handle = app.handle().clone();
             let client = setup_engine.clone();
