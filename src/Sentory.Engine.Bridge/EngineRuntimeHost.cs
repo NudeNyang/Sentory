@@ -156,6 +156,15 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         return CreateSettingsDto(settings);
     }
 
+    public EngineStartupPreferenceDto GetStartupPreference()
+    {
+        var settingsFileExisted = File.Exists(_paths.SettingsPath);
+        var settings = _settingsStore.Load();
+        return new EngineStartupPreferenceDto(
+            settingsFileExisted,
+            settings.StartWithWindows);
+    }
+
     public IReadOnlyList<EngineSyncFolderCandidateDto>
         DiscoverSyncFolders() =>
         WindowsCloudSyncFolderDiscovery.Discover()
@@ -1740,6 +1749,10 @@ public sealed record EngineSettingsDto(
     IReadOnlyDictionary<string, bool> Sources,
     IReadOnlyDictionary<string, bool> AvailableSources,
     EngineSyncSettingsDto Sync);
+
+public sealed record EngineStartupPreferenceDto(
+    bool SettingsFileExisted,
+    bool? SavedPreference);
 
 public sealed record EngineSyncSettingsDto(
     bool Enabled,

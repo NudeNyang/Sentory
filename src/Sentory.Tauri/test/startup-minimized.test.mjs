@@ -32,3 +32,34 @@ test("a second launch and tray actions still restore the main window", () => {
   );
   assert.match(rust, /"open" => show_main_window\(&app\)/);
 });
+
+test("Windows login startup repairs an outdated registration before the next restart", () => {
+  assert.match(rust, /const WINDOWS_STARTUP_ARGUMENT: &str = "--windows-startup"/);
+  assert.match(
+    rust,
+    /fn startup_command[\s\S]*?WINDOWS_STARTUP_ARGUMENT/,
+  );
+  assert.match(
+    rust,
+    /synchronize_registry_startup_preference[\s\S]*?"startup-preference-get"[\s\S]*?set_registry_startup_enabled\(enabled, false\)/,
+  );
+  assert.match(
+    rust,
+    /STARTUP_APPROVED_REGISTRY_PATH[\s\S]*?startup_approval_allows/,
+  );
+  assert.match(
+    rust,
+    /repair_registry_startup_before_tauri\(\);[\s\S]*?wait_for_windows_shell\(&arguments\);[\s\S]*?tauri::Builder::default\(\)/,
+  );
+});
+
+test("Windows login waits briefly for Explorer before creating the tray", () => {
+  assert.match(
+    rust,
+    /fn wait_for_windows_shell[\s\S]*?Shell_TrayWnd[\s\S]*?Duration::from_millis\(500\)/,
+  );
+  assert.match(
+    rust,
+    /wait_for_windows_shell\(&arguments\);[\s\S]*?tauri::Builder::default\(\)/,
+  );
+});

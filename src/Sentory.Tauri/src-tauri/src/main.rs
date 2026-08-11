@@ -26,8 +26,11 @@ const DISTRIBUTION_CHANNEL: &str = if cfg!(feature = "microsoft-store") {
     "github"
 };
 const STARTUP_REGISTRY_PATH: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
+const STARTUP_APPROVED_REGISTRY_PATH: &str =
+    r"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
 const STARTUP_VALUE_NAME: &str = "Sentory";
 const STARTUP_TASK_ID: &str = "SentoryStartupTask";
+const WINDOWS_STARTUP_ARGUMENT: &str = "--windows-startup";
 const TRAY_MENU_WIDTH: f64 = 286.0;
 const TRAY_MENU_BASE_HEIGHT: f64 = 362.0;
 const TRAY_MENU_OPTIONAL_ROW_HEIGHT: f64 = 42.0;
@@ -37,6 +40,106 @@ const VERIFY_INSTALLATION_ARGUMENT: &str = "--verify-installation";
 const VERIFY_MICROSOFT_STORE_CHANNEL_ARGUMENT: &str = "--verify-microsoft-store-channel";
 const RESTORE_DISCORD_STARTUP_ARGUMENT: &str = "--restore-discord-startup";
 const REQUEST_SHUTDOWN_ARGUMENT: &str = "--request-shutdown";
+
+fn resolve_startup_preference(
+    settings_file_existed: bool,
+    saved_preference: Option<bool>,
+    registration_enabled: bool,
+) -> bool {
+    saved_preference.unwrap_or(if settings_file_existed {
+        registration_enabled
+    } else {
+        true
+    })
+}
+
+fn is_windows_startup_launch(arguments: &[String]) -> bool {
+    arguments
+        .iter()
+        .any(|argument| argument.eq_ignore_ascii_case(WINDOWS_STARTUP_ARGUMENT))
+}
+
+fn startup_approval_allows(value: Option<&[u8]>) -> bool {
+    !value.is_some_and(|bytes| bytes.first() == Some(&0x03))
+}
+
+fn startup_preference_from_settings_json(contents: &str) -> Result<Option<bool>, String> {
+    let settings: serde_json::Value = serde_json::from_str(contents)
+        .map_err(|error| format!("자동 실행 설정 파일을 읽지 못했습니다: {error}"))?;
+    Ok(settings
+        .get("StartWithWindows")
+        .or_else(|| settings.get("startWithWindows"))
+        .and_then(serde_json::Value::as_bool))
+}
+
+#[cfg(windows)]
+fn repair_registry_startup_before_tauri() {
+    if is_microsoft_store() {
+        return;
+    }
+    if let Err(error) = repair_registry_startup_before_tauri_inner() {
+        append_diagnostic("startup-registration-repair-failed", &error);
+    }
+}
+
+#[cfg(windows)]
+fn repair_registry_startup_before_tauri_inner() -> Result<(), String> {
+    let local_app_data = std::env::var_os("LOCALAPPDATA")
+        .ok_or_else(|| "Windows 로컬 데이터 폴더를 찾지 못했습니다.".to_string())?;
+    let settings_path = PathBuf::from(local_app_data)
+        .join("Sentory")
+        .join("gallery-settings.json");
+    let settings_file_existed = settings_path.exists();
+    let saved_preference = if settings_file_existed {
+        let contents = std::fs::read_to_string(&settings_path)
+            .map_err(|error| format!("자동 실행 설정 파일을 열지 못했습니다: {error}"))?;
+        startup_preference_from_settings_json(&contents)?
+    } else {
+        None
+    };
+    let approval_blocked = !read_registry_startup_approval()?;
+    let registration_enabled = read_registry_startup_registered()? && !approval_blocked;
+    let enabled = if approval_blocked {
+        false
+    } else {
+        resolve_startup_preference(
+            settings_file_existed,
+            saved_preference,
+            registration_enabled,
+        )
+    };
+    set_registry_startup_enabled(enabled, false)
+}
+
+#[cfg(not(windows))]
+fn repair_registry_startup_before_tauri() {}
+
+#[cfg(windows)]
+fn wait_for_windows_shell(arguments: &[String]) {
+    if !is_windows_startup_launch(arguments) {
+        return;
+    }
+
+    #[link(name = "user32")]
+    extern "system" {
+        fn FindWindowW(class_name: *const u16, window_name: *const u16) -> *mut std::ffi::c_void;
+    }
+
+    let class_name = "Shell_TrayWnd"
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect::<Vec<_>>();
+    for _ in 0..60 {
+        if !unsafe { FindWindowW(class_name.as_ptr(), std::ptr::null()) }.is_null() {
+            std::thread::sleep(Duration::from_millis(500));
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(250));
+    }
+}
+
+#[cfg(not(windows))]
+fn wait_for_windows_shell(_arguments: &[String]) {}
 
 fn engine_executable_path() -> Result<PathBuf, String> {
     let executable = std::env::current_exe()
@@ -730,8 +833,19 @@ async fn update_install(
 }
 
 #[tauri::command]
-async fn startup_get() -> Result<bool, String> {
-    read_startup_enabled().await
+async fn startup_get(app: AppHandle, engine: State<'_, EngineClient>) -> Result<bool, String> {
+    if is_microsoft_store() {
+        return read_store_startup_enabled().await;
+    }
+    #[cfg(windows)]
+    {
+        synchronize_registry_startup_preference(&app, &engine).await
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, engine);
+        read_registry_startup_enabled()
+    }
 }
 
 #[tauri::command]
@@ -1718,7 +1832,81 @@ async fn write_startup_enabled(enabled: bool) -> Result<(), String> {
 }
 
 #[cfg(windows)]
+async fn synchronize_registry_startup_preference(
+    app: &AppHandle,
+    engine: &EngineClient,
+) -> Result<bool, String> {
+    let preference = engine
+        .request(app, "startup-preference-get", serde_json::Value::Null)
+        .await?;
+    let settings_file_existed = preference
+        .get("settingsFileExisted")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(true);
+    let saved_preference = preference
+        .get("savedPreference")
+        .and_then(serde_json::Value::as_bool);
+    let approval_blocked = !read_registry_startup_approval()?;
+    let registration_enabled = read_registry_startup_registered()? && !approval_blocked;
+    let enabled = if approval_blocked {
+        false
+    } else {
+        resolve_startup_preference(
+            settings_file_existed,
+            saved_preference,
+            registration_enabled,
+        )
+    };
+
+    set_registry_startup_enabled(enabled, false)?;
+    if saved_preference != Some(enabled) {
+        engine
+            .request(
+                app,
+                "settings-update",
+                serde_json::json!({ "startWithWindows": enabled }),
+            )
+            .await?;
+    }
+    Ok(enabled)
+}
+
+fn startup_command(executable: &Path) -> String {
+    format!("\"{}\" {}", executable.display(), WINDOWS_STARTUP_ARGUMENT)
+}
+
+fn startup_command_matches_current(value: &str, executable: &Path) -> bool {
+    value
+        .trim()
+        .eq_ignore_ascii_case(&startup_command(executable))
+        || value
+            .trim()
+            .eq_ignore_ascii_case(&format!("\"{}\"", executable.display()))
+}
+
+#[cfg(windows)]
 fn read_registry_startup_enabled() -> Result<bool, String> {
+    use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
+    use winreg::RegKey;
+    let current_user = RegKey::predef(HKEY_CURRENT_USER);
+    let Ok(key) = current_user.open_subkey_with_flags(STARTUP_REGISTRY_PATH, KEY_READ) else {
+        return Ok(false);
+    };
+    let Ok(value) = key.get_value::<String, _>(STARTUP_VALUE_NAME) else {
+        return Ok(false);
+    };
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("실행 파일 경로를 확인하지 못했습니다: {error}"))?;
+    Ok(startup_command_matches_current(&value, &executable) && read_registry_startup_approval()?)
+}
+
+#[cfg(not(windows))]
+fn read_registry_startup_enabled() -> Result<bool, String> {
+    Ok(false)
+}
+
+#[cfg(windows)]
+fn read_registry_startup_registered() -> Result<bool, String> {
     use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
     use winreg::RegKey;
     let current_user = RegKey::predef(HKEY_CURRENT_USER);
@@ -1731,12 +1919,37 @@ fn read_registry_startup_enabled() -> Result<bool, String> {
 }
 
 #[cfg(not(windows))]
-fn read_registry_startup_enabled() -> Result<bool, String> {
+fn read_registry_startup_registered() -> Result<bool, String> {
     Ok(false)
 }
 
 #[cfg(windows)]
+fn read_registry_startup_approval() -> Result<bool, String> {
+    use winreg::enums::{HKEY_CURRENT_USER, KEY_READ};
+    use winreg::RegKey;
+    let current_user = RegKey::predef(HKEY_CURRENT_USER);
+    let Ok(key) = current_user.open_subkey_with_flags(STARTUP_APPROVED_REGISTRY_PATH, KEY_READ)
+    else {
+        return Ok(true);
+    };
+    let value = key.get_raw_value(STARTUP_VALUE_NAME).ok();
+    Ok(startup_approval_allows(
+        value.as_ref().map(|item| item.bytes.as_slice()),
+    ))
+}
+
+#[cfg(not(windows))]
+fn read_registry_startup_approval() -> Result<bool, String> {
+    Ok(true)
+}
+
+#[cfg(windows)]
 fn write_registry_startup_enabled(enabled: bool) -> Result<(), String> {
+    set_registry_startup_enabled(enabled, true)
+}
+
+#[cfg(windows)]
+fn set_registry_startup_enabled(enabled: bool, reset_startup_approval: bool) -> Result<(), String> {
     use winreg::enums::HKEY_CURRENT_USER;
     use winreg::RegKey;
     let current_user = RegKey::predef(HKEY_CURRENT_USER);
@@ -1746,20 +1959,53 @@ fn write_registry_startup_enabled(enabled: bool) -> Result<(), String> {
     if enabled {
         let executable = std::env::current_exe()
             .map_err(|error| format!("실행 파일 경로를 확인하지 못했습니다: {error}"))?;
-        key.set_value(STARTUP_VALUE_NAME, &format!("\"{}\"", executable.display()))
-            .map_err(|error| format!("자동 실행 설정을 변경하지 못했습니다: {error}"))
+        key.set_value(STARTUP_VALUE_NAME, &startup_command(&executable))
+            .map_err(|error| format!("자동 실행 설정을 변경하지 못했습니다: {error}"))?;
     } else {
         match key.delete_value(STARTUP_VALUE_NAME) {
-            Ok(()) => Ok(()),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(error) => Err(format!("자동 실행 설정을 변경하지 못했습니다: {error}")),
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(format!("자동 실행 설정을 변경하지 못했습니다: {error}"));
+            }
         }
     }
+
+    if reset_startup_approval {
+        clear_registry_startup_approval()?;
+    }
+    Ok(())
 }
 
 #[cfg(not(windows))]
 fn write_registry_startup_enabled(_enabled: bool) -> Result<(), String> {
     Err("이 운영체제에서는 Windows 자동 실행을 사용할 수 없습니다.".to_string())
+}
+
+#[cfg(not(windows))]
+fn set_registry_startup_enabled(
+    _enabled: bool,
+    _reset_startup_approval: bool,
+) -> Result<(), String> {
+    Err("이 운영체제에서는 Windows 자동 실행을 사용할 수 없습니다.".to_string())
+}
+
+#[cfg(windows)]
+fn clear_registry_startup_approval() -> Result<(), String> {
+    use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
+    use winreg::RegKey;
+    let current_user = RegKey::predef(HKEY_CURRENT_USER);
+    let Ok(key) = current_user.open_subkey_with_flags(STARTUP_APPROVED_REGISTRY_PATH, KEY_WRITE)
+    else {
+        return Ok(());
+    };
+    match key.delete_value(STARTUP_VALUE_NAME) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!(
+            "자동 실행 허용 상태를 변경하지 못했습니다: {error}"
+        )),
+    }
 }
 
 #[cfg(windows)]
@@ -1841,6 +2087,9 @@ fn main() {
         std::process::exit(run_engine_utility("restore-discord-startup"));
     }
 
+    repair_registry_startup_before_tauri();
+    wait_for_windows_shell(&arguments);
+
     let engine = EngineClient::default();
     let setup_engine = engine.clone();
     let shutdown_engine = engine.clone();
@@ -1877,6 +2126,15 @@ fn main() {
                     .await
                 {
                     append_diagnostic("engine-prewarm-failed", &error);
+                }
+
+                #[cfg(windows)]
+                if !is_microsoft_store() {
+                    if let Err(error) =
+                        synchronize_registry_startup_preference(&handle, &client).await
+                    {
+                        append_diagnostic("startup-registration-failed", &error);
+                    }
                 }
 
                 let mut last_revision = client
@@ -1999,7 +2257,8 @@ fn main() {
 mod tray_menu_tests {
     use super::{
         clamp_tray_menu_position, durable_data_root_from_store_local_folder,
-        tray_action_closes_menu,
+        is_windows_startup_launch, resolve_startup_preference, startup_approval_allows,
+        startup_preference_from_settings_json, tray_action_closes_menu,
     };
     use std::path::{Path, PathBuf};
 
@@ -2038,5 +2297,50 @@ mod tray_menu_tests {
         for action in ["pause", "startup", "discord", "repair"] {
             assert!(!tray_action_closes_menu(action));
         }
+    }
+
+    #[test]
+    fn saved_startup_preference_repairs_the_registration_after_an_update() {
+        assert!(resolve_startup_preference(true, Some(true), false));
+        assert!(!resolve_startup_preference(true, Some(false), true));
+        assert!(resolve_startup_preference(false, None, false));
+        assert!(!resolve_startup_preference(true, None, false));
+        assert!(resolve_startup_preference(true, None, true));
+    }
+
+    #[test]
+    fn windows_startup_launch_is_distinguished_from_a_regular_launch() {
+        assert!(is_windows_startup_launch(&[
+            "Sentory.exe".to_string(),
+            "--windows-startup".to_string(),
+        ]));
+        assert!(is_windows_startup_launch(&[
+            "Sentory.exe".to_string(),
+            "--WINDOWS-STARTUP".to_string(),
+        ]));
+        assert!(!is_windows_startup_launch(&["Sentory.exe".to_string()]));
+    }
+
+    #[test]
+    fn windows_startup_approval_blocks_only_an_explicit_disabled_state() {
+        assert!(startup_approval_allows(None));
+        assert!(startup_approval_allows(Some(&[0x02, 0x00, 0x00, 0x00])));
+        assert!(!startup_approval_allows(Some(&[0x03, 0x00, 0x00, 0x00])));
+    }
+
+    #[test]
+    fn saved_startup_preference_is_read_before_the_engine_starts() {
+        assert_eq!(
+            startup_preference_from_settings_json(r#"{"StartWithWindows":true}"#).unwrap(),
+            Some(true)
+        );
+        assert_eq!(
+            startup_preference_from_settings_json(r#"{"startWithWindows":false}"#).unwrap(),
+            Some(false)
+        );
+        assert_eq!(
+            startup_preference_from_settings_json(r#"{"ThemeMode":"Light"}"#).unwrap(),
+            None
+        );
     }
 }

@@ -102,6 +102,8 @@ public sealed class BridgeServer(
                 ReadString(request.Payload, "항목 ID"),
                 cancellationToken),
             "settings-get" => RequireRuntime().GetSettings(),
+            "startup-preference-get" =>
+                RequireRuntime().GetStartupPreference(),
             "settings-update" => await RequireRuntime().UpdateSettingsAsync(
                 request.Payload.Deserialize<EngineSettingsPatchDto>(JsonOptions) ??
                 throw new ArgumentException("설정 변경 요청을 읽지 못했습니다.")),

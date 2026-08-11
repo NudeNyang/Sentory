@@ -116,6 +116,28 @@ public sealed class EngineRuntimeHostTests : IDisposable
     }
 
     [Fact]
+    public async Task StartupPreferencePreservesWhetherAChoiceWasSaved()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var repository = new SqliteCaptureRepository(paths);
+        await repository.InitializeAsync();
+        await using var host = new EngineRuntimeHost(repository, paths);
+
+        var fresh = host.GetStartupPreference();
+        Assert.False(fresh.SettingsFileExisted);
+        Assert.Null(fresh.SavedPreference);
+
+        new SentorySettingsStore(paths).Save(new SentorySettings
+        {
+            StartWithWindows = true
+        });
+        var saved = host.GetStartupPreference();
+
+        Assert.True(saved.SettingsFileExisted);
+        Assert.True(saved.SavedPreference);
+    }
+
+    [Fact]
     public void WebDavCredentialIsEncryptedForTheCurrentWindowsUser()
     {
         var encrypted = WebDavCredentialProtector.Protect("nas-password");
