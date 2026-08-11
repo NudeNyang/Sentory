@@ -70,7 +70,7 @@ same storage.
 
 ## Download
 
-The current stable version is **2.0.6**. It runs on x64 and ARM64 Windows 10 and 11.
+The current stable version is **2.0.7**. It runs on x64 and ARM64 Windows 10 and 11.
 Download the installer or portable package from
 [Releases](https://github.com/NudeNyang/Sentory/releases). There is no release schedule
 yet for macOS or Linux.
@@ -80,7 +80,7 @@ The GitHub edition will remain free. A paid
 available for anyone who prefers Store-managed installation and updates or wants to
 support development.
 
-See the [Sentory 2.0.6 release notes](./releases/2.0.6.md) for details.
+See the [Sentory 2.0.7 release notes](./releases/2.0.7.md) for details.
 
 | System | Installer | Portable |
 | --- | --- | --- |
@@ -163,8 +163,8 @@ git clone https://github.com/NudeNyang/Sentory.git
 cd Sentory
 dotnet build .\Sentory.sln --configuration Release
 dotnet test .\Sentory.sln --configuration Release
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.6 -Architecture x64
-.\scripts\Publish-TauriRelease.ps1 -Version 2.0.6 -Architecture arm64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.7 -Architecture x64
+.\scripts\Publish-TauriRelease.ps1 -Version 2.0.7 -Architecture arm64
 ```
 
 The release script creates the installer and portable package for the selected Windows
