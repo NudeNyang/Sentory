@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text;
 using Microsoft.Win32;
 
 namespace Sentory.Platform.Windows.Runtime;
@@ -28,6 +29,9 @@ internal interface IDiscordStartupRegistry
 public sealed class DiscordStartupRegistrationManager
 {
     public const string RestoreArgument = "--restore-discord-startup";
+    internal const int DependencyWaitSeconds = 30;
+    private const string TranslatorRunValueName =
+        "NudeNyang Translator";
 
     private readonly IDiscordStartupRegistry _registry;
     private readonly Func<bool> _launcherExists;
@@ -56,9 +60,65 @@ public sealed class DiscordStartupRegistrationManager
 
     internal string LauncherPath { get; }
 
-    internal string ManagedCommand =>
-        $"\"{LauncherPath}\" --processStart Discord.exe " +
-        "--process-start-args \"--force-renderer-accessibility\"";
+    internal string ManagedCommand
+    {
+        get
+        {
+            var powershellPath = Path.Combine(
+                Environment.SystemDirectory,
+                "WindowsPowerShell",
+                "v1.0",
+                "powershell.exe");
+            var script = CreateManagedScript();
+            var encoded = Convert.ToBase64String(
+                Encoding.Unicode.GetBytes(script));
+            return $"\"{powershellPath}\" -NoLogo -NoProfile " +
+                   "-NonInteractive -WindowStyle Hidden " +
+                   $"-EncodedCommand {encoded}";
+        }
+    }
+
+    internal string CreateManagedScript()
+    {
+        var launcher = LauncherPath.Replace("'", "''");
+        return
+            "$runKey = 'HKCU:\\Software\\Microsoft\\Windows\\" +
+            "CurrentVersion\\Run'; " +
+            "$backupKey = 'HKCU:\\Software\\Sentory\\" +
+            "DiscordStartupBackup'; " +
+            "$translatorExpected = $null -ne (Get-ItemProperty " +
+            $"-Path $runKey -Name '{TranslatorRunValueName}' " +
+            "-ErrorAction SilentlyContinue); " +
+            "$deadline = [DateTime]::UtcNow.AddSeconds(" +
+            $"{DependencyWaitSeconds}); " +
+            "do { " +
+            "$sentoryReady = $null -ne (Get-Process -Name 'Sentory' " +
+            "-ErrorAction SilentlyContinue); " +
+            "$translatorReady = -not $translatorExpected -or " +
+            "$null -ne (Get-Process -Name 'NudeNyang Translator' " +
+            "-ErrorAction SilentlyContinue); " +
+            "if ($sentoryReady -and $translatorReady) { break }; " +
+            "Start-Sleep -Milliseconds 250 " +
+            "} while ([DateTime]::UtcNow -lt $deadline); " +
+            "if (-not $sentoryReady) { " +
+            "$backup = Get-ItemProperty -Path $backupKey " +
+            "-ErrorAction SilentlyContinue; " +
+            "if ($null -ne $backup -and $backup.Managed -eq 1) { " +
+            "if ($backup.OriginalPresent -eq 1 -and " +
+            "$null -ne $backup.OriginalCommand) { " +
+            "$propertyType = if ($backup.OriginalKind -eq 2) " +
+            "{ 'ExpandString' } else { 'String' }; " +
+            "New-ItemProperty -Path $runKey -Name 'Discord' " +
+            "-Value $backup.OriginalCommand -PropertyType $propertyType " +
+            "-Force | Out-Null " +
+            "} else { Remove-ItemProperty -Path $runKey -Name 'Discord' " +
+            "-ErrorAction SilentlyContinue }; " +
+            "Remove-Item -Path $backupKey -Recurse -Force " +
+            "-ErrorAction SilentlyContinue } }; " +
+            $"& '{launcher}' '--processStart' 'Discord.exe' " +
+            "'--process-start-args' " +
+            "'\"--force-renderer-accessibility\"'";
+    }
 
     public void Synchronize(bool shouldManage)
     {

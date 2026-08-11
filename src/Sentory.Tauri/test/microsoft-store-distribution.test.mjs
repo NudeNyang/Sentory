@@ -79,6 +79,13 @@ test("Store startup uses the declared StartupTask instead of the Run key", () =>
   assert.match(rust, /RequestEnableAsync/);
 });
 
+test("Store Discord startup coordination uses explicit registry exceptions", () => {
+  assert.match(manifest, /desktop6:RegistryWriteVirtualization>disabled/);
+  assert.match(manifest, /HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run/);
+  assert.match(manifest, /HKEY_CURRENT_USER\\Software\\Sentory\\DiscordStartupBackup/);
+  assert.match(manifest, /rescap:Capability Name="unvirtualizedResources"/);
+});
+
 test("Store keeps durable user data outside disposable local package data", () => {
   assert.match(rust, /"SENTORY_DATA_ROOT"[\s\S]{0,100}store_durable_data_root/);
   assert.match(rust, /"SENTORY_LOCAL_DATA_ROOT"[\s\S]{0,100}store_local_data_root/);

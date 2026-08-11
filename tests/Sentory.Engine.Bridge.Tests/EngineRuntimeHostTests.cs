@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
+using Sentory.Core;
 using Sentory.Infrastructure.Data;
 using Sentory.Infrastructure.Ocr;
 
@@ -135,6 +137,54 @@ public sealed class EngineRuntimeHostTests : IDisposable
 
         Assert.True(saved.SettingsFileExisted);
         Assert.True(saved.SavedPreference);
+    }
+
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, false)]
+    public void DiscordStartupManagementRequiresBothSettings(
+        bool startWithWindows,
+        bool discordSupportEnabled,
+        bool expected)
+    {
+        var settings = new SentorySettings
+        {
+            StartWithWindows = startWithWindows,
+            DiscordSupportEnabled = discordSupportEnabled
+        };
+
+        Assert.Equal(
+            expected,
+            EngineRuntimeHost.ShouldManageDiscordStartup(settings));
+    }
+
+    [Fact]
+    public async Task StartupAndSettingsChangesSynchronizeDiscordStartup()
+    {
+        var paths = SentoryDataPaths.ForRoot(_root);
+        var repository = new SqliteCaptureRepository(paths);
+        await repository.InitializeAsync();
+        new SentorySettingsStore(paths).Save(new SentorySettings
+        {
+            StartWithWindows = true,
+            DiscordSupportEnabled = false
+        });
+        var synchronized = new ConcurrentQueue<bool>();
+        await using var host = new EngineRuntimeHost(
+            repository,
+            paths,
+            (_, _, _) => Task.FromResult(0),
+            (_, _) => Task.FromResult(new OcrEnrichmentBatchResult(0, 0)),
+            synchronized.Enqueue);
+
+        await host.StartAsync();
+        await host.UpdateSettingsAsync(new EngineSettingsPatchDto(
+            DiscordSupportEnabled: true));
+
+        Assert.Contains(false, synchronized);
+        Assert.True(synchronized.Last());
     }
 
     [Fact]

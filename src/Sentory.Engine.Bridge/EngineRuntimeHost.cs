@@ -27,6 +27,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         _enrichLinkPreviews;
     private readonly Func<int, CancellationToken, Task<OcrEnrichmentBatchResult>>?
         _enrichImageOcr;
+    private readonly Action<bool> _synchronizeDiscordStartup;
     private readonly LinkPreviewFetcher? _linkPreviewFetcher;
     private readonly PaddleOcrImageTextRecognizer? _ocrRecognizer;
     private readonly SemaphoreSlim _linkPreviewWakeSignal = new(0, 1);
@@ -67,7 +68,12 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
     public EngineRuntimeHost(
         SqliteCaptureRepository repository,
         SentoryDataPaths paths)
-        : this(repository, paths, null, null)
+        : this(
+            repository,
+            paths,
+            null,
+            null,
+            new DiscordStartupRegistrationManager().Synchronize)
     {
     }
 
@@ -77,11 +83,14 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         Func<int, DateTimeOffset, CancellationToken, Task<int>>?
             enrichLinkPreviews,
         Func<int, CancellationToken, Task<OcrEnrichmentBatchResult>>?
-            enrichImageOcr = null)
+            enrichImageOcr = null,
+        Action<bool>? synchronizeDiscordStartup = null)
     {
         _repository = repository;
         _paths = paths;
         _settingsStore = new SentorySettingsStore(paths);
+        _synchronizeDiscordStartup =
+            synchronizeDiscordStartup ?? (_ => { });
         _automaticCleanup = new AutomaticCleanupCoordinator(
             repository,
             _settingsStore);
@@ -137,6 +146,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
             return;
         }
         _started = true;
+        SynchronizeDiscordStartupRegistration(_settingsStore.Load());
         _dispatcherThread.Start();
         await _ready.Task;
         _discordMonitor = Task.Run(() => MonitorDiscordAsync(_lifetime.Token));
@@ -628,6 +638,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
             settings.LastAutoCleanupAt = null;
         }
         _settingsStore.Save(settings);
+        SynchronizeDiscordStartupRegistration(settings);
         _repository.ConfigureAutomaticFavorites(
             settings.AutoFavoriteEnabled,
             settings.AutoFavoriteCopyThreshold);
@@ -944,6 +955,7 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         {
             while (true)
             {
+                SynchronizeDiscordStartupRegistration(_settingsStore.Load());
                 await ApplyAutomaticCleanupAsync(cancellationToken);
                 await Task.Delay(TimeSpan.FromHours(6), cancellationToken);
             }
@@ -951,6 +963,30 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         catch (OperationCanceledException)
             when (cancellationToken.IsCancellationRequested)
         {
+        }
+    }
+
+    internal static bool ShouldManageDiscordStartup(
+        SentorySettings settings) =>
+        settings.StartWithWindows == true &&
+        settings.DiscordSupportEnabled;
+
+    private void SynchronizeDiscordStartupRegistration(
+        SentorySettings settings)
+    {
+        try
+        {
+            _synchronizeDiscordStartup(
+                ShouldManageDiscordStartup(settings));
+        }
+        catch (Exception exception)
+            when (exception is IOException or
+                  UnauthorizedAccessException or
+                  System.Security.SecurityException)
+        {
+            Console.Error.WriteLine(
+                "discord-startup-registration-failed\t" +
+                exception.Message.Replace('\r', ' ').Replace('\n', ' '));
         }
     }
 

@@ -2,6 +2,18 @@
 
 ## 개발 중
 
+- Windows 자동 실행과 Discord 감지가 모두 켜져 있으면 Discord 로그인 시작
+  명령을 다시 관리한다. 로그인할 때 Sentory가 먼저 실행될 때까지 기다리고,
+  `NudeNyang Translator`의 자동 실행 항목도 켜져 있으면 해당 프로세스까지 확인한
+  뒤 Discord를 접근성 옵션과 함께 시작한다.
+- 준비 프로세스를 30초 안에 확인하지 못하면 Discord는 그대로 실행한다. Sentory가
+  시작되지 않은 경우에는 백업한 Discord 시작 명령을 자동으로 복원해 잘못된 자동
+  실행 설정 때문에 Discord까지 계속 막히는 상황을 피한다.
+- Microsoft Store MSIX에서도 같은 시작 조정을 쓸 수 있도록 패키지의
+  `StartupTask`는 유지하면서 Discord 시작 항목과 Sentory 백업 키만 패키지 밖
+  HKCU에서 공유하도록 매니페스트를 보완했다. 이 동작에는
+  `unvirtualizedResources` 제한 기능 승인이 필요하다.
+
 ## 2.0.8 — 2026-08-11
 
 - GitHub 배포판은 창과 엔진을 만들기 전에 저장된 Windows 자동 실행 설정을 실제

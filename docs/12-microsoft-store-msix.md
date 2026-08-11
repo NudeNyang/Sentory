@@ -12,9 +12,10 @@ Store판은 Tauri 호스트와 C# 엔진을 함께 넣은 데스크톱 MSIX다. 
 - `Windows 시작 시 실행`은 `HKCU\...\Run`을 쓰지 않는다. 매니페스트의
   `windows.startupTask`와 Windows `StartupTask` API로만 켜고 끈다. 기본값은
   꺼짐이며 사용자가 Sentory 설정에서 직접 켰을 때만 등록된다.
-- Discord를 다시 시작할 때는 현재 프로세스에 접근성 실행 옵션만 전달한다.
-  Discord의 로그인 시작 레지스트리를 새로 만들거나 바꾸지 않는다. GitHub 설치판
-  제거기에 남아 있는 구버전 복원 명령도 Store판에서는 실행할 수 없다.
+- Windows 자동 실행과 Discord 감지를 모두 켜면 Discord 로그인 시작 값은
+  예외적으로 관리한다. Sentory와 자동 실행이 켜진 `NudeNyang Translator`가 먼저
+  뜬 뒤 Discord를 접근성 옵션과 함께 실행하며, 30초 제한과 원래 값 자동 복원은
+  GitHub판과 같다. Sentory 자체의 자동 실행 방식은 계속 `StartupTask`다.
 - GitHub판과 Store판은 같은 사용자 보관함을 사용하므로 동시에 실행하지 않는다.
   Tauri 단일 실행 식별자도 같아서 먼저 실행된 한 인스턴스만 유지된다.
 
@@ -34,6 +35,32 @@ Store판도 GitHub판과 같은 `%LOCALAPPDATA%\Sentory` 보관함을 읽는다.
 
 모든 기록을 직접 없애려면 Sentory를 완전히 종료한 뒤
 `%LOCALAPPDATA%\Sentory`를 삭제한다. Store판 제거만으로 이 폴더를 지우지 않는다.
+
+## Discord 시작 등록과 MSIX 가상화
+
+일반 MSIX 데스크톱 앱이 실행 중 HKCU에 쓰는 값은 패키지별 레지스트리로
+가상화되므로 Discord나 Windows 시작 프로그램에서는 그 변경을 볼 수 없다.
+Store판에서 Discord 시작 순서 조정을 사용하려면 코드만 포함해서는 안 되고,
+`AppxManifest.xml`에 다음 항목이 함께 있어야 한다.
+
+- `desktop6:RegistryWriteVirtualization`의 `disabled` 선언
+- Windows 11의 범위를 좁힌 예외 키
+  `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`
+- Sentory 원본값 보관 키
+  `HKEY_CURRENT_USER\Software\Sentory\DiscordStartupBackup`
+- `rescap:Capability Name="unvirtualizedResources"`
+
+Windows 11에서는 위 두 키만 가상화에서 제외하고, 이전 지원 Windows에서는
+`desktop6` 선언이 HKCU 쓰기 가상화를 해제한다. `unvirtualizedResources`는 제한
+기능이므로 Partner Center 제출의 `제한된 기능` 설명에 사용 목적을 반드시 적고
+Microsoft 승인을 받아야 한다. 승인되지 않은 매니페스트로는 Store판에서 이 기능을
+제공할 수 없다.
+
+MSIX 제거 시 임의의 종료 코드를 실행할 수 없으므로 GitHub 설치 제거기처럼 그
+자리에서 복원 명령을 호출하지는 못한다. 대신 관리된 로그인 명령이 다음 로그인에서
+30초 안에 Sentory 프로세스를 찾지 못하면 백업한 Discord 값을 직접 복원하고
+Discord를 실행한다. 따라서 Store판을 제거하거나 StartupTask가 실패해도 Discord가
+계속 차단되지는 않는다.
 
 ## 제품 identity
 
@@ -173,6 +200,18 @@ Packages 화면에는 `Sentory-2.0.8-store.msixbundle` 하나만 올린다. 개�
 > restarting Discord with an accessibility argument after explicit one-time consent. The
 > app does not read message history, collect unrelated clipboard contents, or upload the
 > user's library to a Sentory-operated server.
+
+`unvirtualizedResources` 제한 기능 설명에는 다음처럼 Discord 시작 값 두 곳만
+공유한다는 점과 실패 시 복원 정책을 분리해 적는다.
+
+> Sentory uses unvirtualized HKCU registry access only for the current user's Discord
+> login-start command and Sentory's backup of that command. When both user-controlled
+> settings, "Run at Windows startup" and "Discord detection," are enabled, Sentory delays
+> Discord until the configured local detection applications have started, then launches
+> Discord with its accessibility argument. Disabling either setting restores the original
+> command. If Sentory does not start within 30 seconds, the managed command restores the
+> original value itself and launches Discord, preventing a failed or removed package from
+> blocking Discord startup.
 
 인증 참고 사항에는 첫 실행에서 모든 메신저 감지가 꺼져 있고 검수자가 직접 켤 수
 있다는 점, Discord 자동 재시작은 최초 동의 뒤 필요한 경우에만 실행된다는 점,

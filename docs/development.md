@@ -456,7 +456,9 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
   `%LOCALAPPDATA%\Sentory`에 유지하고 로그·링크 미리보기·OCR 모델은 패키지의
   `LocalState\Sentory`에 둔다.
 - Microsoft Store판의 자동 실행은 매니페스트 `windows.startupTask`와
-  `StartupTask` API만 사용한다. Discord 로그인 시작 레지스트리는 변경하지 않는다.
+  `StartupTask` API만 사용한다. Discord보다 먼저 감지기를 준비하는 기능을 켠
+  경우에만 Discord 로그인 시작 값과 Sentory 백업 키를 패키지 밖 HKCU에서
+  관리하며, 이를 위해 MSIX 매니페스트에 제한 기능과 가상화 예외를 선언한다.
 - 설치 프로그램은 1.x와 같은 AppId와 설치 위치를 사용해 기존 사용자
   데이터와 자동 실행 설정을 이어받는다.
 - Sentory의 원본 소스는 GNU GPL v3 전용(`GPL-3.0-only`)으로 공개한다.
@@ -498,7 +500,10 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
   트레이와 최소화 창을 만든다. 일반 실행과 Store `StartupTask`에는 적용하지 않는다.
 - Windows 자동 실행과 Discord 감지를 모두 켠 경우에만 Discord 로그인 시작
   명령을 관리한다. 원래 값과 값 형식을 먼저 백업하고, 두 기능 중 하나를 끄거나
-  앱을 제거하면 복원한다. 관리 중 사용자가 직접 바꾼 값은 덮어쓰지 않는다.
+  앱을 제거하면 복원한다. 관리 명령은 Sentory 프로세스를 먼저 확인하고,
+  `HKCU\...\Run`에 `NudeNyang Translator`가 등록돼 있으면 해당 프로세스도 시작된
+  뒤 Discord를 실행한다. 30초 안에 준비되지 않으면 Discord 실행을 계속하며,
+  Sentory 자체가 시작되지 않은 경우에는 백업값도 함께 복원한다.
 - Discord 사진 후보가 전송을 기다리는 동안에는 전송 전 첨부 제거 버튼 수를
   접근성 작업자에서 확인한다. 확인된 첨부 수가 줄었을 때만 500ms보다 오래된
   단일 사진 후보부터 취소하며, 첨부 버튼을 한 번도 확인하지 못한 환경에서는

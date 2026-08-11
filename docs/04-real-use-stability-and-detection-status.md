@@ -393,6 +393,27 @@ PC에서도 재부팅할 때마다 재연결 안내가 나타날 가능성이 �
 - Discord가 업데이트 중 자체 재실행한 현재 프로세스에는 옵션을 사후 적용할 수
   없으므로, 자동 재탐색 실패 시에만 기존 재연결 안내를 유지한다.
 
+## 2026-08-12 Discord 로그인 시작 순서 조정
+
+Tauri 전환 뒤에는 `DiscordStartupRegistrationManager` 클래스와 복원 명령만 남고,
+앱 시작·설정 변경·유지보수에서 실제 동기화를 부르는 경로가 빠져 있었다. 이 때문에
+문서와 달리 2.0.8 런타임은 Discord의 로그인 시작 명령을 관리하지 않았다.
+
+- 엔진 시작, 자동 실행·Discord 감지 설정 변경과 6시간 유지보수 주기에서 시작
+  등록을 다시 동기화한다.
+- 관리 명령은 PowerShell의 조건 대기로 `Sentory.exe` 프로세스를 먼저 확인한다.
+  Windows `Run`에 `NudeNyang Translator` 자동 실행 값이 있으면
+  `NudeNyang Translator.exe` 프로세스도 함께 확인한다.
+- 두 프로세스의 시작을 확인하면 Discord `Update.exe`를
+  `--force-renderer-accessibility` 옵션과 함께 실행한다. Translator가 등록되지 않은
+  PC에서는 Sentory만 기다린다.
+- 준비 확인은 최대 30초로 제한한다. Translator가 늦거나 실패해도 Discord는
+  실행하며, Sentory가 시작되지 않은 경우에는 관리 명령이 원래 Discord 시작 값을
+  스스로 복원한 뒤 Discord를 실행한다.
+- GitHub판과 Store판 모두 같은 런타임 정책을 쓴다. Store판은 자체 자동 실행에
+  계속 `StartupTask`를 사용하지만, Discord 시작 값은 패키지 밖에서 보여야 하므로
+  MSIX 매니페스트의 별도 가상화 예외가 필요하다.
+
 ## 2026-07-22 Discord 사진 첨부 취소와 다음 전송 분리
 
 Discord 사진 후보는 전송 확인 전까지 최대 2분간 유지된다. 이전에는 첨부

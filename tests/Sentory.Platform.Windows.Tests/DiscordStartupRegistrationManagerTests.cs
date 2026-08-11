@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Text;
 using Microsoft.Win32;
 using Sentory.Platform.Windows.Runtime;
 
@@ -9,7 +11,7 @@ public sealed class DiscordStartupRegistrationManagerTests
         @"C:\Users\tester\AppData\Local\Discord\Update.exe";
 
     [Fact]
-    public void BacksUpExistingCommandAndAddsAccessibilityArgument()
+    public void BacksUpExistingCommandAndWaitsForStartupDependencies()
     {
         var original = new DiscordStartupCommand(
             $"\"{LauncherPath}\" --processStart Discord.exe",
@@ -25,6 +27,13 @@ public sealed class DiscordStartupRegistrationManagerTests
         Assert.Equal(original, registry.Backup?.OriginalCommand);
         Assert.Equal(manager.ManagedCommand, registry.RunCommand?.Value);
         Assert.Equal(RegistryValueKind.String, registry.RunCommand?.Kind);
+        var script = DecodeManagedScript(manager.ManagedCommand);
+        Assert.Contains("Get-Process -Name 'Sentory'", script);
+        Assert.Contains("'NudeNyang Translator'", script);
+        Assert.Contains("AddSeconds(30)", script);
+        Assert.Contains("if (-not $sentoryReady)", script);
+        Assert.Contains("$backup.OriginalCommand", script);
+        Assert.Contains("--force-renderer-accessibility", script);
     }
 
     [Fact]
@@ -145,9 +154,51 @@ public sealed class DiscordStartupRegistrationManagerTests
         Assert.Null(registry.Backup);
     }
 
+    [Fact]
+    public void ManagedPowerShellScriptHasValidSyntax()
+    {
+        var manager = CreateManager(new FakeDiscordStartupRegistry());
+        var encoded = Convert.ToBase64String(
+            Encoding.Unicode.GetBytes(manager.CreateManagedScript()));
+        var validation =
+            "[ScriptBlock]::Create([Text.Encoding]::Unicode.GetString(" +
+            $"[Convert]::FromBase64String('{encoded}'))) | Out-Null";
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = Path.Combine(
+                Environment.SystemDirectory,
+                "WindowsPowerShell",
+                "v1.0",
+                "powershell.exe"),
+            ArgumentList =
+            {
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                validation
+            },
+            UseShellExecute = false,
+            CreateNoWindow = true
+        });
+
+        Assert.NotNull(process);
+        Assert.True(process.WaitForExit(10_000));
+        Assert.Equal(0, process.ExitCode);
+    }
+
     private static DiscordStartupRegistrationManager CreateManager(
         FakeDiscordStartupRegistry registry) =>
         new(registry, LauncherPath, () => true);
+
+    private static string DecodeManagedScript(string command)
+    {
+        const string marker = "-EncodedCommand ";
+        var encoded = command[(command.IndexOf(
+            marker,
+            StringComparison.Ordinal) + marker.Length)..];
+        return Encoding.Unicode.GetString(Convert.FromBase64String(encoded));
+    }
 
     private sealed class FakeDiscordStartupRegistry :
         IDiscordStartupRegistry
