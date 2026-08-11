@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$BundlePath = "artifacts\store-test\Sentory-2.0.7-test.msixbundle",
+    [string]$BundlePath = "artifacts\store-test\Sentory-2.0.8-test.msixbundle",
     [string]$CertificatePath = "artifacts\store-test\Sentory-TestCertificate.cer"
 )
 

@@ -3,7 +3,7 @@
 ## Status
 
 Sentory is applying to the SignPath Foundation open-source code-signing program.
-Release 2.0.7 and earlier releases are unsigned. This page will be updated when the
+Release 2.0.8 and earlier releases are unsigned. This page will be updated when the
 application has been approved and the signing pipeline has been activated.
 
 **Free code signing provided by SignPath.io, certificate by SignPath Foundation.**
