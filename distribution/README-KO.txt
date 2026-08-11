@@ -1,4 +1,4 @@
-Sentory 2.0.8 사용 방법
+Sentory 2.0.9 사용 방법
 ========================
 
 Sentory는 이야기 속, 흩어진 순간들을 한 곳에 모아 보는 Windows 프로그램입니다.
@@ -109,7 +109,7 @@ Sentory는 GNU General Public License v3.0 only로 배포합니다. 라이선스
 함께 제공해야 합니다. 전체 내용은 LICENSE.txt를 확인해 주세요.
 
 이 버전에 대응하는 소스 코드는 공식 GitHub Release의
-Sentory-2.0.8-source.zip과 같은 버전의 Git 태그에서 받을 수 있습니다.
+Sentory-2.0.9-source.zip과 같은 버전의 Git 태그에서 받을 수 있습니다.
 
 개인정보 및 로컬 데이터 처리 방식은 PRIVACY.md, 제3자 구성 요소의 라이선스는
 THIRD-PARTY-NOTICES.txt를 확인해 주세요. 포함된 OCR 모델의 정확한 출처와
