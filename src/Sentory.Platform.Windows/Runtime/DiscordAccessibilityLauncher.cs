@@ -141,6 +141,24 @@ public sealed class DiscordAccessibilityLauncher
         }
     }
 
+    public bool IsPrivatePipeManaged(int processId)
+    {
+        try
+        {
+            var commandLine = _commandLineReader(processId);
+            return string.IsNullOrWhiteSpace(commandLine) ||
+                   ClassifyPrivatePipeManagement(commandLine);
+        }
+        catch (Exception exception)
+            when (exception is ManagementException or
+                  COMException or
+                  InvalidOperationException or
+                  UnauthorizedAccessException)
+        {
+            return true;
+        }
+    }
+
     internal static DiscordAccessibilityArgumentState
         ClassifyAccessibilityArgument(string? commandLine)
     {
@@ -155,6 +173,10 @@ public sealed class DiscordAccessibilityLauncher
                 ? DiscordAccessibilityArgumentState.Enabled
                 : DiscordAccessibilityArgumentState.Missing;
     }
+
+    internal static bool ClassifyPrivatePipeManagement(string? commandLine) =>
+        !string.IsNullOrWhiteSpace(commandLine) &&
+        ContainsCommandLineArgument(commandLine, "--remote-debugging-pipe");
 
     public async Task<bool> WaitForMainProcessExitAsync(
         int processId,
@@ -224,7 +246,7 @@ public sealed class DiscordAccessibilityLauncher
         }
     }
 
-    public async Task RestartAsync(
+    public async Task<bool> RestartAsync(
         CancellationToken cancellationToken = default)
     {
         if (!File.Exists(LauncherPath))
@@ -232,6 +254,13 @@ public sealed class DiscordAccessibilityLauncher
             throw new FileNotFoundException(
                 "Discord 실행 파일을 찾지 못했습니다.",
                 LauncherPath);
+        }
+
+        var mainProcessId = GetMainProcessId();
+        if (mainProcessId is { } processId &&
+            IsPrivatePipeManaged(processId))
+        {
+            return false;
         }
 
         var processes = Process.GetProcessesByName(DiscordProcessName);
@@ -281,6 +310,8 @@ public sealed class DiscordAccessibilityLauncher
             throw new InvalidOperationException(
                 "Discord를 다시 시작하지 못했습니다.");
         }
+
+        return true;
     }
 
     private static bool IsRunning(Process process)

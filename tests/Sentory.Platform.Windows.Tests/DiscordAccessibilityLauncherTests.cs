@@ -112,6 +112,48 @@ public sealed class DiscordAccessibilityLauncherTests
             launcher.GetAccessibilityArgumentState(42));
     }
 
+    [Theory]
+    [InlineData(
+        "\"C:\\Discord\\Discord.exe\" --force-renderer-accessibility --remote-debugging-pipe",
+        true)]
+    [InlineData(
+        "\"C:\\Discord\\Discord.exe\" \"--remote-debugging-pipe\"",
+        true)]
+    [InlineData(
+        "\"C:\\Discord\\Discord.exe\" --remote-debugging-pipe=false",
+        false)]
+    [InlineData("\"C:\\Discord\\Discord.exe\"", false)]
+    [InlineData(null, false)]
+    public void DetectsPrivatePipeOwnershipFromTheMainProcess(
+        string? commandLine,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            DiscordAccessibilityLauncher
+                .ClassifyPrivatePipeManagement(commandLine));
+    }
+
+    [Fact]
+    public void PrivatePipeCheckPreventsRestartWhenOwnershipCannotBeRead()
+    {
+        var launcher = new DiscordAccessibilityLauncher(
+            @"C:\Users\tester\AppData\Local",
+            _ => throw new UnauthorizedAccessException());
+
+        Assert.True(launcher.IsPrivatePipeManaged(42));
+    }
+
+    [Fact]
+    public void PrivatePipeCheckPreventsRestartWhenCommandLineIsUnavailable()
+    {
+        var launcher = new DiscordAccessibilityLauncher(
+            @"C:\Users\tester\AppData\Local",
+            _ => null);
+
+        Assert.True(launcher.IsPrivatePipeManaged(42));
+    }
+
     [Fact]
     public async Task ProcessExitWaitUsesATimeoutWithoutPolling()
     {

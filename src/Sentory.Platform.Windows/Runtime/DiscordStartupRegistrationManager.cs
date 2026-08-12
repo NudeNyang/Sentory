@@ -24,6 +24,8 @@ internal interface IDiscordStartupRegistry
     void WriteBackup(DiscordStartupBackup backup);
 
     void DeleteBackup();
+
+    bool IsTranslatorStartupRegistered();
 }
 
 public sealed class DiscordStartupRegistrationManager
@@ -59,6 +61,10 @@ public sealed class DiscordStartupRegistrationManager
     }
 
     internal string LauncherPath { get; }
+
+    internal DiscordStartupCommand SafeOriginalCommand => new(
+        $"\"{LauncherPath}\" --processStart Discord.exe",
+        RegistryValueKind.String);
 
     internal string ManagedCommand
     {
@@ -115,13 +121,29 @@ public sealed class DiscordStartupRegistrationManager
             "-ErrorAction SilentlyContinue }; " +
             "Remove-Item -Path $backupKey -Recurse -Force " +
             "-ErrorAction SilentlyContinue } }; " +
+            "$discordReady = $false; " +
+            "if ($translatorExpected -and $translatorReady) { " +
+            "$discordDeadline = [DateTime]::UtcNow.AddSeconds(" +
+            $"{DependencyWaitSeconds}); " +
+            "do { $discordReady = $null -ne (Get-Process " +
+            "-Name 'Discord' -ErrorAction SilentlyContinue); " +
+            "if ($discordReady) { break }; " +
+            "Start-Sleep -Milliseconds 250 " +
+            "} while ([DateTime]::UtcNow -lt $discordDeadline) }; " +
+            "if (-not $discordReady) { " +
             $"& '{launcher}' '--processStart' 'Discord.exe' " +
             "'--process-start-args' " +
-            "'\"--force-renderer-accessibility\"'";
+            "'\"--force-renderer-accessibility\"' }";
     }
 
     public void Synchronize(bool shouldManage)
     {
+        if (_registry.IsTranslatorStartupRegistered())
+        {
+            YieldDiscordStartupToTranslator();
+            return;
+        }
+
         if (!shouldManage || !_launcherExists())
         {
             Restore();
@@ -132,8 +154,18 @@ public sealed class DiscordStartupRegistrationManager
         if (backup is null)
         {
             backup = new DiscordStartupBackup(
-                _registry.ReadRunCommand());
+                NormalizeOriginal(_registry.ReadRunCommand()));
             _registry.WriteBackup(backup.Value);
+        }
+        else
+        {
+            var normalized = new DiscordStartupBackup(
+                NormalizeOriginal(backup.Value.OriginalCommand));
+            if (normalized != backup.Value)
+            {
+                backup = normalized;
+                _registry.WriteBackup(normalized);
+            }
         }
 
         var managed = new DiscordStartupCommand(
@@ -147,18 +179,24 @@ public sealed class DiscordStartupRegistrationManager
 
     public void Restore()
     {
+        if (_registry.IsTranslatorStartupRegistered())
+        {
+            YieldDiscordStartupToTranslator();
+            return;
+        }
+
         var backup = _registry.ReadBackup();
         if (backup is null)
         {
             return;
         }
 
+        backup = new DiscordStartupBackup(
+            NormalizeOriginal(backup.Value.OriginalCommand));
+
         var current = _registry.ReadRunCommand();
         var currentIsManaged = current is not null &&
-                               string.Equals(
-                                   current.Value.Value,
-                                   ManagedCommand,
-                                   StringComparison.OrdinalIgnoreCase);
+                               IsManagedOrLegacyCommand(current.Value.Value);
         if (currentIsManaged)
         {
             if (backup.Value.OriginalCommand is { } original)
@@ -173,6 +211,62 @@ public sealed class DiscordStartupRegistrationManager
 
         _registry.DeleteBackup();
     }
+
+    private void YieldDiscordStartupToTranslator()
+    {
+        var backup = _registry.ReadBackup();
+        var current = _registry.ReadRunCommand();
+        if (backup is null && current is not null &&
+            IsLegacyRemoteDebuggingCommand(current.Value.Value))
+        {
+            backup = new DiscordStartupBackup(SafeOriginalCommand);
+            _registry.WriteBackup(backup.Value);
+        }
+        else if (backup is not null)
+        {
+            var normalized = new DiscordStartupBackup(
+                NormalizeOriginal(backup.Value.OriginalCommand));
+            if (normalized != backup.Value)
+            {
+                _registry.WriteBackup(normalized);
+            }
+        }
+
+        if (current is not null && IsManagedOrLegacyCommand(current.Value.Value))
+        {
+            _registry.DeleteRunCommand();
+        }
+    }
+
+    private DiscordStartupCommand? NormalizeOriginal(
+        DiscordStartupCommand? command)
+    {
+        if (command is null)
+        {
+            return null;
+        }
+
+        return IsManagedOrLegacyCommand(command.Value.Value)
+            ? SafeOriginalCommand
+            : command;
+    }
+
+    private bool IsManagedOrLegacyCommand(string command) =>
+        string.Equals(
+            command,
+            ManagedCommand,
+            StringComparison.OrdinalIgnoreCase) ||
+        IsSentoryManagedPowerShellCommand(command) ||
+        IsLegacyRemoteDebuggingCommand(command);
+
+    internal static bool IsSentoryManagedPowerShellCommand(string command) =>
+        command.Contains("powershell.exe", StringComparison.OrdinalIgnoreCase) &&
+        command.Contains("-EncodedCommand", StringComparison.OrdinalIgnoreCase);
+
+    internal static bool IsLegacyRemoteDebuggingCommand(string command) =>
+        command.Contains(
+            "--remote-debugging-port=9222",
+            StringComparison.OrdinalIgnoreCase);
 }
 
 internal sealed class WindowsDiscordStartupRegistry :
@@ -292,6 +386,16 @@ internal sealed class WindowsDiscordStartupRegistry :
         Registry.CurrentUser.DeleteSubKeyTree(
             BackupKeyPath,
             throwOnMissingSubKey: false);
+
+    public bool IsTranslatorStartupRegistered()
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath);
+        return key?.GetValue(
+            "NudeNyang Translator",
+            null,
+            RegistryValueOptions.DoNotExpandEnvironmentNames) is string command &&
+            !string.IsNullOrWhiteSpace(command);
+    }
 
     private static RegistryValueKind NormalizeKind(
         RegistryValueKind kind) =>

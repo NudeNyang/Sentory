@@ -18,7 +18,7 @@ namespace Sentory.Engine.Bridge;
 
 public sealed class EngineRuntimeHost : IAsyncDisposable
 {
-    private const string CurrentVersion = "2.0.9";
+    private const string CurrentVersion = "2.0.10";
     private const string MicrosoftStoreChannel = "microsoft-store";
     private readonly SqliteCaptureRepository _repository;
     private readonly SentoryDataPaths _paths;
