@@ -410,9 +410,9 @@ Tauri 전환 뒤에는 `DiscordStartupRegistrationManager` 클래스와 복원 �
 - 준비 확인은 최대 30초로 제한한다. Translator가 늦거나 실패해도 Discord는
   실행하며, Sentory가 시작되지 않은 경우에는 관리 명령이 원래 Discord 시작 값을
   스스로 복원한 뒤 Discord를 실행한다.
-- GitHub판과 Store판 모두 같은 런타임 정책을 쓴다. Store판은 자체 자동 실행에
-  계속 `StartupTask`를 사용하지만, Discord 시작 값은 패키지 밖에서 보여야 하므로
-  MSIX 매니페스트의 별도 가상화 예외가 필요하다.
+- 이 시작 순서 조정은 GitHub판에서만 사용한다. Store판은 Microsoft 인증 정책에
+  맞춰 외부 Discord 시작 값을 건드리지 않으며, Sentory 자체 자동 실행에만
+  `StartupTask`를 사용한다.
 
 ## 2026-07-22 Discord 사진 첨부 취소와 다음 전송 분리
 

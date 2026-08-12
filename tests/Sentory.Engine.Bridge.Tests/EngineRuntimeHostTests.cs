@@ -160,6 +160,21 @@ public sealed class EngineRuntimeHostTests : IDisposable
             EngineRuntimeHost.ShouldManageDiscordStartup(settings));
     }
 
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("github", true)]
+    [InlineData("microsoft-store", false)]
+    [InlineData("MICROSOFT-STORE", false)]
+    public void StoreChannelDoesNotSynchronizeExternalDiscordStartup(
+        string? distributionChannel,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            EngineRuntimeHost.ShouldSynchronizeDiscordStartupForChannel(
+                distributionChannel));
+    }
+
     [Fact]
     public async Task StartupAndSettingsChangesSynchronizeDiscordStartup()
     {

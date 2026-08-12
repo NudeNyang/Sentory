@@ -2,6 +2,12 @@
 
 ## 개발 중
 
+- Microsoft Store 인증 정책 10.6.3에 맞춰 Store판에서 Discord 로그인 시작
+  레지스트리를 조정하지 않도록 분리했다. GitHub판의 시작 순서 기능은 유지한다.
+- Store MSIX에서 레지스트리 가상화 예외와 `unvirtualizedResources` 제한 기능을
+  제거하고 재제출 패키지 버전을 2.0.9.1로 올렸다. Sentory 자체 자동 실행은 기존
+  `StartupTask`를 그대로 사용한다.
+
 ## 2.0.9 — 2026-08-12
 
 - Windows 자동 실행과 Discord 감지가 모두 켜져 있으면 Discord 로그인 시작

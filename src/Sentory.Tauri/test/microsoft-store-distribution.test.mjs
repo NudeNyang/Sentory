@@ -16,6 +16,7 @@ const manifest = read("../../../installer/msix/AppxManifest.xml.template");
 const buildScript = read("../../../scripts/Build-Tauri.ps1");
 const bundleScript = read("../../../scripts/Publish-MsixStoreBundle.ps1");
 const packageScript = read("../../../scripts/Publish-MsixPackage.ps1");
+const engineRuntime = read("../../Sentory.Engine.Bridge/EngineRuntimeHost.cs");
 const certificateScript = read("../../../scripts/New-MsixTestCertificate.ps1");
 const installTestPackageScript = read("../../../scripts/Install-MsixTestPackage.ps1");
 const workflow = read("../../../.github/workflows/tauri-msix-store.yml");
@@ -79,11 +80,13 @@ test("Store startup uses the declared StartupTask instead of the Run key", () =>
   assert.match(rust, /RequestEnableAsync/);
 });
 
-test("Store Discord startup coordination uses explicit registry exceptions", () => {
-  assert.match(manifest, /desktop6:RegistryWriteVirtualization>disabled/);
-  assert.match(manifest, /HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run/);
-  assert.match(manifest, /HKEY_CURRENT_USER\\Software\\Sentory\\DiscordStartupBackup/);
-  assert.match(manifest, /rescap:Capability Name="unvirtualizedResources"/);
+test("Store leaves external Discord startup registration untouched", () => {
+  assert.match(rust, /SENTORY_DISTRIBUTION_CHANNEL/);
+  assert.match(engineRuntime, /ShouldSynchronizeDiscordStartupForChannel/);
+  assert.doesNotMatch(manifest, /RegistryWriteVirtualization/);
+  assert.doesNotMatch(manifest, /HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run/);
+  assert.doesNotMatch(manifest, /HKEY_CURRENT_USER\\Software\\Sentory\\DiscordStartupBackup/);
+  assert.doesNotMatch(manifest, /unvirtualizedResources/);
 });
 
 test("Store keeps durable user data outside disposable local package data", () => {

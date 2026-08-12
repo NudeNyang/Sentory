@@ -456,9 +456,8 @@ KakaoTalk가 실제 발신 메시지를 공개 접근성 API에 노출하지 않
   `%LOCALAPPDATA%\Sentory`에 유지하고 로그·링크 미리보기·OCR 모델은 패키지의
   `LocalState\Sentory`에 둔다.
 - Microsoft Store판의 자동 실행은 매니페스트 `windows.startupTask`와
-  `StartupTask` API만 사용한다. Discord보다 먼저 감지기를 준비하는 기능을 켠
-  경우에만 Discord 로그인 시작 값과 Sentory 백업 키를 패키지 밖 HKCU에서
-  관리하며, 이를 위해 MSIX 매니페스트에 제한 기능과 가상화 예외를 선언한다.
+  `StartupTask` API만 사용한다. Store판은 외부 Discord 로그인 시작 값을 수정하지
+  않으며, Discord보다 먼저 감지기를 준비하는 기능은 GitHub판에서만 제공한다.
 - 설치 프로그램은 1.x와 같은 AppId와 설치 위치를 사용해 기존 사용자
   데이터와 자동 실행 설정을 이어받는다.
 - Sentory의 원본 소스는 GNU GPL v3 전용(`GPL-3.0-only`)으로 공개한다.

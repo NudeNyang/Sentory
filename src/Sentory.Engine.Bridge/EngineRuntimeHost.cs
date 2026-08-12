@@ -19,6 +19,7 @@ namespace Sentory.Engine.Bridge;
 public sealed class EngineRuntimeHost : IAsyncDisposable
 {
     private const string CurrentVersion = "2.0.9";
+    private const string MicrosoftStoreChannel = "microsoft-store";
     private readonly SqliteCaptureRepository _repository;
     private readonly SentoryDataPaths _paths;
     private readonly SentorySettingsStore _settingsStore;
@@ -73,7 +74,9 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
             paths,
             null,
             null,
-            new DiscordStartupRegistrationManager().Synchronize)
+            CreateDiscordStartupSynchronizer(
+                Environment.GetEnvironmentVariable(
+                    "SENTORY_DISTRIBUTION_CHANNEL")))
     {
     }
 
@@ -970,6 +973,24 @@ public sealed class EngineRuntimeHost : IAsyncDisposable
         SentorySettings settings) =>
         settings.StartWithWindows == true &&
         settings.DiscordSupportEnabled;
+
+    internal static bool ShouldSynchronizeDiscordStartupForChannel(
+        string? distributionChannel) =>
+        !string.Equals(
+            distributionChannel,
+            MicrosoftStoreChannel,
+            StringComparison.OrdinalIgnoreCase);
+
+    private static Action<bool> CreateDiscordStartupSynchronizer(
+        string? distributionChannel)
+    {
+        if (!ShouldSynchronizeDiscordStartupForChannel(distributionChannel))
+        {
+            return _ => { };
+        }
+
+        return new DiscordStartupRegistrationManager().Synchronize;
+    }
 
     private void SynchronizeDiscordStartupRegistration(
         SentorySettings settings)

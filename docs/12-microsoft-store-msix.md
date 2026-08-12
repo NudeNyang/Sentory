@@ -12,10 +12,9 @@ Store판은 Tauri 호스트와 C# 엔진을 함께 넣은 데스크톱 MSIX다. 
 - `Windows 시작 시 실행`은 `HKCU\...\Run`을 쓰지 않는다. 매니페스트의
   `windows.startupTask`와 Windows `StartupTask` API로만 켜고 끈다. 기본값은
   꺼짐이며 사용자가 Sentory 설정에서 직접 켰을 때만 등록된다.
-- Windows 자동 실행과 Discord 감지를 모두 켜면 Discord 로그인 시작 값은
-  예외적으로 관리한다. Sentory와 자동 실행이 켜진 `NudeNyang Translator`가 먼저
-  뜬 뒤 Discord를 접근성 옵션과 함께 실행하며, 30초 제한과 원래 값 자동 복원은
-  GitHub판과 같다. Sentory 자체의 자동 실행 방식은 계속 `StartupTask`다.
+- Store판은 외부 Discord 로그인 시작 값을 수정하지 않는다. Sentory와
+  `NudeNyang Translator`를 Discord보다 먼저 준비하는 시작 순서 기능은 GitHub판에서만
+  제공한다. Store판에서 Sentory 자체의 자동 실행은 계속 `StartupTask`를 쓴다.
 - GitHub판과 Store판은 같은 사용자 보관함을 사용하므로 동시에 실행하지 않는다.
   Tauri 단일 실행 식별자도 같아서 먼저 실행된 한 인스턴스만 유지된다.
 
@@ -36,31 +35,23 @@ Store판도 GitHub판과 같은 `%LOCALAPPDATA%\Sentory` 보관함을 읽는다.
 모든 기록을 직접 없애려면 Sentory를 완전히 종료한 뒤
 `%LOCALAPPDATA%\Sentory`를 삭제한다. Store판 제거만으로 이 폴더를 지우지 않는다.
 
-## Discord 시작 등록과 MSIX 가상화
+## Discord 시작 등록 정책
 
-일반 MSIX 데스크톱 앱이 실행 중 HKCU에 쓰는 값은 패키지별 레지스트리로
-가상화되므로 Discord나 Windows 시작 프로그램에서는 그 변경을 볼 수 없다.
-Store판에서 Discord 시작 순서 조정을 사용하려면 코드만 포함해서는 안 되고,
-`AppxManifest.xml`에 다음 항목이 함께 있어야 한다.
+2.0.9.0 제출본은 Discord 로그인 시작 값과 Sentory 백업 키를 패키지 밖에서
+공유하기 위해 `unvirtualizedResources` 제한 기능과 레지스트리 가상화 예외를
+선언했다. Microsoft Store 인증 정책 10.6.3 검토에서 이 제한 기능 사용이
+승인되지 않았다.
 
-- `desktop6:RegistryWriteVirtualization`의 `disabled` 선언
-- Windows 11의 범위를 좁힌 예외 키
-  `HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`
-- Sentory 원본값 보관 키
-  `HKEY_CURRENT_USER\Software\Sentory\DiscordStartupBackup`
-- `rescap:Capability Name="unvirtualizedResources"`
+2.0.9.1부터 Store판은 다음 원칙을 지킨다.
 
-Windows 11에서는 위 두 키만 가상화에서 제외하고, 이전 지원 Windows에서는
-`desktop6` 선언이 HKCU 쓰기 가상화를 해제한다. `unvirtualizedResources`는 제한
-기능이므로 Partner Center 제출의 `제한된 기능` 설명에 사용 목적을 반드시 적고
-Microsoft 승인을 받아야 한다. 승인되지 않은 매니페스트로는 Store판에서 이 기능을
-제공할 수 없다.
+- `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`을 읽거나 수정하지 않는다.
+- Discord 시작 명령의 백업 키를 만들지 않는다.
+- 매니페스트에 레지스트리 가상화 예외와 `unvirtualizedResources`를 선언하지 않는다.
+- Sentory 자체 자동 실행에는 사용자 동의형 `StartupTask`만 사용한다.
 
-MSIX 제거 시 임의의 종료 코드를 실행할 수 없으므로 GitHub 설치 제거기처럼 그
-자리에서 복원 명령을 호출하지는 못한다. 대신 관리된 로그인 명령이 다음 로그인에서
-30초 안에 Sentory 프로세스를 찾지 못하면 백업한 Discord 값을 직접 복원하고
-Discord를 실행한다. 따라서 Store판을 제거하거나 StartupTask가 실패해도 Discord가
-계속 차단되지는 않는다.
+Discord보다 먼저 감지기를 준비하는 로그인 시작 순서 기능은 GitHub판에 남는다.
+Store판의 Discord 감지와 사용자가 동의한 실행 중 재연결 기능은 그대로 사용할 수
+있지만, Windows 로그인 때 Discord의 시작 순서를 바꾸지는 않는다.
 
 ## 제품 identity
 
@@ -85,7 +76,7 @@ Store Publisher와 같은 Subject를 가진 로컬 검수 인증서를 준비한
 $thumbprint = .\scripts\New-MsixTestCertificate.ps1
 
 .\scripts\Publish-MsixStoreBundle.ps1 `
-  -PackageVersion 2.0.9.0 `
+  -PackageVersion 2.0.9.1 `
   -Architectures x64 `
   -OutputRoot artifacts\store-test `
   -SignedTest `
@@ -126,7 +117,7 @@ Windows가 기본 아이콘에 색상 배경을 붙일 수 있으므로 수동 �
    `%LOCALAPPDATA%\Sentory`가 없는 환경에서 확인한다.
 2. 설정의 앱 정보에 `자동 업데이트`가 없는지 확인한다.
    앱 안에는 제품 버전 `2.0.9`을 표시하고 Windows의 설치된 패키지 정보에는
-   MSIX 버전 `2.0.9.0`을 표시한다.
+   MSIX 버전 `2.0.9.1`을 표시한다.
 3. 작업 표시줄과 작업 표시줄 우클릭 메뉴의 Sentory 아이콘에 별도 색상 배경이
    붙지 않고 투명하게 표시되는지 확인한다. 밝은 테마와 어두운 테마에서 각각 본다.
 4. `Windows 시작 시 실행`을 켠 뒤 작업 관리자의 `시작 앱`에 Sentory가 나타나는지
@@ -160,22 +151,22 @@ x64와 ARM64 C++ 빌드 도구가 모두 있는 환경에서는 다음 명령 �
 실행 파일과 번들을 만든다.
 
 ```powershell
-.\scripts\Publish-MsixStoreBundle.ps1 -PackageVersion 2.0.9.0
+.\scripts\Publish-MsixStoreBundle.ps1 -PackageVersion 2.0.9.1
 ```
 
 기본 출력은 `artifacts/store`이다.
 
 - `Sentory-2.0.9-store.msixbundle`: Partner Center에 올릴 파일
 - `Sentory-2.0.9-store.msixbundle.sha256`: 번들 확인값
-- `Sentory-2.0.9.0-store-x64.msix`: x64 개별 패키지
-- `Sentory-2.0.9.0-store-arm64.msix`: ARM64 개별 패키지
+- `Sentory-2.0.9.1-store-x64.msix`: x64 개별 패키지
+- `Sentory-2.0.9.1-store-arm64.msix`: ARM64 개별 패키지
 - `msix-package-manifest.json`: identity, 아키텍처, 크기와 SHA-256
 
 Store 제출용 파일은 로컬 검수 인증서로 서명하지 않는다. 인증을 통과한 패키지는
 Microsoft Store가 서명한다. `-SignedTest`나 `-UnsignedTest`로 만든 파일은
 제출하면 안 된다.
 
-패키징 스크립트는 MakeAppx의 `/bv` 값에도 `2.0.9.0`을 넘긴다. 따라서 개별 x64·
+패키징 스크립트는 MakeAppx의 `/bv` 값에도 `2.0.9.1`을 넘긴다. 따라서 개별 x64·
 ARM64 패키지뿐 아니라 바깥 MSIX 번들의 버전도 같은 4자리 값으로 고정된다.
 
 현재 x64 개발 PC에는 Visual C++ ARM64 도구가 없으므로 x64 시험판은 로컬에서
@@ -201,17 +192,9 @@ Packages 화면에는 `Sentory-2.0.9-store.msixbundle` 하나만 올린다. 개�
 > app does not read message history, collect unrelated clipboard contents, or upload the
 > user's library to a Sentory-operated server.
 
-`unvirtualizedResources` 제한 기능 설명에는 다음처럼 Discord 시작 값 두 곳만
-공유한다는 점과 실패 시 복원 정책을 분리해 적는다.
-
-> Sentory uses unvirtualized HKCU registry access only for the current user's Discord
-> login-start command and Sentory's backup of that command. When both user-controlled
-> settings, "Run at Windows startup" and "Discord detection," are enabled, Sentory delays
-> Discord until the configured local detection applications have started, then launches
-> Discord with its accessibility argument. Disabling either setting restores the original
-> command. If Sentory does not start within 30 seconds, the managed command restores the
-> original value itself and launches Discord, preventing a failed or removed package from
-> blocking Discord startup.
+2.0.9.1 매니페스트에는 `unvirtualizedResources`가 없으므로 이 기능에 대한 제한
+기능 설명을 제출하지 않는다. 이전 제출에서 작성한 사용 사유도 새 제출에서는
+제거한다.
 
 인증 참고 사항에는 첫 실행에서 모든 메신저 감지가 꺼져 있고 검수자가 직접 켤 수
 있다는 점, Discord 자동 재시작은 최초 동의 뒤 필요한 경우에만 실행된다는 점,
