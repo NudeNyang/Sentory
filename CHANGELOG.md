@@ -2,11 +2,19 @@
 
 ## 개발 중
 
-- Microsoft Store 인증 정책 10.6.3에 맞춰 Store판에서 Discord 로그인 시작
-  레지스트리를 조정하지 않도록 분리했다. GitHub판의 시작 순서 기능은 유지한다.
-- Store MSIX에서 레지스트리 가상화 예외와 `unvirtualizedResources` 제한 기능을
-  제거하고 재제출 패키지 버전을 2.0.9.1로 올렸다. Sentory 자체 자동 실행은 기존
-  `StartupTask`를 그대로 사용한다.
+## 2.0.10 — 2026-08-13
+
+- `NudeNyang Translator`의 자동 실행이 켜져 있으면 Discord 시작을 Translator에
+  맡긴다. Translator가 보안 파이프로 연 Discord는 Sentory가 종료하거나 다시
+  시작하지 않고 접근성 연결만 사용한다.
+- 예전 `--remote-debugging-port=9222` 명령과 두 앱이 서로 보관해 둔 PowerShell
+  대기 명령을 안전한 Discord 기본 시작 명령으로 정리한다. 사용자가 직접 바꾼
+  다른 시작 명령은 건드리지 않는다.
+- Microsoft Store판은 Sentory 자체 자동 실행에 `StartupTask`만 사용한다. Discord
+  로그인 시작 레지스트리와 Sentory 백업 레지스트리를 조정하지 않으며 MSIX의
+  `unvirtualizedResources` 제한 기능도 사용하지 않는다.
+- 제품 버전을 2.0.10으로 올렸다. Partner Center 제출용 2.0.10.0 MSIX 번들은
+  x64와 ARM64 패키지를 함께 담는다.
 
 ## 2.0.9 — 2026-08-12
 

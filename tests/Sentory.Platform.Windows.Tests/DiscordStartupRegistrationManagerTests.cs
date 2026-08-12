@@ -33,7 +33,75 @@ public sealed class DiscordStartupRegistrationManagerTests
         Assert.Contains("AddSeconds(30)", script);
         Assert.Contains("if (-not $sentoryReady)", script);
         Assert.Contains("$backup.OriginalCommand", script);
+        Assert.Contains("Get-Process -Name 'Discord'", script);
+        Assert.Contains("if (-not $discordReady)", script);
         Assert.Contains("--force-renderer-accessibility", script);
+    }
+
+    [Fact]
+    public void TranslatorStartupTakesOwnershipWithoutRestoringDiscordEarly()
+    {
+        var original = new DiscordStartupCommand(
+            $"\"{LauncherPath}\" --processStart Discord.exe",
+            RegistryValueKind.ExpandString);
+        var registry = new FakeDiscordStartupRegistry
+        {
+            RunCommand = original
+        };
+        var manager = CreateManager(registry);
+        manager.Synchronize(shouldManage: true);
+        registry.TranslatorStartupRegistered = true;
+
+        manager.Synchronize(shouldManage: true);
+
+        Assert.Null(registry.RunCommand);
+        Assert.Equal(original, registry.Backup?.OriginalCommand);
+
+        registry.TranslatorStartupRegistered = false;
+        manager.Synchronize(shouldManage: true);
+
+        Assert.Equal(manager.ManagedCommand, registry.RunCommand?.Value);
+        Assert.Equal(original, registry.Backup?.OriginalCommand);
+    }
+
+    [Fact]
+    public void TranslatorOwnershipRemovesLegacyPortAndKeepsSafeFallback()
+    {
+        var registry = new FakeDiscordStartupRegistry
+        {
+            TranslatorStartupRegistered = true,
+            RunCommand = new DiscordStartupCommand(
+                $"\"{LauncherPath}\" --processStart Discord.exe " +
+                "--process-start-args \"--remote-debugging-port=9222\"",
+                RegistryValueKind.String)
+        };
+        var manager = CreateManager(registry);
+
+        manager.Synchronize(shouldManage: true);
+
+        Assert.Null(registry.RunCommand);
+        Assert.Equal(manager.SafeOriginalCommand, registry.Backup?.OriginalCommand);
+    }
+
+    [Fact]
+    public void RestoreReplacesLegacyPortBackupWithNormalDiscordStartup()
+    {
+        var registry = new FakeDiscordStartupRegistry
+        {
+            RunCommand = new DiscordStartupCommand(
+                "powershell.exe -EncodedCommand old-sentory-command",
+                RegistryValueKind.String),
+            Backup = new DiscordStartupBackup(new DiscordStartupCommand(
+                $"\"{LauncherPath}\" --processStart Discord.exe " +
+                "--process-start-args \"--remote-debugging-port=9222\"",
+                RegistryValueKind.String))
+        };
+        var manager = CreateManager(registry);
+
+        manager.Restore();
+
+        Assert.Equal(manager.SafeOriginalCommand, registry.RunCommand);
+        Assert.Null(registry.Backup);
     }
 
     [Fact]
@@ -207,6 +275,8 @@ public sealed class DiscordStartupRegistrationManagerTests
 
         public DiscordStartupBackup? Backup { get; set; }
 
+        public bool TranslatorStartupRegistered { get; set; }
+
         public DiscordStartupCommand? ReadRunCommand() => RunCommand;
 
         public void WriteRunCommand(DiscordStartupCommand command) =>
@@ -220,5 +290,8 @@ public sealed class DiscordStartupRegistrationManagerTests
             Backup = backup;
 
         public void DeleteBackup() => Backup = null;
+
+        public bool IsTranslatorStartupRegistered() =>
+            TranslatorStartupRegistered;
     }
 }

@@ -50,7 +50,7 @@ const TRANSLATIONS = {
     discordAutoRestartConsentTitle: "Discord 자동 재시작을 허용할까요?", discordAutoRestartConsentMessage: "Discord 감지를 켜면 필요한 접근성 실행 옵션이 없을 때 15초 안내 후 Discord를 자동으로 다시 시작합니다.\n작성 중인 메시지가 취소되거나 통화가 종료될 수 있습니다.", discordAutoRestartConsentAction: "동의하고 켜기", discordAutoRestartConsentDeclined: "동의하지 않아 Discord 자동 재시작을 진행하지 않았습니다. 설정에서 직접 다시 연결할 수 있어요.",
     discordAutoRestartTitle: "Discord 감지 연결을 준비할게요", discordAutoRestartCountdown: seconds => `Discord에 필요한 접근성 실행 옵션이 없습니다.\n작성 중인 메시지가 취소되거나 통화가 종료될 수 있습니다.\n${seconds}초 뒤 Discord를 자동으로 다시 시작합니다.`, discordAutoRestartCancelled: "Discord 자동 재시작을 취소했습니다. 설정에서 언제든 다시 연결할 수 있어요.",
     discordSendWarningTitle: "지금 보낸 항목은 저장되지 않았어요", discordSendWarningMessage: "Discord 감지가 연결되지 않은 상태에서 붙여넣기 또는 드롭이 감지됐습니다. 이후 항목을 저장하려면 Discord를 접근성 모드로 다시 시작해야 합니다.",
-    repairing: "워커 복구 중", repaired: "Discord를 연결 복구 모드로 다시 시작했습니다.", settingsFailed: "Sentory를 시작하지 못했습니다",
+    repairing: "워커 복구 중", repaired: "Discord 연결 복구를 요청했습니다.", settingsFailed: "Sentory를 시작하지 못했습니다",
     discordPhotoSaved: "Discord에서 사진 전송을 확인해 저장했습니다.", discordUrlSaved: "Discord에서 URL 전송을 확인해 저장했습니다.", discordUrlsSaved: n => `Discord에서 URL ${n.toLocaleString("ko-KR")}개 전송을 확인해 저장했습니다.`, discordCollectionSaved: "Discord에서 여러 항목의 전송을 확인해 하나의 묶음으로 저장했습니다.",
     inputPhotoSaved: "사진을 입력 시 저장했습니다.", inputUrlSaved: "URL을 입력 시 저장했습니다.", inputUrlsSaved: n => `URL ${n.toLocaleString("ko-KR")}개를 입력 시 저장했습니다.`, inputCollectionSaved: "여러 항목을 입력 시 하나의 묶음으로 저장했습니다.",
     galleryRefreshing: "보관함을 불러오는 중", enginePreparing: "시작 중...",
@@ -99,7 +99,7 @@ const TRANSLATIONS = {
     discordAutoRestartConsentTitle: "Allow automatic Discord restarts?", discordAutoRestartConsentMessage: "When Discord detection is on and the required accessibility launch option is missing, Sentory shows a 15-second warning and then restarts Discord automatically.\nDraft messages and active calls may be ended.", discordAutoRestartConsentAction: "Agree and enable", discordAutoRestartConsentDeclined: "Automatic Discord restart was not allowed. You can reconnect Discord manually from Settings.",
     discordAutoRestartTitle: "Preparing Discord detection", discordAutoRestartCountdown: seconds => `Discord is missing the required accessibility argument.\nCancel to protect drafts and active calls.\nDiscord will restart automatically in ${seconds} seconds.`, discordAutoRestartCancelled: "Automatic Discord restart was cancelled. You can reconnect it from Settings.",
     discordSendWarningTitle: "The item you just sent was not saved", discordSendWarningMessage: "A paste or drop was detected while Discord detection was disconnected. Restart Discord in accessibility mode to save subsequent items.",
-    repaired: "Discord restarted in connection recovery mode.", settingsFailed: "Could not load settings.", galleryRefreshing: "Loading library",
+    repaired: "Discord connection recovery was requested.", settingsFailed: "Could not load settings.", galleryRefreshing: "Loading library",
     discordPhotoSaved: "Saved a photo confirmed as sent in Discord.", discordUrlSaved: "Saved a URL confirmed as sent in Discord.", discordUrlsSaved: n => `Saved ${n.toLocaleString("en-US")} URLs confirmed as sent in Discord.`, discordCollectionSaved: "Saved multiple Discord items as one collection.",
     inputPhotoSaved: "Saved the photo when pasted.", inputUrlSaved: "Saved the URL when pasted.", inputUrlsSaved: n => `Saved ${n.toLocaleString("en-US")} URLs when pasted.`, inputCollectionSaved: "Saved multiple pasted items as one collection.",
     enginePreparing: "Starting...", engineRecovering: "Recovering worker",
@@ -140,7 +140,7 @@ TRANSLATIONS["ja-JP"] = {
   selectedCount: n => `${n.toLocaleString("ja-JP")}件選択`, visibleSelect: "すべて選択", clearSelection: "選択を解除", deleteSelected: "選択項目を削除", emptyFiltered: "検索結果がありません", emptyFilteredDescription: "別の検索語やフィルターをお試しください。", empty: "まだ保存された項目はありません", emptyDescription: "メッセンジャーに URL や写真を貼り付けてみてください。", loading: "ライブラリを読み込み中", loadFailed: "ライブラリを読み込めませんでした",
   close: "通知を閉じる", detail: "Sentory 項目の詳細", favoriteMarked: "★ お気に入り", captureCount: "保存回数", usageCountLabel: "再利用回数", usageBreakdown: (copies, external) => `コピー ${copies.toLocaleString("ja-JP")}回・外部で再利用 ${external.toLocaleString("ja-JP")}回`, messageSource: "最後の送信元", savedAt: "最終保存", photos: "写真", collectionLinks: "リンク", previousPhoto: "前の写真", nextPhoto: "次の写真", copyCurrentPhoto: "現在の写真をコピー", previousLink: "前のリンク", nextLink: "次のリンク", clipboardImage: "クリップボードの画像", savedLink: "保存したリンク", imageFormat: format => `${format} 画像`, collectionItems: n => `${n.toLocaleString("ja-JP")}件`, collectionTitle: (photos, links) => `写真 ${photos.toLocaleString("ja-JP")}件・リンク ${links.toLocaleString("ja-JP")}件`, times: n => `${n.toLocaleString("ja-JP")}回`, openPhoto: "写真を開く", openLink: "リンクを開く", openPreview: "元をすぐ開く", copyPhoto: "写真をコピー", copyUrl: "URL をコピー", copyCollection: "まとめてコピー", delete: "削除", openOriginal: "元を開く", openOriginalFolder: "元のフォルダーを開く", openOriginalLink: "元のリンクを開く", cancel: "キャンセル",
   deleteQuestion: n => n === 1 ? "この項目を削除しますか？" : `選択した ${n.toLocaleString("ja-JP")}件を削除しますか？`, deleteWarning: n => n === 1 ? "この項目をライブラリから削除します。\nこの操作は元に戻せません。" : "選択した項目と保存された写真ファイルをライブラリから削除します。\nこの操作は元に戻せません。", deleted: n => `${n.toLocaleString("ja-JP")}件を削除しました。`,
-  repairQuestion: "Discord を再接続しますか？", repairWarning: "Discord をアクセシビリティモードで再起動します。作成中のメッセージや通話が終了する場合があります。", restart: "再起動", repaired: "Discord を接続復旧モードで再起動しました。",
+  repairQuestion: "Discord を再接続しますか？", repairWarning: "Discord をアクセシビリティモードで再起動します。作成中のメッセージや通話が終了する場合があります。", restart: "再起動", repaired: "Discord の接続復旧を要求しました。",
   discordAutoRestartConsentTitle: "Discord の自動再起動を許可しますか？", discordAutoRestartConsentMessage: "Discord 検出をオンにすると、必要なアクセシビリティ起動オプションがない場合に15秒間の案内後、Discord を自動的に再起動します。\n作成中のメッセージや通話が終了する場合があります。", discordAutoRestartConsentAction: "同意してオンにする", discordAutoRestartConsentDeclined: "同意されなかったため、Discord の自動再起動は行いませんでした。設定から手動で再接続できます。",
   discordPhotoSaved: "Discord で写真の送信を確認して保存しました。", discordUrlSaved: "Discord で URL の送信を確認して保存しました。", discordUrlsSaved: n => `Discord で URL ${n.toLocaleString("ja-JP")}件の送信を確認して保存しました。`, discordCollectionSaved: "Discord の複数項目を1つのまとめとして保存しました。",
   inputPhotoSaved: "写真を入力時に保存しました。", inputUrlSaved: "URL を入力時に保存しました。", inputUrlsSaved: n => `URL ${n.toLocaleString("ja-JP")}件を入力時に保存しました。`, inputCollectionSaved: "複数の入力項目を1つのまとめとして保存しました。",
@@ -167,7 +167,7 @@ TRANSLATIONS["zh-CN"] = {
   selectedCount: n => `已选择 ${n.toLocaleString("zh-CN")} 项`, visibleSelect: "全选", clearSelection: "取消选择", deleteSelected: "删除所选项目", emptyFiltered: "没有搜索结果", emptyFilteredDescription: "请尝试其他关键词或筛选条件。", empty: "尚未保存任何项目", emptyDescription: "请在聊天应用中粘贴链接或图片。", loading: "正在加载收藏库", loadFailed: "无法加载收藏库",
   close: "关闭通知", detail: "Sentory 项目详情", favoriteMarked: "★ 已收藏", captureCount: "保存次数", usageCountLabel: "重复使用次数", usageBreakdown: (copies, external) => `复制 ${copies.toLocaleString("zh-CN")} 次 · 在外部重复使用 ${external.toLocaleString("zh-CN")} 次`, messageSource: "最近来源", savedAt: "最后保存", photos: "图片", collectionLinks: "链接", previousPhoto: "上一张图片", nextPhoto: "下一张图片", copyCurrentPhoto: "复制当前图片", previousLink: "上一个链接", nextLink: "下一个链接", clipboardImage: "剪贴板图片", savedLink: "已保存的链接", imageFormat: format => `${format} 图片`, collectionItems: n => `${n.toLocaleString("zh-CN")} 项`, collectionTitle: (photos, links) => `${photos.toLocaleString("zh-CN")} 张图片 · ${links.toLocaleString("zh-CN")} 个链接`, times: n => `${n.toLocaleString("zh-CN")} 次`, openPhoto: "打开图片", openLink: "打开链接", openPreview: "直接打开原文件", copyPhoto: "复制图片", copyUrl: "复制 URL", copyCollection: "复制组合", delete: "删除", openOriginal: "打开原文件", openOriginalFolder: "打开原文件所在文件夹", openOriginalLink: "打开原链接", cancel: "取消",
   deleteQuestion: n => n === 1 ? "要删除此项目吗？" : `要删除所选的 ${n.toLocaleString("zh-CN")} 个项目吗？`, deleteWarning: n => n === 1 ? "将从收藏库中删除此项目。\n此操作无法撤销。" : "将从收藏库中删除所选项目及保存的图片文件。\n此操作无法撤销。", deleted: n => `已删除 ${n.toLocaleString("zh-CN")} 个项目。`,
-  repairQuestion: "要重新连接 Discord 吗？", repairWarning: "Discord 将以无障碍模式重启。正在编辑的消息和通话可能会结束。", restart: "重新启动", repaired: "Discord 已以连接恢复模式重新启动。",
+  repairQuestion: "要重新连接 Discord 吗？", repairWarning: "Discord 将以无障碍模式重启。正在编辑的消息和通话可能会结束。", restart: "重新启动", repaired: "已请求恢复 Discord 连接。",
   discordAutoRestartConsentTitle: "允许自动重启 Discord 吗？", discordAutoRestartConsentMessage: "开启 Discord 检测后，如果缺少所需的无障碍启动选项，Sentory 会先显示 15 秒提示，然后自动重启 Discord。\n正在编辑的消息和通话可能会结束。", discordAutoRestartConsentAction: "同意并开启", discordAutoRestartConsentDeclined: "由于未获得同意，未自动重启 Discord。你可以在设置中手动重新连接。",
   discordPhotoSaved: "已保存经确认在 Discord 中发送的图片。", discordUrlSaved: "已保存经确认在 Discord 中发送的 URL。", discordUrlsSaved: n => `已保存 ${n.toLocaleString("zh-CN")} 个经确认在 Discord 中发送的 URL。`, discordCollectionSaved: "已将 Discord 中发送的多个项目保存为一个组合。",
   inputPhotoSaved: "已在粘贴图片时保存。", inputUrlSaved: "已在粘贴 URL 时保存。", inputUrlsSaved: n => `已在粘贴时保存 ${n.toLocaleString("zh-CN")} 个 URL。`, inputCollectionSaved: "已将粘贴的多个项目保存为一个组合。",
@@ -585,7 +585,7 @@ function applyLocalizedUi(language) {
   document.querySelector("#auto-cleanup-description").textContent = t("autoCleanupDefault");
   document.querySelector("#app-info-heading").textContent = t("appInfo");
   document.querySelector("#version-label").textContent =
-    `${t("version", "2.0.9")}${state.versionSuffix}`;
+    `${t("version", "2.0.10")}${state.versionSuffix}`;
   document.querySelector("#copyright-label").textContent = t("copyrightNotice");
   document.querySelector("#license-summary").textContent = t("licenseSummary");
   viewLicense.textContent = t("viewLicense");
@@ -3163,7 +3163,7 @@ async function configureDistributionUi() {
     ]);
     state.versionSuffix = typeof versionSuffix === "string" ? versionSuffix : "";
     document.querySelector("#version-label").textContent =
-      `${t("version", "2.0.9")}${state.versionSuffix}`;
+      `${t("version", "2.0.10")}${state.versionSuffix}`;
     updateSettingRow.hidden = channel !== "github";
     if (channel === "github") {
       window.setTimeout(() => void checkForUpdates(false), 6000);
